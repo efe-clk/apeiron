@@ -288,7 +288,7 @@ Ref, bir snapshot'a verilen isimdir. Dal, etiket ve yedek noktası arasında çe
 1. Bir veya daha fazla parçadan oluşur, parçalar `/` ile ayrılır (ör. `backup/home`, `tag/v1`).
 2. Her parça yalnızca `a-z`, `0-9`, `.`, `_`, `-` içerir; `.` ile başlamaz; `.lock` ile bitmez.
 3. Toplam uzunluk en fazla 200 bayttır.
-4. Bir ad, başka bir adın klasörü olamaz (`backup` ve `backup/home` birlikte bulunamaz).
+4. Bir ad, başka bir adın klasörü olamaz (`backup` ve `backup/home` birlikte bulunamaz). Silinmiş bir ref'in reflog'u durduğu sürece bu kural onun için de geçerlidir; böylece geçmişi kaybolmaz.
 
 Yalnızca küçük harf kullanılması, büyük/küçük harf ayırmayan dosya sistemlerinde (Windows, macOS) iki adın çakışmasını önler. Kullanıcıya gösterilecek serbest adlar hizmet katmanında tutulur.
 
@@ -299,6 +299,8 @@ apeiron-ref 1
 target <64 hex: snapshot kimliği>
 check <64 hex: ilk iki satırın düz BLAKE3 özeti>
 ```
+
+`check`, ilk iki satırın satır sonları (`\n`) dahil baytları üzerinden hesaplanır.
 
 `check` tutmuyorsa ref bozuktur; okuyucu reflog'dan son geçerli değeri önerir, kendiliğinden düzeltmez.
 
@@ -318,11 +320,14 @@ Ref silme: ref dosyası `rename` ile `tmp/` altına taşınır, klasör `fsync` 
 Her ref değişikliği, ref güncellendikten **sonra** bu dosyanın sonuna bir satır olarak eklenir ve dosya `fsync` edilir:
 
 ```text
-<eski hex | 64 sıfır> <yeni hex | 64 sıfır> <unix saniye> <işlem: create|update|delete|repair> <check: önceki alanların BLAKE3'ünün ilk 16 hex karakteri>
+<eski hex | 64 sıfır> <yeni hex | 64 sıfır> <unix saniye> <işlem: create|update|delete|repair> <check>
 ```
 
-- Son satır yarım kalmışsa (güç kesintisi) veya `check` tutmuyorsa o satır yok sayılır.
-- Ref değeri reflog'daki son `yeni` değerden farklıysa (ref güncellendi ama satır yazılamadı), bir sonraki açılışta `repair` satırı eklenir. Eski değer zaten önceki satırda kayıtlı olduğu için bilgi kaybolmaz.
+Alanlar tek boşlukla ayrılır, satır `\n` ile biter. `check`, satırın `check` alanından önceki kısmının (aradaki son boşluk hariç) düz BLAKE3 özetinin ilk 16 hex karakteridir.
+
+- Dosyanın son satırı geçersizse (`\n` ile bitmiyorsa veya `check` tutmuyorsa) güç kesintisi kalıntısı sayılır ve yok sayılır. Yazıcı, yeni satır eklemeden önce bu kalıntıyı dosyadan keser (truncate).
+- Son satır dışındaki bir satır geçersizse bu bozulmadır ve hata olarak raporlanır.
+- Ref değeri reflog'daki son `yeni` değerden farklıysa (ref güncellendi ama satır yazılamadı), o ref bir sonraki kez güncellenmeden hemen önce (veya açık bir onarım komutuyla) `repair` satırı eklenir. Eski değer zaten önceki satırda kayıtlı olduğu için bilgi kaybolmaz.
 - Reflog, çöp toplamanın (Aşama 1) hangi snapshot'ları canlı sayacağını belirlemek için de kullanılır.
 
 ## 10. Kesinti ve bozulma durumları
@@ -335,7 +340,7 @@ Aşağıdaki tablo, Aşama 0'ın güç kesintisi testlerinin beklenen sonuçlar�
 | Paket taşındı, indeks yazılmadı | Ref eski snapshot'ı gösterir | Sahipsiz paket indekslenir ya da çöp toplamada silinir |
 | İndeks yazıldı, ref güncellenmedi | Ref eski snapshot'ı gösterir | Yok; yeni nesneler zararsız fazlalıktır |
 | Ref kilidi alındı, taşınmadı | Ref eski snapshot'ı gösterir | Bayat kilit `repair` ile kaldırılır |
-| Ref taşındı, reflog yazılmadı | Ref yeni snapshot'ı gösterir | Açılışta `repair` satırı eklenir |
+| Ref taşındı, reflog yazılmadı | Ref yeni snapshot'ı gösterir | Sonraki güncellemede `repair` satırı eklenir |
 | Disk doldu (herhangi bir adımda) | Değişiklik yok | Hata raporlanır, geçici dosya silinir |
 | Paket içinde bit bozulması | Okuma "bozulma" hatası verir | Başka bir kopyadan onarım (Aşama 1) |
 
