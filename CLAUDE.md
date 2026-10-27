@@ -48,7 +48,7 @@ Apeiron; sürüm kontrolü, arşivleme, yedekleme, senkronizasyon ve bütünlük
 
 1. ~~`docs/FORMAT.md`: nesne modeli ve disk formatı spesifikasyonu.~~ Tamamlandı.
 2. ~~Cargo workspace iskeleti ve CI (fmt, clippy, test).~~ Tamamlandı.
-3. Depolama motoru: chunk yazma/okuma, BLAKE3 doğrulama, atomik ref güncelleme.
+3. ~~Depolama motoru: chunk yazma/okuma, BLAKE3 doğrulama, atomik ref güncelleme.~~ Tamamlandı.
 4. Güç kesintisi ve bozulma testleri.
 
 Çıkış kriteri: spesifikasyon yazılı; güç kesintisi testlerinde veri kaybı yok.
