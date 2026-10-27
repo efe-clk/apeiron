@@ -46,8 +46,8 @@ Apeiron; sürüm kontrolü, arşivleme, yedekleme, senkronizasyon ve bütünlük
 
 **Aşama 0 — Format ve çekirdek.** Sıradaki işler:
 
-1. `docs/FORMAT.md`: nesne modeli ve disk formatı spesifikasyonu.
-2. Cargo workspace iskeleti ve CI (fmt, clippy, test).
+1. ~~`docs/FORMAT.md`: nesne modeli ve disk formatı spesifikasyonu.~~ Tamamlandı.
+2. ~~Cargo workspace iskeleti ve CI (fmt, clippy, test).~~ Tamamlandı.
 3. Depolama motoru: chunk yazma/okuma, BLAKE3 doğrulama, atomik ref güncelleme.
 4. Güç kesintisi ve bozulma testleri.
 
