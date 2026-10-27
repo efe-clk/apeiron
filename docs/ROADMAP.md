@@ -1,0 +1,106 @@
+> **Türkçe:** [ROADMAP.tr.md](ROADMAP.tr.md)
+
+# Apeiron Roadmap
+
+The expensive decisions (format, object model, API and plugin boundary) are made in Stage 0; everything else is built on top of that foundation. Every stage leaves a product that is usable on its own. The stages and exit criteria come from [VISION.md](VISION.md).
+
+**Current stage: Stage 0 — Format and core (In progress).**
+
+## 1. Overview
+
+```mermaid
+flowchart LR
+    S0["Stage 0<br/>Format and core<br/>In progress"]
+    S1["Stage 1<br/>Local MVP<br/>Planned"]
+    S2["Stage 2<br/>Remote and sync<br/>Planned"]
+    S3["Stage 3<br/>Developer and ecosystem<br/>Planned"]
+    S4["Stage 4<br/>Interfaces and multi-user<br/>Planned"]
+    S5["Stage 5<br/>Enterprise<br/>Planned"]
+    S0 --> S1 --> S2 --> S3 --> S4 --> S5
+```
+
+| Stage | Scope | Exit criterion | Status |
+| --- | --- | --- | --- |
+| 0. Format and core | Object model and format specification, storage engine, integrity verification, Rust API draft | Specification written; no data loss in power-failure tests | In progress |
+| 1. Local MVP | CLI; taking snapshots, history, file-level diff, restore, verification; local and external disk backup targets; tar/zip export | Backing up and restoring your own data with nothing but Apeiron for one month | Planned |
+| 2. Remote and sync | Background service, scheduled backup, encryption, SFTP and S3 targets, one-/two-way sync, conflict detection, restore test | One month of trouble-free sync between two devices and a remote server | Planned |
+| 3. Developer and ecosystem | Branching and merging, Git import/export (goal: Git network protocol), C ABI and Python SDK, WebAssembly plugin system, text diff plugin, search | A real Git repository can be moved into Apeiron and back | Planned |
+| 4. Interfaces and multi-user | Desktop and web interface, users and permissions, audit log, sharing | A non-technical user can back up and restore without the CLI | Planned |
+| 5. Enterprise | Central identity, multi-tenant use, replication, high availability, immutable archive, compliance reports | First enterprise pilot installation | Planned |
+
+## 2. Stage 0 — Format and core
+
+**Exit criterion:** Specification written; no data loss in power-failure tests.
+
+| # | Work item | Status | Notes |
+| --- | --- | --- | --- |
+| 1 | Storage format specification ([FORMAT.md](FORMAT.md)) | Done | Version 1 approved on 2026-10-27 |
+| 2 | Cargo workspace skeleton and CI (fmt, clippy, test) | Done | Linux x86_64/aarch64, macOS, Windows |
+| 3 | Storage engine: chunk write/read, BLAKE3 verification, atomic ref update | Done | Packs, indexes, refs and reflogs in `apeiron-core` |
+| 4 | Canonical CBOR encoding of blob, tree and snapshot ([FORMAT.md](FORMAT.md) §6) | Planned | |
+| 5 | Power-failure and corruption tests ([FORMAT.md](FORMAT.md) §10) | In progress | Unit tests cover corruption detection, orphan packs and torn reflog lines; systematic fault injection is planned |
+| 6 | Rust API draft | In progress | Design principles in [API.md](API.md); no public API crate yet |
+
+Known gap: on Windows, `MOVEFILE_WRITE_THROUGH` is not used yet ([FORMAT.md](FORMAT.md) §9.1). It needs `unsafe` code, which is only allowed in the FFI crate; how to solve this is an open decision.
+
+## 3. Stage 1 — Local MVP
+
+**Exit criterion:** Backing up and restoring your own data with nothing but Apeiron for one month.
+
+| Work item | Status |
+| --- | --- |
+| CLI (all operations, JSON output, progress, cancellation) | Planned |
+| Taking snapshots, history, file-level diff | Planned |
+| Restore and verification (scrub) | Planned |
+| Local and external disk backup targets | Planned |
+| tar/zip export | Planned |
+| Garbage collection, repository locks, pack merging | Planned |
+
+## 4. Stage 2 — Remote and sync
+
+**Exit criterion:** One month of trouble-free sync between two devices and a remote server.
+
+| Work item | Status |
+| --- | --- |
+| Background service (daemon) and scheduled backup | Planned |
+| Client-side encryption | Planned |
+| SFTP and S3 targets | Planned |
+| One-way and two-way sync, conflict detection | Planned |
+| Restore test | Planned |
+
+## 5. Stage 3 — Developer and ecosystem
+
+**Exit criterion:** A real Git repository can be moved into Apeiron and back.
+
+| Work item | Status |
+| --- | --- |
+| Branching and merging | Planned |
+| Git import/export (goal: Git network protocol) | Planned |
+| C ABI and Python SDK | Planned |
+| WebAssembly plugin system | Planned |
+| Text diff plugin | Planned |
+| Search | Planned |
+
+## 6. Stage 4 — Interfaces and multi-user
+
+**Exit criterion:** A non-technical user can back up and restore without the CLI.
+
+| Work item | Status |
+| --- | --- |
+| Desktop interface | Planned |
+| Web interface | Planned |
+| Users and permissions | Planned |
+| Audit log | Planned |
+| Sharing | Planned |
+
+## 7. Stage 5 — Enterprise
+
+**Exit criterion:** First enterprise pilot installation.
+
+| Work item | Status |
+| --- | --- |
+| Central identity | Planned |
+| Multi-tenant use | Planned |
+| Replication and high availability | Planned |
+| Immutable archive | Planned |
+| Compliance reports | Planned |

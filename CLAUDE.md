@@ -36,7 +36,7 @@ Apeiron; sürüm kontrolü, arşivleme, yedekleme, senkronizasyon ve bütünlük
 - Cargo workspace; her katman ayrı crate (`crates/` altında).
 - `unsafe` yalnızca FFI crate'inde. Diğer crate'lerde `#![forbid(unsafe_code)]`.
 - Her değişiklikten sonra `cargo fmt`, `cargo clippy --all-targets -- -D warnings` ve `cargo test` temiz geçmelidir.
-- Kod, tanımlayıcılar, kod yorumları ve commit mesajları İngilizce (açık kaynak katkısı için). Belgeler (`docs/`) Türkçe.
+- Kod, tanımlayıcılar, kod yorumları ve commit mesajları İngilizce (açık kaynak katkısı için). Belgeler iki dillidir: X.md İngilizce, X.tr.md Türkçe. Bir belge değişince iki sürüm aynı commit'te güncellenir.
 - Commit mesajları Conventional Commits biçiminde (`feat:`, `fix:`, `docs:` ...).
 - Depolama formatını etkileyen her değişiklik önce `docs/FORMAT.md` içinde belgelenir, sonra kodlanır.
 - Hata türleri tiplidir (`thiserror`); kütüphane crate'lerinde `unwrap`/`expect` kullanılmaz.
