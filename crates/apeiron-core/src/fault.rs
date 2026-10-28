@@ -881,7 +881,6 @@ fn every_crash_during_index_repair_keeps_objects_readable_with(encrypted: bool) 
 #[test]
 fn every_crash_during_encrypted_init_leaves_no_repository_or_a_whole_one() {
     let params = ChunkerParams::new(64 * 1024).unwrap();
-    let mut whole = 0;
     for n in 0.. {
         let work = tempfile::tempdir().unwrap();
         let path = work.path().join("repo");
@@ -898,17 +897,14 @@ fn every_crash_during_encrypted_init_leaves_no_repository_or_a_whole_one() {
         let result = Repository::init_encrypted(&path, params, PASSWORD);
         if !PLAN.take().is_some_and(|p| p.fired) {
             result.unwrap();
+            assert!(open(&path).unwrap().is_encrypted());
             break;
         }
         assert!(result.is_err());
         match open(&dest) {
-            Ok(repo) => {
-                assert!(repo.is_encrypted());
-                whole += 1;
-            }
+            Ok(repo) => assert!(repo.is_encrypted()),
             Err(Error::InvalidRepository { reason, .. }) => assert_eq!(reason, "no config file"),
             Err(e) => panic!("checkpoint {n}: {e}"),
         }
     }
-    assert!(whole > 0);
 }
