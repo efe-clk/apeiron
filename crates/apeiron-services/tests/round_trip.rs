@@ -6,7 +6,7 @@ use std::time::{Duration, SystemTime};
 
 use apeiron_core::Repository;
 use apeiron_services::{
-    BackupOptions, ChangeKind, Control, Error, Kind, Name, WarningKind, backup, diff, list, restore,
+    BackupOptions, ChangeKind, Control, Error, Kind, Name, backup, diff, list, restore,
 };
 
 fn noise(len: usize, seed: u64) -> Vec<u8> {
@@ -322,15 +322,13 @@ fn source_must_be_a_folder_and_ref_name_valid() {
 
 #[cfg(unix)]
 #[test]
-fn unix_special_cases_become_warnings_or_round_trip() {
-    use std::os::unix::ffi::OsStrExt;
+fn special_and_unreadable_entries_become_warnings() {
+    use apeiron_services::WarningKind;
     use std::os::unix::fs::PermissionsExt;
 
     let mut s = Setup::new();
-    let odd = std::ffi::OsStr::from_bytes(b"bad\xffname");
-    fs::write(s.src.clone().join(odd), b"bytes").unwrap();
-    let _socket = std::os::unix::net::UnixListener::bind(s.src.clone().join("sock")).unwrap();
-    let secret = s.src.clone().join("secret");
+    let _socket = std::os::unix::net::UnixListener::bind(s.src.join("sock")).unwrap();
+    let secret = s.src.join("secret");
     fs::write(&secret, b"x").unwrap();
     fs::set_permissions(&secret, fs::Permissions::from_mode(0o000)).unwrap();
     // Running as root can read anything; then the file is simply stored.
@@ -347,22 +345,36 @@ fn unix_special_cases_become_warnings_or_round_trip() {
         kinds.contains(&("secret".to_owned(), WarningKind::Unreadable)),
         !readable
     );
+}
 
+/// Linux allows any bytes in names; macOS and Windows do not.
+#[cfg(target_os = "linux")]
+#[test]
+fn non_utf8_names_round_trip() {
+    use std::os::unix::ffi::OsStrExt;
+
+    let mut s = Setup::new();
+    let odd = std::ffi::OsStr::from_bytes(b"bad\xffname");
+    fs::write(s.src.join(odd), b"bytes").unwrap();
+    let out = s.backup();
     let names: Vec<Name> = list(&s.repo, &out.snapshot, b"")
         .unwrap()
         .into_iter()
         .map(|e| e.name)
         .collect();
-    assert!(names.contains(&Name(b"bad\xffname".to_vec())));
-    let json = serde_json::to_string(&Name(b"bad\xffname".to_vec())).unwrap();
-    assert_eq!(json, r#"{"hex":"626164ff6e616d65"}"#);
-    assert_eq!(
-        serde_json::from_str::<Name>(&json).unwrap(),
-        Name(b"bad\xffname".to_vec())
-    );
-    assert_eq!(serde_json::to_string(&Name::from("ok")).unwrap(), r#""ok""#);
+    assert_eq!(names, [Name(b"bad\xffname".to_vec())]);
 
     let target = s.root.join("restored");
     restore(&s.repo, &out.snapshot, b"", &target, &Control::new()).unwrap();
     assert_eq!(fs::read(target.join(odd)).unwrap(), b"bytes");
+}
+
+#[test]
+fn names_serialise_as_text_or_hex() {
+    let odd = Name(b"bad\xffname".to_vec());
+    let json = serde_json::to_string(&odd).unwrap();
+    assert_eq!(json, r#"{"hex":"626164ff6e616d65"}"#);
+    assert_eq!(serde_json::from_str::<Name>(&json).unwrap(), odd);
+    assert_eq!(serde_json::to_string(&Name::from("ok")).unwrap(), r#""ok""#);
+    assert!(serde_json::from_str::<Name>(r#"{"hex":"abc"}"#).is_err());
 }
