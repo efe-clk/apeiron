@@ -197,6 +197,13 @@ impl Repository {
     pub fn reflog(&self, name: &str) -> Result<Vec<ReflogEntry>> {
         self.refs.reflog(name)
     }
+
+    /// Removes ref locks left behind more than 10 minutes ago and records ref
+    /// changes whose reflog line was lost in a crash (FORMAT.md §9.3, §9.4).
+    /// Returns the removed lock files.
+    pub fn repair(&self) -> Result<Vec<PathBuf>> {
+        self.refs.repair()
+    }
 }
 
 /// Writes objects into packs; see [`Repository::writer`].

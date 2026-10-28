@@ -15,7 +15,7 @@ Implementation status (`apeiron-core`):
 | 7 | Chunking (FastCDC) | Done |
 | 8 | Pack and index files | Done |
 | 9 | Durable writes, refs and reflogs | Done (`MOVEFILE_WRITE_THROUGH` on Windows Planned) |
-| 10 | Power-failure tests | In progress |
+| 10 | Power-failure tests | Done |
 
 ## Plain summary
 
@@ -354,10 +354,12 @@ The table below lists the expected results of the Stage 0 power-failure tests. E
 | Index written, ref not updated | Ref points to the old snapshot | None; the new objects are a harmless surplus |
 | Ref lock taken, not moved | Ref points to the old snapshot | The stale lock is removed with `repair` |
 | Ref moved, reflog not written | Ref points to the new snapshot | A `repair` line is appended on the next update |
-| Disk full (at any step) | No change | The error is reported, the temporary file is deleted |
+| Disk full (at any step) | No change; if the error comes after the ref was moved, as in the row above | The error is reported, the temporary file is deleted |
 | Bit corruption inside a pack | Reading gives a "corruption" error | Repair from another copy (Stage 1) |
 
 In no row may the state "a ref points to a missing or half-written object" arise.
+
+The tests interrupt a full write (new chunks, snapshot, ref update) once at every change to the disk and check each resulting state against this table.
 
 ## 11. Verification summary
 

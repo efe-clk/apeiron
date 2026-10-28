@@ -38,7 +38,7 @@ flowchart LR
 | 2 | Cargo workspace skeleton and CI (fmt, clippy, test) | Done | Linux x86_64/aarch64, macOS, Windows |
 | 3 | Storage engine: chunk write/read, BLAKE3 verification, atomic ref update | Done | Packs, indexes, refs and reflogs in `apeiron-core` |
 | 4 | Canonical CBOR encoding of blob, tree and snapshot ([FORMAT.md](FORMAT.md) §6) | Planned | |
-| 5 | Power-failure and corruption tests ([FORMAT.md](FORMAT.md) §10) | In progress | Unit tests cover corruption detection, orphan packs and torn reflog lines; systematic fault injection is planned |
+| 5 | Power-failure and corruption tests ([FORMAT.md](FORMAT.md) §10) | Done | A crash and a full disk are simulated at every change to the disk; a bit flip is tested at every byte of a pack |
 | 6 | Rust API draft | In progress | Design principles in [API.md](API.md); no public API crate yet |
 
 Known gap: on Windows, `MOVEFILE_WRITE_THROUGH` is not used yet ([FORMAT.md](FORMAT.md) §9.1). It needs `unsafe` code, which is only allowed in the FFI crate; how to solve this is an open decision.

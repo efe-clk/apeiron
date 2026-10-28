@@ -7,6 +7,17 @@ use std::path::{Path, PathBuf};
 use crate::error::{IoContext, Result};
 use crate::id::{random_bytes, to_hex};
 
+/// Called before every change to the disk so that tests can inject crashes
+/// and errors there (see the `fault` module). Does nothing outside tests.
+#[cfg(not(test))]
+#[inline(always)]
+pub(crate) fn checkpoint() -> io::Result<()> {
+    Ok(())
+}
+
+#[cfg(test)]
+pub(crate) use crate::fault::checkpoint;
+
 pub(crate) fn random_name() -> Result<String> {
     Ok(to_hex(&random_bytes::<16>()?))
 }
@@ -14,10 +25,8 @@ pub(crate) fn random_name() -> Result<String> {
 /// Creates a new, uniquely named file in `tmp_dir`.
 pub(crate) fn create_tmp(tmp_dir: &Path) -> Result<(File, PathBuf)> {
     let path = tmp_dir.join(random_name()?);
-    let file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&path)
+    let file = checkpoint()
+        .and_then(|()| OpenOptions::new().write(true).create_new(true).open(&path))
         .at(&path)?;
     Ok((file, path))
 }
@@ -25,7 +34,10 @@ pub(crate) fn create_tmp(tmp_dir: &Path) -> Result<(File, PathBuf)> {
 /// Flushes a directory entry change (create, rename, delete) to disk.
 #[cfg(not(windows))]
 pub(crate) fn sync_dir(dir: &Path) -> Result<()> {
-    File::open(dir).and_then(|d| d.sync_all()).at(dir)
+    checkpoint()
+        .and_then(|()| File::open(dir))
+        .and_then(|d| d.sync_all())
+        .at(dir)
 }
 
 /// Windows cannot open directories for flushing; NTFS journals the rename itself.
@@ -43,7 +55,7 @@ pub(crate) fn ensure_dir(dir: &Path) -> Result<()> {
     if let Some(parent) = parent {
         ensure_dir(parent)?;
     }
-    match fs::create_dir(dir) {
+    match checkpoint().and_then(|()| fs::create_dir(dir)) {
         Ok(()) => {}
         Err(e) if e.kind() == io::ErrorKind::AlreadyExists && dir.is_dir() => return Ok(()),
         Err(e) => return Err(e).at(dir),
@@ -57,8 +69,12 @@ pub(crate) fn ensure_dir(dir: &Path) -> Result<()> {
 /// Moves a fully synced temporary file to `dest` and syncs the directory.
 pub(crate) fn persist(tmp_path: &Path, dest: &Path) -> Result<()> {
     let parent = parent_of(dest);
-    ensure_dir(parent)?;
-    if let Err(e) = fs::rename(tmp_path, dest).at(dest) {
+    let moved = ensure_dir(parent).and_then(|()| {
+        checkpoint()
+            .and_then(|()| fs::rename(tmp_path, dest))
+            .at(dest)
+    });
+    if let Err(e) = moved {
         let _ = fs::remove_file(tmp_path);
         return Err(e);
     }
@@ -86,8 +102,9 @@ pub(crate) fn write_durable_new(tmp_dir: &Path, dest: &Path, bytes: &[u8]) -> Re
 
 fn write_synced_tmp(tmp_dir: &Path, bytes: &[u8]) -> Result<PathBuf> {
     let (mut file, tmp_path) = create_tmp(tmp_dir)?;
-    let written = file
-        .write_all(bytes)
+    let written = checkpoint()
+        .and_then(|()| file.write_all(bytes))
+        .and_then(|()| checkpoint())
         .and_then(|()| file.sync_all())
         .at(&tmp_path);
     drop(file);

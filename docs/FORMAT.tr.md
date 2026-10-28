@@ -15,7 +15,7 @@ Uygulama durumu (`apeiron-core`):
 | 7 | Chunk bölme (FastCDC) | Tamamlandı |
 | 8 | Paket ve indeks dosyaları | Tamamlandı |
 | 9 | Kalıcı yazma, ref ve reflog | Tamamlandı (Windows'ta `MOVEFILE_WRITE_THROUGH` Planlandı) |
-| 10 | Güç kesintisi testleri | Devam ediyor |
+| 10 | Güç kesintisi testleri | Tamamlandı |
 
 ## Sade anlatım
 
@@ -354,10 +354,12 @@ Aşağıdaki tablo, Aşama 0'ın güç kesintisi testlerinin beklenen sonuçlar�
 | İndeks yazıldı, ref güncellenmedi | Ref eski snapshot'ı gösterir | Yok; yeni nesneler zararsız fazlalıktır |
 | Ref kilidi alındı, taşınmadı | Ref eski snapshot'ı gösterir | Bayat kilit `repair` ile kaldırılır |
 | Ref taşındı, reflog yazılmadı | Ref yeni snapshot'ı gösterir | Sonraki güncellemede `repair` satırı eklenir |
-| Disk doldu (herhangi bir adımda) | Değişiklik yok | Hata raporlanır, geçici dosya silinir |
+| Disk doldu (herhangi bir adımda) | Değişiklik yok; hata ref taşındıktan sonra gelirse bir üstteki satırdaki gibi | Hata raporlanır, geçici dosya silinir |
 | Paket içinde bit bozulması | Okuma "bozulma" hatası verir | Başka bir kopyadan onarım (Aşama 1) |
 
 Hiçbir satırda "ref, var olmayan veya yarım yazılmış bir nesneyi gösteriyor" durumu oluşmamalıdır.
+
+Testler tam bir yazma işlemini (yeni chunk'lar, snapshot, ref güncellemesi) diskteki her değişiklikte bir kez keser ve oluşan her durumu bu tabloyla karşılaştırır.
 
 ## 11. Doğrulama özeti
 

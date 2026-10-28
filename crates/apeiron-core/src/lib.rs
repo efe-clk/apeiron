@@ -8,6 +8,8 @@
 mod chunker;
 mod config;
 mod error;
+#[cfg(test)]
+mod fault;
 mod fsutil;
 mod id;
 mod index;

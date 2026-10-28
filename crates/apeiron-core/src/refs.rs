@@ -1,9 +1,10 @@
 //! Refs and reflogs (FORMAT.md §9.3, §9.4).
 
+use std::collections::BTreeSet;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use crate::error::{Error, IoContext, Result};
 use crate::fsutil;
@@ -11,6 +12,8 @@ use crate::id::{ObjectId, to_hex};
 
 const MAX_NAME_LEN: usize = 200;
 const LOCK_SUFFIX: &str = ".lock";
+/// Locks older than this are considered stale (FORMAT.md §9.3).
+const LOCK_STALE_AGE: Duration = Duration::from_secs(600);
 const NO_ID: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 
 /// Checks a ref name against FORMAT.md §9.3.
@@ -221,7 +224,9 @@ impl RefStore {
             Some(target) => lock.commit(&path, &encode_ref(target))?,
             None => {
                 let graveyard = self.tmp_dir.join(fsutil::random_name()?);
-                fs::rename(&path, &graveyard).at(&path)?;
+                fsutil::checkpoint()
+                    .and_then(|()| fs::rename(&path, &graveyard))
+                    .at(&path)?;
                 fsutil::sync_dir(parent)?;
                 drop(lock);
             }
@@ -258,6 +263,43 @@ impl RefStore {
         Ok(())
     }
 
+    /// Removes stale locks and records ref changes whose reflog line was lost.
+    /// Returns the removed lock files.
+    pub(crate) fn repair(&self) -> Result<Vec<PathBuf>> {
+        let mut removed = Vec::new();
+        let mut names = BTreeSet::new();
+        for (path, name) in walk(&self.refs_dir)? {
+            if !name.ends_with(LOCK_SUFFIX) {
+                names.insert(name);
+            } else if is_stale(&path)? {
+                fsutil::checkpoint()
+                    .and_then(|()| fs::remove_file(&path))
+                    .at(&path)?;
+                fsutil::sync_dir(fsutil::parent_of(&path))?;
+                removed.push(path);
+            }
+        }
+        // Deleted refs have a reflog but no ref file.
+        names.extend(walk(&self.logs_dir)?.into_iter().map(|(_, name)| name));
+
+        for name in names {
+            if validate_ref_name(&name).is_err() {
+                continue;
+            }
+            let path = self.refs_dir.join(&name);
+            fsutil::ensure_dir(fsutil::parent_of(&path))?;
+            let _lock = match Lock::acquire(&name, path.with_file_name(lock_file_name(&path))) {
+                Ok(lock) => lock,
+                // Another writer is active; it repairs the reflog itself.
+                Err(Error::RefLocked { .. }) => continue,
+                Err(e) => return Err(e),
+            };
+            let actual = self.read_path(&path)?;
+            self.repair_log(&name, actual)?;
+        }
+        Ok(removed)
+    }
+
     pub(crate) fn reflog(&self, name: &str) -> Result<Vec<ReflogEntry>> {
         validate_ref_name(name)?;
         let path = self.logs_dir.join(name);
@@ -287,15 +329,21 @@ impl RefStore {
         let parent = fsutil::parent_of(&path);
         fsutil::ensure_dir(parent)?;
         let (_, valid_len, existed) = read_log(&path)?;
-        let mut file = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(false)
-            .open(&path)
+        let mut file = fsutil::checkpoint()
+            .and_then(|()| {
+                OpenOptions::new()
+                    .create(true)
+                    .write(true)
+                    .truncate(false)
+                    .open(&path)
+            })
             .at(&path)?;
         // Drop a torn last line left by a crash before appending.
-        file.set_len(valid_len).at(&path)?;
-        file.sync_all().at(&path)?;
+        fsutil::checkpoint()
+            .and_then(|()| file.set_len(valid_len))
+            .and_then(|()| fsutil::checkpoint())
+            .and_then(|()| file.sync_all())
+            .at(&path)?;
         append(&mut file, &path, valid_len, entry.encode().as_bytes())?;
         if !existed {
             fsutil::sync_dir(parent)?;
@@ -307,8 +355,37 @@ impl RefStore {
 fn append(file: &mut File, path: &Path, offset: u64, bytes: &[u8]) -> Result<()> {
     use std::io::{Seek, SeekFrom};
     file.seek(SeekFrom::Start(offset)).at(path)?;
-    file.write_all(bytes).at(path)?;
-    file.sync_all().at(path)
+    fsutil::checkpoint()
+        .and_then(|()| file.write_all(bytes))
+        .and_then(|()| fsutil::checkpoint())
+        .and_then(|()| file.sync_all())
+        .at(path)
+}
+
+/// Lists the files below `root` with their `/`-separated relative names.
+fn walk(root: &Path) -> Result<Vec<(PathBuf, String)>> {
+    let mut out = Vec::new();
+    let mut dirs = vec![(root.to_path_buf(), String::new())];
+    while let Some((dir, prefix)) = dirs.pop() {
+        for entry in fs::read_dir(&dir).at(&dir)? {
+            let entry = entry.at(&dir)?;
+            let path = entry.path();
+            let name = format!("{prefix}{}", entry.file_name().to_string_lossy());
+            if entry.file_type().at(&path)?.is_dir() {
+                dirs.push((path, format!("{name}/")));
+            } else {
+                out.push((path, name));
+            }
+        }
+    }
+    Ok(out)
+}
+
+fn is_stale(path: &Path) -> Result<bool> {
+    let modified = fs::metadata(path).and_then(|m| m.modified()).at(path)?;
+    Ok(SystemTime::now()
+        .duration_since(modified)
+        .is_ok_and(|age| age > LOCK_STALE_AGE))
 }
 
 /// Returns the valid entries, the byte length they occupy and whether the file exists.
@@ -360,7 +437,9 @@ struct Lock {
 
 impl Lock {
     fn acquire(name: &str, path: PathBuf) -> Result<Self> {
-        match OpenOptions::new().write(true).create_new(true).open(&path) {
+        let opened = fsutil::checkpoint()
+            .and_then(|()| OpenOptions::new().write(true).create_new(true).open(&path));
+        match opened {
             Ok(file) => Ok(Lock {
                 path,
                 file: Some(file),
@@ -376,7 +455,9 @@ impl Lock {
     /// Writes `content` into the lock file and renames it over `dest`.
     fn commit(mut self, dest: &Path, content: &str) -> Result<()> {
         if let Some(mut file) = self.file.take() {
-            file.write_all(content.as_bytes())
+            fsutil::checkpoint()
+                .and_then(|()| file.write_all(content.as_bytes()))
+                .and_then(|()| fsutil::checkpoint())
                 .and_then(|()| file.sync_all())
                 .at(&self.path)?;
         }

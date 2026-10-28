@@ -113,7 +113,9 @@ impl PackWriter {
     }
 
     fn write(&mut self, bytes: &[u8]) -> Result<()> {
-        self.file.write_all(bytes).at(&self.tmp_path)?;
+        fsutil::checkpoint()
+            .and_then(|()| self.file.write_all(bytes))
+            .at(&self.tmp_path)?;
         self.hasher.update(bytes);
         self.len += bytes.len() as u64;
         Ok(())
@@ -155,7 +157,9 @@ impl PackWriter {
         table.extend_from_slice(END_MAGIC);
         self.write(&table)?;
         self.file.flush().at(&self.tmp_path)?;
-        self.file.get_ref().sync_all().at(&self.tmp_path)?;
+        fsutil::checkpoint()
+            .and_then(|()| self.file.get_ref().sync_all())
+            .at(&self.tmp_path)?;
 
         let name = *self.hasher.finalize().as_bytes();
         fsutil::persist_new(&self.tmp_path, &pack_path(packs_dir, &name))?;

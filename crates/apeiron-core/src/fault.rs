@@ -1,0 +1,471 @@
+//! Fault-injection tests for the interruption cases of FORMAT.md §10.
+//!
+//! Every change to the disk first calls [`checkpoint`]. A test arms a fault at
+//! the n-th checkpoint of an operation and runs the operation once for every
+//! n, on a fresh copy of the same repository each time.
+//!
+//! A simulated crash copies the repository as it is at that moment; the copy
+//! is then opened like a repository after a power failure. The copy keeps data
+//! that was written but not yet synced; torn writes are covered by their own
+//! tests (`refs::tests::torn_reflog_line_is_ignored_and_truncated`).
+
+use std::cell::RefCell;
+use std::fs;
+use std::io;
+use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime};
+
+use tempfile::TempDir;
+
+use crate::chunker::ChunkerParams;
+use crate::chunker::tests::noise;
+use crate::error::{Error, Result};
+use crate::id::{ObjectId, ObjectType};
+use crate::refs::RefOp;
+use crate::repo::Repository;
+
+enum Fault {
+    /// Copies the repository at `repo` to `dest`, then fails.
+    Crash { repo: PathBuf, dest: PathBuf },
+    /// Fails like a full disk.
+    DiskFull,
+}
+
+struct Plan {
+    fault: Fault,
+    remaining: usize,
+    fired: bool,
+}
+
+thread_local! {
+    static PLAN: RefCell<Option<Plan>> = const { RefCell::new(None) };
+}
+
+pub(crate) fn checkpoint() -> io::Result<()> {
+    PLAN.with_borrow_mut(|plan| {
+        let Some(plan) = plan.as_mut().filter(|p| !p.fired) else {
+            return Ok(());
+        };
+        if plan.remaining > 0 {
+            plan.remaining -= 1;
+            return Ok(());
+        }
+        plan.fired = true;
+        match &plan.fault {
+            Fault::Crash { repo, dest } => {
+                copy_dir(repo, dest);
+                Err(io::Error::other("simulated crash"))
+            }
+            Fault::DiskFull => Err(io::ErrorKind::StorageFull.into()),
+        }
+    })
+}
+
+fn copy_dir(src: &Path, dest: &Path) {
+    fs::create_dir_all(dest).unwrap();
+    for entry in fs::read_dir(src).unwrap() {
+        let entry = entry.unwrap();
+        let target = dest.join(entry.file_name());
+        if entry.file_type().unwrap().is_dir() {
+            copy_dir(&entry.path(), &target);
+        } else {
+            fs::copy(entry.path(), &target).unwrap();
+        }
+    }
+}
+
+/// Relative paths of all files below `dir`.
+fn files(dir: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    for entry in fs::read_dir(dir).unwrap() {
+        let entry = entry.unwrap();
+        if entry.file_type().unwrap().is_dir() {
+            out.extend(
+                files(&entry.path())
+                    .into_iter()
+                    .map(|p| Path::new(&entry.file_name()).join(p)),
+            );
+        } else {
+            out.push(PathBuf::from(entry.file_name()));
+        }
+    }
+    out.sort();
+    out
+}
+
+/// Makes every file below `dir` look two hours old, as after a long outage.
+fn age_files(dir: &Path) {
+    let old = SystemTime::now() - Duration::from_secs(2 * 3600);
+    for path in files(dir) {
+        fs::File::options()
+            .write(true)
+            .open(dir.join(path))
+            .unwrap()
+            .set_modified(old)
+            .unwrap();
+    }
+}
+
+const OLD: &[u8] = b"snapshot old";
+const NEW: &[u8] = b"snapshot new";
+const LATER: &[u8] = b"snapshot later";
+
+/// A repository whose `main` ref points to the snapshot `old`.
+struct Fixture {
+    _dir: TempDir,
+    base: PathBuf,
+    old: ObjectId,
+    new: ObjectId,
+}
+
+fn fixture() -> Fixture {
+    let dir = tempfile::tempdir().unwrap();
+    let base = dir.path().join("repo");
+    let params = ChunkerParams::new(64 * 1024).unwrap();
+    let mut repo = Repository::init_with(&base, params).unwrap();
+    let mut writer = repo.writer();
+    let old = writer.put(ObjectType::Snapshot, OLD).unwrap();
+    writer.finish().unwrap();
+    repo.update_ref("main", None, Some(old)).unwrap();
+
+    // Object ids depend on the repository's key: learn `new` from a copy.
+    let scratch = tempfile::tempdir().unwrap();
+    copy_dir(&base, scratch.path());
+    let mut copy = Repository::open(scratch.path()).unwrap();
+    let mut writer = copy.writer();
+    let new = writer.put(ObjectType::Snapshot, NEW).unwrap();
+    writer.finish().unwrap();
+    Fixture {
+        _dir: dir,
+        base,
+        old,
+        new,
+    }
+}
+
+/// The interrupted operation: store new data and move `main` to it.
+fn commit_new(repo: &mut Repository, old: ObjectId) -> Result<()> {
+    let mut writer = repo.writer();
+    writer.put_chunks(noise(200 * 1024, 7).as_slice())?;
+    let new = writer.put(ObjectType::Snapshot, NEW)?;
+    writer.finish()?;
+    repo.update_ref("main", Some(old), Some(new))
+}
+
+/// Runs [`commit_new`] on a fresh copy of the fixture with a fault at
+/// checkpoint `n`. Returns the copy, the result and whether the fault fired.
+fn run(f: &Fixture, n: usize, fault: impl FnOnce(&Path) -> Fault) -> (TempDir, Result<()>, bool) {
+    let work = tempfile::tempdir().unwrap();
+    let path = work.path().join("repo");
+    copy_dir(&f.base, &path);
+    let mut repo = Repository::open(&path).unwrap();
+    PLAN.set(Some(Plan {
+        fault: fault(&path),
+        remaining: n,
+        fired: false,
+    }));
+    let result = commit_new(&mut repo, f.old);
+    let fired = PLAN.take().is_some_and(|p| p.fired);
+    (work, result, fired)
+}
+
+/// The repository as a crash at each checkpoint leaves it, in order,
+/// followed by the state after the operation completed.
+fn crash_states(f: &Fixture) -> Vec<TempDir> {
+    let mut states = Vec::new();
+    for n in 0.. {
+        let crash = tempfile::tempdir().unwrap();
+        let dest = crash.path().join("repo");
+        let (work, result, fired) = run(f, n, |repo| Fault::Crash {
+            repo: repo.to_path_buf(),
+            dest,
+        });
+        if !fired {
+            result.unwrap();
+            states.push(work);
+            break;
+        }
+        assert!(result.is_err());
+        states.push(crash);
+    }
+    states
+}
+
+fn repo_path(state: &TempDir) -> PathBuf {
+    state.path().join("repo")
+}
+
+fn has_new_files(f: &Fixture, state: &Path, dir: &str) -> bool {
+    files(&state.join(dir)) != files(&f.base.join(dir))
+}
+
+fn has_lock(state: &Path) -> bool {
+    state.join("refs/main.lock").exists()
+}
+
+fn last_logged(repo: &Repository) -> Option<ObjectId> {
+    repo.reflog("main").unwrap().last().and_then(|e| e.new)
+}
+
+/// Stores a further snapshot and moves `main` from `current` to it.
+fn commit_later(repo: &mut Repository, current: ObjectId) -> ObjectId {
+    let mut writer = repo.writer();
+    let later = writer.put(ObjectType::Snapshot, LATER).unwrap();
+    writer.finish().unwrap();
+    repo.update_ref("main", Some(current), Some(later)).unwrap();
+    later
+}
+
+/// Each reflog line continues from the previous one and the last matches the ref.
+fn assert_reflog_chain(repo: &Repository) {
+    let log = repo.reflog("main").unwrap();
+    for pair in log.windows(2) {
+        assert_eq!(pair[1].old, pair[0].new);
+    }
+    assert_eq!(
+        log.last().and_then(|e| e.new),
+        repo.read_ref("main").unwrap()
+    );
+}
+
+#[test]
+fn every_crash_leaves_main_at_a_readable_snapshot_and_recovers() {
+    let f = fixture();
+    let states = crash_states(&f);
+    assert!(states.len() > 20, "only {} checkpoints", states.len());
+
+    let done = Repository::open(&repo_path(states.last().unwrap())).unwrap();
+    assert_eq!(done.read_ref("main").unwrap(), Some(f.new));
+    assert_reflog_chain(&done);
+
+    for state in &states {
+        let path = repo_path(state);
+        let repo = Repository::open(&path).unwrap();
+        let target = repo.read_ref("main").unwrap().unwrap();
+        assert!(target == f.old || target == f.new);
+        assert_eq!(repo.read_object(&target).unwrap().0, ObjectType::Snapshot);
+
+        // After the outage: old temporary files and locks are cleaned up and
+        // the repository accepts the next update.
+        age_files(&path.join("tmp"));
+        age_files(&path.join("refs"));
+        repo.repair().unwrap();
+        let mut repo = Repository::open(&path).unwrap();
+        assert!(files(&path.join("tmp")).is_empty());
+        commit_later(&mut repo, target);
+        assert_reflog_chain(&repo);
+    }
+}
+
+#[test]
+fn crash_while_pack_is_in_tmp_changes_nothing() {
+    let f = fixture();
+    let mut seen = 0;
+    for state in crash_states(&f) {
+        let path = repo_path(&state);
+        if has_new_files(&f, &path, "packs") {
+            continue;
+        }
+        let repo = Repository::open(&path).unwrap();
+        assert_eq!(repo.read_ref("main").unwrap(), Some(f.old));
+        assert!(!repo.contains(&f.new));
+        seen += usize::from(!files(&path.join("tmp")).is_empty());
+
+        age_files(&path.join("tmp"));
+        Repository::open(&path).unwrap();
+        assert!(files(&path.join("tmp")).is_empty());
+    }
+    assert!(seen > 0);
+}
+
+#[test]
+fn crash_after_pack_move_before_index_indexes_the_orphan_pack() {
+    let f = fixture();
+    let mut seen = 0;
+    for state in crash_states(&f) {
+        let path = repo_path(&state);
+        if !has_new_files(&f, &path, "packs") || has_new_files(&f, &path, "index") {
+            continue;
+        }
+        let repo = Repository::open(&path).unwrap();
+        assert_eq!(repo.read_ref("main").unwrap(), Some(f.old));
+        assert_eq!(repo.read_object(&f.new).unwrap().1, NEW);
+        seen += 1;
+    }
+    assert!(seen > 0);
+}
+
+#[test]
+fn crash_after_index_before_ref_update_keeps_old_ref() {
+    let f = fixture();
+    let mut seen = 0;
+    for state in crash_states(&f) {
+        let path = repo_path(&state);
+        let repo = Repository::open(&path).unwrap();
+        if !has_new_files(&f, &path, "index")
+            || has_lock(&path)
+            || repo.read_ref("main").unwrap() != Some(f.old)
+        {
+            continue;
+        }
+        assert_eq!(repo.read_object(&f.new).unwrap().1, NEW);
+        seen += 1;
+    }
+    assert!(seen > 0);
+}
+
+#[test]
+fn crash_with_ref_lock_taken_needs_repair() {
+    let f = fixture();
+    let mut seen = 0;
+    for state in crash_states(&f) {
+        let path = repo_path(&state);
+        if !has_lock(&path) {
+            continue;
+        }
+        let mut repo = Repository::open(&path).unwrap();
+        assert_eq!(repo.read_ref("main").unwrap(), Some(f.old));
+        assert!(matches!(
+            repo.update_ref("main", Some(f.old), Some(f.new)),
+            Err(Error::RefLocked { .. })
+        ));
+
+        // A fresh lock may belong to a running writer and is kept.
+        assert!(repo.repair().unwrap().is_empty());
+        assert!(has_lock(&path));
+
+        age_files(&path.join("refs"));
+        assert_eq!(repo.repair().unwrap(), [path.join("refs/main.lock")]);
+        commit_later(&mut repo, f.old);
+        seen += 1;
+    }
+    assert!(seen > 0);
+}
+
+#[test]
+fn crash_after_ref_move_before_reflog_gets_repair_line() {
+    let f = fixture();
+    let mut seen = 0;
+    for state in crash_states(&f) {
+        let path = repo_path(&state);
+        let mut repo = Repository::open(&path).unwrap();
+        if repo.read_ref("main").unwrap() != Some(f.new) || last_logged(&repo) != Some(f.old) {
+            continue;
+        }
+        let later = commit_later(&mut repo, f.new);
+        let log = repo.reflog("main").unwrap();
+        let tail: Vec<_> = log[log.len() - 2..]
+            .iter()
+            .map(|e| (e.old, e.new, e.op))
+            .collect();
+        assert_eq!(
+            tail,
+            [
+                (Some(f.old), Some(f.new), RefOp::Repair),
+                (Some(f.new), Some(later), RefOp::Update),
+            ]
+        );
+        seen += 1;
+    }
+    assert!(seen > 0);
+}
+
+#[test]
+fn repair_command_appends_lost_reflog_line() {
+    let f = fixture();
+    let state = crash_states(&f)
+        .into_iter()
+        .find(|state| {
+            let repo = Repository::open(&repo_path(state)).unwrap();
+            repo.read_ref("main").unwrap() == Some(f.new) && last_logged(&repo) == Some(f.old)
+        })
+        .unwrap();
+    let repo = Repository::open(&repo_path(&state)).unwrap();
+    repo.repair().unwrap();
+    let last = repo.reflog("main").unwrap().pop().unwrap();
+    assert_eq!(
+        (last.old, last.new, last.op),
+        (Some(f.old), Some(f.new), RefOp::Repair)
+    );
+    assert_reflog_chain(&repo);
+}
+
+#[test]
+fn disk_full_at_any_step_reports_error_and_cleans_up() {
+    let f = fixture();
+    let mut steps = 0;
+    for n in 0.. {
+        let (work, result, fired) = run(&f, n, |_| Fault::DiskFull);
+        if !fired {
+            result.unwrap();
+            break;
+        }
+        steps += 1;
+        let err = result.unwrap_err();
+        assert!(
+            matches!(&err, Error::Io { source, .. } if source.kind() == io::ErrorKind::StorageFull),
+            "{err}"
+        );
+
+        let path = repo_path(&work);
+        assert!(files(&path.join("tmp")).is_empty(), "step {n}");
+        assert!(!has_lock(&path), "step {n}");
+        let mut repo = Repository::open(&path).unwrap();
+        let target = repo.read_ref("main").unwrap().unwrap();
+        // The ref only moves when the error hit the reflog append after it;
+        // the line may or may not have been written.
+        if target == f.new {
+            assert!([Some(f.old), Some(f.new)].contains(&last_logged(&repo)));
+        } else {
+            assert_eq!(target, f.old);
+        }
+        assert_eq!(repo.read_object(&target).unwrap().0, ObjectType::Snapshot);
+        commit_later(&mut repo, target);
+        assert_reflog_chain(&repo);
+    }
+    assert!(steps > 20, "only {steps} checkpoints");
+}
+
+#[test]
+fn bit_flip_anywhere_in_a_pack_is_never_silent() {
+    let f = fixture();
+    let mut repo = Repository::open(&f.base).unwrap();
+    let data = noise(4096, 8);
+    let mut writer = repo.writer();
+    let id = writer.put(ObjectType::Chunk, &data).unwrap();
+    writer.finish().unwrap();
+
+    let pack = files(&f.base.join("packs"))
+        .into_iter()
+        .map(|p| f.base.join("packs").join(p))
+        .find(|p| fs::read(p).unwrap().len() > data.len())
+        .unwrap();
+    let index_files = files(&f.base.join("index"));
+    let original = fs::read(&pack).unwrap();
+
+    for i in 0..original.len() {
+        let mut bytes = original.clone();
+        bytes[i] ^= 0x01;
+        fs::write(&pack, &bytes).unwrap();
+
+        // Through the index the object is either intact or reported corrupt.
+        match repo.read_object(&id) {
+            Ok((_, read)) => assert_eq!(read, data, "byte {i}"),
+            Err(Error::Corrupt { .. }) => {}
+            Err(e) => panic!("byte {i}: {e}"),
+        }
+
+        // Without an index, the pack is checked against its name when opened.
+        let hidden = tempfile::tempdir().unwrap();
+        for name in &index_files {
+            fs::rename(f.base.join("index").join(name), hidden.path().join(name)).unwrap();
+        }
+        assert!(
+            matches!(Repository::open(&f.base), Err(Error::Corrupt { .. })),
+            "byte {i}"
+        );
+        for name in &index_files {
+            fs::rename(hidden.path().join(name), f.base.join("index").join(name)).unwrap();
+        }
+    }
+}
