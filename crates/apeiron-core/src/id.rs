@@ -36,6 +36,25 @@ impl fmt::Display for ObjectId {
     }
 }
 
+impl serde::Serialize for ObjectId {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> std::result::Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.to_hex())
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ObjectId {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        let hex = <std::borrow::Cow<'de, str>>::deserialize(deserializer)?;
+        ObjectId::from_hex(&hex)
+            .ok_or_else(|| serde::de::Error::custom("expected 64 lowercase hex characters"))
+    }
+}
+
 impl fmt::Debug for ObjectId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "ObjectId({self})")

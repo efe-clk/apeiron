@@ -204,7 +204,7 @@ impl Repository {
         self.decode_stored(id, Snapshot::decode, &data)
     }
 
-    fn read_blob(&self, id: &ObjectId) -> Result<Blob> {
+    pub fn read_blob(&self, id: &ObjectId) -> Result<Blob> {
         let data = self.read_typed(id, ObjectType::Blob)?;
         self.decode_stored(id, Blob::decode, &data)
     }
@@ -214,17 +214,35 @@ impl Repository {
     pub fn read_file<W: Write>(&self, id: &ObjectId, mut out: W) -> Result<u64> {
         let blob = self.read_blob(id)?;
         for (chunk_id, len) in &blob.chunks {
-            let chunk = self.read_typed(chunk_id, ObjectType::Chunk)?;
-            if chunk.len() != *len as usize {
-                return Err(Error::corrupt(
-                    &self.dir(PACKS),
-                    format!("blob {id}: chunk {chunk_id} has the wrong length"),
-                ));
-            }
+            let chunk = self.read_chunk(chunk_id, *len)?;
             out.write_all(&chunk).map_err(Error::Output)?;
         }
         out.flush().map_err(Error::Output)?;
         Ok(blob.size)
+    }
+
+    /// Reads one chunk of a blob and checks its length.
+    pub fn read_chunk(&self, id: &ObjectId, len: u32) -> Result<Vec<u8>> {
+        let chunk = self.read_typed(id, ObjectType::Chunk)?;
+        if chunk.len() != len as usize {
+            return Err(Error::corrupt(
+                &self.dir(PACKS),
+                format!("chunk {id} has the wrong length"),
+            ));
+        }
+        Ok(chunk)
+    }
+
+    /// Stored snapshots whose hex id starts with `prefix`, sorted.
+    pub fn snapshots_with_prefix(&self, prefix: &str) -> Vec<ObjectId> {
+        let mut ids: Vec<_> = self
+            .index
+            .iter()
+            .filter(|(id, l)| l.entry.ty == ObjectType::Snapshot && id.to_hex().starts_with(prefix))
+            .map(|(id, _)| *id)
+            .collect();
+        ids.sort();
+        ids
     }
 
     /// Walks from the snapshot `id` back through first parents.
@@ -283,6 +301,7 @@ impl Repository {
             pack: None,
             pending: HashMap::new(),
             packs: Vec::new(),
+            new_bytes: 0,
         }
     }
 
@@ -361,6 +380,7 @@ pub struct ObjectWriter<'a> {
     pack: Option<PackWriter>,
     pending: HashMap<ObjectId, ObjectType>,
     packs: Vec<(FileHash, Vec<PackEntry>)>,
+    new_bytes: u64,
 }
 
 impl ObjectWriter<'_> {
@@ -376,6 +396,7 @@ impl ObjectWriter<'_> {
         };
         pack.add(id, ty, data)?;
         self.pending.insert(id, ty);
+        self.new_bytes += data.len() as u64;
         if pack.len() >= pack::TARGET_SIZE {
             self.finish_pack()?;
         }
@@ -392,6 +413,12 @@ impl ObjectWriter<'_> {
             chunks.push((self.put(ObjectType::Chunk, &chunk)?, len));
         }
         Ok(chunks)
+    }
+
+    /// Uncompressed size of the objects this batch stored that were not
+    /// stored before.
+    pub fn new_bytes(&self) -> u64 {
+        self.new_bytes
     }
 
     /// Stores the content of a file and returns its size and blob id

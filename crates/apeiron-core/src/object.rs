@@ -15,7 +15,7 @@ const MODE_MASK: u16 = 0o7777;
 const NANOS_PER_SEC: u32 = 1_000_000_000;
 
 /// A point in time: Unix seconds (UTC) and nanoseconds.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Time {
     pub seconds: i64,
     pub nanos: u32,
