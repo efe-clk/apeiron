@@ -108,6 +108,7 @@ Rules for code, commits and format changes: [CONTRIBUTING.md](CONTRIBUTING.md).
 | [Decisions](docs/DECISIONS.md) | Architecture decision records (ADR) |
 | [Roadmap](docs/ROADMAP.md) | Stages 0–5, scope, exit criteria, current status |
 | [API](docs/API.md) | Design principles of the planned public API (draft) |
+| [CLI](docs/CLI.md) | Design of the `apeiron` command (draft) |
 | [Glossary](docs/GLOSSARY.md) | Terms with English–Turkish equivalents |
 | [Contributing](CONTRIBUTING.md) | Development environment and rules |
 | [Security](SECURITY.md) | Reporting vulnerabilities, security principles |
