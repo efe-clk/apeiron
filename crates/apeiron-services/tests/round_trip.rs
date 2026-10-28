@@ -154,7 +154,7 @@ fn backup_and_restore_round_trip() {
     fill(&s.src.clone());
     let out = s.backup();
     assert_eq!(out.parent, None);
-    assert_eq!((out.files, out.dirs), (4, 4));
+    assert_eq!((out.files, out.dirs), (4, 3));
     assert!(out.warnings.is_empty(), "{:?}", out.warnings);
     assert_eq!(s.repo.read_ref("main").unwrap(), Some(out.snapshot));
 

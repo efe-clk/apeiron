@@ -240,7 +240,10 @@ impl Walk<'_> {
                 xattrs: Vec::new(),
             });
         }
-        self.dirs += 1;
+        // The source folder itself is not counted, as in restore and export.
+        if !rel.as_bytes().is_empty() {
+            self.dirs += 1;
+        }
         Ok(Some(writer.put_tree(&Tree { entries })?))
     }
 
