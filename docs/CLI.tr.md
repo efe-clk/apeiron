@@ -27,11 +27,23 @@ CLI, Apeiron'un ilk arayüzüdür. Diğer tüm arayüzler gibi yalnızca herkese
 
 İkisi de verilmezse komut bir kullanım hatasıyla durur. Harici diskteki bir depo, o diskteki bir yolda duran sıradan bir depodur.
 
+### 2.1 Şifreli depolar
+
+`apeiron init --encrypt <path>` yeni bir parolayı iki kez sorar ve kurtarma anahtarını bir kez yazdırır ([FORMAT.tr.md](FORMAT.tr.md) §14). Şifreli bir depodaki diğer her komut parolayı ya da kurtarma anahtarını ister:
+
+| Kaynak | Örnek | Öncelik |
+| --- | --- | --- |
+| `--password-file` seçeneği | `apeiron --password-file ~/.config/apeiron/password log` | 1 |
+| `APEIRON_PASSWORD_FILE` ortam değişkeni | `export APEIRON_PASSWORD_FILE=~/.config/apeiron/password` | 2 |
+| Terminalde, gösterilmeden sorulur | `Password or recovery key:` | 3 |
+
+Dosyanın ilk satırı paroladır; `init --encrypt` yeni parolayı da oradan okur. Yanlış bir parola ya da kurtarma anahtarı komutu 1 çıkış koduyla ve `key` hata türüyle bitirir. `--json` ile `init`, `recovery_key` alanını ekler.
+
 ## 3. Komutlar
 
 | Komut | Ne yapar | Durum |
 | --- | --- | --- |
-| `apeiron init <path>` | Boş bir depo oluşturur | Tamamlandı |
+| `apeiron init <path> [--encrypt]` | Boş bir depo oluşturur; `--encrypt` onu bir parolayla şifreler (bölüm 2.1) | Tamamlandı |
 | `apeiron backup <folder> [--ref <name>] [--message <text>]` | Klasörü yeni bir snapshot olarak saklar ve ref'i ona taşır (varsayılan ref: `main`) | Tamamlandı |
 | `apeiron log [<ref>]` | Bir ref'in snapshot'larını en yeniden başlayarak listeler | Tamamlandı |
 | `apeiron ls <snapshot> [<path>]` | Bir snapshot'taki dosya ve klasörleri listeler | Tamamlandı |
@@ -95,6 +107,7 @@ apeiron verify
 | Komut satırı ayrıştırma | `clap` | En yaygın Rust ayrıştırıcısı; yardım metnini üretir ve seçenekleri denetler |
 | JSON çıktı | `serde_json` | `serde` için standart JSON kütüphanesi; `serde` yapılandırmada zaten kullanılıyor |
 | Ctrl+C | `ctrlc` | Küçük ve yaygın; Linux, macOS ve Windows'ta aynı kod |
+| Gizli parola sorma | `rpassword` | Küçük ve yaygın; Linux, macOS ve Windows'ta terminalden ekrana yansıtmadan okur |
 | tar, zip ve 7z dışa aktarma | `tar`, `zip`, `sevenz-rust2` | Saf Rust; arşivler standart `tar`, `unzip` ve `7z` araçlarıyla izinler ve sembolik bağlar korunarak açılır |
 
 ## 8. Açık sorular

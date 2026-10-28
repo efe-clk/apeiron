@@ -42,9 +42,37 @@ impl Repository {
         Ok(Repository::wrap(path, core::Repository::init(path)?))
     }
 
+    /// Creates an encrypted repository in a new or empty folder and opens
+    /// it. Returns the recovery key, which is shown to the user once: with
+    /// every password lost, it is the only way back to the data.
+    pub fn init_encrypted(path: impl AsRef<Path>, password: &str) -> Result<(Self, String)> {
+        if password.is_empty() {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "the password must not be empty",
+            ));
+        }
+        let path = path.as_ref();
+        let (core, recovery) =
+            core::Repository::init_encrypted(path, core::ChunkerParams::default(), password)?;
+        Ok((Repository::wrap(path, core), recovery))
+    }
+
+    /// Opens a repository. An encrypted one fails with [`ErrorKind::Key`];
+    /// see [`Repository::unlock`].
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
         Ok(Repository::wrap(path, core::Repository::open(path)?))
+    }
+
+    /// Opens an encrypted repository with a password or its recovery key.
+    /// A repository that is not encrypted opens without using `secret`.
+    pub fn unlock(path: impl AsRef<Path>, secret: &str) -> Result<Self> {
+        let path = path.as_ref();
+        Ok(Repository::wrap(
+            path,
+            core::Repository::unlock(path, secret)?,
+        ))
     }
 
     fn wrap(path: &Path, core: core::Repository) -> Self {
@@ -104,6 +132,7 @@ impl Repository {
             chunk_min: chunker.min_size(),
             chunk_avg: chunker.avg_size(),
             chunk_max: chunker.max_size(),
+            encrypted: core.is_encrypted(),
         }
     }
 
@@ -120,7 +149,7 @@ impl Repository {
             let _writer = repo.lock_writer();
             // The index is loaded after the lock is taken (FORMAT.md §12).
             let _lock = core::RepoLock::shared(repo.path())?;
-            let mut core = core::Repository::open(repo.path())?;
+            let mut core = repo.read().reopen()?;
             let report = services::backup(&mut core, &request, ctl)?;
             *repo.write() = core;
             Ok(report)
@@ -134,7 +163,7 @@ impl Repository {
         Job::spawn("gc", move |ctl| {
             let _writer = repo.lock_writer();
             ctl.update(|p| p.phase = crate::Phase::Finishing);
-            let mut core = core::Repository::open(repo.path())?;
+            let mut core = repo.read().reopen()?;
             let report = core.gc(&request)?;
             *repo.write() = core;
             ctl.update(|p| p.phase = crate::Phase::Done);

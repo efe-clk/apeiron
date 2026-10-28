@@ -62,6 +62,27 @@ export APEIRON_REPO=/run/media/<user>/<disk>/apeiron
 
 Every command also accepts `--repo <path>`, which takes precedence.
 
+### 3.1 Encrypted repository
+
+If the disk may be lost or stolen, or will later be copied to a server, create the repository encrypted instead:
+
+```bash
+apeiron init --encrypt /run/media/<user>/<disk>/apeiron
+```
+
+The command asks for a password twice and prints a **recovery key** once (13 groups of four characters). Write the recovery key on paper and keep it apart from the computer and the disk. Either the password or the recovery key opens the repository; if both are lost, nobody can recover the data. Encryption can only be chosen when the repository is created.
+
+Every later command asks `Password or recovery key:`. For the automatic backup (section 8), put the password in a file that only you can read and tell Apeiron where it is:
+
+```bash
+mkdir -p ~/.config/apeiron
+printf '%s\n' 'your password' > ~/.config/apeiron/password
+chmod 600 ~/.config/apeiron/password
+export APEIRON_PASSWORD_FILE=~/.config/apeiron/password
+```
+
+Without a key, someone holding the disk sees only the number and size of the data files and the ref names (`backup/documents`), not file names or content ([FORMAT.md](FORMAT.md) §14.5).
+
 ## 4. Backing up
 
 Give every folder its own ref, so each has its own history:
@@ -126,6 +147,8 @@ Description=Apeiron backup of Documents
 [Service]
 Type=oneshot
 Environment=APEIRON_REPO=/run/media/<user>/<disk>/apeiron
+# Only for an encrypted repository (section 3.1):
+Environment=APEIRON_PASSWORD_FILE=%h/.config/apeiron/password
 ExecStart=%h/.cargo/bin/apeiron backup %h/Documents --ref backup/documents
 # Exit code 3 means "done with warnings".
 SuccessExitStatus=3
@@ -175,6 +198,7 @@ The exit criterion of Stage 1 is to back up and restore your own data with nothi
 | `invalid repository … no config file` | The path is wrong or the external disk is not mounted |
 | `the repository is locked by another program` | `gc` runs only when nothing else uses the repository, and other commands cannot start during `gc`. Wait and try again |
 | `warning: damaged file …` | Run `apeiron verify` for details and `apeiron repair` to rebuild damaged index files. Damaged packs cannot be repaired yet (Stage 2 brings copies on other targets) |
+| `wrong password or recovery key` | Type the password again; the recovery key works too, with or without dashes. With a password file, check that its first line is the password |
 | `already exists and is not an empty folder` | `restore` and `export` never overwrite; choose a new target |
 | Exit code 130 | The command was cancelled with Ctrl+C; nothing half-done is visible |
 

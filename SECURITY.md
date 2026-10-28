@@ -31,7 +31,7 @@ Your report is visible only to the maintainers. You will get an answer as soon a
 | Crash safety | Write → `fsync` → atomic rename; a power failure never leaves a half-finished state visible | Done |
 | Content privacy | Object identifiers are keyed hashes, so stored content cannot be guessed from them | Done |
 | Memory safety | Written in Rust; `unsafe` only in the FFI crate and the small `apeiron-sys` crate | In effect |
-| Encryption | Client-side; keys belong to the user; the remote target never sees plaintext | Planned (Stage 2) |
+| Encryption | Client-side; keys belong to the user; the remote target never sees plaintext ([FORMAT.md](docs/FORMAT.md) §14) | Done |
 | Permissions | Separate read, write, delete, share and admin permissions | Planned (Stage 4) |
 | Audit log | Sensitive operations are logged; sensitive data never is | Planned (Stage 4) |
 | Plugin isolation | Plugins run in a WebAssembly sandbox with declared, user-approved permissions | Planned (Stage 3) |

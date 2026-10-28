@@ -125,8 +125,10 @@ flowchart TB
 | İşlev | Ne yapar |
 | --- | --- |
 | `Repository::init(path)` | Boş bir depo oluşturur ve açar |
-| `Repository::open(path)` | Var olan bir depoyu açar |
-| `repo.info()` | Yolu, format sürümünü, chunk bölme ayarlarını ve açılırken bozuk bulunan dosyaları döndürür |
+| `Repository::init_encrypted(path, password)` | Boş, şifreli bir depo oluşturur ([FORMAT.tr.md](FORMAT.tr.md) §14), açar ve kurtarma anahtarını döndürür; bu anahtar hiçbir yerde saklanmaz ve kullanıcıya bir kez gösterilir |
+| `Repository::open(path)` | Var olan bir depoyu açar; şifreli bir depoda `Key` hatası verir |
+| `Repository::unlock(path, secret)` | Bir depoyu bir parola ya da kurtarma anahtarıyla açar |
+| `repo.info()` | Yolu, format sürümünü, chunk bölme ayarlarını, deponun şifreli olup olmadığını ve açılırken bozuk bulunan dosyaları döndürür |
 
 Bir `Repository` iş parçacıkları arasında paylaşılabilir (`Send + Sync`). Yalnızca okuyan işlemler paralel çalışır; yazan işlemler süreç içinde birbirini bekler. Her işlem çalışırken depo kilidini paylaşımlı, çöp toplama ise özel tutar ([FORMAT.tr.md](FORMAT.tr.md) §12); böylece çöp toplama hiçbir zaman başka bir programla aynı anda çalışmaz. Diğer yazıcılar aynı anda çalışabilir, çünkü ref'ler karşılaştır ve değiştir ile güncellenir.
 
@@ -197,6 +199,7 @@ Her hatanın sabit numaralı bir türü, bir mesajı ve gerekiyorsa bir yolu var
 | 9 | `Cancelled` | İş iptal edildi |
 | 10 | `Unsupported` | Bilinmeyen format sürümü ya da desteklenmeyen özellik |
 | 11 | `Internal` | Apeiron'da bir hata; lütfen bildirin |
+| 12 | `Key` | Depo şifreli ve parola ya da kurtarma anahtarı eksik veya yanlış |
 
 Bir işlemi durdurmayan sorunlar (yedek sırasında okunamayan bir dosya, okunurken değişen bir dosya, atlanan bir aygıt dosyası) sonuçta **uyarı** olarak yer alır; her birinin bir yolu, türü ve mesajı vardır.
 

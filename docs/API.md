@@ -125,8 +125,10 @@ flowchart TB
 | Function | What it does |
 | --- | --- |
 | `Repository::init(path)` | Creates an empty repository and opens it |
-| `Repository::open(path)` | Opens an existing repository |
-| `repo.info()` | Returns the path, format version, chunker settings and files found damaged when opening |
+| `Repository::init_encrypted(path, password)` | Creates an empty encrypted repository ([FORMAT.md](FORMAT.md) §14), opens it and returns its recovery key, which is never stored and is shown to the user once |
+| `Repository::open(path)` | Opens an existing repository; an encrypted one fails with `Key` |
+| `Repository::unlock(path, secret)` | Opens a repository with a password or the recovery key |
+| `repo.info()` | Returns the path, format version, chunker settings, whether the repository is encrypted and files found damaged when opening |
 
 A `Repository` can be shared between threads (`Send + Sync`). Operations that only read run in parallel; operations that write wait for each other inside the process. Every operation holds the repository lock shared while it runs and garbage collection holds it exclusive ([FORMAT.md](FORMAT.md) §12), so garbage collection never runs beside another program; other writers can work at the same time because refs are updated with compare-and-swap.
 
@@ -197,6 +199,7 @@ Every error has a kind with a stable number, a message and, when it applies, a p
 | 9 | `Cancelled` | The job was cancelled |
 | 10 | `Unsupported` | Unknown format version or unsupported feature |
 | 11 | `Internal` | A bug in Apeiron; please report it |
+| 12 | `Key` | The repository is encrypted and the password or recovery key is missing or wrong |
 
 Problems that do not stop an operation (an unreadable file during a backup, a file that changed while it was read, a skipped device file) are **warnings** in the result, each with a path, a kind and a message.
 

@@ -55,6 +55,10 @@ pub enum Error {
     InvalidObject { ty: ObjectType, reason: String },
     #[error("failed to encode object: {0}")]
     Encode(String),
+    #[error("the repository at {} is encrypted; a password or recovery key is needed", .0.display())]
+    KeyRequired(PathBuf),
+    #[error("wrong password or recovery key")]
+    WrongKey,
     #[error("random number generator failed: {0}")]
     Random(getrandom::Error),
 }

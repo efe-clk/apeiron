@@ -24,7 +24,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [014](#adr-014-a-small-system-crate-for-unsafe-os-calls) | `unsafe` code | Only in the FFI crate and the small `apeiron-sys` crate | Accepted |
 | [015](#adr-015-json-values-at-the-c-abi-boundary) | C ABI | A small fixed set of functions; requests and results as JSON | Proposed |
 | [016](#adr-016-synchronous-public-api-with-jobs-on-threads) | Long operations | Synchronous API; jobs on threads with polled progress | Proposed |
-| [017](#adr-017-xchacha20-poly1305-and-argon2id-for-encryption) | Encryption | XChaCha20-Poly1305 for data, Argon2id for passwords | Proposed |
+| [017](#adr-017-xchacha20-poly1305-and-argon2id-for-encryption) | Encryption | XChaCha20-Poly1305 for data, Argon2id for passwords | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28.
 
@@ -349,7 +349,7 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 
 ## ADR-017: XChaCha20-Poly1305 and Argon2id for encryption
 
-**Status:** Proposed (2026-10-28)
+**Status:** Accepted (2026-10-28)
 
 **Context.** Stage 2 stores repositories on disks and servers that are not trusted ([FORMAT.md](FORMAT.md) §14). The cipher must be safe with nonces chosen at random by several independent writers, fast on a Raspberry Pi 4, and available as a maintained pure-Rust library. Passwords need a slow, memory-hard derivation.
 

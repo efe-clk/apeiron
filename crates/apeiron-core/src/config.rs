@@ -17,11 +17,13 @@ const VERSION: u32 = FORMAT_VERSION;
 const HASH_ALGORITHM: &str = "blake3-keyed";
 const CHUNKER_ALGORITHM: &str = "fastcdc-2020";
 const ENCRYPTION_NONE: &str = "none";
+const ENCRYPTION_XCHACHA: &str = "xchacha20-poly1305";
 
 #[derive(Clone, Debug)]
 pub(crate) struct Config {
     pub(crate) id: [u8; 16],
-    pub(crate) id_key: IdKey,
+    /// `None` in an encrypted repository, whose `id_key` is in the key files.
+    pub(crate) id_key: Option<IdKey>,
     pub(crate) chunker: ChunkerParams,
     created: Datetime,
 }
@@ -42,7 +44,8 @@ struct RawConfig {
 #[serde(deny_unknown_fields)]
 struct RawHash {
     algorithm: String,
-    id_key: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    id_key: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -61,10 +64,11 @@ struct RawEncryption {
 }
 
 impl Config {
-    pub(crate) fn generate(chunker: ChunkerParams) -> Result<Self> {
+    /// A new configuration. `id_key` is `None` for an encrypted repository.
+    pub(crate) fn generate(chunker: ChunkerParams, id_key: Option<IdKey>) -> Result<Self> {
         Ok(Config {
             id: random_bytes()?,
-            id_key: IdKey::generate()?,
+            id_key,
             chunker,
             created: utc_datetime(SystemTime::now()),
         })
@@ -78,7 +82,7 @@ impl Config {
             created: self.created,
             hash: RawHash {
                 algorithm: HASH_ALGORITHM.to_owned(),
-                id_key: to_hex(self.id_key.as_bytes()),
+                id_key: self.id_key.as_ref().map(|k| to_hex(k.as_bytes())),
             },
             chunker: RawChunker {
                 algorithm: CHUNKER_ALGORITHM.to_owned(),
@@ -87,7 +91,12 @@ impl Config {
                 max_size: self.chunker.max_size(),
             },
             encryption: RawEncryption {
-                mode: ENCRYPTION_NONE.to_owned(),
+                mode: if self.is_encrypted() {
+                    ENCRYPTION_XCHACHA
+                } else {
+                    ENCRYPTION_NONE
+                }
+                .to_owned(),
             },
         };
         // Serializing plain strings and integers cannot fail.
@@ -118,14 +127,20 @@ impl Config {
                 raw.chunker.algorithm
             )));
         }
-        if raw.encryption.mode != ENCRYPTION_NONE {
-            return Err(invalid(format!(
-                "unsupported encryption {:?}",
-                raw.encryption.mode
-            )));
-        }
+        let id_key = match (raw.encryption.mode.as_str(), raw.hash.id_key) {
+            (ENCRYPTION_NONE, Some(hex)) => Some(IdKey::from_bytes(
+                parse_hex(&hex).ok_or_else(|| invalid("bad id_key".to_owned()))?,
+            )),
+            (ENCRYPTION_XCHACHA, None) => None,
+            (ENCRYPTION_NONE | ENCRYPTION_XCHACHA, _) => {
+                return Err(invalid(
+                    "id_key must be present exactly when the repository is not encrypted"
+                        .to_owned(),
+                ));
+            }
+            (mode, _) => return Err(invalid(format!("unsupported encryption {mode:?}"))),
+        };
         let id = parse_hex(&raw.id).ok_or_else(|| invalid("bad repository id".to_owned()))?;
-        let id_key = parse_hex(&raw.hash.id_key).ok_or_else(|| invalid("bad id_key".to_owned()))?;
         let chunker = ChunkerParams::from_parts(
             raw.chunker.min_size,
             raw.chunker.avg_size,
@@ -134,15 +149,19 @@ impl Config {
         .map_err(|e| invalid(e.to_string()))?;
         Ok(Config {
             id,
-            id_key: IdKey::from_bytes(id_key),
+            id_key,
             chunker,
             created: raw.created,
         })
     }
+
+    pub(crate) fn is_encrypted(&self) -> bool {
+        self.id_key.is_none()
+    }
 }
 
 /// Converts a time to a UTC TOML datetime with second precision.
-fn utc_datetime(time: SystemTime) -> Datetime {
+pub(crate) fn utc_datetime(time: SystemTime) -> Datetime {
     let secs = time
         .duration_since(SystemTime::UNIX_EPOCH)
         .map_or(0, |d| d.as_secs());
@@ -187,7 +206,8 @@ mod tests {
 
     #[test]
     fn round_trip() {
-        let config = Config::generate(ChunkerParams::default()).unwrap();
+        let config =
+            Config::generate(ChunkerParams::default(), Some(IdKey::generate().unwrap())).unwrap();
         let text = config.to_toml();
         assert!(text.contains("format = \"apeiron-repository\""));
         assert!(text.contains("avg_size = 1048576"));
@@ -200,7 +220,7 @@ mod tests {
 
     #[test]
     fn rejects_newer_version_and_unknown_fields() {
-        let text = Config::generate(ChunkerParams::default())
+        let text = Config::generate(ChunkerParams::default(), Some(IdKey::generate().unwrap()))
             .unwrap()
             .to_toml();
         let newer = text.replace("version = 1", "version = 2");
@@ -213,5 +233,29 @@ mod tests {
             Config::from_toml(Path::new("config"), &extra),
             Err(Error::InvalidRepository { .. })
         ));
+    }
+
+    #[test]
+    fn encrypted_config_has_no_id_key() {
+        let config = Config::generate(ChunkerParams::default(), None).unwrap();
+        let text = config.to_toml();
+        assert!(text.contains("mode = \"xchacha20-poly1305\""));
+        assert!(!text.contains("id_key"));
+        let parsed = Config::from_toml(Path::new("config"), &text).unwrap();
+        assert!(parsed.is_encrypted());
+
+        // A key next to the encryption mode, or none without it, is refused.
+        let plain = Config::generate(ChunkerParams::default(), Some(IdKey::generate().unwrap()))
+            .unwrap()
+            .to_toml();
+        for bad in [
+            plain.replace("mode = \"none\"", "mode = \"xchacha20-poly1305\""),
+            text.replace("mode = \"xchacha20-poly1305\"", "mode = \"none\""),
+        ] {
+            assert!(matches!(
+                Config::from_toml(Path::new("config"), &bad),
+                Err(Error::InvalidRepository { .. })
+            ));
+        }
     }
 }

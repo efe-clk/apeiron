@@ -4,15 +4,18 @@ use std::fs::{self, File};
 use std::io::{BufWriter, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
+use crate::crypto::{BOX_OVERHEAD, Keys, SecretKey};
 use crate::error::{Error, IoContext, Result};
 use crate::fsutil;
-use crate::id::{ID_LEN, IdKey, ObjectId, ObjectType, to_hex};
+use crate::id::{ID_LEN, ObjectId, ObjectType, to_hex};
 
 const MAGIC: &[u8; 8] = b"APRNPACK";
 const END_MAGIC: &[u8; 8] = b"APRNPEND";
 const VERSION: u16 = 1;
 const HEADER_LEN: u64 = 16;
 const FOOTER_LEN: u64 = 12;
+/// Header flag: object data and entry table are sealed (FORMAT.md §14.4).
+const FLAG_ENCRYPTED: u16 = 1;
 pub(crate) const ENTRY_LEN: usize = 52;
 /// Bytes of an entry after its id; shared with index entries.
 pub(crate) const ENTRY_TAIL_LEN: usize = ENTRY_LEN - ID_LEN;
@@ -78,10 +81,20 @@ pub(crate) fn pack_path(packs_dir: &Path, name: &FileHash) -> PathBuf {
     packs_dir.join(&hex[..2]).join(format!("{hex}.pack"))
 }
 
+/// Additional data that binds a sealed object to its id and type.
+fn object_aad(id: &ObjectId, ty: ObjectType) -> [u8; ID_LEN + 1] {
+    let mut aad = [0u8; ID_LEN + 1];
+    aad[..ID_LEN].copy_from_slice(id.as_bytes());
+    aad[ID_LEN] = ty.as_byte();
+    aad
+}
+
 /// Streams objects into a temporary pack file.
 pub(crate) struct PackWriter {
     file: BufWriter<File>,
     tmp_path: PathBuf,
+    data_key: Option<SecretKey>,
+    header: [u8; HEADER_LEN as usize],
     hasher: blake3::Hasher,
     entries: Vec<PackEntry>,
     len: u64,
@@ -89,21 +102,28 @@ pub(crate) struct PackWriter {
 }
 
 impl PackWriter {
-    pub(crate) fn new(tmp_dir: &Path) -> Result<Self> {
+    /// Starts a pack; it is encrypted when `keys` has a data key.
+    pub(crate) fn new(tmp_dir: &Path, keys: &Keys) -> Result<Self> {
         let (file, tmp_path) = fsutil::create_tmp(tmp_dir)?;
+        let flags = if keys.data.is_some() {
+            FLAG_ENCRYPTED
+        } else {
+            0
+        };
+        let mut header = [0u8; HEADER_LEN as usize];
+        header[..8].copy_from_slice(MAGIC);
+        header[8..10].copy_from_slice(&VERSION.to_le_bytes());
+        header[10..12].copy_from_slice(&flags.to_le_bytes());
         let mut writer = PackWriter {
             file: BufWriter::new(file),
             tmp_path,
+            data_key: keys.data.clone(),
+            header,
             hasher: blake3::Hasher::new(),
             entries: Vec::new(),
             len: 0,
             persisted: false,
         };
-        let mut header = Vec::with_capacity(HEADER_LEN as usize);
-        header.extend_from_slice(MAGIC);
-        header.extend_from_slice(&VERSION.to_le_bytes());
-        header.extend_from_slice(&0u16.to_le_bytes());
-        header.extend_from_slice(&0u32.to_le_bytes());
         writer.write(&header)?;
         Ok(writer)
     }
@@ -130,13 +150,21 @@ impl PackWriter {
         } else {
             (Compression::None, raw)
         };
+        let sealed;
+        let stored = match &self.data_key {
+            Some(key) => {
+                sealed = key.seal(&object_aad(&id, ty), stored)?;
+                sealed.as_slice()
+            }
+            None => stored,
+        };
         let entry = PackEntry {
             id,
             ty,
             compression,
             offset: self.len,
-            // `stored` is never longer than `raw`, which fits in a u32.
-            stored_len: stored.len() as u32,
+            stored_len: u32::try_from(stored.len())
+                .map_err(|_| Error::ObjectTooLarge(stored.len()))?,
             raw_len,
         };
         self.write(stored)?;
@@ -161,6 +189,9 @@ impl PackWriter {
         for entry in &self.entries {
             table.extend_from_slice(entry.id.as_bytes());
             entry.encode_tail(&mut table);
+        }
+        if let Some(key) = &self.data_key {
+            table = key.seal(&self.header, &table)?;
         }
         let count = u32::try_from(self.entries.len())
             .map_err(|_| Error::ObjectTooLarge(self.entries.len()))?;
@@ -187,8 +218,9 @@ impl Drop for PackWriter {
     }
 }
 
-/// Reads and validates the entry table of a pack.
-pub(crate) fn read_table(path: &Path) -> Result<Vec<PackEntry>> {
+/// Reads and validates the entry table of a pack. An encrypted repository
+/// accepts only encrypted packs and a plain one only plain packs.
+pub(crate) fn read_table(path: &Path, keys: &Keys) -> Result<Vec<PackEntry>> {
     let mut file = File::open(path).at(path)?;
     let file_len = file.metadata().at(path)?.len();
     if file_len < HEADER_LEN + FOOTER_LEN {
@@ -201,11 +233,18 @@ pub(crate) fn read_table(path: &Path) -> Result<Vec<PackEntry>> {
         return Err(Error::corrupt(path, "bad pack magic"));
     }
     let version = u16::from_le_bytes([header[8], header[9]]);
-    if version != VERSION || header[10..16] != [0; 6] {
+    let flags = u16::from_le_bytes([header[10], header[11]]);
+    if version != VERSION || flags & !FLAG_ENCRYPTED != 0 || header[12..16] != [0; 4] {
         return Err(Error::UnsupportedVersion {
             path: path.to_path_buf(),
             version: u32::from(version),
         });
+    }
+    if (flags == FLAG_ENCRYPTED) != keys.data.is_some() {
+        return Err(Error::corrupt(
+            path,
+            "pack encryption does not match the repository",
+        ));
     }
 
     let mut footer = [0u8; FOOTER_LEN as usize];
@@ -217,7 +256,10 @@ pub(crate) fn read_table(path: &Path) -> Result<Vec<PackEntry>> {
     let count = u64::from(u32::from_le_bytes([
         footer[0], footer[1], footer[2], footer[3],
     ]));
-    let table_len = count * ENTRY_LEN as u64;
+    let mut table_len = count * ENTRY_LEN as u64;
+    if keys.data.is_some() {
+        table_len += BOX_OVERHEAD as u64;
+    }
     let Some(table_start) = (file_len - FOOTER_LEN)
         .checked_sub(table_len)
         .filter(|&s| s >= HEADER_LEN)
@@ -228,6 +270,11 @@ pub(crate) fn read_table(path: &Path) -> Result<Vec<PackEntry>> {
     let mut table = vec![0u8; table_len as usize];
     file.seek(SeekFrom::Start(table_start)).at(path)?;
     file.read_exact(&mut table).at(path)?;
+    if let Some(key) = &keys.data {
+        table = key
+            .open(&header, &table)
+            .ok_or_else(|| Error::corrupt(path, "entry table fails authentication"))?;
+    }
 
     let mut entries = Vec::with_capacity(count as usize);
     let mut expected_offset = HEADER_LEN;
@@ -255,16 +302,16 @@ fn bad_entry(path: &Path) -> Error {
     Error::corrupt(path, "invalid pack entry")
 }
 
-/// Reads one object, decompresses it and checks its id.
-pub(crate) fn read_object(path: &Path, entry: &PackEntry, key: &IdKey) -> Result<Vec<u8>> {
+/// Reads one object, decrypts and decompresses it and checks its id.
+pub(crate) fn read_object(path: &Path, entry: &PackEntry, keys: &Keys) -> Result<Vec<u8>> {
     let stored = read_stored_unchecked(path, entry)?;
-    decode_stored(path, entry, key, stored)
+    decode_stored(path, entry, keys, &stored)
 }
 
 /// Reads the stored bytes of one object after checking that they decode to it.
-pub(crate) fn read_stored(path: &Path, entry: &PackEntry, key: &IdKey) -> Result<Vec<u8>> {
+pub(crate) fn read_stored(path: &Path, entry: &PackEntry, keys: &Keys) -> Result<Vec<u8>> {
     let stored = read_stored_unchecked(path, entry)?;
-    decode_stored(path, entry, key, stored.clone())?;
+    decode_stored(path, entry, keys, &stored)?;
     Ok(stored)
 }
 
@@ -276,10 +323,22 @@ fn read_stored_unchecked(path: &Path, entry: &PackEntry) -> Result<Vec<u8>> {
     Ok(stored)
 }
 
-fn decode_stored(path: &Path, entry: &PackEntry, key: &IdKey, stored: Vec<u8>) -> Result<Vec<u8>> {
+fn decode_stored(path: &Path, entry: &PackEntry, keys: &Keys, stored: &[u8]) -> Result<Vec<u8>> {
+    let opened;
+    let stored = match &keys.data {
+        Some(key) => {
+            opened = key
+                .open(&object_aad(&entry.id, entry.ty), stored)
+                .ok_or_else(|| {
+                    Error::corrupt(path, format!("object {}: fails authentication", entry.id))
+                })?;
+            opened.as_slice()
+        }
+        None => stored,
+    };
     let raw = match entry.compression {
-        Compression::None => stored,
-        Compression::Zstd => zstd::bulk::decompress(&stored, entry.raw_len as usize)
+        Compression::None => stored.to_vec(),
+        Compression::Zstd => zstd::bulk::decompress(stored, entry.raw_len as usize)
             .map_err(|e| Error::corrupt(path, format!("object {}: {e}", entry.id)))?,
     };
     if raw.len() != entry.raw_len as usize {
@@ -288,7 +347,7 @@ fn decode_stored(path: &Path, entry: &PackEntry, key: &IdKey, stored: Vec<u8>) -
             format!("object {}: wrong length", entry.id),
         ));
     }
-    if key.object_id(entry.ty, &raw) != entry.id {
+    if keys.id.object_id(entry.ty, &raw) != entry.id {
         return Err(Error::corrupt(
             path,
             format!("object {}: hash mismatch", entry.id),
@@ -312,6 +371,21 @@ pub(crate) fn verify_file_hash(path: &Path, expected: &FileHash) -> Result<()> {
 mod tests {
     use super::*;
     use crate::chunker::tests::noise;
+    use crate::id::IdKey;
+
+    fn plain_keys() -> Keys {
+        Keys {
+            id: IdKey::from_bytes([1; 32]),
+            data: None,
+        }
+    }
+
+    fn encrypted_keys() -> Keys {
+        Keys {
+            id: IdKey::from_bytes([1; 32]),
+            data: Some(SecretKey::from_bytes([2; 32])),
+        }
+    }
 
     fn setup() -> (tempfile::TempDir, PathBuf, PathBuf) {
         let dir = tempfile::tempdir().unwrap();
@@ -324,14 +398,14 @@ mod tests {
     fn write_pack(
         tmp: &Path,
         packs: &Path,
-        key: &IdKey,
+        key: &Keys,
         objects: &[&[u8]],
     ) -> (FileHash, Vec<PackEntry>) {
-        let mut writer = PackWriter::new(tmp).unwrap();
+        let mut writer = PackWriter::new(tmp, key).unwrap();
         for data in objects {
             writer
                 .add(
-                    key.object_id(ObjectType::Chunk, data),
+                    key.id.object_id(ObjectType::Chunk, data),
                     ObjectType::Chunk,
                     data,
                 )
@@ -343,7 +417,7 @@ mod tests {
     #[test]
     fn round_trip_with_and_without_compression() {
         let (_dir, tmp, packs) = setup();
-        let key = IdKey::from_bytes([1; 32]);
+        let key = plain_keys();
         let compressible = vec![b'a'; 10_000];
         let random = noise(10_000, 3);
         let (name, entries) = write_pack(&tmp, &packs, &key, &[&compressible, &random, b""]);
@@ -352,7 +426,7 @@ mod tests {
 
         let path = pack_path(&packs, &name);
         verify_file_hash(&path, &name).unwrap();
-        assert_eq!(read_table(&path).unwrap(), entries);
+        assert_eq!(read_table(&path, &key).unwrap(), entries);
         assert_eq!(read_object(&path, &entries[0], &key).unwrap(), compressible);
         assert_eq!(read_object(&path, &entries[1], &key).unwrap(), random);
         assert_eq!(read_object(&path, &entries[2], &key).unwrap(), b"");
@@ -362,7 +436,7 @@ mod tests {
     #[test]
     fn detects_flipped_byte() {
         let (_dir, tmp, packs) = setup();
-        let key = IdKey::from_bytes([1; 32]);
+        let key = plain_keys();
         let random = noise(1000, 4);
         let (name, entries) = write_pack(&tmp, &packs, &key, &[&random]);
         let path = pack_path(&packs, &name);
@@ -383,22 +457,88 @@ mod tests {
     #[test]
     fn rejects_truncated_pack() {
         let (_dir, tmp, packs) = setup();
-        let key = IdKey::from_bytes([1; 32]);
+        let key = plain_keys();
         let (name, _) = write_pack(&tmp, &packs, &key, &[b"abc", b"def"]);
         let path = pack_path(&packs, &name);
         let bytes = fs::read(&path).unwrap();
         fs::write(&path, &bytes[..bytes.len() - 5]).unwrap();
-        assert!(matches!(read_table(&path), Err(Error::Corrupt { .. })));
+        assert!(matches!(
+            read_table(&path, &key),
+            Err(Error::Corrupt { .. })
+        ));
     }
 
     #[test]
     fn dropped_writer_removes_tmp_file() {
         let (_dir, tmp, _packs) = setup();
-        let mut writer = PackWriter::new(&tmp).unwrap();
+        let mut writer = PackWriter::new(&tmp, &plain_keys()).unwrap();
         writer
             .add(ObjectId::from_bytes([0; 32]), ObjectType::Chunk, b"x")
             .unwrap();
         drop(writer);
         assert_eq!(fs::read_dir(&tmp).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn encrypted_pack_round_trips_and_hides_content() {
+        let (_dir, tmp, packs) = setup();
+        let key = encrypted_keys();
+        let text = b"secret file content ".repeat(100);
+        let (name, entries) = write_pack(&tmp, &packs, &key, &[&text, b""]);
+        let path = pack_path(&packs, &name);
+        let bytes = fs::read(&path).unwrap();
+        assert_eq!(&bytes[10..12], &[1, 0]);
+        assert!(!bytes.windows(6).any(|w| w == b"secret"));
+        assert!(!bytes.windows(32).any(|w| w == entries[0].id.as_bytes()));
+        assert_eq!(entries[1].stored_len as usize, BOX_OVERHEAD);
+
+        verify_file_hash(&path, &name).unwrap();
+        assert_eq!(read_table(&path, &key).unwrap(), entries);
+        assert_eq!(read_object(&path, &entries[0], &key).unwrap(), text);
+        assert_eq!(read_object(&path, &entries[1], &key).unwrap(), b"");
+
+        // The wrong data key, or none, never reads the pack.
+        let other = Keys {
+            data: Some(SecretKey::from_bytes([3; 32])),
+            ..encrypted_keys()
+        };
+        assert!(matches!(
+            read_table(&path, &other),
+            Err(Error::Corrupt { .. })
+        ));
+        assert!(matches!(
+            read_table(&path, &plain_keys()),
+            Err(Error::Corrupt { .. })
+        ));
+        assert!(matches!(
+            read_object(&path, &entries[0], &other),
+            Err(Error::Corrupt { .. })
+        ));
+    }
+
+    #[test]
+    fn plain_pack_is_refused_in_an_encrypted_repository() {
+        let (_dir, tmp, packs) = setup();
+        let (name, _) = write_pack(&tmp, &packs, &plain_keys(), &[b"abc"]);
+        let path = pack_path(&packs, &name);
+        assert!(matches!(
+            read_table(&path, &encrypted_keys()),
+            Err(Error::Corrupt { .. })
+        ));
+    }
+
+    #[test]
+    fn swapped_encrypted_objects_fail_authentication() {
+        let (_dir, tmp, packs) = setup();
+        let key = encrypted_keys();
+        let (name, entries) = write_pack(&tmp, &packs, &key, &[b"first", b"other"]);
+        let path = pack_path(&packs, &name);
+        // Each entry pointed at the other object's sealed bytes.
+        let mut swapped = entries[0];
+        swapped.offset = entries[1].offset;
+        assert!(matches!(
+            read_object(&path, &swapped, &key),
+            Err(Error::Corrupt { .. })
+        ));
     }
 }

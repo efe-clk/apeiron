@@ -195,3 +195,48 @@ fn warnings_give_exit_code_3() {
     assert_eq!(code(&out), Some(3));
     assert!(String::from_utf8_lossy(&out.stderr).contains("warning: sock"));
 }
+
+#[test]
+fn encrypted_repository_with_password_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    fs::create_dir(root.join("src")).unwrap();
+    fs::write(root.join("src/a.txt"), b"private").unwrap();
+    fs::write(root.join("pw"), "pass word\n").unwrap();
+    fs::write(root.join("wrong"), "other\n").unwrap();
+    let repo = root.join("repo");
+    let run = |args: &[&str], password_file: &str| {
+        Command::new(env!("CARGO_BIN_EXE_apeiron"))
+            .args(args)
+            .env("APEIRON_REPO", &repo)
+            .env("APEIRON_PASSWORD_FILE", root.join(password_file))
+            .output()
+            .unwrap()
+    };
+
+    let out = run(
+        &["--json", "init", "--encrypt", repo.to_str().unwrap()],
+        "pw",
+    );
+    assert_eq!(code(&out), Some(0));
+    let doc: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(doc["encrypted"], true);
+    let recovery = doc["recovery_key"].as_str().unwrap().to_owned();
+    assert_eq!(recovery.len(), 64);
+
+    let src = root.join("src");
+    assert_eq!(
+        code(&run(&["backup", src.to_str().unwrap()], "pw")),
+        Some(0)
+    );
+
+    let out = run(&["--json", "ls", "main"], "wrong");
+    assert_eq!(code(&out), Some(1));
+    let doc: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(doc["error"]["kind"], "key");
+
+    fs::write(root.join("recovery"), &recovery).unwrap();
+    let out = run(&["ls", "main"], "recovery");
+    assert_eq!(code(&out), Some(0));
+    assert!(String::from_utf8_lossy(&out.stdout).contains("a.txt"));
+}

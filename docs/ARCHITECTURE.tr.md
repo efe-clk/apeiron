@@ -63,7 +63,8 @@ Her crate için geçerli kurallar:
 | `config` | Deponun `config` dosyası | Tamamlandı |
 | `repo` | Depo açma/oluşturma, nesne yazma ve okuma | Tamamlandı |
 | Blob, tree, snapshot kodlaması | Kanonik CBOR (FORMAT.tr.md §6) | Planlandı |
-| Şifreleme, işlem günlüğü | — | Planlandı |
+| `crypto`, `keyfile` | Şifreleme: mühürlü kutular ve anahtar dosyaları (FORMAT.tr.md §14) | Tamamlandı |
+| İşlem günlüğü | — | Planlandı |
 
 ## 3. Nesne modeli
 
@@ -107,7 +108,7 @@ Tam spesifikasyon [FORMAT.tr.md](FORMAT.tr.md) içindedir. Kısaca:
 | `index/` | Hangi nesnenin hangi pakette olduğu; yeniden üretilebilen bir önbellek | Tamamlandı |
 | `refs/`, `logs/` | Ref dosyaları ve yalnızca sonuna eklenen değişiklik günlükleri | Tamamlandı |
 | `tmp/` | Yazılmakta olan dosyalar; hiçbir zaman depo içeriği sayılmaz | Tamamlandı |
-| `locks/`, `keys/` | Depo kilitleri (Aşama 1) ve şifreleme anahtarları (Aşama 2) | Planlandı |
+| `locks/`, `keys/` | Depo kilidi ve şifreli bir deponun anahtar dosyaları | Tamamlandı |
 
 ## 5. Veri akışları
 
@@ -215,7 +216,7 @@ flowchart LR
 | Bütünlük | Ref dosyaları ve reflog satırları sağlama özeti taşır | Tamamlandı |
 | Gizlilik | Nesne kimlikleri anahtarlı BLAKE3'tür; uzak hedef bilinen bir dosyanın saklanıp saklanmadığını sınayamaz | Tamamlandı |
 | Kesinti güvenliği | Yaz → `fsync` → yeniden adlandır → klasör `fsync`; ref'ler karşılaştır-ve-değiştir ile güncellenir | Tamamlandı |
-| Şifreleme | İstemci tarafı şifreleme; uzak hedef düz metni hiç görmez; anahtarlar kullanıcıda kalır | Planlandı (Aşama 2) |
+| Şifreleme | İstemci tarafı şifreleme; uzak hedef düz metni hiç görmez; anahtarlar kullanıcıda kalır | Tamamlandı |
 | Kimlik ve izinler | Okuma, yazma, silme, paylaşma ve yönetme izinleri ayrıdır | Planlandı (Aşama 4) |
 | Denetim kaydı | Hassas işlemler kaydedilir; hassas veri hiçbir zaman kaydedilmez | Planlandı (Aşama 4) |
 | Eklentiler | Bildirilmiş ve kullanıcının onayladığı izinlerle WASM sandbox | Planlandı (Aşama 3) |

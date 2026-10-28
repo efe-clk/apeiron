@@ -54,4 +54,9 @@ Apeiron; sürüm kontrolü, arşivleme, yedekleme, senkronizasyon ve bütünlük
 
 **Aşama 1 — Yerel MVP.** Tamamlandı (2026-10-28). Bir aylık kullanım denemesi proje sahibinin kararıyla atlandı.
 
-**Aşama 2 — Uzak ve senkron.** Sıradaki işler `docs/ROADMAP.md` §4'te, sırasıyla: şifreleme, uzak hedefler, arka plan hizmeti, senkron.
+**Aşama 2 — Uzak ve senkron.** Devam ediyor. İşler `docs/ROADMAP.md` §4'te, sırasıyla:
+
+1. ~~İstemci tarafı şifreleme (`init --encrypt`, parola ve kurtarma anahtarı).~~ Tamamlandı (2026-10-28).
+2. Uzak hedefler (klasör, SFTP, S3), push ve pull.
+3. Arka plan hizmeti, zamanlanmış yedek, geri yükleme testi.
+4. Senkron ve çatışma tespiti.

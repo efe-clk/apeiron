@@ -91,6 +91,7 @@ Apeiron belgelerinde ve kodunda geçen terimler ve İngilizce karşılıkları. 
 | Importer / exporter | içe / dışa aktarıcı | Veriyi başka bir sistemden alan ya da oraya gönderen eklenti |
 | MSRV | MSRV (en düşük Rust sürümü) | Minimum supported Rust version: desteklenen en düşük Rust sürümü |
 | Plugin | eklenti | Çekirdeği değiştirmeden Apeiron'u genişleten isteğe bağlı kod |
+| Recovery key | kurtarma anahtarı | Şifreli bir depo oluşturulurken bir kez gösterilen rastgele anahtar; tüm parolalar kaybolduğunda depoyu açar |
 | Sandbox | sandbox (yalıtım ortamı) | Bir eklentinin yalnızca izin verileni yapabildiği yalıtılmış ortam |
 | SDK | SDK | Software development kit: Apeiron'u bir dilden kullanmak için kütüphane |
 | Storage backend | storage backend (depolama arka ucu) | Yeni bir depolama hedefi ekleyen eklenti |

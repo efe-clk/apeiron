@@ -63,7 +63,8 @@ What `apeiron-core` contains today:
 | `config` | The repository `config` file | Done |
 | `repo` | Opening/creating a repository, writing and reading objects | Done |
 | Blob, tree, snapshot encoding | Canonical CBOR (FORMAT.md §6) | Planned |
-| Encryption, operation log | — | Planned |
+| `crypto`, `keyfile` | Encryption: sealed boxes and key files (FORMAT.md §14) | Done |
+| Operation log | — | Planned |
 
 ## 3. Object model
 
@@ -107,7 +108,7 @@ The full specification is [FORMAT.md](FORMAT.md). In short:
 | `index/` | Which object is in which pack; a cache that can be rebuilt | Done |
 | `refs/`, `logs/` | Ref files and their append-only change logs | Done |
 | `tmp/` | Files being written; never repository content | Done |
-| `locks/`, `keys/` | Repository locks (Stage 1) and encryption keys (Stage 2) | Planned |
+| `locks/`, `keys/` | Repository lock and the key files of an encrypted repository | Done |
 
 ## 5. Data flows
 
@@ -215,7 +216,7 @@ flowchart LR
 | Integrity | Ref files and reflog lines carry checksums | Done |
 | Privacy | Object identifiers use keyed BLAKE3, so a remote target cannot test whether a known file is stored | Done |
 | Crash safety | Write → `fsync` → rename → directory `fsync`; refs are updated with compare-and-swap | Done |
-| Encryption | Client-side encryption; the remote target never sees plaintext; keys stay with the user | Planned (Stage 2) |
+| Encryption | Client-side encryption; the remote target never sees plaintext; keys stay with the user | Done |
 | Identity and permissions | Separate read, write, delete, share and admin permissions | Planned (Stage 4) |
 | Audit log | Sensitive operations are logged; sensitive data never is | Planned (Stage 4) |
 | Plugins | WASM sandbox with declared, user-approved permissions | Planned (Stage 3) |

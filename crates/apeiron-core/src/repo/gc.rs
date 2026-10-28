@@ -58,7 +58,7 @@ impl Repository {
         for shard in list_dirs(&self.dir(PACKS))? {
             for path in list_files(&shard)? {
                 if let Some(name) = index::hash_from_file_name(&path, ".pack") {
-                    let entries = pack::read_table(&path)?;
+                    let entries = pack::read_table(&path, &self.keys)?;
                     packs.push((name, path, entries));
                 }
             }
@@ -109,10 +109,10 @@ impl Repository {
         let mut written = Vec::new();
         let mut writer: Option<PackWriter> = None;
         for (path, entry) in &copies {
-            let stored = pack::read_stored(path, entry, &self.config.id_key)?;
+            let stored = pack::read_stored(path, entry, &self.keys)?;
             let w = match &mut writer {
                 Some(w) => w,
-                None => writer.insert(PackWriter::new(&self.dir(TMP))?),
+                None => writer.insert(PackWriter::new(&self.dir(TMP), &self.keys)?),
             };
             w.add_stored(entry, &stored)?;
             if w.len() >= pack::TARGET_SIZE {
@@ -127,7 +127,7 @@ impl Repository {
         report.written_packs = written.len() as u64;
 
         kept.extend(written);
-        let new_index = index::write_index(&self.dir(TMP), &self.dir(INDEX), &kept)?;
+        let new_index = index::write_index(&self.dir(TMP), &self.dir(INDEX), &kept, &self.keys)?;
         for path in index_files {
             if path != new_index {
                 remove(&path)?;

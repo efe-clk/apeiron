@@ -50,7 +50,9 @@ The ABI is deliberately small: a handful of functions that never change, while t
 | --- | --- |
 | `apeiron_abi_version()` | ABI version as `major << 16 \| minor` |
 | `apeiron_repo_init(path, &repo)` | Creates a repository and opens it |
+| `apeiron_repo_init_encrypted(path, password, &repo, &recovery_key)` | Creates an encrypted repository, opens it and returns its recovery key |
 | `apeiron_repo_open(path, &repo)` | Opens a repository |
+| `apeiron_repo_unlock(path, secret, &repo)` | Opens a repository with a password or the recovery key |
 | `apeiron_repo_free(repo)` | Closes a repository handle |
 | `apeiron_call(repo, operation, request_json, &result_json)` | Runs a short operation (`log`, `list`, `diff`, `refs`, `reflog`, `resolve`, `delete_ref`, `repair`, `info`) |
 | `apeiron_start(repo, operation, request_json, &job)` | Starts a long operation (`backup`, `restore`, `export`, `verify`, `gc`) |

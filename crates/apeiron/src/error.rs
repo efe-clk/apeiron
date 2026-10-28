@@ -24,6 +24,9 @@ pub enum ErrorKind {
     Cancelled = 9,
     Unsupported = 10,
     Internal = 11,
+    /// The repository is encrypted and the password or recovery key is
+    /// missing or wrong.
+    Key = 12,
 }
 
 impl ErrorKind {
@@ -91,6 +94,8 @@ impl From<apeiron_core::Error> for Error {
                 Error::new(ErrorKind::Unsupported, message).with_path(path)
             }
             E::ObjectNotFound(_) => Error::new(ErrorKind::NotFound, message),
+            E::KeyRequired(path) => Error::new(ErrorKind::Key, message).with_path(path),
+            E::WrongKey => Error::new(ErrorKind::Key, message),
             E::RefLocked { lock, .. } | E::RepoLocked(lock) => {
                 Error::new(ErrorKind::Locked, message).with_path(lock)
             }

@@ -91,6 +91,7 @@ Terms used across the Apeiron documentation and code, with their Turkish equival
 | Importer / exporter | içe / dışa aktarıcı | A plugin that moves data from or to another system |
 | MSRV | MSRV (en düşük Rust sürümü) | Minimum supported Rust version |
 | Plugin | eklenti | Optional code that extends Apeiron without changing the core |
+| Recovery key | kurtarma anahtarı | A random key shown once when an encrypted repository is created; it opens the repository when every password is lost |
 | Sandbox | sandbox (yalıtım ortamı) | An isolated environment where a plugin can only do what it is allowed to |
 | SDK | SDK | Software development kit: a library for using Apeiron from a language |
 | Storage backend | storage backend (depolama arka ucu) | A plugin that adds a new storage target |

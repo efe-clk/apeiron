@@ -62,6 +62,27 @@ export APEIRON_REPO=/run/media/<user>/<disk>/apeiron
 
 Her komut ayrıca öncelikli olan `--repo <path>` seçeneğini kabul eder.
 
+### 3.1 Şifreli depo
+
+Disk kaybolabilir ya da çalınabilirse veya daha sonra bir sunucuya kopyalanacaksa depoyu bunun yerine şifreli oluşturun:
+
+```bash
+apeiron init --encrypt /run/media/<user>/<disk>/apeiron
+```
+
+Komut bir parolayı iki kez sorar ve bir **kurtarma anahtarını** bir kez yazdırır (dörder karakterlik 13 grup). Kurtarma anahtarını kâğıda yazın ve bilgisayardan ve diskten ayrı bir yerde saklayın. Depoyu parola da kurtarma anahtarı da açar; ikisi birden kaybolursa veriyi hiç kimse kurtaramaz. Şifreleme yalnızca depo oluşturulurken seçilebilir.
+
+Sonraki her komut `Password or recovery key:` diye sorar. Otomatik yedek (bölüm 8) için parolayı yalnızca sizin okuyabildiğiniz bir dosyaya yazın ve Apeiron'a yerini söyleyin:
+
+```bash
+mkdir -p ~/.config/apeiron
+printf '%s\n' 'parolanız' > ~/.config/apeiron/password
+chmod 600 ~/.config/apeiron/password
+export APEIRON_PASSWORD_FILE=~/.config/apeiron/password
+```
+
+Anahtarı olmayan ve diski elinde tutan biri yalnızca veri dosyalarının sayısını ve boyutunu ve ref adlarını (`backup/documents`) görür; dosya adlarını ve içeriği göremez ([FORMAT.tr.md](FORMAT.tr.md) §14.5).
+
 ## 4. Yedekleme
 
 Her klasöre kendi ref'ini verin; böylece her birinin kendi geçmişi olur:
@@ -126,6 +147,8 @@ Description=Apeiron backup of Documents
 [Service]
 Type=oneshot
 Environment=APEIRON_REPO=/run/media/<user>/<disk>/apeiron
+# Only for an encrypted repository (section 3.1):
+Environment=APEIRON_PASSWORD_FILE=%h/.config/apeiron/password
 ExecStart=%h/.cargo/bin/apeiron backup %h/Documents --ref backup/documents
 # Exit code 3 means "done with warnings".
 SuccessExitStatus=3
@@ -175,6 +198,7 @@ Aşama 1'in çıkış kriteri, kendi verinizi bir ay boyunca yalnızca Apeiron i
 | `invalid repository … no config file` | Yol yanlış ya da harici disk bağlı değil |
 | `the repository is locked by another program` | `gc` yalnızca depoyu başka hiçbir şey kullanmıyorken çalışır ve `gc` sürerken diğer komutlar başlayamaz. Bekleyip yeniden deneyin |
 | `warning: damaged file …` | Ayrıntı için `apeiron verify`, bozuk indeks dosyalarını yeniden kurmak için `apeiron repair` çalıştırın. Bozuk paketler henüz onarılamaz (Aşama 2 başka hedeflerde kopyalar getirir) |
+| `wrong password or recovery key` | Parolayı yeniden yazın; kurtarma anahtarı da tireli ya da tiresiz çalışır. Parola dosyası kullanıyorsanız ilk satırının parola olduğunu denetleyin |
 | `already exists and is not an empty folder` | `restore` ve `export` asla üzerine yazmaz; yeni bir hedef seçin |
 | Çıkış kodu 130 | Komut Ctrl+C ile iptal edildi; yarım kalmış hiçbir şey görünmez |
 

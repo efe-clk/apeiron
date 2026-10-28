@@ -24,7 +24,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [014](#adr-014-güvensiz-sistem-çağrıları-için-küçük-bir-sistem-cratei) | `unsafe` kod | Yalnızca FFI crate'inde ve küçük `apeiron-sys` crate'inde | Kabul edildi |
 | [015](#adr-015-c-abi-sınırında-json-değerler) | C ABI | Küçük ve sabit bir işlev kümesi; istekler ve sonuçlar JSON | Önerildi |
 | [016](#adr-016-senkron-herkese-açık-api-ve-iş-parçacığında-çalışan-işler) | Uzun işlemler | Senkron API; sorgulanan ilerlemeyle iş parçacığında çalışan işler | Önerildi |
-| [017](#adr-017-şifreleme-için-xchacha20-poly1305-ve-argon2id) | Şifreleme | Veri için XChaCha20-Poly1305, parolalar için Argon2id | Önerildi |
+| [017](#adr-017-şifreleme-için-xchacha20-poly1305-ve-argon2id) | Şifreleme | Veri için XChaCha20-Poly1305, parolalar için Argon2id | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
@@ -349,7 +349,7 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 
 ## ADR-017: Şifreleme için XChaCha20-Poly1305 ve Argon2id
 
-**Durum:** Önerildi (2026-10-28)
+**Durum:** Kabul edildi (2026-10-28)
 
 **Bağlam.** Aşama 2, depoları güvenilmeyen disklerde ve sunucularda saklar ([FORMAT.tr.md](FORMAT.tr.md) §14). Şifre, birbirinden bağımsız birkaç yazıcının rastgele seçtiği nonce'larla güvenli olmalı, bir Raspberry Pi 4'te hızlı çalışmalı ve bakımı yapılan saf Rust bir kütüphane olarak bulunmalıdır. Parolalar için yavaş ve çok bellek isteyen bir türetme gerekir.
 

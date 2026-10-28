@@ -7,12 +7,14 @@
 
 mod chunker;
 mod config;
+mod crypto;
 mod error;
 #[cfg(test)]
 mod fault;
 mod fsutil;
 mod id;
 mod index;
+mod keyfile;
 mod lock;
 mod object;
 mod pack;

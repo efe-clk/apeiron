@@ -13,7 +13,7 @@ macro_rules! say {
 mod format;
 
 use std::io::{IsTerminal, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -44,6 +44,15 @@ struct Cli {
     #[arg(long, global = true, env = "APEIRON_REPO", value_name = "PATH")]
     repo: Option<PathBuf>,
 
+    /// File holding the password or recovery key of an encrypted repository
+    #[arg(
+        long,
+        global = true,
+        env = "APEIRON_PASSWORD_FILE",
+        value_name = "PATH"
+    )]
+    password_file: Option<PathBuf>,
+
     /// Print the result as one JSON document on standard output
     #[arg(long, global = true)]
     json: bool,
@@ -55,7 +64,12 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     /// Create an empty repository
-    Init { path: PathBuf },
+    Init {
+        path: PathBuf,
+        /// Encrypt the repository with a password; a recovery key is shown once
+        #[arg(long)]
+        encrypt: bool,
+    },
     /// Store a folder as a new snapshot and move a ref to it
     Backup {
         folder: PathBuf,
@@ -183,11 +197,29 @@ struct ErrorDocument<'a> {
     error: &'a Error,
 }
 
-fn open(cli_repo: Option<PathBuf>) -> Result<Repository, Failure> {
+/// Result of `init`; the recovery key is only there for an encrypted repository.
+#[derive(Serialize)]
+struct InitResult {
+    #[serde(flatten)]
+    info: apeiron::RepoInfo,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    recovery_key: Option<String>,
+}
+
+fn open(cli_repo: Option<PathBuf>, password_file: Option<&Path>) -> Result<Repository, Failure> {
     let path = cli_repo.ok_or_else(|| {
         Failure::Usage("no repository given; use --repo or set APEIRON_REPO".to_owned())
     })?;
-    let repo = Repository::open(path)?;
+    let repo = match Repository::open(&path) {
+        Err(e) if e.kind == ErrorKind::Key => {
+            let secret = match password_file {
+                Some(file) => read_password_file(file)?,
+                None => prompt("Password or recovery key: ")?,
+            };
+            Repository::unlock(&path, &secret)?
+        }
+        result => result?,
+    };
     let damaged = repo.info().damaged_files;
     if !damaged.is_empty() {
         for path in &damaged {
@@ -200,12 +232,72 @@ fn open(cli_repo: Option<PathBuf>) -> Result<Repository, Failure> {
     Ok(repo)
 }
 
+/// Reads a password or recovery key from the first line of a file.
+fn read_password_file(path: &Path) -> Result<String, Failure> {
+    let text = std::fs::read_to_string(path).map_err(|e| {
+        Failure::Usage(format!("cannot read password file {}: {e}", path.display()))
+    })?;
+    let line = text.lines().next().unwrap_or_default();
+    if line.is_empty() {
+        return Err(Failure::Usage(format!(
+            "password file {} is empty",
+            path.display()
+        )));
+    }
+    Ok(line.to_owned())
+}
+
+/// Asks for a password on the terminal without showing it.
+fn prompt(text: &str) -> Result<String, Failure> {
+    rpassword::prompt_password(text).map_err(|e| {
+        Failure::Usage(format!(
+            "cannot ask for the password ({e}); use --password-file or APEIRON_PASSWORD_FILE"
+        ))
+    })
+}
+
+fn new_password(password_file: Option<&Path>) -> Result<String, Failure> {
+    if let Some(file) = password_file {
+        return read_password_file(file);
+    }
+    let password = prompt("New password: ")?;
+    if password.is_empty() {
+        return Err(Failure::Usage("the password must not be empty".to_owned()));
+    }
+    if prompt("Repeat the password: ")? != password {
+        return Err(Failure::Usage("the passwords do not match".to_owned()));
+    }
+    Ok(password)
+}
+
 fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
+    let password_file = cli.password_file.as_deref();
     match cli.command {
-        Command::Init { path } => {
-            let repo = Repository::init(&path)?;
-            out.result(&repo.info(), |info| {
-                say!("Created an empty repository at {}", info.path.display());
+        Command::Init { path, encrypt } => {
+            let (repo, recovery_key) = if encrypt {
+                let (repo, key) = Repository::init_encrypted(&path, &new_password(password_file)?)?;
+                (repo, Some(key))
+            } else {
+                (Repository::init(&path)?, None)
+            };
+            let result = InitResult {
+                info: repo.info(),
+                recovery_key,
+            };
+            out.result(&result, |r| match &r.recovery_key {
+                None => say!("Created an empty repository at {}", r.info.path.display()),
+                Some(key) => {
+                    say!(
+                        "Created an empty encrypted repository at {}",
+                        r.info.path.display()
+                    );
+                    say!("Recovery key: {key}");
+                    say!(
+                        "Write the recovery key down and keep it apart from the password. \
+                         It is shown only now. If every password and the recovery key are lost, \
+                         nobody can recover the data."
+                    );
+                }
             });
             Ok(0)
         }
@@ -216,7 +308,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             author,
             host,
         } => {
-            let repo = open(cli.repo)?;
+            let repo = open(cli.repo, password_file)?;
             let mut request = BackupRequest::new(folder, ref_name.clone());
             request.message = message;
             request.author = author;
@@ -235,7 +327,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             Ok(warnings_exit(out, &report.warnings))
         }
         Command::Log { snapshot, limit } => {
-            let repo = open(cli.repo)?;
+            let repo = open(cli.repo, password_file)?;
             let page = repo.log(&LogRequest {
                 start: snapshot,
                 limit,
@@ -256,7 +348,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             Ok(0)
         }
         Command::Ls { snapshot, path } => {
-            let repo = open(cli.repo)?;
+            let repo = open(cli.repo, password_file)?;
             let entries = repo.list(&ListRequest {
                 snapshot,
                 path: Name::from(path.as_str()),
@@ -269,7 +361,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             Ok(0)
         }
         Command::Diff { from, to } => {
-            let repo = open(cli.repo)?;
+            let repo = open(cli.repo, password_file)?;
             let changes = repo.diff(&DiffRequest { from, to })?;
             out.result(&changes, |changes| {
                 for c in changes {
@@ -283,7 +375,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             target,
             path,
         } => {
-            let repo = open(cli.repo)?;
+            let repo = open(cli.repo, password_file)?;
             let report = watch(
                 out,
                 repo.restore(RestoreRequest {
@@ -309,7 +401,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             format,
             path,
         } => {
-            let repo = open(cli.repo)?;
+            let repo = open(cli.repo, password_file)?;
             let report = watch(
                 out,
                 repo.export(ExportRequest {
@@ -331,7 +423,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             Ok(warnings_exit(out, &report.warnings))
         }
         Command::Refs => {
-            let repo = open(cli.repo)?;
+            let repo = open(cli.repo, password_file)?;
             let refs = repo.refs()?;
             out.result(&refs, |refs| {
                 for r in refs {
@@ -341,7 +433,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             Ok(0)
         }
         Command::Verify => {
-            let repo = open(cli.repo)?;
+            let repo = open(cli.repo, password_file)?;
             let report = watch(out, repo.verify()?)?;
             out.result(&report, |r| {
                 for path in &r.damaged_files {
@@ -357,7 +449,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             Ok(if report.is_ok() { 0 } else { EXIT_DAMAGED })
         }
         Command::Gc { keep_days, dry_run } => {
-            let repo = open(cli.repo)?;
+            let repo = open(cli.repo, password_file)?;
             let report = watch(
                 out,
                 repo.gc(GcRequest {
@@ -378,7 +470,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             Ok(0)
         }
         Command::Repair => {
-            let repo = open(cli.repo)?;
+            let repo = open(cli.repo, password_file)?;
             let report = repo.repair()?;
             out.result(&report, |r| {
                 for lock in &r.removed_locks {

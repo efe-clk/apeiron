@@ -8,3 +8,11 @@ edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/efe-clk/apeiron"
+
+# Opening an encrypted repository runs Argon2id with 64 MiB of memory; without
+# optimization that takes seconds in debug builds and tests.
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3

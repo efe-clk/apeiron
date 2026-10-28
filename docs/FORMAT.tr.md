@@ -18,7 +18,7 @@ Uygulama durumu (`apeiron-core`):
 | 10 | Güç kesintisi testleri | Tamamlandı |
 | 12 | Depo kilidi | Tamamlandı |
 | 13 | Çöp toplama | Tamamlandı |
-| 14 | Şifreleme | Planlandı (incelemeye sunulan taslak) |
+| 14 | Şifreleme | Tamamlandı |
 
 ## Sade anlatım
 
@@ -459,7 +459,8 @@ keys = "…hex…"                              # id_key ‖ data_key'in mühür
 ```
 
 - **Parola:** anahtar şifreleme anahtarı, saklanan parametrelerle `Argon2id(parola, salt)`'tır. Varsayılanlar bir Raspberry Pi 4'e uygundur; bir yazıcı daha güçlü değerler seçebilir.
-- **Kurtarma anahtarı:** kullanıcıya bir kez, dörder karakterlik gruplar hâlinde 52 base32 karakter olarak gösterilen 32 rastgele bayt. Rastgele olduğu için yavaş bir türetme gerektirmez: anahtar şifreleme anahtarı `BLAKE3_derive_key("apeiron 2026 recovery key", kurtarma anahtarı)`'dır.
+- **Kurtarma anahtarı:** kullanıcıya bir kez, `-` ile birleştirilmiş dörder karakterlik gruplar hâlinde 52 base32 karakter (RFC 4648, dolgusuz) olarak gösterilen 32 rastgele bayt. Rastgele olduğu için yavaş bir türetme gerektirmez: anahtar şifreleme anahtarı `BLAKE3_derive_key("apeiron 2026 recovery key", kurtarma anahtarı)`'dır ve `[kdf]` yalnızca `algorithm`'i tutar. Okuyucu anahtarı büyük ya da küçük harfle kabul eder; boşlukları ve tireleri yok sayar.
+- `<name>` 32 rastgele hex karakterdir. Okuyucu ayrıştıramadığı anahtar dosyalarını yok sayar ve 4 GiB bellek, 64 tur ya da 64 şeritten büyük Argon2id parametrelerini reddeder; böylece araya sokulmuş bir anahtar dosyası belleğini ya da zamanını tüketemez.
 - Mühürlü kutunun ek verisi `"apeiron-key 1" ‖ depo kimliği`'dir (`config`'deki `id`'nin 16 baytı); böylece bir anahtar dosyası başka bir depoya taşınamaz.
 - Depoyu açmak için okuyucu anahtar dosyalarını tek tek dener; yanlış bir parola doğrulama etiketinde başarısız olur ve asla bozulma olarak değil, "yanlış parola" olarak bildirilir.
 - Bir parola eklemek ya da değiştirmek, eskisi silinmeden önce yeni bir anahtar dosyasını kalıcı olarak yazar (bölüm 9.1). Tüm parolalar ve kurtarma anahtarları kaybolursa veriyi hiç kimse kurtaramaz.
@@ -484,7 +485,7 @@ nonce (24 bayt, rastgele) ‖ şifreli metin ‖ etiket (16 bayt)
 | `config` | Düz; `[hash].id_key` yoktur ve `encryption.mode = "xchacha20-poly1305"` | — |
 | Ref'ler ve reflog'lar | Düz | — |
 
-Bir nesneyi okumak: mühürlü kutuyu aç → sıkıştırmayı çöz → `raw_len`'i denetle → kimliği yeniden hesapla (bölüm 4). Paket ve indeks dosyalarının adları dosya baytlarının düz BLAKE3'ü olarak kalır; böylece anahtarı olmayan bir sunucu da dosyaların sağlam olduğunu denetleyebilir.
+Bir nesneyi okumak: mühürlü kutuyu aç → sıkıştırmayı çöz → `raw_len`'i denetle → kimliği yeniden hesapla (bölüm 4). Şifreleme bayrağı `encryption.mode` ile uyuşmayan bir paket ya da indeks bozuktur: şifreli bir depo asla düz veri sunmaz, tersi de geçerlidir. Paket ve indeks dosyalarının adları dosya baytlarının düz BLAKE3'ü olarak kalır; böylece anahtarı olmayan bir sunucu da dosyaların sağlam olduğunu denetleyebilir.
 
 ### 14.5 Anahtarı olmayan bir okuyucunun görebildikleri
 

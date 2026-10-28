@@ -8,10 +8,12 @@ use std::time::{Duration, SystemTime};
 
 use crate::chunker::ChunkerParams;
 use crate::config::Config;
+use crate::crypto::{Keys, SecretKey};
 use crate::error::{Error, IoContext, Result};
 use crate::fsutil;
-use crate::id::{ObjectId, ObjectType};
+use crate::id::{IdKey, ObjectId, ObjectType};
 use crate::index::{self, Location};
+use crate::keyfile;
 use crate::object::{Blob, EntryKind, Snapshot, Tree};
 use crate::pack::{self, FileHash, PackEntry, PackWriter};
 use crate::refs::{RefStore, ReflogEntry, RepairReport};
@@ -26,6 +28,7 @@ const INDEX: &str = "index";
 const REFS: &str = "refs";
 const LOGS: &str = "logs";
 const LOCKS: &str = "locks";
+const KEYS: &str = "keys";
 const TMP: &str = "tmp";
 const TMP_MAX_AGE: Duration = Duration::from_secs(3600);
 
@@ -34,6 +37,7 @@ const TMP_MAX_AGE: Duration = Duration::from_secs(3600);
 pub struct Repository {
     root: PathBuf,
     config: Config,
+    keys: Keys,
     index: HashMap<ObjectId, Location>,
     /// The index files `index` was loaded from.
     index_files: Vec<PathBuf>,
@@ -52,27 +56,54 @@ impl Repository {
     }
 
     pub fn init_with(path: &Path, chunker: ChunkerParams) -> Result<Self> {
-        fsutil::ensure_dir(path)?;
-        if fs::read_dir(path).at(path)?.next().is_some() {
-            return Err(Error::InvalidRepository {
-                path: path.to_path_buf(),
-                reason: "directory is not empty".to_owned(),
-            });
-        }
-        for dir in [PACKS, INDEX, REFS, LOGS, LOCKS, TMP] {
-            fsutil::ensure_dir(&path.join(dir))?;
-        }
-        // The config file is written last: its presence marks a complete repository.
-        let config = Config::generate(chunker)?;
-        fsutil::write_durable(
-            &path.join(TMP),
-            &path.join(CONFIG),
-            config.to_toml().as_bytes(),
-        )?;
+        create_layout(path, false)?;
+        let config = Config::generate(chunker, Some(IdKey::generate()?))?;
+        write_config(path, &config)?;
         Repository::open(path)
     }
 
+    /// Creates an encrypted repository (FORMAT.md §14) with one password
+    /// key file and one recovery key file. Returns the repository and the
+    /// recovery key, which is shown to the user once and never stored.
+    pub fn init_encrypted(
+        path: &Path,
+        chunker: ChunkerParams,
+        password: &str,
+    ) -> Result<(Self, String)> {
+        create_layout(path, true)?;
+        let config = Config::generate(chunker, None)?;
+        let (id_key, data_key) = (IdKey::generate()?, SecretKey::generate()?);
+        let (keys_dir, tmp) = (path.join(KEYS), path.join(TMP));
+        keyfile::write_password(&keys_dir, &tmp, &config.id, &id_key, &data_key, password)?;
+        let recovery = keyfile::write_recovery(&keys_dir, &tmp, &config.id, &id_key, &data_key)?;
+        fsutil::sync_dir(&keys_dir)?;
+        write_config(path, &config)?;
+        let keys = Keys {
+            id: id_key,
+            data: Some(data_key),
+        };
+        Ok((Repository::open_with(path, Unlock::Keys(keys))?, recovery))
+    }
+
+    /// Opens a repository. An encrypted one fails with
+    /// [`Error::KeyRequired`]; see [`Repository::unlock`].
     pub fn open(path: &Path) -> Result<Self> {
+        Repository::open_with(path, Unlock::None)
+    }
+
+    /// Opens a repository with a password or recovery key. A repository that
+    /// is not encrypted opens without using `secret`.
+    pub fn unlock(path: &Path, secret: &str) -> Result<Self> {
+        Repository::open_with(path, Unlock::Secret(secret))
+    }
+
+    /// Opens the same repository again, with the keys this one was opened
+    /// with, and loads its index from disk.
+    pub fn reopen(&self) -> Result<Self> {
+        Repository::open_with(&self.root, Unlock::Keys(self.keys.clone()))
+    }
+
+    fn open_with(path: &Path, unlock: Unlock<'_>) -> Result<Self> {
         let config_path = path.join(CONFIG);
         let text = match fs::read_to_string(&config_path) {
             Ok(text) => text,
@@ -85,9 +116,21 @@ impl Repository {
             Err(e) => return Err(e).at(&config_path),
         };
         let config = Config::from_toml(&config_path, &text)?;
+        let keys = match (&config.id_key, unlock) {
+            (Some(id), _) => Keys {
+                id: id.clone(),
+                data: None,
+            },
+            (None, Unlock::None) => return Err(Error::KeyRequired(path.to_path_buf())),
+            (None, Unlock::Secret(secret)) => {
+                keyfile::unlock(&path.join(KEYS), &config.id, secret)?
+            }
+            (None, Unlock::Keys(keys)) => keys,
+        };
         let mut repo = Repository {
             root: path.to_path_buf(),
             config,
+            keys,
             index: HashMap::new(),
             index_files: Vec::new(),
             unindexed: Vec::new(),
@@ -105,6 +148,10 @@ impl Repository {
 
     pub fn chunker(&self) -> ChunkerParams {
         self.config.chunker
+    }
+
+    pub fn is_encrypted(&self) -> bool {
+        self.config.is_encrypted()
     }
 
     fn dir(&self, name: &str) -> PathBuf {
@@ -146,7 +193,7 @@ impl Repository {
             if index::hash_from_file_name(&path, ".idx").is_none() {
                 continue;
             }
-            let locations = match index::read_index(&path) {
+            let locations = match index::read_index(&path, &self.keys) {
                 Ok(locations) => locations,
                 Err(Error::Corrupt { .. }) => {
                     self.damaged.push(path);
@@ -170,7 +217,7 @@ impl Repository {
                     continue;
                 }
                 let entries = match pack::verify_file_hash(&path, &name)
-                    .and_then(|()| pack::read_table(&path))
+                    .and_then(|()| pack::read_table(&path, &self.keys))
                 {
                     Ok(entries) => entries,
                     Err(Error::Corrupt { .. }) => {
@@ -216,7 +263,7 @@ impl Repository {
     pub fn read_object(&self, id: &ObjectId) -> Result<(ObjectType, Vec<u8>)> {
         let location = self.index.get(id).ok_or(Error::ObjectNotFound(*id))?;
         let path = pack::pack_path(&self.dir(PACKS), &location.pack);
-        let data = pack::read_object(&path, &location.entry, &self.config.id_key)?;
+        let data = pack::read_object(&path, &location.entry, &self.keys)?;
         Ok((location.entry.ty, data))
     }
 
@@ -325,15 +372,15 @@ impl Repository {
                 check(
                     &mut report.damaged_files,
                     path.clone(),
-                    index::read_index(&path),
+                    index::read_index(&path, &self.keys),
                 )?;
             }
         }
         for shard in list_dirs(&self.dir(PACKS))? {
             for path in list_files(&shard)? {
                 if let Some(name) = index::hash_from_file_name(&path, ".pack") {
-                    let checked =
-                        pack::verify_file_hash(&path, &name).and_then(|()| pack::read_table(&path));
+                    let checked = pack::verify_file_hash(&path, &name)
+                        .and_then(|()| pack::read_table(&path, &self.keys));
                     check(&mut report.damaged_files, path, checked)?;
                 }
             }
@@ -414,7 +461,12 @@ impl Repository {
         // The new index covers every pack the damaged ones covered before
         // they are deleted (FORMAT.md §8.2).
         if !self.unindexed.is_empty() {
-            index::write_index(&self.dir(TMP), &self.dir(INDEX), &self.unindexed)?;
+            index::write_index(
+                &self.dir(TMP),
+                &self.dir(INDEX),
+                &self.unindexed,
+                &self.keys,
+            )?;
             report.indexed_packs = self.unindexed.len() as u64;
         }
         for path in damaged_indexes {
@@ -475,13 +527,15 @@ pub struct ObjectWriter<'a> {
 impl ObjectWriter<'_> {
     /// Stores an object unless it already exists and returns its id.
     pub fn put(&mut self, ty: ObjectType, data: &[u8]) -> Result<ObjectId> {
-        let id = self.repo.config.id_key.object_id(ty, data);
+        let id = self.repo.keys.id.object_id(ty, data);
         if self.repo.contains(&id) || self.pending.contains_key(&id) {
             return Ok(id);
         }
         let pack = match &mut self.pack {
             Some(pack) => pack,
-            None => self.pack.insert(PackWriter::new(&self.repo.dir(TMP))?),
+            None => self
+                .pack
+                .insert(PackWriter::new(&self.repo.dir(TMP), &self.repo.keys)?),
         };
         pack.add(id, ty, data)?;
         self.pending.insert(id, ty);
@@ -579,7 +633,12 @@ impl ObjectWriter<'_> {
         if self.packs.is_empty() {
             return Ok(());
         }
-        index::write_index(&self.repo.dir(TMP), &self.repo.dir(INDEX), &self.packs)?;
+        index::write_index(
+            &self.repo.dir(TMP),
+            &self.repo.dir(INDEX),
+            &self.packs,
+            &self.repo.keys,
+        )?;
         for (name, entries) in self.packs.drain(..) {
             for entry in entries {
                 self.repo
@@ -590,6 +649,42 @@ impl ObjectWriter<'_> {
         }
         Ok(())
     }
+}
+
+/// How [`Repository::open_with`] gets the keys of an encrypted repository.
+enum Unlock<'a> {
+    None,
+    Secret(&'a str),
+    Keys(Keys),
+}
+
+/// Creates the folders of a new repository in a new or empty folder.
+fn create_layout(path: &Path, encrypted: bool) -> Result<()> {
+    fsutil::ensure_dir(path)?;
+    if fs::read_dir(path).at(path)?.next().is_some() {
+        return Err(Error::InvalidRepository {
+            path: path.to_path_buf(),
+            reason: "directory is not empty".to_owned(),
+        });
+    }
+    let keys = encrypted.then_some(KEYS);
+    for dir in [PACKS, INDEX, REFS, LOGS, LOCKS, TMP]
+        .into_iter()
+        .chain(keys)
+    {
+        fsutil::ensure_dir(&path.join(dir))?;
+    }
+    Ok(())
+}
+
+/// Writes the config file of a new repository. It is written last: its
+/// presence marks a complete repository.
+fn write_config(path: &Path, config: &Config) -> Result<()> {
+    fsutil::write_durable(
+        &path.join(TMP),
+        &path.join(CONFIG),
+        config.to_toml().as_bytes(),
+    )
 }
 
 fn list_entries(dir: &Path, want_dir: bool) -> Result<Vec<PathBuf>> {
@@ -641,7 +736,54 @@ mod tests {
         }
         let reopened = Repository::open(repo.path()).unwrap();
         assert_eq!(reopened.chunker(), repo.chunker());
-        assert_eq!(reopened.config.id_key, repo.config.id_key);
+        assert_eq!(reopened.keys.id, repo.keys.id);
+    }
+
+    #[test]
+    fn encrypted_repository_needs_a_key_and_hides_content() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("repo");
+        let params = ChunkerParams::new(64 * 1024).unwrap();
+        let (mut repo, recovery) = Repository::init_encrypted(&path, params, "pw").unwrap();
+        assert!(repo.is_encrypted());
+        let secret = b"top secret content ".repeat(50);
+        let mut writer = repo.writer();
+        let (_, blob) = writer.put_file(secret.as_slice()).unwrap();
+        writer.finish().unwrap();
+        let blob = blob.unwrap();
+
+        for file in walk(&path) {
+            let bytes = fs::read(&file).unwrap();
+            assert!(!bytes.windows(10).any(|w| w == b"top secret"), "{file:?}");
+            assert!(!bytes.windows(32).any(|w| w == blob.as_bytes()), "{file:?}");
+        }
+
+        assert!(matches!(
+            Repository::open(&path),
+            Err(Error::KeyRequired(_))
+        ));
+        assert!(matches!(
+            Repository::unlock(&path, "wrong"),
+            Err(Error::WrongKey)
+        ));
+        for secret_key in ["pw", recovery.as_str()] {
+            let opened = Repository::unlock(&path, secret_key).unwrap();
+            let mut out = Vec::new();
+            opened.read_file(&blob, &mut out).unwrap();
+            assert_eq!(out, secret);
+            assert!(opened.verify().unwrap().is_ok());
+        }
+        let mut out = Vec::new();
+        repo.reopen().unwrap().read_file(&blob, &mut out).unwrap();
+        assert_eq!(out, secret);
+    }
+
+    fn walk(dir: &Path) -> Vec<PathBuf> {
+        let mut out = list_files(dir).unwrap();
+        for sub in list_dirs(dir).unwrap() {
+            out.extend(walk(&sub));
+        }
+        out
     }
 
     #[test]

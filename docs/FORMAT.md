@@ -18,7 +18,7 @@ Implementation status (`apeiron-core`):
 | 10 | Power-failure tests | Done |
 | 12 | Repository lock | Done |
 | 13 | Garbage collection | Done |
-| 14 | Encryption | Planned (draft for review) |
+| 14 | Encryption | Done |
 
 ## Plain summary
 
@@ -459,7 +459,8 @@ keys = "…hex…"                              # sealed box (14.3) of id_key �
 ```
 
 - **Password:** the key-encryption key is `Argon2id(password, salt)` with the stored parameters. The defaults fit a Raspberry Pi 4; a writer may choose stronger ones.
-- **Recovery key:** 32 random bytes shown once to the user as 52 base32 characters in groups of four. Being random, it needs no slow derivation: the key-encryption key is `BLAKE3_derive_key("apeiron 2026 recovery key", recovery key)`.
+- **Recovery key:** 32 random bytes shown once to the user as 52 base32 characters (RFC 4648, no padding) in groups of four joined by `-`. Being random, it needs no slow derivation: the key-encryption key is `BLAKE3_derive_key("apeiron 2026 recovery key", recovery key)`, and `[kdf]` holds only `algorithm`. A reader accepts the key in any letter case and ignores spaces and dashes.
+- `<name>` is 32 random hex characters. A reader ignores key files it cannot parse and refuses Argon2id parameters above 4 GiB of memory, 64 iterations or 64 lanes, so that a planted key file cannot exhaust its memory or time.
 - The additional data of the sealed box is `"apeiron-key 1" ‖ repository id` (the 16 bytes of `id` in `config`), so a key file cannot be moved into another repository.
 - To open the repository, a reader tries the key files one by one; a wrong password fails the authentication tag and is reported as "wrong password", never as corruption.
 - Adding or changing a password writes a new key file durably (section 9.1) before an old one is deleted. If every password and recovery key is lost, the data cannot be recovered by anyone.
@@ -484,7 +485,7 @@ A 24-byte random nonce can be chosen without coordination between writers; repea
 | `config` | Plain; `[hash].id_key` is absent and `encryption.mode = "xchacha20-poly1305"` | — |
 | Refs and reflogs | Plain | — |
 
-Reading an object: open the sealed box → decompress → check `raw_len` → recompute the identifier (section 4). Pack and index file names stay the plain BLAKE3 of the file bytes, so a server without keys can still check that the files are intact.
+Reading an object: open the sealed box → decompress → check `raw_len` → recompute the identifier (section 4). A pack or index whose encryption flag does not match `encryption.mode` is corrupt: an encrypted repository never serves plain data and the other way round. Pack and index file names stay the plain BLAKE3 of the file bytes, so a server without keys can still check that the files are intact.
 
 ### 14.5 What a reader without a key can see
 

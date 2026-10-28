@@ -27,11 +27,23 @@ The CLI is the first interface of Apeiron. Like every other interface it uses on
 
 If neither is given, the command stops with a usage error. A repository on an external disk is just a repository at a path on that disk.
 
+### 2.1 Encrypted repositories
+
+`apeiron init --encrypt <path>` asks for a new password twice and prints the recovery key once ([FORMAT.md](FORMAT.md) §14). Every other command on an encrypted repository needs the password or the recovery key:
+
+| Source | Example | Priority |
+| --- | --- | --- |
+| `--password-file` option | `apeiron --password-file ~/.config/apeiron/password log` | 1 |
+| `APEIRON_PASSWORD_FILE` environment variable | `export APEIRON_PASSWORD_FILE=~/.config/apeiron/password` | 2 |
+| Asked on the terminal, without showing it | `Password or recovery key:` | 3 |
+
+The first line of the file is the password; `init --encrypt` also reads the new password from it. A wrong password or recovery key ends the command with exit code 1 and the error kind `key`. With `--json`, `init` adds the field `recovery_key`.
+
 ## 3. Commands
 
 | Command | What it does | Status |
 | --- | --- | --- |
-| `apeiron init <path>` | Creates an empty repository | Done |
+| `apeiron init <path> [--encrypt]` | Creates an empty repository; `--encrypt` encrypts it with a password (section 2.1) | Done |
 | `apeiron backup <folder> [--ref <name>] [--message <text>]` | Stores the folder as a new snapshot and moves the ref to it (default ref: `main`) | Done |
 | `apeiron log [<ref>]` | Lists the snapshots of a ref, newest first | Done |
 | `apeiron ls <snapshot> [<path>]` | Lists the files and folders inside a snapshot | Done |
@@ -95,6 +107,7 @@ apeiron verify
 | Command-line parsing | `clap` | The most widely used Rust parser; generates help and checks options |
 | JSON output | `serde_json` | Standard JSON library for `serde`, already used for configuration |
 | Ctrl+C | `ctrlc` | Small, widely used; the same code on Linux, macOS and Windows |
+| Hidden password prompt | `rpassword` | Small, widely used; reads from the terminal without echo on Linux, macOS and Windows |
 | tar, zip and 7z export | `tar`, `zip`, `sevenz-rust2` | Pure Rust; the archives open with the standard `tar`, `unzip` and `7z` tools, keeping permissions and symbolic links |
 
 ## 8. Open questions

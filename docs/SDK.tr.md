@@ -50,7 +50,9 @@ ABI bilerek küçük tutulur: hiç değişmeyen birkaç işlev vardır; işlemle
 | --- | --- |
 | `apeiron_abi_version()` | `major << 16 \| minor` biçiminde ABI sürümü |
 | `apeiron_repo_init(path, &repo)` | Bir depo oluşturur ve açar |
+| `apeiron_repo_init_encrypted(path, password, &repo, &recovery_key)` | Şifreli bir depo oluşturur, açar ve kurtarma anahtarını döndürür |
 | `apeiron_repo_open(path, &repo)` | Bir depoyu açar |
+| `apeiron_repo_unlock(path, secret, &repo)` | Bir depoyu bir parola ya da kurtarma anahtarıyla açar |
 | `apeiron_repo_free(repo)` | Bir depo tutamacını kapatır |
 | `apeiron_call(repo, operation, request_json, &result_json)` | Kısa bir işlemi çalıştırır (`log`, `list`, `diff`, `refs`, `reflog`, `resolve`, `delete_ref`, `repair`, `info`) |
 | `apeiron_start(repo, operation, request_json, &job)` | Uzun bir işlemi başlatır (`backup`, `restore`, `export`, `verify`, `gc`) |

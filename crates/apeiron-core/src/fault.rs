@@ -61,8 +61,13 @@ pub(crate) fn checkpoint() -> io::Result<()> {
     })
 }
 
+/// Copies `src` to `dest`; a `src` that does not exist yet copies as an
+/// empty folder.
 fn copy_dir(src: &Path, dest: &Path) {
     fs::create_dir_all(dest).unwrap();
+    if !src.exists() {
+        return;
+    }
     for entry in fs::read_dir(src).unwrap() {
         let entry = entry.unwrap();
         let target = dest.join(entry.file_name());
@@ -118,11 +123,34 @@ struct Fixture {
     new: ObjectId,
 }
 
+/// Password of the encrypted test repositories.
+const PASSWORD: &str = "correct horse";
+
+/// Creates a test repository, encrypted with [`PASSWORD`] if asked.
+fn init(path: &Path, encrypted: bool) -> Repository {
+    let params = ChunkerParams::new(64 * 1024).unwrap();
+    if encrypted {
+        Repository::init_encrypted(path, params, PASSWORD)
+            .unwrap()
+            .0
+    } else {
+        Repository::init_with(path, params).unwrap()
+    }
+}
+
+/// Opens a test repository, encrypted or not.
+fn open(path: &Path) -> Result<Repository> {
+    Repository::unlock(path, PASSWORD)
+}
+
 fn fixture() -> Fixture {
+    fixture_of(false)
+}
+
+fn fixture_of(encrypted: bool) -> Fixture {
     let dir = tempfile::tempdir().unwrap();
     let base = dir.path().join("repo");
-    let params = ChunkerParams::new(64 * 1024).unwrap();
-    let mut repo = Repository::init_with(&base, params).unwrap();
+    let mut repo = init(&base, encrypted);
     let mut writer = repo.writer();
     let old = writer.put(ObjectType::Snapshot, OLD).unwrap();
     writer.finish().unwrap();
@@ -131,7 +159,7 @@ fn fixture() -> Fixture {
     // Object ids depend on the repository's key: learn `new` from a copy.
     let scratch = tempfile::tempdir().unwrap();
     copy_dir(&base, scratch.path());
-    let mut copy = Repository::open(scratch.path()).unwrap();
+    let mut copy = open(scratch.path()).unwrap();
     let mut writer = copy.writer();
     let new = writer.put(ObjectType::Snapshot, NEW).unwrap();
     writer.finish().unwrap();
@@ -169,7 +197,7 @@ fn run_on(
     let work = tempfile::tempdir().unwrap();
     let path = work.path().join("repo");
     copy_dir(base, &path);
-    let mut repo = Repository::open(&path).unwrap();
+    let mut repo = open(&path).unwrap();
     PLAN.set(Some(Plan {
         fault: fault(&path),
         remaining: n,
@@ -250,17 +278,26 @@ fn assert_reflog_chain(repo: &Repository) {
 
 #[test]
 fn every_crash_leaves_main_at_a_readable_snapshot_and_recovers() {
-    let f = fixture();
+    every_crash_leaves_main_at_a_readable_snapshot_and_recovers_with(false);
+}
+
+#[test]
+fn every_crash_leaves_main_at_a_readable_snapshot_and_recovers_encrypted() {
+    every_crash_leaves_main_at_a_readable_snapshot_and_recovers_with(true);
+}
+
+fn every_crash_leaves_main_at_a_readable_snapshot_and_recovers_with(encrypted: bool) {
+    let f = fixture_of(encrypted);
     let states = crash_states(&f);
     assert!(states.len() > 20, "only {} checkpoints", states.len());
 
-    let done = Repository::open(&repo_path(states.last().unwrap())).unwrap();
+    let done = open(&repo_path(states.last().unwrap())).unwrap();
     assert_eq!(done.read_ref("main").unwrap(), Some(f.new));
     assert_reflog_chain(&done);
 
     for state in &states {
         let path = repo_path(state);
-        let mut repo = Repository::open(&path).unwrap();
+        let mut repo = open(&path).unwrap();
         let target = repo.read_ref("main").unwrap().unwrap();
         assert!(target == f.old || target == f.new);
         assert_eq!(repo.read_object(&target).unwrap().0, ObjectType::Snapshot);
@@ -270,7 +307,7 @@ fn every_crash_leaves_main_at_a_readable_snapshot_and_recovers() {
         age_files(&path.join("tmp"));
         age_files(&path.join("refs"));
         repo.repair().unwrap();
-        let mut repo = Repository::open(&path).unwrap();
+        let mut repo = open(&path).unwrap();
         assert!(files(&path.join("tmp")).is_empty());
         commit_later(&mut repo, target);
         assert_reflog_chain(&repo);
@@ -286,13 +323,13 @@ fn crash_while_pack_is_in_tmp_changes_nothing() {
         if has_new_files(&f, &path, "packs") {
             continue;
         }
-        let repo = Repository::open(&path).unwrap();
+        let repo = open(&path).unwrap();
         assert_eq!(repo.read_ref("main").unwrap(), Some(f.old));
         assert!(!repo.contains(&f.new));
         seen += usize::from(!files(&path.join("tmp")).is_empty());
 
         age_files(&path.join("tmp"));
-        Repository::open(&path).unwrap();
+        open(&path).unwrap();
         assert!(files(&path.join("tmp")).is_empty());
     }
     assert!(seen > 0);
@@ -307,7 +344,7 @@ fn crash_after_pack_move_before_index_indexes_the_orphan_pack() {
         if !has_new_files(&f, &path, "packs") || has_new_files(&f, &path, "index") {
             continue;
         }
-        let repo = Repository::open(&path).unwrap();
+        let repo = open(&path).unwrap();
         assert_eq!(repo.read_ref("main").unwrap(), Some(f.old));
         assert_eq!(repo.read_object(&f.new).unwrap().1, NEW);
         seen += 1;
@@ -321,7 +358,7 @@ fn crash_after_index_before_ref_update_keeps_old_ref() {
     let mut seen = 0;
     for state in crash_states(&f) {
         let path = repo_path(&state);
-        let repo = Repository::open(&path).unwrap();
+        let repo = open(&path).unwrap();
         if !has_new_files(&f, &path, "index")
             || has_lock(&path)
             || repo.read_ref("main").unwrap() != Some(f.old)
@@ -343,7 +380,7 @@ fn crash_with_ref_lock_taken_needs_repair() {
         if !has_lock(&path) {
             continue;
         }
-        let mut repo = Repository::open(&path).unwrap();
+        let mut repo = open(&path).unwrap();
         assert_eq!(repo.read_ref("main").unwrap(), Some(f.old));
         assert!(matches!(
             repo.update_ref("main", Some(f.old), Some(f.new)),
@@ -371,7 +408,7 @@ fn crash_after_ref_move_before_reflog_gets_repair_line() {
     let mut seen = 0;
     for state in crash_states(&f) {
         let path = repo_path(&state);
-        let mut repo = Repository::open(&path).unwrap();
+        let mut repo = open(&path).unwrap();
         if repo.read_ref("main").unwrap() != Some(f.new) || last_logged(&repo) != Some(f.old) {
             continue;
         }
@@ -399,11 +436,11 @@ fn repair_command_appends_lost_reflog_line() {
     let state = crash_states(&f)
         .into_iter()
         .find(|state| {
-            let repo = Repository::open(&repo_path(state)).unwrap();
+            let repo = open(&repo_path(state)).unwrap();
             repo.read_ref("main").unwrap() == Some(f.new) && last_logged(&repo) == Some(f.old)
         })
         .unwrap();
-    let mut repo = Repository::open(&repo_path(&state)).unwrap();
+    let mut repo = open(&repo_path(&state)).unwrap();
     assert_eq!(repo.repair().unwrap().repaired_refs, ["main"]);
     let last = repo.reflog("main").unwrap().pop().unwrap();
     assert_eq!(
@@ -415,7 +452,16 @@ fn repair_command_appends_lost_reflog_line() {
 
 #[test]
 fn disk_full_at_any_step_reports_error_and_cleans_up() {
-    let f = fixture();
+    disk_full_at_any_step_reports_error_and_cleans_up_with(false);
+}
+
+#[test]
+fn disk_full_at_any_step_reports_error_and_cleans_up_encrypted() {
+    disk_full_at_any_step_reports_error_and_cleans_up_with(true);
+}
+
+fn disk_full_at_any_step_reports_error_and_cleans_up_with(encrypted: bool) {
+    let f = fixture_of(encrypted);
     let mut steps = 0;
     for n in 0.. {
         let (work, result, fired) = run(&f, n, |_| Fault::DiskFull);
@@ -433,7 +479,7 @@ fn disk_full_at_any_step_reports_error_and_cleans_up() {
         let path = repo_path(&work);
         assert!(files(&path.join("tmp")).is_empty(), "step {n}");
         assert!(!has_lock(&path), "step {n}");
-        let mut repo = Repository::open(&path).unwrap();
+        let mut repo = open(&path).unwrap();
         let target = repo.read_ref("main").unwrap().unwrap();
         // The ref only moves when the error hit the reflog append after it;
         // the line may or may not have been written.
@@ -451,8 +497,17 @@ fn disk_full_at_any_step_reports_error_and_cleans_up() {
 
 #[test]
 fn bit_flip_anywhere_in_a_pack_is_never_silent() {
-    let f = fixture();
-    let mut repo = Repository::open(&f.base).unwrap();
+    bit_flip_anywhere_in_a_pack_is_never_silent_with(false);
+}
+
+#[test]
+fn bit_flip_anywhere_in_a_pack_is_never_silent_encrypted() {
+    bit_flip_anywhere_in_a_pack_is_never_silent_with(true);
+}
+
+fn bit_flip_anywhere_in_a_pack_is_never_silent_with(encrypted: bool) {
+    let f = fixture_of(encrypted);
+    let mut repo = open(&f.base).unwrap();
     let data = noise(4096, 8);
     let mut writer = repo.writer();
     let id = writer.put(ObjectType::Chunk, &data).unwrap();
@@ -484,7 +539,7 @@ fn bit_flip_anywhere_in_a_pack_is_never_silent() {
         for name in &index_files {
             fs::rename(f.base.join("index").join(name), hidden.path().join(name)).unwrap();
         }
-        let reopened = Repository::open(&f.base).unwrap();
+        let reopened = open(&f.base).unwrap();
         assert_eq!(
             reopened.damaged_files(),
             std::slice::from_ref(&pack),
@@ -545,10 +600,13 @@ mod gc {
     }
 
     fn gc_fixture() -> GcFixture {
+        gc_fixture_of(false)
+    }
+
+    fn gc_fixture_of(encrypted: bool) -> GcFixture {
         let dir = tempfile::tempdir().unwrap();
         let base = dir.path().join("repo");
-        let params = ChunkerParams::new(64 * 1024).unwrap();
-        let mut repo = Repository::init_with(&base, params).unwrap();
+        let mut repo = init(&base, encrypted);
         let kept_data = noise(150 * 1024, 11);
 
         let mut writer = repo.writer();
@@ -581,7 +639,7 @@ mod gc {
 
     /// `keep` is intact, nothing is damaged, and another collection finishes.
     fn assert_healthy(path: &Path, kept_data: &[u8]) {
-        let mut repo = Repository::open(path).unwrap();
+        let mut repo = open(path).unwrap();
         let check = |repo: &Repository| {
             let snapshot = repo
                 .read_snapshot(&repo.read_ref("keep").unwrap().unwrap())
@@ -612,7 +670,16 @@ mod gc {
 
     #[test]
     fn every_crash_during_gc_keeps_live_data() {
-        let f = gc_fixture();
+        every_crash_during_gc_keeps_live_data_with(false);
+    }
+
+    #[test]
+    fn every_crash_during_gc_keeps_live_data_encrypted() {
+        every_crash_during_gc_keeps_live_data_with(true);
+    }
+
+    fn every_crash_during_gc_keeps_live_data_with(encrypted: bool) {
+        let f = gc_fixture_of(encrypted);
         let states = crash_states_of(&f.base, collect);
         assert!(states.len() > 10, "only {} checkpoints", states.len());
         for state in &states {
@@ -645,7 +712,7 @@ mod gc {
     fn gc_removes_dead_objects_and_rewrites_the_shared_pack() {
         let f = gc_fixture();
         let (_dir, path) = copy_of(&f);
-        let mut repo = Repository::open(&path).unwrap();
+        let mut repo = open(&path).unwrap();
         // The dry run creates only the lock file, which is never deleted.
         crate::lock::RepoLock::shared(&path).unwrap();
         let before = files(&path);
@@ -676,7 +743,7 @@ mod gc {
     fn recent_reflog_lines_keep_deleted_snapshots() {
         let f = gc_fixture();
         let (_dir, path) = copy_of(&f);
-        let mut repo = Repository::open(&path).unwrap();
+        let mut repo = open(&path).unwrap();
         let report = repo.gc(&GcOptions::default()).unwrap();
         assert_eq!(report.removed_objects, 0);
     }
@@ -685,7 +752,7 @@ mod gc {
     fn gc_needs_the_lock_alone() {
         let f = gc_fixture();
         let (_dir, path) = copy_of(&f);
-        let mut repo = Repository::open(&path).unwrap();
+        let mut repo = open(&path).unwrap();
         let reader = crate::lock::RepoLock::shared(&path).unwrap();
         assert!(matches!(
             repo.gc(&GcOptions::default()),
@@ -699,7 +766,7 @@ mod gc {
     fn missing_reachable_object_stops_gc_before_deleting() {
         let f = gc_fixture();
         let (_dir, path) = copy_of(&f);
-        let mut repo = Repository::open(&path).unwrap();
+        let mut repo = open(&path).unwrap();
         // A tree naming a blob that does not exist, stored without the usual checks.
         let tree = Tree {
             entries: vec![TreeEntry {
@@ -747,14 +814,23 @@ mod gc {
 
 #[test]
 fn damaged_index_is_skipped_and_rebuilt_by_repair() {
-    let f = fixture();
+    damaged_index_is_skipped_and_rebuilt_by_repair_with(false);
+}
+
+#[test]
+fn damaged_index_is_skipped_and_rebuilt_by_repair_encrypted() {
+    damaged_index_is_skipped_and_rebuilt_by_repair_with(true);
+}
+
+fn damaged_index_is_skipped_and_rebuilt_by_repair_with(encrypted: bool) {
+    let f = fixture_of(encrypted);
     let index_dir = f.base.join("index");
     let index = index_dir.join(&files(&index_dir)[0]);
     let mut bytes = fs::read(&index).unwrap();
     bytes[40] ^= 0x01;
     fs::write(&index, bytes).unwrap();
 
-    let mut repo = Repository::open(&f.base).unwrap();
+    let mut repo = open(&f.base).unwrap();
     assert_eq!(repo.damaged_files(), std::slice::from_ref(&index));
     assert_eq!(repo.read_object(&f.old).unwrap().1, OLD);
     assert_eq!(
@@ -765,7 +841,7 @@ fn damaged_index_is_skipped_and_rebuilt_by_repair() {
     let report = repo.repair().unwrap();
     assert_eq!(report.removed_index_files, [index]);
     assert_eq!(report.indexed_packs, 1);
-    let repo = Repository::open(&f.base).unwrap();
+    let repo = open(&f.base).unwrap();
     assert!(repo.damaged_files().is_empty());
     // The fixture's snapshots are plain bytes, so only files are checked here.
     assert!(repo.verify().unwrap().damaged_files.is_empty());
@@ -774,7 +850,16 @@ fn damaged_index_is_skipped_and_rebuilt_by_repair() {
 
 #[test]
 fn every_crash_during_index_repair_keeps_objects_readable() {
-    let f = fixture();
+    every_crash_during_index_repair_keeps_objects_readable_with(false);
+}
+
+#[test]
+fn every_crash_during_index_repair_keeps_objects_readable_encrypted() {
+    every_crash_during_index_repair_keeps_objects_readable_with(true);
+}
+
+fn every_crash_during_index_repair_keeps_objects_readable_with(encrypted: bool) {
+    let f = fixture_of(encrypted);
     let index_dir = f.base.join("index");
     let index = index_dir.join(&files(&index_dir)[0]);
     let mut bytes = fs::read(&index).unwrap();
@@ -784,11 +869,46 @@ fn every_crash_during_index_repair_keeps_objects_readable() {
     let states = crash_states_of(&f.base, |repo| repo.repair().map(drop));
     assert!(states.len() > 3);
     for state in &states {
-        let mut repo = Repository::open(&repo_path(state)).unwrap();
+        let mut repo = open(&repo_path(state)).unwrap();
         assert_eq!(repo.read_object(&f.old).unwrap().1, OLD);
         repo.repair().unwrap();
-        let repo = Repository::open(&repo_path(state)).unwrap();
+        let repo = open(&repo_path(state)).unwrap();
         assert!(repo.damaged_files().is_empty());
         assert!(repo.verify().unwrap().damaged_files.is_empty());
     }
+}
+
+#[test]
+fn every_crash_during_encrypted_init_leaves_no_repository_or_a_whole_one() {
+    let params = ChunkerParams::new(64 * 1024).unwrap();
+    let mut whole = 0;
+    for n in 0.. {
+        let work = tempfile::tempdir().unwrap();
+        let path = work.path().join("repo");
+        let crash = tempfile::tempdir().unwrap();
+        let dest = crash.path().join("repo");
+        PLAN.set(Some(Plan {
+            fault: Fault::Crash {
+                repo: path.clone(),
+                dest: dest.clone(),
+            },
+            remaining: n,
+            fired: false,
+        }));
+        let result = Repository::init_encrypted(&path, params, PASSWORD);
+        if !PLAN.take().is_some_and(|p| p.fired) {
+            result.unwrap();
+            break;
+        }
+        assert!(result.is_err());
+        match open(&dest) {
+            Ok(repo) => {
+                assert!(repo.is_encrypted());
+                whole += 1;
+            }
+            Err(Error::InvalidRepository { reason, .. }) => assert_eq!(reason, "no config file"),
+            Err(e) => panic!("checkpoint {n}: {e}"),
+        }
+    }
+    assert!(whole > 0);
 }

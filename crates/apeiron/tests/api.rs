@@ -257,3 +257,37 @@ fn requests_and_results_round_trip_as_json() {
         serde_json::from_str(r#"{"snapshot": "main", "target": "/tmp/x"}"#).unwrap();
     assert!(request.path.as_bytes().is_empty());
 }
+
+#[test]
+fn encrypted_repository_round_trip() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path();
+    fs::create_dir(root.join("src")).unwrap();
+    fs::write(root.join("src/a.txt"), b"private").unwrap();
+    let err = Repository::init_encrypted(root.join("empty-pw"), "").unwrap_err();
+    assert_eq!(err.kind, ErrorKind::InvalidInput);
+    let (repo, recovery) = Repository::init_encrypted(root.join("repo"), "pw").unwrap();
+    assert!(repo.info().encrypted);
+    let job = repo
+        .backup(BackupRequest::new(root.join("src"), "main"))
+        .unwrap();
+    job.wait().unwrap();
+
+    let err = Repository::open(root.join("repo")).unwrap_err();
+    assert_eq!((err.kind, err.code), (ErrorKind::Key, 12));
+    let err = Repository::unlock(root.join("repo"), "nope").unwrap_err();
+    assert_eq!(err.kind, ErrorKind::Key);
+
+    let repo = Repository::unlock(root.join("repo"), &recovery).unwrap();
+    let target = root.join("out");
+    let job = repo
+        .restore(RestoreRequest {
+            snapshot: "main".into(),
+            target: target.clone(),
+            path: Default::default(),
+        })
+        .unwrap();
+    job.wait().unwrap();
+    assert_eq!(fs::read(target.join("a.txt")).unwrap(), b"private");
+    assert!(repo.verify().unwrap().wait().unwrap().is_ok());
+}
