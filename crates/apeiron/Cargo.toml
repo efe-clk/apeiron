@@ -1,0 +1,19 @@
+[package]
+name = "apeiron"
+description = "Public Rust API of Apeiron"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+apeiron-core = { path = "../apeiron-core" }
+apeiron-services = { path = "../apeiron-services" }
+serde = { version = "1.0.229", features = ["derive"] }
+thiserror = "2.0.21"
+
+[dev-dependencies]
+serde_json = "1"
+tempfile = "3.27.0"

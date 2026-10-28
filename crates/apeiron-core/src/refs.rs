@@ -35,8 +35,18 @@ pub fn validate_ref_name(name: &str) -> Result<()> {
     Ok(())
 }
 
+/// What [`crate::Repository::repair`] did.
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct RepairReport {
+    /// Stale ref lock files that were removed.
+    pub removed_locks: Vec<PathBuf>,
+    /// Refs whose reflog got a `repair` line.
+    pub repaired_refs: Vec<String>,
+}
+
 /// Kind of change recorded in a reflog line.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum RefOp {
     Create,
     Update,
@@ -66,7 +76,7 @@ impl RefOp {
 }
 
 /// One line of a reflog.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ReflogEntry {
     pub old: Option<ObjectId>,
     pub new: Option<ObjectId>,
@@ -213,7 +223,6 @@ impl RefStore {
             });
         }
         self.repair_log(name, actual)?;
-
         let op = match (actual, new) {
             (None, None) => return Ok(()),
             (None, Some(_)) => RefOp::Create,
@@ -279,9 +288,9 @@ impl RefStore {
     }
 
     /// Removes stale locks and records ref changes whose reflog line was lost.
-    /// Returns the removed lock files.
-    pub(crate) fn repair(&self) -> Result<Vec<PathBuf>> {
+    pub(crate) fn repair(&self) -> Result<RepairReport> {
         let mut removed = Vec::new();
+        let mut repaired = Vec::new();
         let mut names = BTreeSet::new();
         for (path, name) in walk(&self.refs_dir)? {
             if !name.ends_with(LOCK_SUFFIX) {
@@ -310,9 +319,14 @@ impl RefStore {
                 Err(e) => return Err(e),
             };
             let actual = self.read_path(&path)?;
-            self.repair_log(&name, actual)?;
+            if self.repair_log(&name, actual)? {
+                repaired.push(name);
+            }
         }
-        Ok(removed)
+        Ok(RepairReport {
+            removed_locks: removed,
+            repaired_refs: repaired,
+        })
     }
 
     pub(crate) fn reflog(&self, name: &str) -> Result<Vec<ReflogEntry>> {
@@ -322,11 +336,12 @@ impl RefStore {
     }
 
     /// Records a ref change whose reflog line was lost (FORMAT.md §9.4).
-    fn repair_log(&self, name: &str, actual: Option<ObjectId>) -> Result<()> {
+    /// Returns whether a line was added.
+    fn repair_log(&self, name: &str, actual: Option<ObjectId>) -> Result<bool> {
         let path = self.logs_dir.join(name);
         let last = read_log(&path)?.0.last().and_then(|e| e.new);
         if last == actual {
-            return Ok(());
+            return Ok(false);
         }
         self.append_log(
             name,
@@ -336,7 +351,8 @@ impl RefStore {
                 time: now(),
                 op: RefOp::Repair,
             },
-        )
+        )?;
+        Ok(true)
     }
 
     fn append_log(&self, name: &str, entry: &ReflogEntry) -> Result<()> {

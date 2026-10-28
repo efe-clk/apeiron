@@ -331,11 +331,14 @@ fn crash_with_ref_lock_taken_needs_repair() {
         ));
 
         // A fresh lock may belong to a running writer and is kept.
-        assert!(repo.repair().unwrap().is_empty());
+        assert!(repo.repair().unwrap().removed_locks.is_empty());
         assert!(has_lock(&path));
 
         age_files(&path.join("refs"));
-        assert_eq!(repo.repair().unwrap(), [path.join("refs/main.lock")]);
+        assert_eq!(
+            repo.repair().unwrap().removed_locks,
+            [path.join("refs/main.lock")]
+        );
         commit_later(&mut repo, f.old);
         seen += 1;
     }
@@ -381,7 +384,7 @@ fn repair_command_appends_lost_reflog_line() {
         })
         .unwrap();
     let repo = Repository::open(&repo_path(&state)).unwrap();
-    repo.repair().unwrap();
+    assert_eq!(repo.repair().unwrap().repaired_refs, ["main"]);
     let last = repo.reflog("main").unwrap().pop().unwrap();
     assert_eq!(
         (last.old, last.new, last.op),

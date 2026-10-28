@@ -14,7 +14,7 @@ use crate::id::{ObjectId, ObjectType};
 use crate::index::{self, Location};
 use crate::object::{Blob, EntryKind, Snapshot, Tree};
 use crate::pack::{self, FileHash, PackEntry, PackWriter};
-use crate::refs::{RefStore, ReflogEntry};
+use crate::refs::{RefStore, ReflogEntry, RepairReport};
 
 const CONFIG: &str = "config";
 const PACKS: &str = "packs";
@@ -340,14 +340,13 @@ impl Repository {
 
     /// Removes ref locks left behind more than 10 minutes ago and records ref
     /// changes whose reflog line was lost in a crash (FORMAT.md §9.3, §9.4).
-    /// Returns the removed lock files.
-    pub fn repair(&self) -> Result<Vec<PathBuf>> {
+    pub fn repair(&self) -> Result<RepairReport> {
         self.refs.repair()
     }
 }
 
 /// Result of [`Repository::verify`].
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct VerifyReport {
     pub objects_checked: u64,
     /// Pack and index files whose hash or structure is wrong.

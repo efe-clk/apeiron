@@ -1,0 +1,29 @@
+//! The public Rust API of Apeiron (`docs/API.md` §8).
+//!
+//! Applications use only this crate. Every request and result is plain data
+//! that can be written as JSON; long operations run as [`Job`]s.
+
+#![forbid(unsafe_code)]
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
+
+mod error;
+mod job;
+mod repo;
+mod spec;
+mod types;
+
+/// Version of the API contract in `docs/API.md` §8.
+pub const API_VERSION: &str = "0.1";
+
+pub use apeiron_core::{ObjectId, RefOp, ReflogEntry, RepairReport, Time, VerifyReport};
+pub use apeiron_services::{
+    BackupOptions as BackupRequest, BackupOutcome as BackupReport, Change, ChangeKind, EntryInfo,
+    Kind, Name, Phase, Progress, RestoreOutcome as RestoreReport, Warning, WarningKind,
+};
+pub use error::{Error, ErrorKind, Result};
+pub use job::Job;
+pub use repo::Repository;
+pub use types::{
+    DeleteRefRequest, DiffRequest, ListRequest, LogPage, LogRequest, RefInfo, RepoInfo,
+    RestoreRequest, SnapshotInfo,
+};

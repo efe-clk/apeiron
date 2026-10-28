@@ -11,7 +11,9 @@ use crate::error::{Error, Result};
 use crate::id::{IdKey, parse_hex, random_bytes, to_hex};
 
 const FORMAT: &str = "apeiron-repository";
-const VERSION: u32 = 1;
+/// Version of the repository format this crate reads and writes.
+pub const FORMAT_VERSION: u32 = 1;
+const VERSION: u32 = FORMAT_VERSION;
 const HASH_ALGORITHM: &str = "blake3-keyed";
 const CHUNKER_ALGORITHM: &str = "fastcdc-2020";
 const ENCRYPTION_NONE: &str = "none";

@@ -19,8 +19,9 @@ mod refs;
 mod repo;
 
 pub use chunker::ChunkerParams;
+pub use config::FORMAT_VERSION;
 pub use error::{Error, Result};
 pub use id::{ID_LEN, ObjectId, ObjectType};
 pub use object::{Blob, EntryKind, Snapshot, Time, Tree, TreeEntry};
-pub use refs::{RefOp, ReflogEntry, validate_ref_name};
+pub use refs::{RefOp, ReflogEntry, RepairReport, validate_ref_name};
 pub use repo::{ObjectWriter, Repository, VerifyReport};

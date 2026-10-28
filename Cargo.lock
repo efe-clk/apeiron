@@ -3,6 +3,18 @@
 version = 4
 
 [[package]]
+name = "apeiron"
+version = "0.0.0"
+dependencies = [
+ "apeiron-core",
+ "apeiron-services",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "apeiron-core"
 version = "0.0.0"
 dependencies = [
