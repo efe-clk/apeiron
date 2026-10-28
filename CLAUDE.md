@@ -44,11 +44,12 @@ Apeiron; sürüm kontrolü, arşivleme, yedekleme, senkronizasyon ve bütünlük
 
 ## Mevcut durum
 
-**Aşama 0 — Format ve çekirdek.** Sıradaki işler:
+**Aşama 0 — Format ve çekirdek.** Tamamlandı (2026-10-28):
 
 1. ~~`docs/FORMAT.md`: nesne modeli ve disk formatı spesifikasyonu.~~ Tamamlandı.
 2. ~~Cargo workspace iskeleti ve CI (fmt, clippy, test).~~ Tamamlandı.
 3. ~~Depolama motoru: chunk yazma/okuma, BLAKE3 doğrulama, atomik ref güncelleme.~~ Tamamlandı.
 4. ~~Güç kesintisi ve bozulma testleri.~~ Tamamlandı.
+5. ~~Kanonik CBOR kodlaması ve Rust API taslağı.~~ Tamamlandı.
 
-Çıkış kriteri: spesifikasyon yazılı; güç kesintisi testlerinde veri kaybı yok.
+**Aşama 1 — Yerel MVP.** Sıradaki işler `docs/ROADMAP.md` §3'tedir. Çıkış kriteri: bir ay boyunca kendi verisini yalnızca Apeiron ile yedekleyip geri yüklemek.

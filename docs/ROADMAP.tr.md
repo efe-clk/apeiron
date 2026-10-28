@@ -4,13 +4,13 @@
 
 Pahalı kararlar (format, nesne modeli, API ve eklenti sınırı) Aşama 0'da verilir; geri kalan her şey bu temelin üstüne kurulur. Her aşama kendi başına kullanılabilir bir ürün bırakır. Aşamalar ve çıkış kriterleri [VISION.tr.md](VISION.tr.md) belgesinden alınmıştır.
 
-**Şu anki aşama: Aşama 0 — Format ve çekirdek (Devam ediyor).**
+**Şu anki aşama: Aşama 1 — Yerel MVP (Planlandı).** Aşama 0, 2026-10-28'de tamamlandı.
 
 ## 1. Genel bakış
 
 ```mermaid
 flowchart LR
-    S0["Aşama 0<br/>Format ve çekirdek<br/>Devam ediyor"]
+    S0["Aşama 0<br/>Format ve çekirdek<br/>Tamamlandı"]
     S1["Aşama 1<br/>Yerel MVP<br/>Planlandı"]
     S2["Aşama 2<br/>Uzak ve senkron<br/>Planlandı"]
     S3["Aşama 3<br/>Geliştirici ve ekosistem<br/>Planlandı"]
@@ -21,7 +21,7 @@ flowchart LR
 
 | Aşama | Kapsam | Çıkış kriteri | Durum |
 | --- | --- | --- | --- |
-| 0. Format ve çekirdek | Nesne modeli ve format spesifikasyonu, depolama motoru, bütünlük doğrulama, Rust API taslağı | Spesifikasyon yazılı; güç kesintisi testlerinde veri kaybı yok | Devam ediyor |
+| 0. Format ve çekirdek | Nesne modeli ve format spesifikasyonu, depolama motoru, bütünlük doğrulama, Rust API taslağı | Spesifikasyon yazılı; güç kesintisi testlerinde veri kaybı yok | Tamamlandı |
 | 1. Yerel MVP | CLI; snapshot alma, geçmiş, dosya düzeyi diff, geri yükleme, doğrulama; yerel ve harici disk yedek hedefi; tar/zip dışa aktarma | Kendi verini bir ay boyunca yalnızca Apeiron ile yedekleyip geri yükleyebilmek | Planlandı |
 | 2. Uzak ve senkron | Arka plan hizmeti, zamanlanmış yedek, şifreleme, SFTP ve S3 hedefleri, tek/çift yönlü senkron, çatışma tespiti, geri yükleme testi | İki cihaz ve bir uzak sunucu arasında bir ay sorunsuz senkron | Planlandı |
 | 3. Geliştirici ve ekosistem | Dal ve birleştirme, Git içe/dışa aktarma (hedef: Git ağ protokolü), C ABI ve Python SDK, WebAssembly eklenti sistemi, metin diff eklentisi, arama | Gerçek bir Git deposu Apeiron'a taşınıp geri alınabiliyor | Planlandı |
@@ -55,6 +55,7 @@ Windows'ta yeniden adlandırmalar küçük `apeiron-sys` crate'i üzerinden `MOV
 | Yerel ve harici disk yedek hedefleri | Planlandı |
 | tar/zip dışa aktarma | Planlandı |
 | Çöp toplama, depo kilitleri, paket birleştirme | Planlandı |
+| İndeksi bozuk bir depoyu, indeksi paketlerden yeniden üreterek açmak | Planlandı |
 
 ## 4. Aşama 2 — Uzak ve senkron
 

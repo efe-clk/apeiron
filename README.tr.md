@@ -6,7 +6,7 @@
 
 Apeiron, bir yazılımcının deposuna, bir müzisyenin projesine ve bir ailenin fotoğraf arşivine aynı gözle bakar: hepsi, içerik adresli ve değişmez nesnelerden oluşan snapshot'lardır. Yedek, arşiv, senkron ve sürümleme dört ayrı motor değil, aynı nesne grafiği üzerinde çalışan farklı politikalardır. Yerel önceliklidir: hiçbir temel işlev bulut, hesap ya da internet bağlantısı istemez.
 
-> **Durum:** Erken geliştirme (Aşama 0 — format ve çekirdek). Henüz kullanılabilir bir sürüm, CLI ya da kararlı API yok. Yalnızca `apeiron-core` içindeki depolama motoru yazıldı. Bkz. [docs/ROADMAP.tr.md](docs/ROADMAP.tr.md).
+> **Durum:** Erken geliştirme. Aşama 0 (format ve çekirdek) tamamlandı; sıradaki Aşama 1 (yerel MVP). Henüz kullanılabilir bir sürüm, CLI ya da kararlı API yok. Yalnızca `apeiron-core` içindeki depolama motoru yazıldı. Bkz. [docs/ROADMAP.tr.md](docs/ROADMAP.tr.md).
 
 ## Temel ilkeler
 
@@ -79,7 +79,7 @@ Her seçimin gerekçesi: [docs/DECISIONS.tr.md](docs/DECISIONS.tr.md).
 
 | Aşama | Kapsam | Durum |
 | --- | --- | --- |
-| 0. Format ve çekirdek | Format spesifikasyonu, depolama motoru, bütünlük, Rust API taslağı | Devam ediyor |
+| 0. Format ve çekirdek | Format spesifikasyonu, depolama motoru, bütünlük, Rust API taslağı | Tamamlandı |
 | 1. Yerel MVP | CLI, snapshot, geçmiş, geri yükleme, yerel yedek hedefleri, tar/zip dışa aktarma | Planlandı |
 | 2. Uzak ve senkron | Arka plan hizmeti, şifreleme, SFTP/S3, senkron, geri yükleme testi | Planlandı |
 | 3. Geliştirici ve ekosistem | Dal/birleştirme, Git içe/dışa aktarma, C ABI, Python SDK, eklentiler | Planlandı |
