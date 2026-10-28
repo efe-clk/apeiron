@@ -18,6 +18,7 @@ Implementation status (`apeiron-core`):
 | 10 | Power-failure tests | Done |
 | 12 | Repository lock | Done |
 | 13 | Garbage collection | Done |
+| 14 | Encryption | Planned (draft for review) |
 
 ## Plain summary
 
@@ -50,7 +51,7 @@ Implementation status (`apeiron-core`):
 ├── logs/
 │   └── backup/home        # Change log of each ref (reflog)
 ├── locks/                 # Repository lock, section 12
-├── keys/                  # Encryption keys (to be defined in Stage 2, reserved)
+├── keys/                  # Key files of an encrypted repository, section 14
 └── tmp/                   # Temporary files being written
 ```
 
@@ -79,7 +80,7 @@ avg_size = 1048576                          # 1 MiB
 max_size = 4194304                          # 4 MiB
 
 [encryption]
-mode = "none"                               # The only value in version 1; extended in Stage 2
+mode = "none"                               # or "xchacha20-poly1305", section 14
 ```
 
 - `version` is the major version of the format. A reader refuses versions it does not know.
@@ -218,7 +219,7 @@ A pack is a single file that stores many objects. The recommended size is 16–6
 | --- | --- | --- | --- |
 | 0 | 8 | magic | ASCII `APRNPACK` |
 | 8 | 2 | version | `1` |
-| 10 | 2 | flags | `0` (reserved for the encryption flag in Stage 2) |
+| 10 | 2 | flags | Bit 0: encrypted (section 14); all other bits `0` |
 | 12 | 4 | reserved | `0` |
 
 **Entry table:** One entry per object, in the order the objects appear in the file.
@@ -422,8 +423,80 @@ A dry run performs steps 1–3 and reports what would be removed without changin
 
 In no case does a ref point to a missing object: an object is deleted only after a durable index covers another copy of it, or after it was found dead.
 
-## 14. Left for later versions
+## 14. Encryption
 
-- Encryption (`keys/`, pack `flags`, `encryption.mode`): Stage 2.
+An encrypted repository can be stored on a disk or a server that is not trusted: without a key, the content of files, their names and the folder structure cannot be read. Encryption is chosen when the repository is created and cannot be switched on or off later; to encrypt existing data, it is copied into a new encrypted repository.
+
+### 14.1 Keys
+
+| Key | Size | Use |
+| --- | --- | --- |
+| `id_key` | 32 bytes, random | Object identifiers (section 4); in an encrypted repository it is not written into `config` |
+| `data_key` | 32 bytes, random | Encrypting object data, pack tables and index files |
+| Key-encryption key | 32 bytes | Derived from a password or a recovery key; it only opens a key file |
+
+`id_key` and `data_key` are created once, when the repository is created. They never leave a key file unencrypted and they never change, so every copy of the repository (section 4) keeps working with every key file.
+
+### 14.2 Key files (`keys/<name>.key`)
+
+A key file holds `id_key ‖ data_key` (64 bytes) sealed with a key-encryption key. A repository has one key file per password and one per recovery key; any one of them opens the repository.
+
+```toml
+format = "apeiron-key"
+version = 1
+kind = "password"                           # or "recovery"
+created = 2026-10-28T12:00:00Z
+
+[kdf]
+algorithm = "argon2id"                      # "blake3-derive" for kind = "recovery"
+memory_kib = 65536                          # 64 MiB
+iterations = 3
+parallelism = 1
+salt = "…32 hex characters…"                # 16 random bytes
+
+[sealed]
+keys = "…hex…"                              # sealed box (14.3) of id_key ‖ data_key
+```
+
+- **Password:** the key-encryption key is `Argon2id(password, salt)` with the stored parameters. The defaults fit a Raspberry Pi 4; a writer may choose stronger ones.
+- **Recovery key:** 32 random bytes shown once to the user as 52 base32 characters in groups of four. Being random, it needs no slow derivation: the key-encryption key is `BLAKE3_derive_key("apeiron 2026 recovery key", recovery key)`.
+- The additional data of the sealed box is `"apeiron-key 1" ‖ repository id` (the 16 bytes of `id` in `config`), so a key file cannot be moved into another repository.
+- To open the repository, a reader tries the key files one by one; a wrong password fails the authentication tag and is reported as "wrong password", never as corruption.
+- Adding or changing a password writes a new key file durably (section 9.1) before an old one is deleted. If every password and recovery key is lost, the data cannot be recovered by anyone.
+
+### 14.3 Sealed box
+
+Every encrypted piece of data is a sealed box of XChaCha20-Poly1305:
+
+```text
+nonce (24 bytes, random) ‖ ciphertext ‖ tag (16 bytes)
+```
+
+A 24-byte random nonce can be chosen without coordination between writers; repeating one by chance is not a practical risk. A box that fails authentication is corruption (or, for a key file, a wrong key).
+
+### 14.4 What is encrypted
+
+| Data | Form in an encrypted repository | Additional data |
+| --- | --- | --- |
+| Object data in a pack | The stored bytes (after compression) are a sealed box; `stored_len` includes its 40 extra bytes | `id ‖ type byte` of the object, so objects cannot be swapped |
+| Pack entry table | Header flag bit 0 set; the table is one sealed box between the object data and the footer, of length `entry_count × 52 + 40` | The 16 header bytes |
+| Index file | Header flags `1`; everything after the 16-byte header is one sealed box | The 16 header bytes |
+| `config` | Plain; `[hash].id_key` is absent and `encryption.mode = "xchacha20-poly1305"` | — |
+| Refs and reflogs | Plain | — |
+
+Reading an object: open the sealed box → decompress → check `raw_len` → recompute the identifier (section 4). Pack and index file names stay the plain BLAKE3 of the file bytes, so a server without keys can still check that the files are intact.
+
+### 14.5 What a reader without a key can see
+
+| Visible | Not visible |
+| --- | --- |
+| Number and size of packs and index files, and when they change | Content of files, their names, sizes, times and the folder structure |
+| Number of objects per pack (`entry_count`) | Which objects are files, folders or snapshots |
+| Ref names (for example `backup/documents`), the snapshot ids they point to and the times they changed | What a snapshot contains; ids are keyed (section 4) and reveal nothing |
+
+Ref names are visible by design so that a remote server can update refs safely; a user who wants to hide them chooses neutral names.
+
+## 15. Left for later versions
+
 - Multi-level blobs, hard links, Windows ACLs, device files.
 - Format upgrade tool: automatic and reversible migration when the format version changes.

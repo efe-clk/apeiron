@@ -52,4 +52,6 @@ Apeiron; sürüm kontrolü, arşivleme, yedekleme, senkronizasyon ve bütünlük
 4. ~~Güç kesintisi ve bozulma testleri.~~ Tamamlandı.
 5. ~~Kanonik CBOR kodlaması ve Rust API taslağı.~~ Tamamlandı.
 
-**Aşama 1 — Yerel MVP.** Sıradaki işler `docs/ROADMAP.md` §3'tedir. Çıkış kriteri: bir ay boyunca kendi verisini yalnızca Apeiron ile yedekleyip geri yüklemek.
+**Aşama 1 — Yerel MVP.** Tamamlandı (2026-10-28). Bir aylık kullanım denemesi proje sahibinin kararıyla atlandı.
+
+**Aşama 2 — Uzak ve senkron.** Sıradaki işler `docs/ROADMAP.md` §4'te, sırasıyla: şifreleme, uzak hedefler, arka plan hizmeti, senkron.

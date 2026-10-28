@@ -4,15 +4,15 @@
 
 The expensive decisions (format, object model, API and plugin boundary) are made in Stage 0; everything else is built on top of that foundation. Every stage leaves a product that is usable on its own. The stages and exit criteria come from [VISION.md](VISION.md).
 
-**Current stage: Stage 1 — Local MVP (In progress).** Stage 0 was completed on 2026-10-28.
+**Current stage: Stage 2 — Remote and sync (In progress).** Stage 0 and Stage 1 were completed on 2026-10-28; the one-month test of Stage 1 was skipped by the owner's decision.
 
 ## 1. Overview
 
 ```mermaid
 flowchart LR
     S0["Stage 0<br/>Format and core<br/>Done"]
-    S1["Stage 1<br/>Local MVP<br/>In progress"]
-    S2["Stage 2<br/>Remote and sync<br/>Planned"]
+    S1["Stage 1<br/>Local MVP<br/>Done"]
+    S2["Stage 2<br/>Remote and sync<br/>In progress"]
     S3["Stage 3<br/>Developer and ecosystem<br/>Planned"]
     S4["Stage 4<br/>Interfaces and multi-user<br/>Planned"]
     S5["Stage 5<br/>Enterprise<br/>Planned"]
@@ -22,8 +22,8 @@ flowchart LR
 | Stage | Scope | Exit criterion | Status |
 | --- | --- | --- | --- |
 | 0. Format and core | Object model and format specification, storage engine, integrity verification, Rust API draft | Specification written; no data loss in power-failure tests | Done |
-| 1. Local MVP | CLI; taking snapshots, history, file-level diff, restore, verification; local and external disk backup targets; tar, zip and 7z export | Backing up and restoring your own data with nothing but Apeiron for one month | In progress |
-| 2. Remote and sync | Background service, scheduled backup, encryption, SFTP and S3 targets, one-/two-way sync, conflict detection, restore test | One month of trouble-free sync between two devices and a remote server | Planned |
+| 1. Local MVP | CLI; taking snapshots, history, file-level diff, restore, verification; local and external disk backup targets; tar, zip and 7z export | Backing up and restoring your own data with nothing but Apeiron for one month | Done (one-month test skipped) |
+| 2. Remote and sync | Background service, scheduled backup, encryption, SFTP and S3 targets, one-/two-way sync, conflict detection, restore test | One month of trouble-free sync between two devices and a remote server | In progress |
 | 3. Developer and ecosystem | Branching and merging, Git import/export (goal: Git network protocol), C ABI and Python SDK, WebAssembly plugin system, text diff plugin, search | A real Git repository can be moved into Apeiron and back | Planned |
 | 4. Interfaces and multi-user | Desktop and web interface, users and permissions, audit log, sharing | A non-technical user can back up and restore without the CLI | Planned |
 | 5. Enterprise | Central identity, multi-tenant use, replication, high availability, immutable archive, compliance reports | First enterprise pilot installation | Planned |
@@ -49,10 +49,10 @@ On Windows, renames use `MOVEFILE_WRITE_THROUGH` ([FORMAT.md](FORMAT.md) §9.1) 
 
 | Work item | Status |
 | --- | --- |
-| CLI (all operations, JSON output, progress, cancellation) | In progress |
+| CLI (all operations, JSON output, progress, cancellation) | Done |
 | Taking snapshots, history, file-level diff | Done |
 | Restore and verification (scrub) | Done |
-| Local and external disk backup targets | In progress |
+| Local and external disk backup targets | Done |
 | tar, zip and 7z export | Done |
 | Garbage collection, repository locks, pack merging | Done |
 | Opening a repository with a damaged index by rebuilding it from the packs | Done |
@@ -61,13 +61,14 @@ On Windows, renames use `MOVEFILE_WRITE_THROUGH` ([FORMAT.md](FORMAT.md) §9.1) 
 
 **Exit criterion:** One month of trouble-free sync between two devices and a remote server.
 
-| Work item | Status |
-| --- | --- |
-| Background service (daemon) and scheduled backup | Planned |
-| Client-side encryption | Planned |
-| SFTP and S3 targets | Planned |
-| One-way and two-way sync, conflict detection | Planned |
-| Restore test | Planned |
+The work items are done in this order, because each builds on the one before: remote targets must only ever receive encrypted data, and the background service schedules what the earlier items provide.
+
+| # | Work item | Status |
+| --- | --- | --- |
+| 1 | Client-side encryption ([FORMAT.md](FORMAT.md) §14) | In progress (specification draft) |
+| 2 | Remote targets (folder, SFTP, S3) with push and pull | Planned |
+| 3 | Background service (daemon), scheduled backup, restore test | Planned |
+| 4 | One-way and two-way sync, conflict detection | Planned |
 
 ## 5. Stage 3 — Developer and ecosystem
 

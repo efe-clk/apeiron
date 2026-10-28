@@ -18,6 +18,7 @@ Uygulama durumu (`apeiron-core`):
 | 10 | Güç kesintisi testleri | Tamamlandı |
 | 12 | Depo kilidi | Tamamlandı |
 | 13 | Çöp toplama | Tamamlandı |
+| 14 | Şifreleme | Planlandı (incelemeye sunulan taslak) |
 
 ## Sade anlatım
 
@@ -50,7 +51,7 @@ Uygulama durumu (`apeiron-core`):
 ├── logs/
 │   └── backup/home        # Her ref'in değişiklik günlüğü (reflog)
 ├── locks/                 # Depo kilidi, bölüm 12
-├── keys/                  # Şifreleme anahtarları (Aşama 2'de tanımlanacak, ayrılmış)
+├── keys/                  # Şifreli bir deponun anahtar dosyaları, bölüm 14
 └── tmp/                   # Yazılmakta olan geçici dosyalar
 ```
 
@@ -79,7 +80,7 @@ avg_size = 1048576                          # 1 MiB
 max_size = 4194304                          # 4 MiB
 
 [encryption]
-mode = "none"                               # Sürüm 1'de tek değer; Aşama 2'de genişler
+mode = "none"                               # ya da "xchacha20-poly1305", bölüm 14
 ```
 
 - `version` formatın ana sürümüdür. Okuyucu bilmediği sürümü reddeder.
@@ -218,7 +219,7 @@ Bir paket, birçok nesnenin saklandığı tek dosyadır. Önerilen boyut 16–64
 | --- | --- | --- | --- |
 | 0 | 8 | magic | ASCII `APRNPACK` |
 | 8 | 2 | version | `1` |
-| 10 | 2 | flags | `0` (Aşama 2'de şifreleme bayrağı için ayrılmış) |
+| 10 | 2 | flags | Bit 0: şifreli (bölüm 14); diğer tüm bitler `0` |
 | 12 | 4 | reserved | `0` |
 
 **Girdi tablosu:** Her nesne için bir girdi, nesnelerin dosyadaki sırasıyla.
@@ -422,8 +423,80 @@ Deneme çalıştırması (dry run) 1–3. adımları yapar ve hiçbir şeyi değ
 
 Hiçbir durumda bir ref var olmayan bir nesneyi göstermez: bir nesne ancak kalıcı bir indeks onun başka bir kopyasını kapsadıktan sonra ya da ölü olduğu anlaşıldıktan sonra silinir.
 
-## 14. Sonraki sürümlere bırakılanlar
+## 14. Şifreleme
 
-- Şifreleme (`keys/`, paket `flags`, `encryption.mode`): Aşama 2.
+Şifreli bir depo güvenilmeyen bir diskte ya da sunucuda saklanabilir: anahtar olmadan dosyaların içeriği, adları ve klasör yapısı okunamaz. Şifreleme depo oluşturulurken seçilir ve sonradan açılıp kapatılamaz; var olan veriyi şifrelemek için veri yeni bir şifreli depoya kopyalanır.
+
+### 14.1 Anahtarlar
+
+| Anahtar | Boyut | Kullanım |
+| --- | --- | --- |
+| `id_key` | 32 bayt, rastgele | Nesne kimlikleri (bölüm 4); şifreli bir depoda `config`'e yazılmaz |
+| `data_key` | 32 bayt, rastgele | Nesne verisini, paket tablolarını ve indeks dosyalarını şifrelemek |
+| Anahtar şifreleme anahtarı | 32 bayt | Bir paroladan ya da kurtarma anahtarından türetilir; yalnızca bir anahtar dosyasını açar |
+
+`id_key` ve `data_key` bir kez, depo oluşturulurken üretilir. Bir anahtar dosyasından hiçbir zaman şifresiz çıkmazlar ve hiç değişmezler; böylece deponun her kopyası (bölüm 4) her anahtar dosyasıyla çalışmaya devam eder.
+
+### 14.2 Anahtar dosyaları (`keys/<name>.key`)
+
+Bir anahtar dosyası, bir anahtar şifreleme anahtarıyla mühürlenmiş `id_key ‖ data_key`'i (64 bayt) tutar. Bir deponun her parola ve her kurtarma anahtarı için bir anahtar dosyası vardır; herhangi biri depoyu açar.
+
+```toml
+format = "apeiron-key"
+version = 1
+kind = "password"                           # ya da "recovery"
+created = 2026-10-28T12:00:00Z
+
+[kdf]
+algorithm = "argon2id"                      # kind = "recovery" için "blake3-derive"
+memory_kib = 65536                          # 64 MiB
+iterations = 3
+parallelism = 1
+salt = "…32 hex karakter…"                  # 16 rastgele bayt
+
+[sealed]
+keys = "…hex…"                              # id_key ‖ data_key'in mühürlü kutusu (14.3)
+```
+
+- **Parola:** anahtar şifreleme anahtarı, saklanan parametrelerle `Argon2id(parola, salt)`'tır. Varsayılanlar bir Raspberry Pi 4'e uygundur; bir yazıcı daha güçlü değerler seçebilir.
+- **Kurtarma anahtarı:** kullanıcıya bir kez, dörder karakterlik gruplar hâlinde 52 base32 karakter olarak gösterilen 32 rastgele bayt. Rastgele olduğu için yavaş bir türetme gerektirmez: anahtar şifreleme anahtarı `BLAKE3_derive_key("apeiron 2026 recovery key", kurtarma anahtarı)`'dır.
+- Mühürlü kutunun ek verisi `"apeiron-key 1" ‖ depo kimliği`'dir (`config`'deki `id`'nin 16 baytı); böylece bir anahtar dosyası başka bir depoya taşınamaz.
+- Depoyu açmak için okuyucu anahtar dosyalarını tek tek dener; yanlış bir parola doğrulama etiketinde başarısız olur ve asla bozulma olarak değil, "yanlış parola" olarak bildirilir.
+- Bir parola eklemek ya da değiştirmek, eskisi silinmeden önce yeni bir anahtar dosyasını kalıcı olarak yazar (bölüm 9.1). Tüm parolalar ve kurtarma anahtarları kaybolursa veriyi hiç kimse kurtaramaz.
+
+### 14.3 Mühürlü kutu
+
+Şifrelenen her veri parçası XChaCha20-Poly1305 ile mühürlenmiş bir kutudur:
+
+```text
+nonce (24 bayt, rastgele) ‖ şifreli metin ‖ etiket (16 bayt)
+```
+
+24 baytlık rastgele bir nonce, yazıcılar arasında eşgüdüm olmadan seçilebilir; birinin tesadüfen tekrarlanması pratik bir risk değildir. Doğrulamadan geçemeyen bir kutu bozulmadır (bir anahtar dosyası için ise yanlış anahtardır).
+
+### 14.4 Neler şifrelenir
+
+| Veri | Şifreli bir depodaki biçimi | Ek veri |
+| --- | --- | --- |
+| Paketteki nesne verisi | Saklanan baytlar (sıkıştırmadan sonra) mühürlü bir kutudur; `stored_len` onun 40 fazla baytını içerir | Nesnenin `id ‖ tür baytı`; böylece nesnelerin yeri değiştirilemez |
+| Paket girdi tablosu | Başlıktaki bayrak bit 0 açık; tablo, nesne verisi ile alt bilgi arasında `entry_count × 52 + 40` uzunluğunda tek bir mühürlü kutudur | 16 başlık baytı |
+| İndeks dosyası | Başlık bayrakları `1`; 16 baytlık başlıktan sonraki her şey tek bir mühürlü kutudur | 16 başlık baytı |
+| `config` | Düz; `[hash].id_key` yoktur ve `encryption.mode = "xchacha20-poly1305"` | — |
+| Ref'ler ve reflog'lar | Düz | — |
+
+Bir nesneyi okumak: mühürlü kutuyu aç → sıkıştırmayı çöz → `raw_len`'i denetle → kimliği yeniden hesapla (bölüm 4). Paket ve indeks dosyalarının adları dosya baytlarının düz BLAKE3'ü olarak kalır; böylece anahtarı olmayan bir sunucu da dosyaların sağlam olduğunu denetleyebilir.
+
+### 14.5 Anahtarı olmayan bir okuyucunun görebildikleri
+
+| Görünür | Görünmez |
+| --- | --- |
+| Paket ve indeks dosyalarının sayısı ve boyutu, ne zaman değiştikleri | Dosyaların içeriği, adları, boyutları, zamanları ve klasör yapısı |
+| Paket başına nesne sayısı (`entry_count`) | Hangi nesnelerin dosya, klasör ya da snapshot olduğu |
+| Ref adları (ör. `backup/documents`), gösterdikleri snapshot kimlikleri ve ne zaman değiştikleri | Bir snapshot'ın neler içerdiği; kimlikler anahtarlıdır (bölüm 4) ve hiçbir şey ele vermez |
+
+Ref adları, bir uzak sunucunun ref'leri güvenle güncelleyebilmesi için bilerek görünür bırakılır; onları gizlemek isteyen kullanıcı nötr adlar seçer.
+
+## 15. Sonraki sürümlere bırakılanlar
+
 - Çok katmanlı blob, sabit bağlantılar, Windows ACL'leri, aygıt dosyaları.
 - Format yükseltme aracı: format sürümü değiştiğinde otomatik ve geri alınabilir geçiş.

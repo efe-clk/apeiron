@@ -6,7 +6,7 @@
 
 Apeiron treats a developer's repository, a musician's project and a family photo archive the same way: as snapshots of content-addressed, immutable objects. Backup, archive, sync and versioning are different policies over the same object graph, not four separate engines. It is local first: no core function needs a cloud, an account or an internet connection.
 
-> **Status:** Early development. Stage 0 (format and core) is done; Stage 1 (local MVP) is in progress. The `apeiron` command can already back up, list, compare and restore folders, but there is no release or stable API yet. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status:** Early development. Stage 0 (format and core) is done; Stage 1 (local MVP) is done; Stage 2 (remote and sync) is in progress. The `apeiron` command can already back up, list, compare and restore folders, but there is no release or stable API yet. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Core principles
 
@@ -80,8 +80,8 @@ Why each choice was made: [docs/DECISIONS.md](docs/DECISIONS.md).
 | Stage | Scope | Status |
 | --- | --- | --- |
 | 0. Format and core | Format specification, storage engine, integrity, Rust API draft | Done |
-| 1. Local MVP | CLI, snapshots, history, restore, local backup targets, tar, zip and 7z export | In progress |
-| 2. Remote and sync | Daemon, encryption, SFTP/S3, sync, restore test | Planned |
+| 1. Local MVP | CLI, snapshots, history, restore, local backup targets, tar, zip and 7z export | Done |
+| 2. Remote and sync | Daemon, encryption, SFTP/S3, sync, restore test | In progress |
 | 3. Developer and ecosystem | Branch/merge, Git import/export, C ABI, Python SDK, plugins | Planned |
 | 4. Interfaces and multi-user | Desktop and web UI, permissions, audit log, sharing | Planned |
 | 5. Enterprise | Central identity, replication, high availability | Planned |

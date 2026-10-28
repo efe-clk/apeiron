@@ -24,6 +24,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [014](#adr-014-güvensiz-sistem-çağrıları-için-küçük-bir-sistem-cratei) | `unsafe` kod | Yalnızca FFI crate'inde ve küçük `apeiron-sys` crate'inde | Kabul edildi |
 | [015](#adr-015-c-abi-sınırında-json-değerler) | C ABI | Küçük ve sabit bir işlev kümesi; istekler ve sonuçlar JSON | Önerildi |
 | [016](#adr-016-senkron-herkese-açık-api-ve-iş-parçacığında-çalışan-işler) | Uzun işlemler | Senkron API; sorgulanan ilerlemeyle iş parçacığında çalışan işler | Önerildi |
+| [017](#adr-017-şifreleme-için-xchacha20-poly1305-ve-argon2id) | Şifreleme | Veri için XChaCha20-Poly1305, parolalar için Argon2id | Önerildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
@@ -345,3 +346,24 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Yalnızca bloklayan çağrılar | İlerleme de iptal de olmaz |
 
 **Sonuçlar.** SDK'lar sorgulamanın üzerine kendi dillerinde geri çağrı ya da yineleyici ekleyebilir.
+
+## ADR-017: Şifreleme için XChaCha20-Poly1305 ve Argon2id
+
+**Durum:** Önerildi (2026-10-28)
+
+**Bağlam.** Aşama 2, depoları güvenilmeyen disklerde ve sunucularda saklar ([FORMAT.tr.md](FORMAT.tr.md) §14). Şifre, birbirinden bağımsız birkaç yazıcının rastgele seçtiği nonce'larla güvenli olmalı, bir Raspberry Pi 4'te hızlı çalışmalı ve bakımı yapılan saf Rust bir kütüphane olarak bulunmalıdır. Parolalar için yavaş ve çok bellek isteyen bir türetme gerekir.
+
+**Karar.** Veri, RustCrypto `chacha20poly1305` crate'i ile XChaCha20-Poly1305 kullanılarak şifrelenir (24 baytlık rastgele nonce'lar, 16 baytlık etiketler). Parola anahtarları RustCrypto `argon2` crate'i ile Argon2id kullanılarak türetilir (varsayılan 64 MiB, 3 tur, 1 şerit). Kurtarma anahtarları rastgeledir ve BLAKE3 anahtar türetmesini kullanır.
+
+**Gerekçe.** 24 baytlık bir nonce, yazıcılar arasında paylaşılan bir sayaç olmadan rastgele nonce'ları güvenli kılar; ChaCha20, Raspberry Pi 4'te bulunmayan AES donanımı olmadan da hızlıdır; Argon2id parola özetleme için güncel öneridir; iki kütüphane de yaygın kullanılır, saf Rust'tır ve Rust 1.85'i destekler.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| AES-256-GCM | 12 baytlık nonce'ları büyük ölçekte rastgele seçmek güvenli değildir ve AES donanımı olmadan yavaştır |
+| AES-256-GCM-SIV | Yanlış kullanıma dayanıklıdır, ama AES donanımı olmadan yavaştır ve Rust'ta daha az yaygındır |
+| Parolalar için scrypt ya da PBKDF2 | GPU saldırılarına karşı Argon2id'den zayıftır |
+| Paket dosyalarının tamamını tek bir akış olarak şifrelemek | Tek bir nesneyi okumak tüm paketin şifresini çözmeyi gerektirir |
+
+**Sonuçlar.** Şifreli paketler biraz büyüktür (nesne ve tablo başına 40 bayt). Ref adları görünür kalır (§14.5). Kriptografi için RustCrypto dışındaki kütüphaneler kullanılmaz.
