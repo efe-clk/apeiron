@@ -21,7 +21,7 @@ flowchart TB
 
 | Katman | Rol | Durum |
 | --- | --- | --- |
-| Rust API | Tek doğruluk kaynağı; her işlem burada tanımlanır | Planlandı |
+| Rust API | Tek doğruluk kaynağı; her işlem burada tanımlanır | Devam ediyor (Aşama 0 taslağı `apeiron-core` içinde, bölüm 8) |
 | C ABI | Rust API üzerinde kararlı bir C arayüzü; `unsafe` kullanabilen tek crate | Planlandı (Aşama 3) |
 | SDK'lar | C ABI'yi saran, her dilin alışkanlıklarına uyan ince katmanlar | Planlandı (Aşama 3 ve sonrası) |
 
@@ -103,7 +103,7 @@ let report = job.wait()?; // ya da job.cancel()
 
 ## 8. Aşama 0 Rust API taslağı
 
-Aşama 0, depolama motorunun üzerinde Rust API'nin ilk taslağıyla biter. Taslak veri saklama ve okuma, ref'ler ve bütünlük işlerini kapsar; işler (job), ilerleme ve üstteki hizmetler sonraki aşamalarda gelir. Tamamlandı olarak işaretlenen işlevler `apeiron-core` içinde zaten var; Planlandı olanlar incelemeye sunulan önerilerdir.
+Aşama 0, depolama motorunun üzerinde Rust API'nin ilk taslağıyla biter. Taslak veri saklama ve okuma, ref'ler ve bütünlük işlerini kapsar; işler (job), ilerleme ve üstteki hizmetler sonraki aşamalarda gelir. Aşağıdaki işlevlerin tümü `apeiron-core` içinde vardır.
 
 ### 8.1 Depo
 
@@ -112,16 +112,16 @@ Aşama 0, depolama motorunun üzerinde Rust API'nin ilk taslağıyla biter. Tasl
 | `Repository::init(path)` | Yeni ya da boş bir klasörde boş bir depo oluşturur | Tamamlandı |
 | `Repository::open(path)` | Depoyu açar; bir çökme yüzünden indekssiz kalan paketleri bulur | Tamamlandı |
 | `repo.repair()` | 10 dakikadan eski ref kilitlerini kaldırır ve çökmede kaybolan reflog satırlarını ekler | Tamamlandı |
-| `repo.verify()` | Her paketi, indeksi ve nesneyi okuyup denetler; bozuk olanların raporunu döndürür | Planlandı |
+| `repo.verify()` | Her paketi, indeksi ve nesneyi okuyup denetler; bozuk olanların raporunu döndürür | Tamamlandı |
 
 ### 8.2 Veri yazma
 
 | İşlev | Ne yapar | Durum |
 | --- | --- | --- |
 | `repo.writer()` | Bir yazma grubu başlatır; `finish` çağrılana kadar hiçbir şey görünmez | Tamamlandı |
-| `writer.put_file(reader)` | Bir akışı chunk'lara böler, onları ve blob'u saklar; boyutu ve blob kimliğini döndürür (boş dosyada kimlik yok) | Planlandı |
-| `writer.put_tree(&tree)` | Bir tree'yi denetler ve saklar | Planlandı |
-| `writer.put_snapshot(&snapshot)` | Bir snapshot'ı denetler ve saklar; tree'si ve ebeveynleri önceden saklanmış olmalıdır | Planlandı |
+| `writer.put_file(reader)` | Bir akışı chunk'lara böler, onları ve blob'u saklar; boyutu ve blob kimliğini döndürür (boş dosyada kimlik yok) | Tamamlandı |
+| `writer.put_tree(&tree)` | Bir tree'yi denetler ve saklar | Tamamlandı |
+| `writer.put_snapshot(&snapshot)` | Bir snapshot'ı denetler ve saklar; tree'si ve ebeveynleri önceden saklanmış olmalıdır | Tamamlandı |
 | `writer.finish()` | Gruptaki tüm nesneleri kalıcı ve okunabilir yapar | Tamamlandı |
 | `writer.put(type, bytes)`, `writer.put_chunks(reader)` | Yukarıdaki işlevlerin kullandığı alt düzey yazma | Tamamlandı; iç kullanıma alınacak |
 
@@ -129,10 +129,10 @@ Aşama 0, depolama motorunun üzerinde Rust API'nin ilk taslağıyla biter. Tasl
 
 | İşlev | Ne yapar | Durum |
 | --- | --- | --- |
-| `repo.read_file(blob_id, writer)` | Bir dosyanın içeriğini chunk chunk bir akışa yazar, her chunk'ı doğrular | Planlandı |
-| `repo.read_tree(id)` | Bir tree'yi okur, doğrular ve çözer | Planlandı |
-| `repo.read_snapshot(id)` | Bir snapshot'ı okur, doğrular ve çözer | Planlandı |
-| `repo.history(id)` | `id`'den başlayıp ilk ebeveynler üzerinden geriye doğru snapshot'ları, gerektikçe okuyarak dolaşır | Planlandı |
+| `repo.read_file(blob_id, writer)` | Bir dosyanın içeriğini chunk chunk bir akışa yazar, her chunk'ı doğrular | Tamamlandı |
+| `repo.read_tree(id)` | Bir tree'yi okur, doğrular ve çözer | Tamamlandı |
+| `repo.read_snapshot(id)` | Bir snapshot'ı okur, doğrular ve çözer | Tamamlandı |
+| `repo.history(id)` | `id`'den başlayıp ilk ebeveynler üzerinden geriye doğru snapshot'ları, gerektikçe okuyarak dolaşır | Tamamlandı |
 | `repo.contains(id)`, `repo.read_object(id)` | Alt düzey nesne erişimi | Tamamlandı; iç kullanıma alınacak |
 
 ### 8.4 Ref'ler
@@ -142,7 +142,7 @@ Aşama 0, depolama motorunun üzerinde Rust API'nin ilk taslağıyla biter. Tasl
 | `repo.read_ref(name)` | Ref'in gösterdiği snapshot'ı (varsa) döndürür | Tamamlandı |
 | `repo.update_ref(name, expected, new)` | Ref'i yalnızca hâlâ `expected`'ı gösteriyorsa taşır, oluşturur ya da siler | Tamamlandı |
 | `repo.reflog(name)` | Bir ref'in değişiklik geçmişini döndürür | Tamamlandı |
-| `repo.list_refs()` | Tüm ref'leri ve hedeflerini listeler | Planlandı |
+| `repo.list_refs()` | Tüm ref'leri ve hedeflerini listeler | Tamamlandı |
 
 ### 8.5 Veri türleri
 
@@ -151,7 +151,7 @@ Aşama 0, depolama motorunun üzerinde Rust API'nin ilk taslağıyla biter. Tasl
 | `ObjectId`, `ObjectType` | 32 baytlık nesne kimliği; chunk, blob, tree ya da snapshot | Tamamlandı |
 | `Blob`, `Tree`, `TreeEntry`, `EntryKind`, `Snapshot`, `Time` | [FORMAT.tr.md](FORMAT.tr.md) §6'daki yapısal nesneler | Tamamlandı |
 | `ReflogEntry`, `RefOp` | Bir reflog satırı | Tamamlandı |
-| `VerifyReport` | `verify`'ın bulduğu bozuk paketler, indeksler ve nesneler | Planlandı |
+| `VerifyReport` | `verify`'ın bulduğu bozuk paketler, indeksler ve nesneler | Tamamlandı |
 | `Error` | Tipli hatalar (bölüm 5) | Tamamlandı |
 
 Açık soru: herkese açık API, yalnızca çağıranların ihtiyaç duyduğunu dışa açan ayrı bir `apeiron` crate'inde olabilir; böylece `apeiron-core` serbestçe değişebilir. Öneri, bu crate'in çekirdek dışındaki ilk kullanıcı (CLI) ortaya çıkınca oluşturulmasıdır.

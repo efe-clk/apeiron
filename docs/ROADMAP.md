@@ -39,7 +39,7 @@ flowchart LR
 | 3 | Storage engine: chunk write/read, BLAKE3 verification, atomic ref update | Done | Packs, indexes, refs and reflogs in `apeiron-core` |
 | 4 | Canonical CBOR encoding of blob, tree and snapshot ([FORMAT.md](FORMAT.md) §6) | Done | With `minicbor`; non-canonical objects are rejected |
 | 5 | Power-failure and corruption tests ([FORMAT.md](FORMAT.md) §10) | Done | A crash and a full disk are simulated at every change to the disk; a bit flip is tested at every byte of a pack |
-| 6 | Rust API draft | In progress | Design principles in [API.md](API.md); no public API crate yet |
+| 6 | Rust API draft | Done | [API.md](API.md) §8, implemented in `apeiron-core`; the separate `apeiron` crate comes with the CLI |
 
 Known gap: on Windows, `MOVEFILE_WRITE_THROUGH` is not used yet ([FORMAT.md](FORMAT.md) §9.1). It needs `unsafe` code, which is only allowed in the FFI crate; how to solve this is an open decision.
 

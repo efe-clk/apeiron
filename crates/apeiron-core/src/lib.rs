@@ -23,4 +23,4 @@ pub use error::{Error, Result};
 pub use id::{ID_LEN, ObjectId, ObjectType};
 pub use object::{Blob, EntryKind, Snapshot, Time, Tree, TreeEntry};
 pub use refs::{RefOp, ReflogEntry, validate_ref_name};
-pub use repo::{ObjectWriter, Repository};
+pub use repo::{ObjectWriter, Repository, VerifyReport};

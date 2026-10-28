@@ -21,7 +21,7 @@ flowchart TB
 
 | Layer | Role | Status |
 | --- | --- | --- |
-| Rust API | The single source of truth; every operation is defined here | Planned |
+| Rust API | The single source of truth; every operation is defined here | In progress (Stage 0 draft in `apeiron-core`, section 8) |
 | C ABI | A stable C interface over the Rust API; the only crate allowed to use `unsafe` | Planned (Stage 3) |
 | SDKs | Thin wrappers over the C ABI that follow each language's habits | Planned (Stage 3 onward) |
 
@@ -103,7 +103,7 @@ Cancellation is safe by construction: objects become visible only after they are
 
 ## 8. Stage 0 Rust API draft
 
-Stage 0 ends with a first draft of the Rust API on top of the storage engine. It covers storing and reading data, refs and integrity; jobs, progress and the services above come in later stages. The functions marked Done already exist in `apeiron-core`; the ones marked Planned are proposals for review.
+Stage 0 ends with a first draft of the Rust API on top of the storage engine. It covers storing and reading data, refs and integrity; jobs, progress and the services above come in later stages. All functions below exist in `apeiron-core`.
 
 ### 8.1 Repository
 
@@ -112,16 +112,16 @@ Stage 0 ends with a first draft of the Rust API on top of the storage engine. It
 | `Repository::init(path)` | Creates an empty repository in a new or empty folder | Done |
 | `Repository::open(path)` | Opens a repository; finds packs left without an index by a crash | Done |
 | `repo.repair()` | Removes ref locks older than 10 minutes and adds reflog lines lost in a crash | Done |
-| `repo.verify()` | Reads and checks every pack, index and object; returns a report of what is damaged | Planned |
+| `repo.verify()` | Reads and checks every pack, index and object; returns a report of what is damaged | Done |
 
 ### 8.2 Writing data
 
 | Function | What it does | Status |
 | --- | --- | --- |
 | `repo.writer()` | Starts a batch of writes; nothing is visible until `finish` | Done |
-| `writer.put_file(reader)` | Splits a stream into chunks, stores them and the blob; returns the size and blob id (none for an empty file) | Planned |
-| `writer.put_tree(&tree)` | Checks and stores a tree | Planned |
-| `writer.put_snapshot(&snapshot)` | Checks and stores a snapshot; its tree and parents must already be stored | Planned |
+| `writer.put_file(reader)` | Splits a stream into chunks, stores them and the blob; returns the size and blob id (none for an empty file) | Done |
+| `writer.put_tree(&tree)` | Checks and stores a tree | Done |
+| `writer.put_snapshot(&snapshot)` | Checks and stores a snapshot; its tree and parents must already be stored | Done |
 | `writer.finish()` | Makes every object of the batch durable and readable | Done |
 | `writer.put(type, bytes)`, `writer.put_chunks(reader)` | Low-level writes used by the functions above | Done; to become internal |
 
@@ -129,10 +129,10 @@ Stage 0 ends with a first draft of the Rust API on top of the storage engine. It
 
 | Function | What it does | Status |
 | --- | --- | --- |
-| `repo.read_file(blob_id, writer)` | Writes a file's content to a stream chunk by chunk, verifying each chunk | Planned |
-| `repo.read_tree(id)` | Reads, verifies and decodes a tree | Planned |
-| `repo.read_snapshot(id)` | Reads, verifies and decodes a snapshot | Planned |
-| `repo.history(id)` | Walks snapshots from `id` back through their first parents, lazily | Planned |
+| `repo.read_file(blob_id, writer)` | Writes a file's content to a stream chunk by chunk, verifying each chunk | Done |
+| `repo.read_tree(id)` | Reads, verifies and decodes a tree | Done |
+| `repo.read_snapshot(id)` | Reads, verifies and decodes a snapshot | Done |
+| `repo.history(id)` | Walks snapshots from `id` back through their first parents, lazily | Done |
 | `repo.contains(id)`, `repo.read_object(id)` | Low-level object access | Done; to become internal |
 
 ### 8.4 Refs
@@ -142,7 +142,7 @@ Stage 0 ends with a first draft of the Rust API on top of the storage engine. It
 | `repo.read_ref(name)` | Returns the snapshot a ref points to, if any | Done |
 | `repo.update_ref(name, expected, new)` | Moves, creates or deletes a ref only if it still points to `expected` | Done |
 | `repo.reflog(name)` | Returns the change history of a ref | Done |
-| `repo.list_refs()` | Lists all refs and their targets | Planned |
+| `repo.list_refs()` | Lists all refs and their targets | Done |
 
 ### 8.5 Data types
 
@@ -151,7 +151,7 @@ Stage 0 ends with a first draft of the Rust API on top of the storage engine. It
 | `ObjectId`, `ObjectType` | 32-byte object id; chunk, blob, tree or snapshot | Done |
 | `Blob`, `Tree`, `TreeEntry`, `EntryKind`, `Snapshot`, `Time` | The structured objects of [FORMAT.md](FORMAT.md) §6 | Done |
 | `ReflogEntry`, `RefOp` | One reflog line | Done |
-| `VerifyReport` | Damaged packs, indexes and objects found by `verify` | Planned |
+| `VerifyReport` | Damaged packs, indexes and objects found by `verify` | Done |
 | `Error` | Typed errors (section 5) | Done |
 
 Open question: the public API may live in a separate `apeiron` crate that only re-exports what callers need, so that `apeiron-core` can change freely. The proposal is to create it when the first caller outside the core (the CLI) appears.

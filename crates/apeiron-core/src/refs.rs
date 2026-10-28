@@ -263,6 +263,21 @@ impl RefStore {
         Ok(())
     }
 
+    /// All refs and their targets, sorted by name.
+    pub(crate) fn list(&self) -> Result<Vec<(String, ObjectId)>> {
+        let mut refs = Vec::new();
+        for (path, name) in walk(&self.refs_dir)? {
+            if name.ends_with(LOCK_SUFFIX) || validate_ref_name(&name).is_err() {
+                continue;
+            }
+            if let Some(target) = self.read_path(&path)? {
+                refs.push((name, target));
+            }
+        }
+        refs.sort();
+        Ok(refs)
+    }
+
     /// Removes stale locks and records ref changes whose reflog line was lost.
     /// Returns the removed lock files.
     pub(crate) fn repair(&self) -> Result<Vec<PathBuf>> {

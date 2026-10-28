@@ -15,6 +15,8 @@ pub enum Error {
     },
     #[error("failed to read input: {0}")]
     Input(#[source] io::Error),
+    #[error("failed to write output: {0}")]
+    Output(#[source] io::Error),
     #[error("corrupt data in {path}: {reason}")]
     Corrupt { path: PathBuf, reason: String },
     #[error("invalid repository at {path}: {reason}")]
@@ -25,6 +27,12 @@ pub enum Error {
     ObjectNotFound(ObjectId),
     #[error("object {0} is not a snapshot")]
     NotASnapshot(ObjectId),
+    #[error("object {id} is a {found:?}, expected a {expected:?}")]
+    WrongObjectType {
+        id: ObjectId,
+        expected: ObjectType,
+        found: ObjectType,
+    },
     #[error("object too large: {0} bytes")]
     ObjectTooLarge(usize),
     #[error("invalid chunker parameters: {0}")]
