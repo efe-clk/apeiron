@@ -262,7 +262,7 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | JSON | Bayt dizisi yok; kanonik JSON yaygın biçimde standartlaşmamış |
 | Protocol Buffers | Kodlaması tasarım gereği kanonik değil |
 
-**Sonuçlar.** Yazıcı kanonik kuralları uygulamalıdır; okuyucular kanonik olmayan nesneleri yakalamak için yeniden kodlayıp karşılaştırır. CBOR kütüphanesi henüz seçilmedi.
+**Sonuçlar.** Yazıcı kanonik kuralları uygulamalıdır; okuyucular kanonik olmayan nesneleri yakalamak için yeniden kodlayıp karşılaştırır. Kütüphane `minicbor`'dır (2026-10-28'de seçildi): yazılan baytlar üzerinde tam denetim verir ve etkin olarak bakımı yapılmaktadır.
 
 ## ADR-013: Küçük harfli ASCII ref adları
 

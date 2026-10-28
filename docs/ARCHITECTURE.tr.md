@@ -86,15 +86,15 @@ Ref bir snapshot'a ad verir; snapshot bir kök tree'yi ve ebeveyn snapshot'ları
 | Kavram | Ne olduğu | Durum |
 | --- | --- | --- |
 | Chunk | Dosyanın içerik-tanımlı, yaklaşık 1 MiB'lık parçası; özetiyle adreslenir | Tamamlandı |
-| Blob | Bir dosyanın sıralı chunk listesi | Planlandı (kodlama) |
-| Tree | Bir dizin: adlar, türler, izinler, zamanlar, öznitelikler | Planlandı (kodlama) |
-| Snapshot | Bir veri kümesinin belirli andaki durumu; ebeveynleri, yazarı ve açıklamasıyla | Planlandı (kodlama) |
+| Blob | Bir dosyanın sıralı chunk listesi | Tamamlandı |
+| Tree | Bir dizin: adlar, türler, izinler, zamanlar, öznitelikler | Tamamlandı |
+| Snapshot | Bir veri kümesinin belirli andaki durumu; ebeveynleri, yazarı ve açıklamasıyla | Tamamlandı |
 | Ref | Bir snapshot'ı gösteren ad; dal, etiket ve yedek noktası aynı şeydir | Tamamlandı |
 | Store | Nesnelerin saklandığı yer; her hedef için aynı arayüz | Devam ediyor (yalnızca yerel klasör) |
 | Policy | Saklama, şifreleme, senkron ve doğrulama kuralları | Planlandı |
 | Type driver | Türe özgü diff, birleştirme, önizleme ve indeksleme; eklenti olarak | Planlandı |
 
-Blob, tree ve snapshot'ın tür baytları ve kimlikleri zaten var; eksik olan, kanonik CBOR kodlamalarıdır.
+Blob, tree ve snapshot `minicbor` ile kanonik CBOR olarak kodlanır. Bunları gerçek dosyalardan oluşturan bir kod henüz yok; bu, yedek ve sürümleme hizmetlerinin işidir.
 
 ## 4. Diskte saklama
 

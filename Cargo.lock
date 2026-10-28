@@ -9,6 +9,7 @@ dependencies = [
  "blake3",
  "fastcdc",
  "getrandom",
+ "minicbor",
  "serde",
  "tempfile",
  "thiserror",
@@ -156,6 +157,12 @@ name = "linux-raw-sys"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
+
+[[package]]
+name = "minicbor"
+version = "2.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e7244eafd1e09e7c4e33043881997aa6ab6dffff3ed2cee3395a278980481d6e"
 
 [[package]]
 name = "once_cell"

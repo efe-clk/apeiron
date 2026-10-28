@@ -11,7 +11,7 @@ Implementation status (`apeiron-core`):
 | Section | Topic | Status |
 | --- | --- | --- |
 | 2–5 | Disk layout, `config`, object id, object types | Done |
-| 6 | Canonical CBOR for blob, tree and snapshot | Planned |
+| 6 | Canonical CBOR for blob, tree and snapshot | Done |
 | 7 | Chunking (FastCDC) | Done |
 | 8 | Pack and index files | Done |
 | 9 | Durable writes, refs and reflogs | Done (`MOVEFILE_WRITE_THROUGH` on Windows Planned) |

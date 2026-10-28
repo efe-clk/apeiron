@@ -66,7 +66,7 @@ Planlanan katmanların crate adları, o katmana başlanırken belirlenir.
 | Sıkıştırma | zstd (`zstd`) | Kullanımda |
 | Ayar dosyası | TOML (`toml`, `serde`) | Kullanımda |
 | Hatalar | Tipli hatalar (`thiserror`) | Kullanımda |
-| Yapısal nesneler | Kanonik CBOR (kütüphane seçilmedi) | Planlandı |
+| Yapısal nesneler | Kanonik CBOR (`minicbor`) | Kullanımda |
 | Git uyumu | gitoxide (`gix`) | Planlandı |
 | Eklentiler | WebAssembly bileşen modeli, Wasmtime | Planlandı |
 | Asenkron çalışma zamanı | Tokio (yalnızca ağ, senkron ve arka plan hizmeti katmanları) | Planlandı |

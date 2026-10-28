@@ -11,7 +11,7 @@ Uygulama durumu (`apeiron-core`):
 | Bölüm | Konu | Durum |
 | --- | --- | --- |
 | 2–5 | Disk düzeni, `config`, nesne kimliği, nesne türleri | Tamamlandı |
-| 6 | Blob, tree ve snapshot için kanonik CBOR | Planlandı |
+| 6 | Blob, tree ve snapshot için kanonik CBOR | Tamamlandı |
 | 7 | Chunk bölme (FastCDC) | Tamamlandı |
 | 8 | Paket ve indeks dosyaları | Tamamlandı |
 | 9 | Kalıcı yazma, ref ve reflog | Tamamlandı (Windows'ta `MOVEFILE_WRITE_THROUGH` Planlandı) |

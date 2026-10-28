@@ -1,7 +1,7 @@
 use std::io;
 use std::path::{Path, PathBuf};
 
-use crate::id::ObjectId;
+use crate::id::{ObjectId, ObjectType};
 
 /// Errors returned by `apeiron-core`.
 #[derive(Debug, thiserror::Error)]
@@ -41,6 +41,10 @@ pub enum Error {
         expected: Option<ObjectId>,
         actual: Option<ObjectId>,
     },
+    #[error("invalid {ty:?} object: {reason}")]
+    InvalidObject { ty: ObjectType, reason: String },
+    #[error("failed to encode object: {0}")]
+    Encode(String),
     #[error("random number generator failed: {0}")]
     Random(getrandom::Error),
 }

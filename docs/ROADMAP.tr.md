@@ -37,7 +37,7 @@ flowchart LR
 | 1 | Depolama formatı spesifikasyonu ([FORMAT.tr.md](FORMAT.tr.md)) | Tamamlandı | Sürüm 1, 2026-10-27'de onaylandı |
 | 2 | Cargo workspace iskeleti ve CI (fmt, clippy, test) | Tamamlandı | Linux x86_64/aarch64, macOS, Windows |
 | 3 | Depolama motoru: chunk yazma/okuma, BLAKE3 doğrulama, atomik ref güncelleme | Tamamlandı | `apeiron-core` içinde paketler, indeksler, ref'ler ve reflog'lar |
-| 4 | Blob, tree ve snapshot'ın kanonik CBOR kodlaması ([FORMAT.tr.md](FORMAT.tr.md) §6) | Planlandı | |
+| 4 | Blob, tree ve snapshot'ın kanonik CBOR kodlaması ([FORMAT.tr.md](FORMAT.tr.md) §6) | Tamamlandı | `minicbor` ile; kanonik olmayan nesneler reddedilir |
 | 5 | Güç kesintisi ve bozulma testleri ([FORMAT.tr.md](FORMAT.tr.md) §10) | Tamamlandı | Diskteki her değişiklikte çökme ve disk dolması taklit edilir; bit bozulması bir paketin her baytında denenir |
 | 6 | Rust API taslağı | Devam ediyor | Tasarım ilkeleri [API.tr.md](API.tr.md) içinde; henüz herkese açık API crate'i yok |
 

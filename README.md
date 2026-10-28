@@ -66,7 +66,7 @@ Crate names for planned layers are chosen when the layer is started.
 | Compression | zstd (`zstd`) | In use |
 | Configuration | TOML (`toml`, `serde`) | In use |
 | Errors | Typed errors (`thiserror`) | In use |
-| Structured objects | Canonical CBOR (library not chosen) | Planned |
+| Structured objects | Canonical CBOR (`minicbor`) | In use |
 | Git compatibility | gitoxide (`gix`) | Planned |
 | Plugins | WebAssembly component model, Wasmtime | Planned |
 | Async runtime | Tokio (network, sync and daemon layers only) | Planned |

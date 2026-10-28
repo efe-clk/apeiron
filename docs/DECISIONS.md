@@ -262,7 +262,7 @@ ADR 001â€“008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009â€
 | JSON | No byte strings, and canonical JSON is not widely standardised |
 | Protocol Buffers | Its encoding is not canonical by design |
 
-**Consequences.** The writer must enforce canonical rules; readers re-encode and compare to detect non-canonical objects. The CBOR library is not chosen yet.
+**Consequences.** The writer must enforce canonical rules; readers re-encode and compare to detect non-canonical objects. The library is `minicbor` (chosen on 2026-10-28): it gives full control over the bytes written and is actively maintained.
 
 ## ADR-013: Lowercase ASCII ref names
 

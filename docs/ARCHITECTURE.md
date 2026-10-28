@@ -86,15 +86,15 @@ A ref names a snapshot; a snapshot points at a root tree and at its parent snaps
 | Concept | What it is | Status |
 | --- | --- | --- |
 | Chunk | A content-defined piece of a file, about 1 MiB, addressed by its hash | Done |
-| Blob | The ordered chunk list of one file | Planned (encoding) |
-| Tree | A directory: names, kinds, permissions, times, attributes | Planned (encoding) |
-| Snapshot | The state of a data set at a moment, with parents, author and message | Planned (encoding) |
+| Blob | The ordered chunk list of one file | Done |
+| Tree | A directory: names, kinds, permissions, times, attributes | Done |
+| Snapshot | The state of a data set at a moment, with parents, author and message | Done |
 | Ref | A name pointing at a snapshot; branch, tag and backup point alike | Done |
 | Store | Where objects are kept; the same interface for every target | In progress (local directory only) |
 | Policy | Retention, encryption, sync and verification rules | Planned |
 | Type driver | Type-specific diff, merge, preview and indexing, as a plugin | Planned |
 
-Blob, tree and snapshot already have type bytes and identifiers; what is missing is their canonical CBOR encoding.
+Blob, tree and snapshot are encoded in canonical CBOR with `minicbor`. Nothing creates them from real files yet; that is the job of the backup and versioning services.
 
 ## 4. Storage on disk
 
