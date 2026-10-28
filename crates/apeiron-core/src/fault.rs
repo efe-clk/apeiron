@@ -155,16 +155,27 @@ fn commit_new(repo: &mut Repository, old: ObjectId) -> Result<()> {
 /// Runs [`commit_new`] on a fresh copy of the fixture with a fault at
 /// checkpoint `n`. Returns the copy, the result and whether the fault fired.
 fn run(f: &Fixture, n: usize, fault: impl FnOnce(&Path) -> Fault) -> (TempDir, Result<()>, bool) {
+    run_on(&f.base, n, fault, |repo| commit_new(repo, f.old))
+}
+
+/// Runs `op` on a fresh copy of the repository at `base` with a fault at
+/// checkpoint `n`. Returns the copy, the result and whether the fault fired.
+fn run_on(
+    base: &Path,
+    n: usize,
+    fault: impl FnOnce(&Path) -> Fault,
+    op: impl FnOnce(&mut Repository) -> Result<()>,
+) -> (TempDir, Result<()>, bool) {
     let work = tempfile::tempdir().unwrap();
     let path = work.path().join("repo");
-    copy_dir(&f.base, &path);
+    copy_dir(base, &path);
     let mut repo = Repository::open(&path).unwrap();
     PLAN.set(Some(Plan {
         fault: fault(&path),
         remaining: n,
         fired: false,
     }));
-    let result = commit_new(&mut repo, f.old);
+    let result = op(&mut repo);
     let fired = PLAN.take().is_some_and(|p| p.fired);
     (work, result, fired)
 }
@@ -172,14 +183,23 @@ fn run(f: &Fixture, n: usize, fault: impl FnOnce(&Path) -> Fault) -> (TempDir, R
 /// The repository as a crash at each checkpoint leaves it, in order,
 /// followed by the state after the operation completed.
 fn crash_states(f: &Fixture) -> Vec<TempDir> {
+    crash_states_of(&f.base, |repo| commit_new(repo, f.old))
+}
+
+fn crash_states_of(base: &Path, op: impl Fn(&mut Repository) -> Result<()>) -> Vec<TempDir> {
     let mut states = Vec::new();
     for n in 0.. {
         let crash = tempfile::tempdir().unwrap();
         let dest = crash.path().join("repo");
-        let (work, result, fired) = run(f, n, |repo| Fault::Crash {
-            repo: repo.to_path_buf(),
-            dest,
-        });
+        let (work, result, fired) = run_on(
+            base,
+            n,
+            |repo| Fault::Crash {
+                repo: repo.to_path_buf(),
+                dest,
+            },
+            &op,
+        );
         if !fired {
             result.unwrap();
             states.push(work);
@@ -470,5 +490,250 @@ fn bit_flip_anywhere_in_a_pack_is_never_silent() {
         for name in &index_files {
             fs::rename(hidden.path().join(name), f.base.join("index").join(name)).unwrap();
         }
+    }
+}
+
+mod gc {
+    use super::*;
+    use crate::object::{EntryKind, Snapshot, Time, Tree, TreeEntry};
+    use crate::repo::GcOptions;
+
+    /// A repository where `keep` must survive garbage collection, `drop`
+    /// was deleted, and one pack holds objects of both.
+    struct GcFixture {
+        _dir: TempDir,
+        base: PathBuf,
+        kept_data: Vec<u8>,
+    }
+
+    fn store(writer: &mut crate::repo::ObjectWriter<'_>, data: &[u8], message: &str) -> ObjectId {
+        let (size, blob) = writer.put_file(data).unwrap();
+        let tree = writer
+            .put_tree(&Tree {
+                entries: vec![TreeEntry {
+                    name: b"file".to_vec(),
+                    kind: EntryKind::File { size, blob },
+                    mode: None,
+                    mtime: None,
+                    uid: None,
+                    gid: None,
+                    xattrs: vec![],
+                }],
+            })
+            .unwrap();
+        writer
+            .put_snapshot(&Snapshot {
+                tree,
+                parents: vec![],
+                time: Time {
+                    seconds: 1_700_000_000,
+                    nanos: 0,
+                },
+                author: None,
+                host: None,
+                message: Some(message.to_owned()),
+                meta: vec![],
+            })
+            .unwrap()
+    }
+
+    fn gc_fixture() -> GcFixture {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().join("repo");
+        let params = ChunkerParams::new(64 * 1024).unwrap();
+        let mut repo = Repository::init_with(&base, params).unwrap();
+        let kept_data = noise(150 * 1024, 11);
+
+        let mut writer = repo.writer();
+        let keep = store(&mut writer, &kept_data, "keep");
+        let shared_drop = store(&mut writer, &noise(100 * 1024, 12), "drop");
+        writer.finish().unwrap();
+        let mut writer = repo.writer();
+        let only_drop = store(&mut writer, &noise(100 * 1024, 13), "gone");
+        writer.finish().unwrap();
+
+        repo.update_ref("keep", None, Some(keep)).unwrap();
+        repo.update_ref("drop", None, Some(shared_drop)).unwrap();
+        repo.update_ref("gone", None, Some(only_drop)).unwrap();
+        repo.update_ref("drop", Some(shared_drop), None).unwrap();
+        repo.update_ref("gone", Some(only_drop), None).unwrap();
+        GcFixture {
+            _dir: dir,
+            base,
+            kept_data,
+        }
+    }
+
+    fn collect(repo: &mut Repository) -> Result<()> {
+        repo.gc(&GcOptions {
+            keep_reflog_days: 0,
+            dry_run: false,
+        })
+        .map(drop)
+    }
+
+    /// `keep` is intact, nothing is damaged, and another collection finishes.
+    fn assert_healthy(path: &Path, kept_data: &[u8]) {
+        let mut repo = Repository::open(path).unwrap();
+        let check = |repo: &Repository| {
+            let snapshot = repo
+                .read_snapshot(&repo.read_ref("keep").unwrap().unwrap())
+                .unwrap();
+            let tree = repo.read_tree(&snapshot.tree).unwrap();
+            let EntryKind::File {
+                blob: Some(blob), ..
+            } = tree.entries[0].kind
+            else {
+                panic!("expected a file");
+            };
+            let mut out = Vec::new();
+            repo.read_file(&blob, &mut out).unwrap();
+            assert_eq!(out, kept_data);
+            assert!(repo.verify().unwrap().is_ok());
+        };
+        check(&repo);
+        collect(&mut repo).unwrap();
+        check(&repo);
+        let again = repo
+            .gc(&GcOptions {
+                keep_reflog_days: 0,
+                dry_run: true,
+            })
+            .unwrap();
+        assert_eq!(again.removed_objects, 0);
+    }
+
+    #[test]
+    fn every_crash_during_gc_keeps_live_data() {
+        let f = gc_fixture();
+        let states = crash_states_of(&f.base, collect);
+        assert!(states.len() > 10, "only {} checkpoints", states.len());
+        for state in &states {
+            assert_healthy(&repo_path(state), &f.kept_data);
+        }
+    }
+
+    #[test]
+    fn disk_full_during_gc_keeps_live_data() {
+        let f = gc_fixture();
+        for n in 0.. {
+            let (work, result, fired) = run_on(&f.base, n, |_| Fault::DiskFull, collect);
+            if !fired {
+                result.unwrap();
+                break;
+            }
+            assert!(result.is_err());
+            assert_healthy(&repo_path(&work), &f.kept_data);
+        }
+    }
+
+    fn copy_of(f: &GcFixture) -> (TempDir, PathBuf) {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("repo");
+        copy_dir(&f.base, &path);
+        (dir, path)
+    }
+
+    #[test]
+    fn gc_removes_dead_objects_and_rewrites_the_shared_pack() {
+        let f = gc_fixture();
+        let (_dir, path) = copy_of(&f);
+        let mut repo = Repository::open(&path).unwrap();
+        // The dry run creates only the lock file, which is never deleted.
+        crate::lock::RepoLock::shared(&path).unwrap();
+        let before = files(&path);
+        let dry = repo
+            .gc(&GcOptions {
+                keep_reflog_days: 0,
+                dry_run: true,
+            })
+            .unwrap();
+        assert_eq!(files(&path), before);
+        assert_eq!(dry.removed_packs, 2);
+        assert!(dry.removed_objects > 0);
+
+        let done = repo
+            .gc(&GcOptions {
+                keep_reflog_days: 0,
+                dry_run: false,
+            })
+            .unwrap();
+        assert_eq!((done.removed_packs, done.written_packs), (2, 1));
+        assert_eq!(done.removed_objects, dry.removed_objects);
+        assert_eq!(files(&path.join("packs")).len(), 1);
+        assert_eq!(files(&path.join("index")).len(), 1);
+        assert_healthy(&path, &f.kept_data);
+    }
+
+    #[test]
+    fn recent_reflog_lines_keep_deleted_snapshots() {
+        let f = gc_fixture();
+        let (_dir, path) = copy_of(&f);
+        let mut repo = Repository::open(&path).unwrap();
+        let report = repo.gc(&GcOptions::default()).unwrap();
+        assert_eq!(report.removed_objects, 0);
+    }
+
+    #[test]
+    fn gc_needs_the_lock_alone() {
+        let f = gc_fixture();
+        let (_dir, path) = copy_of(&f);
+        let mut repo = Repository::open(&path).unwrap();
+        let reader = crate::lock::RepoLock::shared(&path).unwrap();
+        assert!(matches!(
+            repo.gc(&GcOptions::default()),
+            Err(Error::RepoLocked(_))
+        ));
+        drop(reader);
+        repo.gc(&GcOptions::default()).unwrap();
+    }
+
+    #[test]
+    fn missing_reachable_object_stops_gc_before_deleting() {
+        let f = gc_fixture();
+        let (_dir, path) = copy_of(&f);
+        let mut repo = Repository::open(&path).unwrap();
+        // A tree naming a blob that does not exist, stored without the usual checks.
+        let tree = Tree {
+            entries: vec![TreeEntry {
+                name: b"lost".to_vec(),
+                kind: EntryKind::File {
+                    size: 1,
+                    blob: Some(ObjectId::from_bytes([7; 32])),
+                },
+                mode: None,
+                mtime: None,
+                uid: None,
+                gid: None,
+                xattrs: vec![],
+            }],
+        };
+        let mut writer = repo.writer();
+        let tree = writer
+            .put(ObjectType::Tree, &tree.encode().unwrap())
+            .unwrap();
+        let snapshot = Snapshot {
+            tree,
+            parents: vec![],
+            time: Time {
+                seconds: 0,
+                nanos: 0,
+            },
+            author: None,
+            host: None,
+            message: None,
+            meta: vec![],
+        };
+        let snapshot = writer.put_snapshot(&snapshot).unwrap();
+        writer.finish().unwrap();
+        repo.update_ref("broken", None, Some(snapshot)).unwrap();
+
+        let before = files(&path.join("packs"));
+        let result = repo.gc(&GcOptions {
+            keep_reflog_days: 0,
+            dry_run: false,
+        });
+        assert!(matches!(result, Err(Error::ObjectNotFound(_))));
+        assert_eq!(files(&path.join("packs")), before);
     }
 }

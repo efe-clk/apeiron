@@ -14,8 +14,8 @@ use crate::types::{
     RepoInfo, RestoreRequest, SnapshotInfo,
 };
 use crate::{
-    ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo, ExportReport, ObjectId,
-    ReflogEntry, RepairReport, RestoreReport, VerifyReport,
+    ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo, ExportReport, GcReport,
+    GcRequest, ObjectId, ReflogEntry, RepairReport, RestoreReport, VerifyReport,
 };
 
 /// An open repository. Cloning is cheap; clones share the same state and can
@@ -64,6 +64,17 @@ impl Repository {
             .unwrap_or_else(PoisonError::into_inner)
     }
 
+    /// Takes the repository lock shared (FORMAT.md §12) and returns the
+    /// current view, reloaded if another program changed the index files.
+    fn view(&self) -> Result<View<'_>> {
+        let lock = core::RepoLock::shared(self.path())?;
+        self.write().refresh_index()?;
+        Ok(View {
+            core: self.read(),
+            _lock: lock,
+        })
+    }
+
     fn write(&self) -> RwLockWriteGuard<'_, core::Repository> {
         self.inner
             .core
@@ -96,7 +107,8 @@ impl Repository {
 
     /// Resolves a snapshot spec (API.md §8.4) to a snapshot id.
     pub fn resolve(&self, spec: &str) -> Result<ObjectId> {
-        spec::resolve(&self.read(), spec)
+        let view = self.view()?;
+        spec::resolve(&view, spec)
     }
 
     /// Stores a folder as a new snapshot and moves the ref to it.
@@ -104,9 +116,26 @@ impl Repository {
         let repo = self.clone();
         Job::spawn("backup", move |ctl| {
             let _writer = repo.lock_writer();
+            // The index is loaded after the lock is taken (FORMAT.md §12).
+            let _lock = core::RepoLock::shared(repo.path())?;
             let mut core = core::Repository::open(repo.path())?;
             let report = services::backup(&mut core, &request, ctl)?;
             *repo.write() = core;
+            Ok(report)
+        })
+    }
+
+    /// Removes objects no ref and no recent reflog line can reach. Fails with
+    /// [`ErrorKind::Locked`] while any other operation uses the repository.
+    pub fn gc(&self, request: GcRequest) -> Result<Job<GcReport>> {
+        let repo = self.clone();
+        Job::spawn("gc", move |ctl| {
+            let _writer = repo.lock_writer();
+            ctl.update(|p| p.phase = crate::Phase::Finishing);
+            let mut core = core::Repository::open(repo.path())?;
+            let report = core.gc(&request)?;
+            *repo.write() = core;
+            ctl.update(|p| p.phase = crate::Phase::Done);
             Ok(report)
         })
     }
@@ -116,7 +145,7 @@ impl Repository {
         let snapshot = self.resolve(&request.snapshot)?;
         let repo = self.clone();
         Job::spawn("restore", move |ctl| {
-            let core = repo.read();
+            let core = repo.view()?;
             Ok(services::restore(
                 &core,
                 &snapshot,
@@ -144,7 +173,7 @@ impl Repository {
         };
         let repo = self.clone();
         Job::spawn("export", move |ctl| {
-            let core = repo.read();
+            let core = repo.view()?;
             Ok(services::export(
                 &core,
                 &snapshot,
@@ -161,7 +190,7 @@ impl Repository {
         let repo = self.clone();
         Job::spawn("verify", move |ctl| {
             ctl.update(|p| p.phase = crate::Phase::Verifying);
-            let report = repo.read().verify()?;
+            let report = repo.view()?.verify()?;
             ctl.update(|p| p.phase = crate::Phase::Done);
             Ok(report)
         })
@@ -169,7 +198,7 @@ impl Repository {
 
     /// One page of history, newest first.
     pub fn log(&self, request: &LogRequest) -> Result<LogPage> {
-        let core = self.read();
+        let core = self.view()?;
         let start = spec::resolve(&core, &request.start)?;
         let mut snapshots = Vec::new();
         let mut next = Some(start);
@@ -186,14 +215,14 @@ impl Repository {
 
     /// Lists the folder at a path, or the single entry if the path is a file.
     pub fn list(&self, request: &ListRequest) -> Result<Vec<EntryInfo>> {
-        let core = self.read();
+        let core = self.view()?;
         let snapshot = spec::resolve(&core, &request.snapshot)?;
         Ok(services::list(&core, &snapshot, request.path.as_bytes())?)
     }
 
     /// Paths added, removed and modified between two snapshots.
     pub fn diff(&self, request: &DiffRequest) -> Result<Vec<Change>> {
-        let core = self.read();
+        let core = self.view()?;
         let from = spec::resolve(&core, &request.from)?;
         let to = spec::resolve(&core, &request.to)?;
         Ok(services::diff(&core, &from, &to)?)
@@ -201,7 +230,7 @@ impl Repository {
 
     pub fn refs(&self) -> Result<Vec<RefInfo>> {
         Ok(self
-            .read()
+            .view()?
             .list_refs()?
             .into_iter()
             .map(|(name, snapshot)| RefInfo { name, snapshot })
@@ -209,7 +238,7 @@ impl Repository {
     }
 
     pub fn reflog(&self, name: &str) -> Result<Vec<ReflogEntry>> {
-        Ok(self.read().reflog(name)?)
+        Ok(self.view()?.reflog(name)?)
     }
 
     /// Deletes a ref if it still points to the expected snapshot. The
@@ -217,13 +246,27 @@ impl Repository {
     pub fn delete_ref(&self, request: &DeleteRefRequest) -> Result<()> {
         let _writer = self.lock_writer();
         Ok(self
-            .read()
+            .view()?
             .update_ref(&request.name, Some(request.expected), None)?)
     }
 
     /// Removes stale ref locks and adds reflog lines lost in a crash.
     pub fn repair(&self) -> Result<RepairReport> {
         let _writer = self.lock_writer();
-        Ok(self.read().repair()?)
+        Ok(self.view()?.repair()?)
+    }
+}
+
+/// A view of the repository while the repository lock is held shared.
+struct View<'a> {
+    core: RwLockReadGuard<'a, core::Repository>,
+    _lock: core::RepoLock,
+}
+
+impl std::ops::Deref for View<'_> {
+    type Target = core::Repository;
+
+    fn deref(&self) -> &core::Repository {
+        &self.core
     }
 }

@@ -2,7 +2,7 @@
 
 # Apeiron Command-Line Interface
 
-> **Status: In progress.** This is the Stage 1 design of the `apeiron` command ([ROADMAP.md](ROADMAP.md) §3). The parts marked Done work today; `gc` is still planned.
+> **Status: In progress.** This is the Stage 1 design of the `apeiron` command ([ROADMAP.md](ROADMAP.md) §3). The parts marked Done work today.
 
 The CLI is the first interface of Apeiron. Like every other interface it uses only the public API ([API.md](API.md)); it has no access to the core that a third-party program would not have.
 
@@ -41,7 +41,7 @@ If neither is given, the command stops with a usage error. A repository on an ex
 | `apeiron refs` | Lists all refs and the snapshots they point to | Done |
 | `apeiron verify` | Reads and checks every pack, index and object | Done |
 | `apeiron repair` | Removes stale ref locks and adds lost reflog lines | Done |
-| `apeiron gc` | Deletes objects no ref or reflog can reach | Planned (after garbage collection exists) |
+| `apeiron gc [--keep-days <days>] [--dry-run]` | Deletes data no ref and no reflog line of the last 90 days (or `--keep-days`) can reach; `--dry-run` only reports | Done |
 
 A `<snapshot>` can be written as a ref name (`main`), a full snapshot id, or the first 8 or more characters of an id if they match exactly one snapshot. A `~N` suffix goes N steps back through first parents: `main~1` is the snapshot before `main`.
 
@@ -104,4 +104,4 @@ apeiron verify
 | Default ref for `backup` | `main`; several folders use `--ref backup/<name>` |
 | May `restore` write into a non-empty folder? | No in Stage 1; a later `--overwrite` flag may allow it |
 | Can `export` write RAR files? | No. Only RARLAB's own software may create RAR archives; there is no open implementation, and the free unRAR code may not be used to create them. Reading RAR files for an import may be added later |
-| Concurrent commands on one repository | A repository lock (Stage 1, [FORMAT.md](FORMAT.md) §12) makes a second writer wait or stop |
+| Concurrent commands on one repository | Decided: commands may run side by side; `gc` runs only alone and otherwise stops with a "locked" error ([FORMAT.md](FORMAT.md) §12) |

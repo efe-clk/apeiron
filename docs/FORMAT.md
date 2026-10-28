@@ -16,8 +16,8 @@ Implementation status (`apeiron-core`):
 | 8 | Pack and index files | Done |
 | 9 | Durable writes, refs and reflogs | Done |
 | 10 | Power-failure tests | Done |
-| 12 | Repository lock | Planned (draft for review) |
-| 13 | Garbage collection | Planned (draft for review) |
+| 12 | Repository lock | Done |
+| 13 | Garbage collection | Done |
 
 ## Plain summary
 

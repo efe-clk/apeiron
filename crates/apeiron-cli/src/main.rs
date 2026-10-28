@@ -20,8 +20,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use apeiron::{
-    ArchiveFormat, BackupRequest, DiffRequest, Error, ErrorKind, ExportRequest, Job, ListRequest,
-    LogRequest, Name, Repository, RestoreRequest, Warning,
+    ArchiveFormat, BackupRequest, DiffRequest, Error, ErrorKind, ExportRequest, GcRequest, Job,
+    ListRequest, LogRequest, Name, Repository, RestoreRequest, Warning,
 };
 use clap::{Parser, Subcommand};
 use serde::Serialize;
@@ -114,6 +114,15 @@ enum Command {
     Verify,
     /// Remove stale ref locks and add lost reflog lines
     Repair,
+    /// Delete data that no ref and no recent reflog line can reach
+    Gc {
+        /// Snapshots a ref pointed to within this many days are kept; 0 keeps only what refs point to now
+        #[arg(long, default_value_t = 90)]
+        keep_days: u32,
+        /// Only show what would be deleted
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[derive(Clone, Copy, clap::ValueEnum)]
@@ -336,6 +345,27 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                 }
             });
             Ok(if report.is_ok() { 0 } else { EXIT_DAMAGED })
+        }
+        Command::Gc { keep_days, dry_run } => {
+            let repo = open(cli.repo)?;
+            let report = watch(
+                out,
+                repo.gc(GcRequest {
+                    keep_reflog_days: keep_days,
+                    dry_run,
+                })?,
+            )?;
+            out.result(&report, |r| {
+                let verb = if r.dry_run { "Would remove" } else { "Removed" };
+                say!(
+                    "{verb} {} ({}) in {}; {} live objects kept",
+                    format::count(r.removed_objects, "object"),
+                    format::bytes(r.removed_bytes),
+                    format::count(r.removed_packs, "pack"),
+                    r.live_objects
+                );
+            });
+            Ok(0)
         }
         Command::Repair => {
             let repo = open(cli.repo)?;

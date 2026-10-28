@@ -15,7 +15,10 @@ mod types;
 /// Version of the API contract in `docs/API.md` §8.
 pub const API_VERSION: &str = "0.1";
 
-pub use apeiron_core::{ObjectId, RefOp, ReflogEntry, RepairReport, Time, VerifyReport};
+pub use apeiron_core::{
+    GcOptions as GcRequest, GcReport, ObjectId, RefOp, ReflogEntry, RepairReport, Time,
+    VerifyReport,
+};
 pub use apeiron_services::{
     ArchiveFormat, BackupOptions as BackupRequest, BackupOutcome as BackupReport, Change,
     ChangeKind, EntryInfo, ExportOutcome as ExportReport, Kind, Name, Phase, Progress,

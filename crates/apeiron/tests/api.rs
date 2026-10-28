@@ -202,6 +202,35 @@ fn progress_reaches_done_and_errors_are_typed() {
         })
         .unwrap();
     assert!(s.repo.refs().unwrap().is_empty());
+
+    // The deleted ref's snapshot stays while its reflog line is recent.
+    let keep = s
+        .repo
+        .gc(apeiron::GcRequest::default())
+        .unwrap()
+        .wait()
+        .unwrap();
+    assert_eq!(keep.removed_objects, 0);
+    {
+        let _reader = apeiron_core::RepoLock::shared(s.repo.path()).unwrap();
+        let err = s
+            .repo
+            .gc(apeiron::GcRequest::default())
+            .unwrap()
+            .wait()
+            .unwrap_err();
+        assert_eq!(err.kind, ErrorKind::Locked);
+    }
+    let request = apeiron::GcRequest {
+        keep_reflog_days: 0,
+        dry_run: false,
+    };
+    let gone = s.repo.gc(request).unwrap().wait().unwrap();
+    assert!(gone.removed_objects > 0);
+    assert_eq!(
+        s.repo.resolve(&report.snapshot.to_hex()).unwrap_err().kind,
+        ErrorKind::NotFound
+    );
     assert!(s.repo.repair().unwrap().removed_locks.is_empty());
 
     assert_eq!(

@@ -128,7 +128,7 @@ flowchart TB
 | `Repository::open(path)` | Opens an existing repository |
 | `repo.info()` | Returns the path, format version and chunker settings |
 
-A `Repository` can be shared between threads (`Send + Sync`). Operations that only read run in parallel; operations that write wait for each other inside the process. Between processes, a repository lock does the same (planned for Stage 1, [FORMAT.md](FORMAT.md) §12).
+A `Repository` can be shared between threads (`Send + Sync`). Operations that only read run in parallel; operations that write wait for each other inside the process. Every operation holds the repository lock shared while it runs and garbage collection holds it exclusive ([FORMAT.md](FORMAT.md) §12), so garbage collection never runs beside another program; other writers can work at the same time because refs are updated with compare-and-swap.
 
 ### 8.3 Operations
 
@@ -148,6 +148,7 @@ Every operation takes one plain request value and returns one plain result value
 | `resolve` | snapshot spec (section 8.4) | snapshot id | No |
 | `delete_ref` | ref name, expected snapshot | — | No |
 | `repair` | — | `RepairReport`: removed locks, repaired reflogs | No |
+| `gc` | days of reflog to keep (default 90), dry run | `GcReport`: live objects, removed objects, bytes and packs, packs written | Yes |
 
 ### 8.4 Naming a snapshot
 

@@ -16,11 +16,16 @@ use crate::object::{Blob, EntryKind, Snapshot, Tree};
 use crate::pack::{self, FileHash, PackEntry, PackWriter};
 use crate::refs::{RefStore, ReflogEntry, RepairReport};
 
+mod gc;
+
+pub use gc::{GcOptions, GcReport};
+
 const CONFIG: &str = "config";
 const PACKS: &str = "packs";
 const INDEX: &str = "index";
 const REFS: &str = "refs";
 const LOGS: &str = "logs";
+const LOCKS: &str = "locks";
 const TMP: &str = "tmp";
 const TMP_MAX_AGE: Duration = Duration::from_secs(3600);
 
@@ -30,6 +35,8 @@ pub struct Repository {
     root: PathBuf,
     config: Config,
     index: HashMap<ObjectId, Location>,
+    /// The index files `index` was loaded from.
+    index_files: Vec<PathBuf>,
     refs: RefStore,
 }
 
@@ -48,7 +55,7 @@ impl Repository {
                 reason: "directory is not empty".to_owned(),
             });
         }
-        for dir in [PACKS, INDEX, REFS, LOGS, TMP] {
+        for dir in [PACKS, INDEX, REFS, LOGS, LOCKS, TMP] {
             fsutil::ensure_dir(&path.join(dir))?;
         }
         // The config file is written last: its presence marks a complete repository.
@@ -78,6 +85,7 @@ impl Repository {
             root: path.to_path_buf(),
             config,
             index: HashMap::new(),
+            index_files: Vec::new(),
             refs: RefStore::new(path.join(REFS), path.join(LOGS), path.join(TMP)),
         };
         repo.load_index()?;
@@ -97,12 +105,33 @@ impl Repository {
         self.root.join(name)
     }
 
+    /// Forgets the loaded index and loads it again from disk.
+    pub fn reload_index(&mut self) -> Result<()> {
+        self.index.clear();
+        self.load_index()
+    }
+
+    /// Reloads the index if another program changed the index files, for
+    /// example by garbage collection. Returns whether it reloaded.
+    pub fn refresh_index(&mut self) -> Result<bool> {
+        let mut current = list_files(&self.dir(INDEX))?;
+        current.sort();
+        if current == self.index_files {
+            return Ok(false);
+        }
+        self.reload_index()?;
+        Ok(true)
+    }
+
     /// Loads all index files, then reads the tables of packs no index covers
     /// (left behind by a crash between writing a pack and its index).
     fn load_index(&mut self) -> Result<()> {
         let mut indexed: HashSet<FileHash> = HashSet::new();
         let index_dir = self.dir(INDEX);
-        for path in list_files(&index_dir)? {
+        let mut index_files = list_files(&index_dir)?;
+        index_files.sort();
+        self.index_files = index_files.clone();
+        for path in index_files {
             if index::hash_from_file_name(&path, ".idx").is_none() {
                 continue;
             }

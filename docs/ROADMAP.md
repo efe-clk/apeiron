@@ -54,7 +54,7 @@ On Windows, renames use `MOVEFILE_WRITE_THROUGH` ([FORMAT.md](FORMAT.md) §9.1) 
 | Restore and verification (scrub) | Done |
 | Local and external disk backup targets | In progress |
 | tar, zip and 7z export | Done |
-| Garbage collection, repository locks, pack merging | Planned |
+| Garbage collection, repository locks, pack merging | Done |
 | Opening a repository with a damaged index by rebuilding it from the packs | Planned |
 
 ## 4. Stage 2 — Remote and sync

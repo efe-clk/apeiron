@@ -12,6 +12,7 @@ publish = false
 apeiron-sys = { version = "0.0.0", path = "../apeiron-sys" }
 blake3 = "1.8.7"
 fastcdc = "5.0.0"
+fs4 = "1.1.0"
 getrandom = "0.4.3"
 minicbor = { version = "2.3.1", default-features = false, features = ["alloc"] }
 serde = { version = "1.0.229", features = ["derive"] }

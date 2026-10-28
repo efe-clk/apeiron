@@ -128,7 +128,7 @@ flowchart TB
 | `Repository::open(path)` | Var olan bir depoyu açar |
 | `repo.info()` | Yolu, format sürümünü ve chunk bölme ayarlarını döndürür |
 
-Bir `Repository` iş parçacıkları arasında paylaşılabilir (`Send + Sync`). Yalnızca okuyan işlemler paralel çalışır; yazan işlemler süreç içinde birbirini bekler. Süreçler arasında bunu bir depo kilidi sağlar (Aşama 1 için planlandı, [FORMAT.tr.md](FORMAT.tr.md) §12).
+Bir `Repository` iş parçacıkları arasında paylaşılabilir (`Send + Sync`). Yalnızca okuyan işlemler paralel çalışır; yazan işlemler süreç içinde birbirini bekler. Her işlem çalışırken depo kilidini paylaşımlı, çöp toplama ise özel tutar ([FORMAT.tr.md](FORMAT.tr.md) §12); böylece çöp toplama hiçbir zaman başka bir programla aynı anda çalışmaz. Diğer yazıcılar aynı anda çalışabilir, çünkü ref'ler karşılaştır ve değiştir ile güncellenir.
 
 ### 8.3 İşlemler
 
@@ -148,6 +148,7 @@ Her işlem tek bir düz istek değeri alır ve tek bir düz sonuç değeri dönd
 | `resolve` | snapshot belirteci (bölüm 8.4) | snapshot kimliği | Hayır |
 | `delete_ref` | ref adı, beklenen snapshot | — | Hayır |
 | `repair` | — | `RepairReport`: kaldırılan kilitler, onarılan reflog'lar | Hayır |
+| `gc` | saklanacak reflog günü (varsayılan 90), deneme çalıştırması | `GcReport`: canlı nesneler; silinen nesneler, baytlar ve paketler; yazılan paketler | Evet |
 
 ### 8.4 Bir snapshot'ı adlandırma
 

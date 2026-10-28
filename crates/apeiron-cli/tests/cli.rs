@@ -104,6 +104,16 @@ fn backup_log_diff_ls_restore() {
     assert_eq!(refs[0]["name"], "main");
     assert!(s.ok(&["verify"]).starts_with("OK: "));
     assert_eq!(s.ok(&["repair"]), "Nothing to repair\n");
+
+    // Both snapshots are reachable from main, so nothing is removed.
+    let dry = s.json(&["gc", "--keep-days", "0", "--dry-run"]);
+    assert_eq!(
+        (dry["dry_run"].as_bool(), dry["removed_objects"].as_u64()),
+        (Some(true), Some(0))
+    );
+    assert!(s.ok(&["gc"]).starts_with("Removed 0 objects"));
+    assert!(s.ok(&["verify"]).starts_with("OK: "));
+    assert_eq!(s.ok(&["diff", "main~1", "main"]), "M a.txt\n");
 }
 
 #[test]

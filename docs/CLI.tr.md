@@ -2,7 +2,7 @@
 
 # Apeiron Komut Satırı Arayüzü
 
-> **Durum: Devam ediyor.** `apeiron` komutunun Aşama 1 tasarımıdır ([ROADMAP.tr.md](ROADMAP.tr.md) §3). Tamamlandı olarak işaretlenen kısımlar bugün çalışır; `gc` hâlâ planlıdır.
+> **Durum: Devam ediyor.** `apeiron` komutunun Aşama 1 tasarımıdır ([ROADMAP.tr.md](ROADMAP.tr.md) §3). Tamamlandı olarak işaretlenen kısımlar bugün çalışır.
 
 CLI, Apeiron'un ilk arayüzüdür. Diğer tüm arayüzler gibi yalnızca herkese açık API'yi kullanır ([API.tr.md](API.tr.md)); çekirdeğe üçüncü taraf bir programın sahip olmadığı hiçbir erişimi yoktur.
 
@@ -41,7 +41,7 @@ CLI, Apeiron'un ilk arayüzüdür. Diğer tüm arayüzler gibi yalnızca herkese
 | `apeiron refs` | Tüm ref'leri ve gösterdikleri snapshot'ları listeler | Tamamlandı |
 | `apeiron verify` | Her paketi, indeksi ve nesneyi okuyup denetler | Tamamlandı |
 | `apeiron repair` | Bayat ref kilitlerini kaldırır ve kaybolan reflog satırlarını ekler | Tamamlandı |
-| `apeiron gc` | Hiçbir ref'in ya da reflog'un ulaşamadığı nesneleri siler | Planlandı (çöp toplama yazıldıktan sonra) |
+| `apeiron gc [--keep-days <days>] [--dry-run]` | Hiçbir ref'in ve son 90 günün (ya da `--keep-days`) hiçbir reflog satırının ulaşamadığı veriyi siler; `--dry-run` yalnızca raporlar | Tamamlandı |
 
 Bir `<snapshot>`; ref adı (`main`), tam snapshot kimliği ya da tek bir snapshot'a uyuyorsa kimliğin ilk 8 ya da daha fazla karakteri olarak yazılabilir. `~N` eki ilk ebeveynler üzerinden N adım geri gider: `main~1`, `main`'den önceki snapshot'tır.
 
@@ -104,4 +104,4 @@ apeiron verify
 | `backup` için varsayılan ref | `main`; birden fazla klasör için `--ref backup/<name>` |
 | `restore` boş olmayan bir klasöre yazabilir mi? | Aşama 1'de hayır; ileride bir `--overwrite` seçeneği buna izin verebilir |
 | `export` RAR dosyası yazabilir mi? | Hayır. RAR arşivlerini yalnızca RARLAB'in kendi yazılımı oluşturabilir; açık bir uygulaması yoktur ve ücretsiz unRAR kodu arşiv oluşturmak için kullanılamaz. İçe aktarma için RAR dosyalarını okumak ileride eklenebilir |
-| Aynı depoda eşzamanlı komutlar | Bir depo kilidi (Aşama 1, [FORMAT.tr.md](FORMAT.tr.md) §12) ikinci yazıcıyı bekletir ya da durdurur |
+| Aynı depoda eşzamanlı komutlar | Karar verildi: komutlar yan yana çalışabilir; `gc` yalnızca tek başına çalışır, aksi hâlde "kilitli" hatasıyla durur ([FORMAT.tr.md](FORMAT.tr.md) §12) |

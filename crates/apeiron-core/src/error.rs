@@ -41,6 +41,8 @@ pub enum Error {
     InvalidRefName(String),
     #[error("ref {0:?} conflicts with an existing ref of a different depth")]
     RefNameConflict(String),
+    #[error("the repository is locked by another program ({}); garbage collection runs alone", .0.display())]
+    RepoLocked(PathBuf),
     #[error("ref {name:?} is locked by another writer ({lock})")]
     RefLocked { name: String, lock: PathBuf },
     #[error("ref {name:?} changed concurrently: expected {expected:?}, found {actual:?}")]

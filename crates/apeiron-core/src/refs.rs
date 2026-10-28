@@ -272,6 +272,17 @@ impl RefStore {
         Ok(())
     }
 
+    /// Names of all reflogs, including those of deleted refs.
+    pub(crate) fn log_names(&self) -> Result<Vec<String>> {
+        let mut names: Vec<String> = walk(&self.logs_dir)?
+            .into_iter()
+            .map(|(_, name)| name)
+            .filter(|name| validate_ref_name(name).is_ok())
+            .collect();
+        names.sort();
+        Ok(names)
+    }
+
     /// All refs and their targets, sorted by name.
     pub(crate) fn list(&self) -> Result<Vec<(String, ObjectId)>> {
         let mut refs = Vec::new();

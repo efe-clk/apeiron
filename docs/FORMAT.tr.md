@@ -16,8 +16,8 @@ Uygulama durumu (`apeiron-core`):
 | 8 | Paket ve indeks dosyaları | Tamamlandı |
 | 9 | Kalıcı yazma, ref ve reflog | Tamamlandı |
 | 10 | Güç kesintisi testleri | Tamamlandı |
-| 12 | Depo kilidi | Planlandı (incelemeye sunulan taslak) |
-| 13 | Çöp toplama | Planlandı (incelemeye sunulan taslak) |
+| 12 | Depo kilidi | Tamamlandı |
+| 13 | Çöp toplama | Tamamlandı |
 
 ## Sade anlatım
 

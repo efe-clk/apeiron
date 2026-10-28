@@ -54,7 +54,7 @@ Windows'ta yeniden adlandırmalar küçük `apeiron-sys` crate'i üzerinden `MOV
 | Geri yükleme ve doğrulama (scrub) | Tamamlandı |
 | Yerel ve harici disk yedek hedefleri | Devam ediyor |
 | tar, zip ve 7z dışa aktarma | Tamamlandı |
-| Çöp toplama, depo kilitleri, paket birleştirme | Planlandı |
+| Çöp toplama, depo kilitleri, paket birleştirme | Tamamlandı |
 | İndeksi bozuk bir depoyu, indeksi paketlerden yeniden üreterek açmak | Planlandı |
 
 ## 4. Aşama 2 — Uzak ve senkron

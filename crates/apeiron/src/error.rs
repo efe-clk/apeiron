@@ -91,7 +91,9 @@ impl From<apeiron_core::Error> for Error {
                 Error::new(ErrorKind::Unsupported, message).with_path(path)
             }
             E::ObjectNotFound(_) => Error::new(ErrorKind::NotFound, message),
-            E::RefLocked { lock, .. } => Error::new(ErrorKind::Locked, message).with_path(lock),
+            E::RefLocked { lock, .. } | E::RepoLocked(lock) => {
+                Error::new(ErrorKind::Locked, message).with_path(lock)
+            }
             E::RefConflict { .. } | E::RefNameConflict(_) => {
                 Error::new(ErrorKind::Conflict, message)
             }

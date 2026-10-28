@@ -53,7 +53,7 @@ The ABI is deliberately small: a handful of functions that never change, while t
 | `apeiron_repo_open(path, &repo)` | Opens a repository |
 | `apeiron_repo_free(repo)` | Closes a repository handle |
 | `apeiron_call(repo, operation, request_json, &result_json)` | Runs a short operation (`log`, `list`, `diff`, `refs`, `reflog`, `resolve`, `delete_ref`, `repair`, `info`) |
-| `apeiron_start(repo, operation, request_json, &job)` | Starts a long operation (`backup`, `restore`, `export`, `verify`) |
+| `apeiron_start(repo, operation, request_json, &job)` | Starts a long operation (`backup`, `restore`, `export`, `verify`, `gc`) |
 | `apeiron_job_progress(job, &progress_json)` | Reads the current progress |
 | `apeiron_job_cancel(job)` | Asks the job to stop |
 | `apeiron_job_wait(job, timeout_ms, &result_json)` | Waits for the result; returns `APEIRON_PENDING` if the timeout passes first (`-1` waits forever) |

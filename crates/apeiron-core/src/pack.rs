@@ -144,6 +144,17 @@ impl PackWriter {
         Ok(())
     }
 
+    /// Appends an object exactly as another pack stored it.
+    pub(crate) fn add_stored(&mut self, from: &PackEntry, stored: &[u8]) -> Result<()> {
+        let entry = PackEntry {
+            offset: self.len,
+            ..*from
+        };
+        self.write(stored)?;
+        self.entries.push(entry);
+        Ok(())
+    }
+
     /// Writes the entry table, syncs and moves the pack into `packs_dir`.
     pub(crate) fn finish(mut self, packs_dir: &Path) -> Result<(FileHash, Vec<PackEntry>)> {
         let mut table = Vec::with_capacity(self.entries.len() * ENTRY_LEN + FOOTER_LEN as usize);
@@ -246,11 +257,26 @@ fn bad_entry(path: &Path) -> Error {
 
 /// Reads one object, decompresses it and checks its id.
 pub(crate) fn read_object(path: &Path, entry: &PackEntry, key: &IdKey) -> Result<Vec<u8>> {
+    let stored = read_stored_unchecked(path, entry)?;
+    decode_stored(path, entry, key, stored)
+}
+
+/// Reads the stored bytes of one object after checking that they decode to it.
+pub(crate) fn read_stored(path: &Path, entry: &PackEntry, key: &IdKey) -> Result<Vec<u8>> {
+    let stored = read_stored_unchecked(path, entry)?;
+    decode_stored(path, entry, key, stored.clone())?;
+    Ok(stored)
+}
+
+fn read_stored_unchecked(path: &Path, entry: &PackEntry) -> Result<Vec<u8>> {
     let mut file = File::open(path).at(path)?;
     file.seek(SeekFrom::Start(entry.offset)).at(path)?;
     let mut stored = vec![0u8; entry.stored_len as usize];
     file.read_exact(&mut stored).at(path)?;
+    Ok(stored)
+}
 
+fn decode_stored(path: &Path, entry: &PackEntry, key: &IdKey, stored: Vec<u8>) -> Result<Vec<u8>> {
     let raw = match entry.compression {
         Compression::None => stored,
         Compression::Zstd => zstd::bulk::decompress(&stored, entry.raw_len as usize)

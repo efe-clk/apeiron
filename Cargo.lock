@@ -83,6 +83,7 @@ dependencies = [
  "apeiron-sys",
  "blake3",
  "fastcdc",
+ "fs4",
  "getrandom",
  "minicbor",
  "serde",
@@ -322,6 +323,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e634e2e0ebac1ee034020da1ca582e17ffe4e0f5e985823721e168928136dcb"
 dependencies = [
  "zlib-rs",
+]
+
+[[package]]
+name = "fs4"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e72ed92b67c146290f88e9c89d60ca163ea417a446f61ffd7b72df3e7f1dfd5"
+dependencies = [
+ "rustix",
+ "windows-sys",
 ]
 
 [[package]]

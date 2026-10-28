@@ -15,5 +15,6 @@ serde = { version = "1.0.229", features = ["derive"] }
 thiserror = "2.0.21"
 
 [dev-dependencies]
+apeiron-core = { path = "../apeiron-core" }
 serde_json = "1"
 tempfile = "3.27.0"
