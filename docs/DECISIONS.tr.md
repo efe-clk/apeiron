@@ -25,6 +25,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [015](#adr-015-c-abi-sınırında-json-değerler) | C ABI | Küçük ve sabit bir işlev kümesi; istekler ve sonuçlar JSON | Önerildi |
 | [016](#adr-016-senkron-herkese-açık-api-ve-iş-parçacığında-çalışan-işler) | Uzun işlemler | Senkron API; sorgulanan ilerlemeyle iş parçacığında çalışan işler | Önerildi |
 | [017](#adr-017-şifreleme-için-xchacha20-poly1305-ve-argon2id) | Şifreleme | Veri için XChaCha20-Poly1305, parolalar için Argon2id | Kabul edildi |
+| [018](#adr-018-uzak-depo-olarak-deponun-tam-kopyası-sftp-için-russh-s3-için-object_store) | Uzak hedefler | Uzak depolar deponun tam kopyasıdır; SFTP için `russh`, S3 için `object_store` | Önerildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
@@ -367,3 +368,25 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Paket dosyalarının tamamını tek bir akış olarak şifrelemek | Tek bir nesneyi okumak tüm paketin şifresini çözmeyi gerektirir |
 
 **Sonuçlar.** Şifreli paketler biraz büyüktür (nesne ve tablo başına 40 bayt). Ref adları görünür kalır (§14.5). Kriptografi için RustCrypto dışındaki kütüphaneler kullanılmaz.
+
+## ADR-018: Uzak depo olarak deponun tam kopyası; SFTP için `russh`, S3 için `object_store`
+
+**Durum:** Önerildi (2026-10-28)
+
+**Bağlam.** Aşama 2, yedekleri harici bir diske, bir ev sunucusuna ve bulut depolamaya gönderir ([FORMAT.tr.md](FORMAT.tr.md) §15). Uzak depolama yavaştır ve her an kesilebilir; bulut depolamada dosya yeniden adlandırma ve kilit yoktur. Windows, macOS ve Linux'un hepsi desteklenir ve çekirdek senkron kalır (ADR-006).
+
+**Karar.** Uzak depo, aynı anahtarlara sahip, deponun eksiksiz bir kopyasıdır; push ve pull yalnızca bir ref'in eksik olan nesnelerini saklandıkları (hâlâ şifreli) baytlarla kopyalar ve ref'leri yalnızca ileri taşır. Her uzak depo aynı beş işlemi sunar (okuma, listeleme, yeni bir dosyayı atomik yazma, bir ref'i koşullu değiştirme, silme). Klasörler Apeiron'un kendi kalıcı yazma yolunu kullanır. SFTP `russh` ve `russh-sftp` kullanır. S3 ve S3 uyumlu depolama `object_store` kullanır. Bu kütüphaneler, yeni `apeiron-remote` crate'inin içinde, bekleyen (blocking) bir arayüzün arkasında Tokio üzerinde çalışır.
+
+**Gerekçe.** Tam bir kopya, asıl bilgisayar olmadan geri yüklenebilir ve yeni dosya türleri gerektirmez. Saklanan baytları kopyalamak, uzak deponun hiçbir zaman parolaya ihtiyaç duymaması ve verinin yolda hiç çözülmemesi demektir. `russh` saf Rust'tır ve sistemdeki `ssh` programını çalıştıran kütüphanelerin aksine Windows'ta çalışır. `object_store` Apache Arrow projesi tarafından bakılır ve güvenli bir ref güncellemesinin gerektirdiği koşullu yazmayı S3'te destekler. İkisi de Rust 1.85'i destekler.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Her yedek için tek bir şifreli arşiv dosyası | Her yedek her şeyi yeniden yükler; tekrar eden veri ayıklanmaz |
+| SFTP için `ssh2` (libssh2) | C kütüphanesidir; ADR-001 Rust'ı tercih eder |
+| `openssh-sftp-client` | Sistemdeki `ssh` programını çalıştırır; Windows'ta çalışmaz |
+| Her uzak depo için `opendal` | Onun SFTP desteği de sistemdeki `ssh` programını çalıştırır |
+| Koşullu yazma yerine S3'te kilit dosyaları | S3'te koşullu yazma olmadan atomik "yoksa oluştur" yoktur |
+
+**Sonuçlar.** Koşullu yazma desteği olmayan S3 uyumlu hizmetler reddedilir. SFTP, sunucunun `~/.ssh/known_hosts` içinde olmasını ister. Uzak kopyaların reflog'u yoktur ve onların çöp toplaması sonraki bir iştir.

@@ -19,6 +19,7 @@ Uygulama durumu (`apeiron-core`):
 | 12 | Depo kilidi | Tamamlandı |
 | 13 | Çöp toplama | Tamamlandı |
 | 14 | Şifreleme | Tamamlandı |
+| 15 | Uzak depolar, push ve pull (taslak, onay bekliyor) | Planlandı |
 
 ## Sade anlatım
 
@@ -52,6 +53,7 @@ Uygulama durumu (`apeiron-core`):
 │   └── backup/home        # Her ref'in değişiklik günlüğü (reflog)
 ├── locks/                 # Depo kilidi, bölüm 12
 ├── keys/                  # Şifreli bir deponun anahtar dosyaları, bölüm 14
+├── remotes                # Bu kopyanın uzak depoları (TOML), bölüm 15.1
 └── tmp/                   # Yazılmakta olan geçici dosyalar
 ```
 
@@ -498,7 +500,69 @@ Bir nesneyi okumak: mühürlü kutuyu aç → sıkıştırmayı çöz → `raw_l
 
 Ref adları, bir uzak sunucunun ref'leri güvenle güncelleyebilmesi için bilerek görünür bırakılır; onları gizlemek isteyen kullanıcı nötr adlar seçer.
 
-## 15. Sonraki sürümlere bırakılanlar
+## 15. Uzak depolar
+
+Uzak depo, aynı deponun başka bir kopyasıdır: aynı `config`, aynı `keys/`, aynı nesne kimlikleri. Push, bir ref'in ihtiyaç duyduğu nesneleri uzak depoya kopyalar ve uzaktaki ref'i taşır; pull aynısını ters yönde yapar. Uzak kopya eksiksiz bir depodur; bu yüzden bir yedek doğrudan ondan geri yüklenebilir.
+
+### 15.1 `remotes` dosyası
+
+```toml
+[remote.disk]
+url = "/run/media/user/disk/apeiron"                  # bir klasör
+
+[remote.server]
+url = "sftp://user@nas.local:22/srv/apeiron"         # SFTP
+
+[remote.cloud]
+url = "s3://bucket/apeiron?endpoint=https://s3.example.com&region=eu-1"   # S3 uyumlu
+```
+
+- Dosya tek bir kopyaya özeldir; asla push edilmez. Adlar bölüm 9.3'teki ref adı kurallarına uyar, `/` içermez.
+- Gizli bilgi tutmaz. SFTP kullanıcının SSH anahtarlarını ve ajanını kullanır ve sunucuyu `~/.ssh/known_hosts` ile denetler; tanınmayan sunucu reddedilir. S3, `AWS_ACCESS_KEY_ID` ve `AWS_SECRET_ACCESS_KEY` değişkenlerini okur.
+- SFTP ya da S3 uzak deposuna yalnızca şifreli bir depo (bölüm 14) push edilebilir. Harici disk gibi bir klasör uzak deposu şifresiz bir depo da tutabilir.
+
+### 15.2 Depolama işlemleri
+
+Her uzak depo türü, bölüm 2'deki düzenin yolları üzerinde aynı küçük işlem kümesini sunar:
+
+| İşlem | Klasör ve SFTP | S3 |
+| --- | --- | --- |
+| Bir dosyayı ya da bir bayt aralığını okuma | Okuma | `Range` ile `GET` |
+| Bir klasörü listeleme | Klasörü okuma | Önekle `LIST` |
+| Yeni bir dosyayı atomik yazma | `tmp/` içine yazma, diske yazma, yeniden adlandırma (bölüm 9.1) | `If-None-Match: *` ile `PUT` |
+| Bir ref'i değiştirme (karşılaştır ve değiştir) | Bölüm 9.3'teki gibi kilit dosyası | `If-Match: <önce okunan etag>` ile `PUT` |
+| Bir dosyayı silme | Silme | `DELETE` |
+
+Bir dosya ya tamamen vardır ya hiç yoktur. Koşullu `PUT` yapamayan bir uzak depo reddedilir; çünkü o olmadan iki yazıcı birbirinin ref'inin üzerine yazabilir.
+
+### 15.3 Push
+
+1. Yerel depo kilidini paylaşımlı al (bölüm 12). Uzaktaki `config`'i oku. Yoksa uzak depo yenidir: önce `keys/`, sonra `config` yazılır. `id`'si yereldekinden farklıysa dur: bu başka bir depodur.
+2. Uzaktaki `keys/`'i yereldekiyle aynı yap: önce eksik anahtar dosyalarını yaz, sonra yerelde silinmiş olanları sil.
+3. Uzaktaki indeks dosyalarını oku; birlikte, uzak deponun sahip olduğu nesnelerin kümesini verirler.
+4. Uzaktaki ref'i oku. Yerel ref'in snapshot'ı ya da onun atalarından biri olmayan bir snapshot'ı gösteriyorsa bir çatışmayla dur: uzak depoda bu kopyada olmayan bir geçmiş vardır ve önce pull yapılmalıdır.
+5. Yerel ref'ten ulaşılabilen nesneleri dolaş. Uzak deponun zaten sahip olduğu bir nesnenin içine girilmez; çünkü ondan ulaşılabilen her şey de oradadır (15.5).
+6. Eksik nesneleri saklandıkları baytlarla, şifrelerini çözmeden yeni paketlere kopyala; her paketi, sonra onun indeksini uzak depoya yaz.
+7. Uzaktaki ref'i, 4. adımda okunan değeri bekleyerek değiştir. Uzak kopyalar reflog tutmaz; bir ref'in geçmişi, ebeveyn snapshot'larının zinciridir.
+
+### 15.4 Pull
+
+Pull, push'un adımlarını ters yönde, hedef olarak yerel depoyla çalıştırır:
+
+1. Uzaktaki `config`'in yerel `id`'yi taşıdığını denetle. Uzaktaki indeks dosyalarını ve uzaktaki ref'i oku.
+2. Uzaktaki ref'ten ulaşılabilen nesneleri, tree ve snapshot nesnelerini uzak depodan okuyarak dolaş; yerel deponun sahip olduğu nesnelerin içine girilmez. Bir paketin bitişik bayt aralıkları birlikte okunur.
+3. Eksik nesneleri yeni yerel paketlere ve onların indeksine yaz (bölüm 9.2).
+4. Yerel ref'i karşılaştır ve değiştir ile ve bir reflog satırıyla taşı; ama yalnızca ileri: yerel ref, uzaktakinin atası olmayan bir snapshot'ı gösteriyorsa bir çatışmayla dur. Anahtarlar asla pull edilmez.
+
+### 15.5 Kurallar ve kesintiler
+
+- Kapanış: bir kopya bir nesneye sahipse, ondan ulaşılabilen her nesneye de sahiptir. Push ve pull nesneleri, onları listeleyen indeksten önce; indeksi de ref'ten önce yazar. Böylece bir kesinti yalnızca listelenmemiş paketler bırakır ve sonraki push ya da pull bunları kapsar.
+- Uzaktaki bir ref, ancak ulaştığı her nesne uzak depoya yazıldıktan sonra değiştirilir (bölüm 9.2'deki gibi).
+- Aynı ref'i aynı anda push eden iki program: koşullu değiştirme birinin kazanmasını sağlar; öteki bir çatışmayla durur ve hiçbir şeyi değiştirmez.
+- Yarıda kalan bir push ya da pull yeniden çalıştırılır. Zaten yazılmış paketler içerik adreslidir ve iki kez yazılmaz.
+- Bir uzak kopyanın çöp toplaması ve çift yönlü senkron sonraki işlere bırakılmıştır ([ROADMAP.tr.md](ROADMAP.tr.md) §4).
+
+## 16. Sonraki sürümlere bırakılanlar
 
 - Çok katmanlı blob, sabit bağlantılar, Windows ACL'leri, aygıt dosyaları.
 - Format yükseltme aracı: format sürümü değiştiğinde otomatik ve geri alınabilir geçiş.
