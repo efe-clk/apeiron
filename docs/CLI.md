@@ -2,7 +2,7 @@
 
 # Apeiron Command-Line Interface
 
-> **Status: In progress.** This is the Stage 1 design of the `apeiron` command ([ROADMAP.md](ROADMAP.md) §3). The parts marked Done work today; `export` and `gc` are still planned.
+> **Status: In progress.** This is the Stage 1 design of the `apeiron` command ([ROADMAP.md](ROADMAP.md) §3). The parts marked Done work today; `gc` is still planned.
 
 The CLI is the first interface of Apeiron. Like every other interface it uses only the public API ([API.md](API.md)); it has no access to the core that a third-party program would not have.
 
@@ -37,7 +37,7 @@ If neither is given, the command stops with a usage error. A repository on an ex
 | `apeiron ls <snapshot> [<path>]` | Lists the files and folders inside a snapshot | Done |
 | `apeiron diff <snapshot> <snapshot>` | Lists files added, removed and changed between two snapshots | Done |
 | `apeiron restore <snapshot> <target> [--path <path>]` | Writes a snapshot (or one path in it) into a new or empty folder | Done |
-| `apeiron export <snapshot> <file>` | Writes a snapshot into a `.tar` or `.zip` file | Planned |
+| `apeiron export <snapshot> <file> [--format <format>] [--path <path>]` | Writes a snapshot (or one path in it) into a new `.tar`, `.zip` or `.7z` file; the extension chooses the format unless `--format` is given | Done |
 | `apeiron refs` | Lists all refs and the snapshots they point to | Done |
 | `apeiron verify` | Reads and checks every pack, index and object | Done |
 | `apeiron repair` | Removes stale ref locks and adds lost reflog lines | Done |
@@ -95,7 +95,7 @@ apeiron verify
 | Command-line parsing | `clap` | The most widely used Rust parser; generates help and checks options |
 | JSON output | `serde_json` | Standard JSON library for `serde`, already used for configuration |
 | Ctrl+C | `ctrlc` | Small, widely used; the same code on Linux, macOS and Windows |
-| tar and zip export | `tar`, `zip` | Widely used, pure Rust |
+| tar, zip and 7z export | `tar`, `zip`, `sevenz-rust2` | Pure Rust; the archives open with the standard `tar`, `unzip` and `7z` tools, keeping permissions and symbolic links |
 
 ## 8. Open questions
 
@@ -103,4 +103,5 @@ apeiron verify
 | --- | --- |
 | Default ref for `backup` | `main`; several folders use `--ref backup/<name>` |
 | May `restore` write into a non-empty folder? | No in Stage 1; a later `--overwrite` flag may allow it |
+| Can `export` write RAR files? | No. Only RARLAB's own software may create RAR archives; there is no open implementation, and the free unRAR code may not be used to create them. Reading RAR files for an import may be added later |
 | Concurrent commands on one repository | A repository lock (Stage 1, [FORMAT.md](FORMAT.md) §12) makes a second writer wait or stop |

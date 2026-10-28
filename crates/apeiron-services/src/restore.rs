@@ -78,7 +78,7 @@ fn prepare_target(target: &Path) -> Result<()> {
     }
 }
 
-fn count_tree(
+pub(crate) fn count_tree(
     repo: &Repository,
     tree: &Tree,
     ctl: &Control,
@@ -90,7 +90,7 @@ fn count_tree(
     Ok(())
 }
 
-fn count_entry(
+pub(crate) fn count_entry(
     repo: &Repository,
     entry: &TreeEntry,
     ctl: &Control,

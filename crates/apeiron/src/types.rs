@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use apeiron_core::{ObjectId, Snapshot, Time};
-use apeiron_services::Name;
+use apeiron_services::{ArchiveFormat, Name};
 use serde::{Deserialize, Serialize};
 
 /// Facts about an open repository.
@@ -23,6 +23,20 @@ pub struct RestoreRequest {
     pub snapshot: String,
     /// A new or empty folder.
     pub target: PathBuf,
+    /// A path inside the snapshot; empty or absent for everything.
+    #[serde(default)]
+    pub path: Name,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExportRequest {
+    /// A snapshot spec (API.md §8.4).
+    pub snapshot: String,
+    /// The archive file to create; it must not exist.
+    pub output: PathBuf,
+    /// `tar`, `zip` or `7z`; taken from the file extension when absent.
+    #[serde(default)]
+    pub format: Option<ArchiveFormat>,
     /// A path inside the snapshot; empty or absent for everything.
     #[serde(default)]
     pub path: Name,

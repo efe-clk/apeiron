@@ -2,7 +2,7 @@
 
 # Apeiron Komut Satırı Arayüzü
 
-> **Durum: Devam ediyor.** `apeiron` komutunun Aşama 1 tasarımıdır ([ROADMAP.tr.md](ROADMAP.tr.md) §3). Tamamlandı olarak işaretlenen kısımlar bugün çalışır; `export` ve `gc` hâlâ planlıdır.
+> **Durum: Devam ediyor.** `apeiron` komutunun Aşama 1 tasarımıdır ([ROADMAP.tr.md](ROADMAP.tr.md) §3). Tamamlandı olarak işaretlenen kısımlar bugün çalışır; `gc` hâlâ planlıdır.
 
 CLI, Apeiron'un ilk arayüzüdür. Diğer tüm arayüzler gibi yalnızca herkese açık API'yi kullanır ([API.tr.md](API.tr.md)); çekirdeğe üçüncü taraf bir programın sahip olmadığı hiçbir erişimi yoktur.
 
@@ -37,7 +37,7 @@ CLI, Apeiron'un ilk arayüzüdür. Diğer tüm arayüzler gibi yalnızca herkese
 | `apeiron ls <snapshot> [<path>]` | Bir snapshot'taki dosya ve klasörleri listeler | Tamamlandı |
 | `apeiron diff <snapshot> <snapshot>` | İki snapshot arasında eklenen, silinen ve değişen dosyaları listeler | Tamamlandı |
 | `apeiron restore <snapshot> <target> [--path <path>]` | Bir snapshot'ı (ya da içindeki bir yolu) yeni ya da boş bir klasöre yazar | Tamamlandı |
-| `apeiron export <snapshot> <file>` | Bir snapshot'ı `.tar` ya da `.zip` dosyasına yazar | Planlandı |
+| `apeiron export <snapshot> <file> [--format <format>] [--path <path>]` | Bir snapshot'ı (ya da içindeki bir yolu) yeni bir `.tar`, `.zip` ya da `.7z` dosyasına yazar; `--format` verilmezse biçimi dosya uzantısı belirler | Tamamlandı |
 | `apeiron refs` | Tüm ref'leri ve gösterdikleri snapshot'ları listeler | Tamamlandı |
 | `apeiron verify` | Her paketi, indeksi ve nesneyi okuyup denetler | Tamamlandı |
 | `apeiron repair` | Bayat ref kilitlerini kaldırır ve kaybolan reflog satırlarını ekler | Tamamlandı |
@@ -95,7 +95,7 @@ apeiron verify
 | Komut satırı ayrıştırma | `clap` | En yaygın Rust ayrıştırıcısı; yardım metnini üretir ve seçenekleri denetler |
 | JSON çıktı | `serde_json` | `serde` için standart JSON kütüphanesi; `serde` yapılandırmada zaten kullanılıyor |
 | Ctrl+C | `ctrlc` | Küçük ve yaygın; Linux, macOS ve Windows'ta aynı kod |
-| tar ve zip dışa aktarma | `tar`, `zip` | Yaygın kullanılan, saf Rust |
+| tar, zip ve 7z dışa aktarma | `tar`, `zip`, `sevenz-rust2` | Saf Rust; arşivler standart `tar`, `unzip` ve `7z` araçlarıyla izinler ve sembolik bağlar korunarak açılır |
 
 ## 8. Açık sorular
 
@@ -103,4 +103,5 @@ apeiron verify
 | --- | --- |
 | `backup` için varsayılan ref | `main`; birden fazla klasör için `--ref backup/<name>` |
 | `restore` boş olmayan bir klasöre yazabilir mi? | Aşama 1'de hayır; ileride bir `--overwrite` seçeneği buna izin verebilir |
+| `export` RAR dosyası yazabilir mi? | Hayır. RAR arşivlerini yalnızca RARLAB'in kendi yazılımı oluşturabilir; açık bir uygulaması yoktur ve ücretsiz unRAR kodu arşiv oluşturmak için kullanılamaz. İçe aktarma için RAR dosyalarını okumak ileride eklenebilir |
 | Aynı depoda eşzamanlı komutlar | Bir depo kilidi (Aşama 1, [FORMAT.tr.md](FORMAT.tr.md) §12) ikinci yazıcıyı bekletir ya da durdurur |

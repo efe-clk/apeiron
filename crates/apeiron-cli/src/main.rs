@@ -20,8 +20,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use apeiron::{
-    BackupRequest, DiffRequest, Error, ErrorKind, Job, ListRequest, LogRequest, Name, Repository,
-    RestoreRequest, Warning,
+    ArchiveFormat, BackupRequest, DiffRequest, Error, ErrorKind, ExportRequest, Job, ListRequest,
+    LogRequest, Name, Repository, RestoreRequest, Warning,
 };
 use clap::{Parser, Subcommand};
 use serde::Serialize;
@@ -96,12 +96,42 @@ enum Command {
         #[arg(long, default_value = "")]
         path: String,
     },
+    /// Write a snapshot, or one path in it, into a new tar, zip or 7z file
+    Export {
+        snapshot: String,
+        /// Archive file to create; its extension chooses the format
+        file: PathBuf,
+        /// Archive format, if the file extension does not say it
+        #[arg(long, value_enum)]
+        format: Option<FormatArg>,
+        /// Path inside the snapshot to export
+        #[arg(long, default_value = "")]
+        path: String,
+    },
     /// List all refs and the snapshots they point to
     Refs,
     /// Read and check every pack, index and object
     Verify,
     /// Remove stale ref locks and add lost reflog lines
     Repair,
+}
+
+#[derive(Clone, Copy, clap::ValueEnum)]
+enum FormatArg {
+    Tar,
+    Zip,
+    #[value(name = "7z")]
+    SevenZ,
+}
+
+impl From<FormatArg> for ArchiveFormat {
+    fn from(f: FormatArg) -> Self {
+        match f {
+            FormatArg::Tar => ArchiveFormat::Tar,
+            FormatArg::Zip => ArchiveFormat::Zip,
+            FormatArg::SevenZ => ArchiveFormat::SevenZ,
+        }
+    }
 }
 
 fn main() -> ExitCode {
@@ -250,6 +280,33 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     format::count(r.dirs, "folder"),
                     format::bytes(r.bytes),
                     target.display()
+                );
+            });
+            Ok(warnings_exit(out, &report.warnings))
+        }
+        Command::Export {
+            snapshot,
+            file,
+            format,
+            path,
+        } => {
+            let repo = open(cli.repo)?;
+            let report = watch(
+                out,
+                repo.export(ExportRequest {
+                    snapshot,
+                    output: file.clone(),
+                    format: format.map(ArchiveFormat::from),
+                    path: Name::from(path.as_str()),
+                })?,
+            )?;
+            out.result(&report, |r| {
+                say!(
+                    "Exported {}, {}, {} into {}",
+                    format::count(r.files, "file"),
+                    format::count(r.dirs, "folder"),
+                    format::bytes(r.bytes),
+                    file.display()
                 );
             });
             Ok(warnings_exit(out, &report.warnings))

@@ -90,6 +90,16 @@ fn backup_log_diff_ls_restore() {
     s.ok(&["restore", "main", &one, "--path", "sub/b.txt"]);
     assert_eq!(fs::read(Path::new(&one).join("b.txt")).unwrap(), b"second");
 
+    let archive = s.path("snap.zip");
+    let exported = s.json(&["export", "main", &archive]);
+    assert_eq!(exported["files"], 2);
+    assert!(Path::new(&archive).is_file());
+    let tar = s.path("snap.archive");
+    s.ok(&["export", "main", &tar, "--format", "tar"]);
+    s.ok(&["export", "main", &s.path("only.7z"), "--path", "sub"]);
+    // Unknown extension and no --format: an invalid request.
+    assert_eq!(code(&s.run(&["export", "main", &s.path("x.rar")])), Some(1));
+
     let refs = s.json(&["refs"]);
     assert_eq!(refs[0]["name"], "main");
     assert!(s.ok(&["verify"]).starts_with("OK: "));

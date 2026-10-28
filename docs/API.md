@@ -2,7 +2,7 @@
 
 # Apeiron Public API — Design Principles
 
-> **Status: Draft for review.** Sections 1–7 are the principles of the API; section 8 is the specification of the public `apeiron` crate, implemented except for `export`; section 9 lists the core functions that already exist. The C ABI and the SDKs are specified in [SDK.md](SDK.md).
+> **Status: Draft for review.** Sections 1–7 are the principles of the API; section 8 is the specification of the public `apeiron` crate, implemented in Stage 1; section 9 lists the core functions that already exist. The C ABI and the SDKs are specified in [SDK.md](SDK.md).
 
 The public API is the only way into Apeiron. The CLI, the background service, the desktop and web interfaces and every external application use it; there is no hidden back door ([VISION.md](VISION.md), principle 8).
 
@@ -115,8 +115,8 @@ flowchart TB
 
 | Crate | Role | Status |
 | --- | --- | --- |
-| `apeiron` | The only crate applications use: repository handle, operations, jobs, errors | In progress (all but `export`) |
-| `apeiron-services` | Turns folders into trees and snapshots and back; diff; tar/zip export | In progress |
+| `apeiron` | The only crate applications use: repository handle, operations, jobs, errors | In progress |
+| `apeiron-services` | Turns folders into trees and snapshots and back; diff; tar, zip and 7z export | In progress |
 | `apeiron-cli` | The `apeiron` command ([CLI.md](CLI.md)) | In progress |
 | `apeiron-ffi` | C ABI over `apeiron` ([SDK.md](SDK.md)) | Planned (Stage 3) |
 
@@ -138,7 +138,7 @@ Every operation takes one plain request value and returns one plain result value
 | --- | --- | --- | --- |
 | `backup` | source folder, ref name, message, author, host, meta | `BackupReport`: snapshot id, counts of files, folders and bytes, bytes newly stored, warnings | Yes |
 | `restore` | snapshot, target folder, optional path inside the snapshot | `RestoreReport`: counts, warnings | Yes |
-| `export` | snapshot, output file, format (`tar` or `zip`), optional path | `ExportReport`: counts, warnings | Yes |
+| `export` | snapshot, output file, format (`tar`, `zip` or `7z`; from the extension when absent), optional path | `ExportReport`: counts, warnings | Yes |
 | `verify` | — | `VerifyReport`: objects checked, damaged files and objects | Yes |
 | `log` | start snapshot, maximum count | `LogPage`: snapshots, newest first, and where the next page starts | No |
 | `list` | snapshot, path | `Vec<EntryInfo>`: name, kind, size, mode, mtime | No |

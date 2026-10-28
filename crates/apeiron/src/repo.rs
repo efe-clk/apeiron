@@ -6,16 +6,16 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard, Rw
 use apeiron_core as core;
 use apeiron_services as services;
 
-use crate::error::Result;
+use crate::error::{Error, ErrorKind, Result};
 use crate::job::Job;
 use crate::spec;
 use crate::types::{
-    DeleteRefRequest, DiffRequest, ListRequest, LogPage, LogRequest, RefInfo, RepoInfo,
-    RestoreRequest, SnapshotInfo,
+    DeleteRefRequest, DiffRequest, ExportRequest, ListRequest, LogPage, LogRequest, RefInfo,
+    RepoInfo, RestoreRequest, SnapshotInfo,
 };
 use crate::{
-    BackupReport, BackupRequest, Change, EntryInfo, ObjectId, ReflogEntry, RepairReport,
-    RestoreReport, VerifyReport,
+    ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo, ExportReport, ObjectId,
+    ReflogEntry, RepairReport, RestoreReport, VerifyReport,
 };
 
 /// An open repository. Cloning is cheap; clones share the same state and can
@@ -122,6 +122,35 @@ impl Repository {
                 &snapshot,
                 request.path.as_bytes(),
                 &request.target,
+                ctl,
+            )?)
+        })
+    }
+
+    /// Writes a snapshot, or one path in it, into a new tar, zip or 7z file.
+    pub fn export(&self, request: ExportRequest) -> Result<Job<ExportReport>> {
+        let snapshot = self.resolve(&request.snapshot)?;
+        let format = match request.format {
+            Some(format) => format,
+            None => ArchiveFormat::from_path(&request.output).ok_or_else(|| {
+                Error::new(
+                    ErrorKind::InvalidInput,
+                    format!(
+                        "cannot tell the archive format of {}; use .tar, .zip or .7z",
+                        request.output.display()
+                    ),
+                )
+            })?,
+        };
+        let repo = self.clone();
+        Job::spawn("export", move |ctl| {
+            let core = repo.read();
+            Ok(services::export(
+                &core,
+                &snapshot,
+                request.path.as_bytes(),
+                &request.output,
+                format,
                 ctl,
             )?)
         })

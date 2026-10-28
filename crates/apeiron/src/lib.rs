@@ -17,13 +17,14 @@ pub const API_VERSION: &str = "0.1";
 
 pub use apeiron_core::{ObjectId, RefOp, ReflogEntry, RepairReport, Time, VerifyReport};
 pub use apeiron_services::{
-    BackupOptions as BackupRequest, BackupOutcome as BackupReport, Change, ChangeKind, EntryInfo,
-    Kind, Name, Phase, Progress, RestoreOutcome as RestoreReport, Warning, WarningKind,
+    ArchiveFormat, BackupOptions as BackupRequest, BackupOutcome as BackupReport, Change,
+    ChangeKind, EntryInfo, ExportOutcome as ExportReport, Kind, Name, Phase, Progress,
+    RestoreOutcome as RestoreReport, Warning, WarningKind,
 };
 pub use error::{Error, ErrorKind, Result};
 pub use job::Job;
 pub use repo::Repository;
 pub use types::{
-    DeleteRefRequest, DiffRequest, ListRequest, LogPage, LogRequest, RefInfo, RepoInfo,
-    RestoreRequest, SnapshotInfo,
+    DeleteRefRequest, DiffRequest, ExportRequest, ListRequest, LogPage, LogRequest, RefInfo,
+    RepoInfo, RestoreRequest, SnapshotInfo,
 };

@@ -22,7 +22,7 @@ flowchart LR
 | Aşama | Kapsam | Çıkış kriteri | Durum |
 | --- | --- | --- | --- |
 | 0. Format ve çekirdek | Nesne modeli ve format spesifikasyonu, depolama motoru, bütünlük doğrulama, Rust API taslağı | Spesifikasyon yazılı; güç kesintisi testlerinde veri kaybı yok | Tamamlandı |
-| 1. Yerel MVP | CLI; snapshot alma, geçmiş, dosya düzeyi diff, geri yükleme, doğrulama; yerel ve harici disk yedek hedefi; tar/zip dışa aktarma | Kendi verini bir ay boyunca yalnızca Apeiron ile yedekleyip geri yükleyebilmek | Devam ediyor |
+| 1. Yerel MVP | CLI; snapshot alma, geçmiş, dosya düzeyi diff, geri yükleme, doğrulama; yerel ve harici disk yedek hedefi; tar, zip ve 7z dışa aktarma | Kendi verini bir ay boyunca yalnızca Apeiron ile yedekleyip geri yükleyebilmek | Devam ediyor |
 | 2. Uzak ve senkron | Arka plan hizmeti, zamanlanmış yedek, şifreleme, SFTP ve S3 hedefleri, tek/çift yönlü senkron, çatışma tespiti, geri yükleme testi | İki cihaz ve bir uzak sunucu arasında bir ay sorunsuz senkron | Planlandı |
 | 3. Geliştirici ve ekosistem | Dal ve birleştirme, Git içe/dışa aktarma (hedef: Git ağ protokolü), C ABI ve Python SDK, WebAssembly eklenti sistemi, metin diff eklentisi, arama | Gerçek bir Git deposu Apeiron'a taşınıp geri alınabiliyor | Planlandı |
 | 4. Arayüzler ve çok kullanıcı | Masaüstü ve web arayüzü, kullanıcı ve izinler, denetim kaydı, paylaşım | Teknik olmayan bir kullanıcı CLI'sız yedek alıp geri yükleyebiliyor | Planlandı |
@@ -53,7 +53,7 @@ Windows'ta yeniden adlandırmalar küçük `apeiron-sys` crate'i üzerinden `MOV
 | Snapshot alma, geçmiş, dosya düzeyi diff | Tamamlandı |
 | Geri yükleme ve doğrulama (scrub) | Tamamlandı |
 | Yerel ve harici disk yedek hedefleri | Devam ediyor |
-| tar/zip dışa aktarma | Planlandı |
+| tar, zip ve 7z dışa aktarma | Tamamlandı |
 | Çöp toplama, depo kilitleri, paket birleştirme | Planlandı |
 | İndeksi bozuk bir depoyu, indeksi paketlerden yeniden üreterek açmak | Planlandı |
 

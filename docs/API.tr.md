@@ -2,7 +2,7 @@
 
 # Apeiron Herkese Açık API — Tasarım İlkeleri
 
-> **Durum: İncelemeye sunulan taslak.** Bölüm 1–7 API'nin ilkeleridir; bölüm 8, `export` dışında uygulanmış olan herkese açık `apeiron` crate'inin spesifikasyonudur; bölüm 9 zaten var olan çekirdek işlevleri listeler. C ABI ve SDK'lar [SDK.tr.md](SDK.tr.md) içinde tanımlanır.
+> **Durum: İncelemeye sunulan taslak.** Bölüm 1–7 API'nin ilkeleridir; bölüm 8, Aşama 1'de uygulanmış olan herkese açık `apeiron` crate'inin spesifikasyonudur; bölüm 9 zaten var olan çekirdek işlevleri listeler. C ABI ve SDK'lar [SDK.tr.md](SDK.tr.md) içinde tanımlanır.
 
 Herkese açık API, Apeiron'a girmenin tek yoludur. CLI, arka plan hizmeti, masaüstü ve web arayüzleri ve tüm dış uygulamalar onu kullanır; gizli iç kapı yoktur ([VISION.tr.md](VISION.tr.md), ilke 8).
 
@@ -115,8 +115,8 @@ flowchart TB
 
 | Crate | Görev | Durum |
 | --- | --- | --- |
-| `apeiron` | Uygulamaların kullandığı tek crate: depo tutamacı, işlemler, işler, hatalar | Devam ediyor (`export` dışında hepsi) |
-| `apeiron-services` | Klasörleri tree ve snapshot'a, onları da geri klasöre çevirir; fark; tar/zip dışa aktarma | Devam ediyor |
+| `apeiron` | Uygulamaların kullandığı tek crate: depo tutamacı, işlemler, işler, hatalar | Devam ediyor |
+| `apeiron-services` | Klasörleri tree ve snapshot'a, onları da geri klasöre çevirir; fark; tar, zip ve 7z dışa aktarma | Devam ediyor |
 | `apeiron-cli` | `apeiron` komutu ([CLI.tr.md](CLI.tr.md)) | Devam ediyor |
 | `apeiron-ffi` | `apeiron` üzerinde C ABI ([SDK.tr.md](SDK.tr.md)) | Planlandı (Aşama 3) |
 
@@ -138,7 +138,7 @@ Her işlem tek bir düz istek değeri alır ve tek bir düz sonuç değeri dönd
 | --- | --- | --- | --- |
 | `backup` | kaynak klasör, ref adı, açıklama, yazar, cihaz, meta | `BackupReport`: snapshot kimliği, dosya, klasör ve bayt sayıları, yeni saklanan baytlar, uyarılar | Evet |
 | `restore` | snapshot, hedef klasör, isteğe bağlı snapshot içi yol | `RestoreReport`: sayılar, uyarılar | Evet |
-| `export` | snapshot, çıktı dosyası, biçim (`tar` ya da `zip`), isteğe bağlı yol | `ExportReport`: sayılar, uyarılar | Evet |
+| `export` | snapshot, çıktı dosyası, biçim (`tar`, `zip` ya da `7z`; verilmezse uzantıdan), isteğe bağlı yol | `ExportReport`: sayılar, uyarılar | Evet |
 | `verify` | — | `VerifyReport`: denetlenen nesneler, bozuk dosyalar ve nesneler | Evet |
 | `log` | başlangıç snapshot'ı, en fazla sayı | `LogPage`: en yeniden başlayan snapshot'lar ve sonraki sayfanın başladığı yer | Hayır |
 | `list` | snapshot, yol | `Vec<EntryInfo>`: ad, tür, boyut, izinler, değişiklik zamanı | Hayır |

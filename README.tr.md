@@ -80,7 +80,7 @@ Her seçimin gerekçesi: [docs/DECISIONS.tr.md](docs/DECISIONS.tr.md).
 | Aşama | Kapsam | Durum |
 | --- | --- | --- |
 | 0. Format ve çekirdek | Format spesifikasyonu, depolama motoru, bütünlük, Rust API taslağı | Tamamlandı |
-| 1. Yerel MVP | CLI, snapshot, geçmiş, geri yükleme, yerel yedek hedefleri, tar/zip dışa aktarma | Devam ediyor |
+| 1. Yerel MVP | CLI, snapshot, geçmiş, geri yükleme, yerel yedek hedefleri, tar, zip ve 7z dışa aktarma | Devam ediyor |
 | 2. Uzak ve senkron | Arka plan hizmeti, şifreleme, SFTP/S3, senkron, geri yükleme testi | Planlandı |
 | 3. Geliştirici ve ekosistem | Dal/birleştirme, Git içe/dışa aktarma, C ABI, Python SDK, eklentiler | Planlandı |
 | 4. Arayüzler ve çok kullanıcı | Masaüstü ve web arayüzü, izinler, denetim kaydı, paylaşım | Planlandı |

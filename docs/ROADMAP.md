@@ -22,7 +22,7 @@ flowchart LR
 | Stage | Scope | Exit criterion | Status |
 | --- | --- | --- | --- |
 | 0. Format and core | Object model and format specification, storage engine, integrity verification, Rust API draft | Specification written; no data loss in power-failure tests | Done |
-| 1. Local MVP | CLI; taking snapshots, history, file-level diff, restore, verification; local and external disk backup targets; tar/zip export | Backing up and restoring your own data with nothing but Apeiron for one month | In progress |
+| 1. Local MVP | CLI; taking snapshots, history, file-level diff, restore, verification; local and external disk backup targets; tar, zip and 7z export | Backing up and restoring your own data with nothing but Apeiron for one month | In progress |
 | 2. Remote and sync | Background service, scheduled backup, encryption, SFTP and S3 targets, one-/two-way sync, conflict detection, restore test | One month of trouble-free sync between two devices and a remote server | Planned |
 | 3. Developer and ecosystem | Branching and merging, Git import/export (goal: Git network protocol), C ABI and Python SDK, WebAssembly plugin system, text diff plugin, search | A real Git repository can be moved into Apeiron and back | Planned |
 | 4. Interfaces and multi-user | Desktop and web interface, users and permissions, audit log, sharing | A non-technical user can back up and restore without the CLI | Planned |
@@ -53,7 +53,7 @@ On Windows, renames use `MOVEFILE_WRITE_THROUGH` ([FORMAT.md](FORMAT.md) §9.1) 
 | Taking snapshots, history, file-level diff | Done |
 | Restore and verification (scrub) | Done |
 | Local and external disk backup targets | In progress |
-| tar/zip export | Planned |
+| tar, zip and 7z export | Done |
 | Garbage collection, repository locks, pack merging | Planned |
 | Opening a repository with a damaged index by rebuilding it from the packs | Planned |
 

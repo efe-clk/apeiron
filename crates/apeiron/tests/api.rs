@@ -100,6 +100,27 @@ fn backup_log_list_diff_restore_verify() {
     assert_eq!(report.files, 2);
     assert_eq!(fs::read(target.join("a.txt")).unwrap(), b"first");
 
+    let job = s
+        .repo
+        .export(apeiron::ExportRequest {
+            snapshot: "main".into(),
+            output: s.root.join("out.7z"),
+            format: None,
+            path: Default::default(),
+        })
+        .unwrap();
+    assert_eq!(job.wait().unwrap().files, 2);
+    let err = s
+        .repo
+        .export(apeiron::ExportRequest {
+            snapshot: "main".into(),
+            output: s.root.join("out.rar"),
+            format: None,
+            path: Default::default(),
+        })
+        .unwrap_err();
+    assert_eq!(err.kind, ErrorKind::InvalidInput);
+
     let job = s.repo.verify().unwrap();
     assert!(job.wait().unwrap().is_ok());
 

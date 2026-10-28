@@ -80,7 +80,7 @@ Why each choice was made: [docs/DECISIONS.md](docs/DECISIONS.md).
 | Stage | Scope | Status |
 | --- | --- | --- |
 | 0. Format and core | Format specification, storage engine, integrity, Rust API draft | Done |
-| 1. Local MVP | CLI, snapshots, history, restore, local backup targets, tar/zip export | In progress |
+| 1. Local MVP | CLI, snapshots, history, restore, local backup targets, tar, zip and 7z export | In progress |
 | 2. Remote and sync | Daemon, encryption, SFTP/S3, sync, restore test | Planned |
 | 3. Developer and ecosystem | Branch/merge, Git import/export, C ABI, Python SDK, plugins | Planned |
 | 4. Interfaces and multi-user | Desktop and web UI, permissions, audit log, sharing | Planned |
