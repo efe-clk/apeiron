@@ -6,7 +6,7 @@
 
 Apeiron treats a developer's repository, a musician's project and a family photo archive the same way: as snapshots of content-addressed, immutable objects. Backup, archive, sync and versioning are different policies over the same object graph, not four separate engines. It is local first: no core function needs a cloud, an account or an internet connection.
 
-> **Status:** Early development. Stage 0 (format and core) is done; Stage 1 (local MVP) is next. There is no usable release, CLI or stable API yet. Only the storage engine inside `apeiron-core` is written. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status:** Early development. Stage 0 (format and core) is done; Stage 1 (local MVP) is in progress. The `apeiron` command can already back up, list, compare and restore folders, but there is no release or stable API yet. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Core principles
 
@@ -48,11 +48,11 @@ Each layer uses only the layer directly below it. Details: [docs/ARCHITECTURE.md
 | --- | --- | --- | --- |
 | Core | `apeiron-core` | Object model, chunking, pack/index files, refs and reflogs | In progress |
 | Storage targets | — | Local, external, SFTP, S3 targets | Planned |
-| Services | — | Versioning, archive, backup, sync, search, policy | Planned |
-| Public API | — | Stable Rust API for all operations | Planned |
+| Services | `apeiron-services` | Backup, restore, listing and diff today; archive, sync, search and policy later | In progress |
+| Public API | `apeiron` | Rust API for all operations ([docs/API.md](docs/API.md) §8) | In progress |
 | System calls | `apeiron-sys` | Operating system calls that need `unsafe` (Windows write-through) | Done |
 | C ABI | — | Stable C interface; may use `unsafe` | Planned |
-| CLI | — | Command-line interface | Planned |
+| CLI | `apeiron-cli` | The `apeiron` command ([docs/CLI.md](docs/CLI.md)) | In progress |
 | Plugins | — | WebAssembly plugin host | Planned |
 
 Crate names for planned layers are chosen when the layer is started.
@@ -80,7 +80,7 @@ Why each choice was made: [docs/DECISIONS.md](docs/DECISIONS.md).
 | Stage | Scope | Status |
 | --- | --- | --- |
 | 0. Format and core | Format specification, storage engine, integrity, Rust API draft | Done |
-| 1. Local MVP | CLI, snapshots, history, restore, local backup targets, tar/zip export | Planned |
+| 1. Local MVP | CLI, snapshots, history, restore, local backup targets, tar/zip export | In progress |
 | 2. Remote and sync | Daemon, encryption, SFTP/S3, sync, restore test | Planned |
 | 3. Developer and ecosystem | Branch/merge, Git import/export, C ABI, Python SDK, plugins | Planned |
 | 4. Interfaces and multi-user | Desktop and web UI, permissions, audit log, sharing | Planned |

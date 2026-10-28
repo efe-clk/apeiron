@@ -165,7 +165,7 @@ Each **entry** is a CBOR map:
 | 9 | xattrs | `[[bytes, bytes], …]` | no | Extended attributes (name, value); sorted by name |
 
 - Names are stored as bytes because Linux file names do not have to be valid UTF-8. On Windows names are encoded as WTF-8. No Unicode normalisation (macOS) is applied; a name is stored exactly as it was read.
-- Version 1 does not store hard links, device files or Windows ACLs. When encountered they are skipped and reported to the user.
+- Version 1 does not store hard links, device files or Windows ACLs. Hard-linked files are stored as separate files (their content is stored only once); the link between them is not kept. Device files are skipped and reported to the user.
 
 ### 6.4 Snapshot
 

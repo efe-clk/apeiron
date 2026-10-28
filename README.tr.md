@@ -6,7 +6,7 @@
 
 Apeiron, bir yazılımcının deposuna, bir müzisyenin projesine ve bir ailenin fotoğraf arşivine aynı gözle bakar: hepsi, içerik adresli ve değişmez nesnelerden oluşan snapshot'lardır. Yedek, arşiv, senkron ve sürümleme dört ayrı motor değil, aynı nesne grafiği üzerinde çalışan farklı politikalardır. Yerel önceliklidir: hiçbir temel işlev bulut, hesap ya da internet bağlantısı istemez.
 
-> **Durum:** Erken geliştirme. Aşama 0 (format ve çekirdek) tamamlandı; sıradaki Aşama 1 (yerel MVP). Henüz kullanılabilir bir sürüm, CLI ya da kararlı API yok. Yalnızca `apeiron-core` içindeki depolama motoru yazıldı. Bkz. [docs/ROADMAP.tr.md](docs/ROADMAP.tr.md).
+> **Durum:** Erken geliştirme. Aşama 0 (format ve çekirdek) tamamlandı; Aşama 1 (yerel MVP) devam ediyor. `apeiron` komutu klasörleri yedekleyebiliyor, listeleyebiliyor, karşılaştırabiliyor ve geri yükleyebiliyor; ancak henüz bir sürüm ya da kararlı API yok. Bkz. [docs/ROADMAP.tr.md](docs/ROADMAP.tr.md).
 
 ## Temel ilkeler
 
@@ -48,11 +48,11 @@ Her katman yalnızca hemen altındaki katmanı kullanır. Ayrıntılar: [docs/AR
 | --- | --- | --- | --- |
 | Çekirdek | `apeiron-core` | Nesne modeli, chunk bölme, paket/indeks dosyaları, ref ve reflog | Devam ediyor |
 | Depolama hedefleri | — | Yerel, harici, SFTP, S3 hedefleri | Planlandı |
-| Hizmetler | — | Sürümleme, arşiv, yedek, senkron, arama, politika | Planlandı |
-| Herkese açık API | — | Tüm işlemler için kararlı Rust API | Planlandı |
+| Hizmetler | `apeiron-services` | Bugün yedek, geri yükleme, listeleme ve fark; arşiv, senkron, arama ve politika sonra | Devam ediyor |
+| Herkese açık API | `apeiron` | Tüm işlemler için Rust API ([docs/API.tr.md](docs/API.tr.md) §8) | Devam ediyor |
 | Sistem çağrıları | `apeiron-sys` | `unsafe` gerektiren işletim sistemi çağrıları (Windows write-through) | Tamamlandı |
 | C ABI | — | Kararlı C arayüzü; `unsafe` kullanabilir | Planlandı |
-| CLI | — | Komut satırı arayüzü | Planlandı |
+| CLI | `apeiron-cli` | `apeiron` komutu ([docs/CLI.tr.md](docs/CLI.tr.md)) | Devam ediyor |
 | Eklentiler | — | WebAssembly eklenti ortamı | Planlandı |
 
 Planlanan katmanların crate adları, o katmana başlanırken belirlenir.
@@ -80,7 +80,7 @@ Her seçimin gerekçesi: [docs/DECISIONS.tr.md](docs/DECISIONS.tr.md).
 | Aşama | Kapsam | Durum |
 | --- | --- | --- |
 | 0. Format ve çekirdek | Format spesifikasyonu, depolama motoru, bütünlük, Rust API taslağı | Tamamlandı |
-| 1. Yerel MVP | CLI, snapshot, geçmiş, geri yükleme, yerel yedek hedefleri, tar/zip dışa aktarma | Planlandı |
+| 1. Yerel MVP | CLI, snapshot, geçmiş, geri yükleme, yerel yedek hedefleri, tar/zip dışa aktarma | Devam ediyor |
 | 2. Uzak ve senkron | Arka plan hizmeti, şifreleme, SFTP/S3, senkron, geri yükleme testi | Planlandı |
 | 3. Geliştirici ve ekosistem | Dal/birleştirme, Git içe/dışa aktarma, C ABI, Python SDK, eklentiler | Planlandı |
 | 4. Arayüzler ve çok kullanıcı | Masaüstü ve web arayüzü, izinler, denetim kaydı, paylaşım | Planlandı |

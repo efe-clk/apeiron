@@ -395,7 +395,9 @@ impl ObjectWriter<'_> {
         };
         pack.add(id, ty, data)?;
         self.pending.insert(id, ty);
-        self.new_bytes += data.len() as u64;
+        if ty == ObjectType::Chunk {
+            self.new_bytes += data.len() as u64;
+        }
         if pack.len() >= pack::TARGET_SIZE {
             self.finish_pack()?;
         }
@@ -414,7 +416,7 @@ impl ObjectWriter<'_> {
         Ok(chunks)
     }
 
-    /// Uncompressed size of the objects this batch stored that were not
+    /// Bytes of file content (chunks) this batch stored that were not
     /// stored before.
     pub fn new_bytes(&self) -> u64 {
         self.new_bytes

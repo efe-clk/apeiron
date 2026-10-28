@@ -38,9 +38,9 @@ Key design ideas:
 
 | Layer | Responsibility | Crate | Status |
 | --- | --- | --- | --- |
-| Interfaces | CLI, background service, desktop, web, mobile | — | Planned |
-| Public API | Stable Rust API; C ABI for other languages; SDKs on top | — | Planned |
-| Services | Versioning, archive, backup, sync, search, policy | — | Planned |
+| Interfaces | CLI, background service, desktop, web, mobile | `apeiron-cli` | In progress (CLI) |
+| Public API | Stable Rust API; C ABI for other languages; SDKs on top | `apeiron` | In progress (Rust API) |
+| Services | Versioning, archive, backup, sync, search, policy | `apeiron-services` | In progress (backup, restore, diff) |
 | Core | Object model, storage engine, integrity, encryption, operation log | `apeiron-core` | In progress |
 | Storage targets | Local disk, external disk, network storage, remote targets | — | Planned |
 | Plugins | Type drivers, storage backends, importers/exporters, hooks | — | Planned |

@@ -2,7 +2,7 @@
 
 # Apeiron Herkese Açık API — Tasarım İlkeleri
 
-> **Durum: İncelemeye sunulan taslak.** Bölüm 1–7 API'nin ilkeleridir; bölüm 8 henüz yazılmamış olan herkese açık `apeiron` crate'inin spesifikasyonudur; bölüm 9 zaten var olan çekirdek işlevleri listeler. C ABI ve SDK'lar [SDK.tr.md](SDK.tr.md) içinde tanımlanır.
+> **Durum: İncelemeye sunulan taslak.** Bölüm 1–7 API'nin ilkeleridir; bölüm 8, `export` dışında uygulanmış olan herkese açık `apeiron` crate'inin spesifikasyonudur; bölüm 9 zaten var olan çekirdek işlevleri listeler. C ABI ve SDK'lar [SDK.tr.md](SDK.tr.md) içinde tanımlanır.
 
 Herkese açık API, Apeiron'a girmenin tek yoludur. CLI, arka plan hizmeti, masaüstü ve web arayüzleri ve tüm dış uygulamalar onu kullanır; gizli iç kapı yoktur ([VISION.tr.md](VISION.tr.md), ilke 8).
 
@@ -21,7 +21,7 @@ flowchart TB
 
 | Katman | Rol | Durum |
 | --- | --- | --- |
-| Rust API | Tek doğruluk kaynağı; her işlem burada tanımlanır | Devam ediyor (Aşama 0 taslağı `apeiron-core` içinde, bölüm 8) |
+| Rust API | Tek doğruluk kaynağı; her işlem burada tanımlanır | Devam ediyor (`apeiron` crate'i, bölüm 8) |
 | C ABI | Rust API üzerinde kararlı bir C arayüzü; `unsafe` kullanabilen iki crate'ten biri (`apeiron-sys` ile birlikte) | Planlandı (Aşama 3) |
 | SDK'lar | C ABI'yi saran, her dilin alışkanlıklarına uyan ince katmanlar | Planlandı (Aşama 3 ve sonrası) |
 
@@ -115,9 +115,9 @@ flowchart TB
 
 | Crate | Görev | Durum |
 | --- | --- | --- |
-| `apeiron` | Uygulamaların kullandığı tek crate: depo tutamacı, işlemler, işler, hatalar | Planlandı (Aşama 1) |
-| `apeiron-services` | Klasörleri tree ve snapshot'a, onları da geri klasöre çevirir; fark; tar/zip dışa aktarma | Planlandı (Aşama 1) |
-| `apeiron-cli` | `apeiron` komutu ([CLI.tr.md](CLI.tr.md)) | Planlandı (Aşama 1) |
+| `apeiron` | Uygulamaların kullandığı tek crate: depo tutamacı, işlemler, işler, hatalar | Devam ediyor (`export` dışında hepsi) |
+| `apeiron-services` | Klasörleri tree ve snapshot'a, onları da geri klasöre çevirir; fark; tar/zip dışa aktarma | Devam ediyor |
+| `apeiron-cli` | `apeiron` komutu ([CLI.tr.md](CLI.tr.md)) | Devam ediyor |
 | `apeiron-ffi` | `apeiron` üzerinde C ABI ([SDK.tr.md](SDK.tr.md)) | Planlandı (Aşama 3) |
 
 ### 8.2 Depo tutamacı

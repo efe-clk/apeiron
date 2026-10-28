@@ -165,7 +165,7 @@ Her **girdi** bir CBOR haritasıdır:
 | 9 | xattrs | `[[bytes, bytes], …]` | hayır | Genişletilmiş öznitelikler (ad, değer); ada göre sıralı |
 
 - Adlar bayt olarak saklanır, çünkü Linux dosya adları geçerli UTF-8 olmak zorunda değildir. Windows'ta adlar WTF-8 olarak kodlanır. Unicode normalleştirmesi (macOS) yapılmaz; ad nasıl okunduysa öyle saklanır.
-- Sürüm 1 sabit bağlantıları (hard link), aygıt dosyalarını ve Windows ACL'lerini saklamaz. Bunlar karşılaşıldığında atlanır ve kullanıcıya raporlanır.
+- Sürüm 1 sabit bağlantıları (hard link), aygıt dosyalarını ve Windows ACL'lerini saklamaz. Sabit bağlantılı dosyalar ayrı dosyalar olarak saklanır (içerikleri yalnızca bir kez saklanır); aralarındaki bağ korunmaz. Aygıt dosyaları atlanır ve kullanıcıya raporlanır.
 
 ### 6.4 Snapshot
 

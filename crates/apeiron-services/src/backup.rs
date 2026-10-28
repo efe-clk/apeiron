@@ -53,7 +53,7 @@ pub struct BackupOutcome {
     pub symlinks: u64,
     /// Size of all files read.
     pub bytes: u64,
-    /// Bytes that were not already in the repository.
+    /// File content bytes that were not already in the repository.
     pub new_bytes: u64,
     pub warnings: Vec<Warning>,
 }

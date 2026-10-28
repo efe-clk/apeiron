@@ -2,7 +2,7 @@
 
 # Apeiron Public API — Design Principles
 
-> **Status: Draft for review.** Sections 1–7 are the principles of the API; section 8 is the specification of the public `apeiron` crate, which is not written yet; section 9 lists the core functions that already exist. The C ABI and the SDKs are specified in [SDK.md](SDK.md).
+> **Status: Draft for review.** Sections 1–7 are the principles of the API; section 8 is the specification of the public `apeiron` crate, implemented except for `export`; section 9 lists the core functions that already exist. The C ABI and the SDKs are specified in [SDK.md](SDK.md).
 
 The public API is the only way into Apeiron. The CLI, the background service, the desktop and web interfaces and every external application use it; there is no hidden back door ([VISION.md](VISION.md), principle 8).
 
@@ -21,7 +21,7 @@ flowchart TB
 
 | Layer | Role | Status |
 | --- | --- | --- |
-| Rust API | The single source of truth; every operation is defined here | In progress (Stage 0 draft in `apeiron-core`, section 8) |
+| Rust API | The single source of truth; every operation is defined here | In progress (the `apeiron` crate, section 8) |
 | C ABI | A stable C interface over the Rust API; one of the two crates allowed to use `unsafe` (with `apeiron-sys`) | Planned (Stage 3) |
 | SDKs | Thin wrappers over the C ABI that follow each language's habits | Planned (Stage 3 onward) |
 
@@ -115,9 +115,9 @@ flowchart TB
 
 | Crate | Role | Status |
 | --- | --- | --- |
-| `apeiron` | The only crate applications use: repository handle, operations, jobs, errors | Planned (Stage 1) |
-| `apeiron-services` | Turns folders into trees and snapshots and back; diff; tar/zip export | Planned (Stage 1) |
-| `apeiron-cli` | The `apeiron` command ([CLI.md](CLI.md)) | Planned (Stage 1) |
+| `apeiron` | The only crate applications use: repository handle, operations, jobs, errors | In progress (all but `export`) |
+| `apeiron-services` | Turns folders into trees and snapshots and back; diff; tar/zip export | In progress |
+| `apeiron-cli` | The `apeiron` command ([CLI.md](CLI.md)) | In progress |
 | `apeiron-ffi` | C ABI over `apeiron` ([SDK.md](SDK.md)) | Planned (Stage 3) |
 
 ### 8.2 Repository handle
