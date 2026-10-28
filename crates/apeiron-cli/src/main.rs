@@ -187,7 +187,17 @@ fn open(cli_repo: Option<PathBuf>) -> Result<Repository, Failure> {
     let path = cli_repo.ok_or_else(|| {
         Failure::Usage("no repository given; use --repo or set APEIRON_REPO".to_owned())
     })?;
-    Ok(Repository::open(path)?)
+    let repo = Repository::open(path)?;
+    let damaged = repo.info().damaged_files;
+    if !damaged.is_empty() {
+        for path in &damaged {
+            eprintln!("warning: damaged file {}", path.display());
+        }
+        eprintln!(
+            "warning: run `apeiron verify` for details and `apeiron repair` to rebuild damaged indexes"
+        );
+    }
+    Ok(repo)
 }
 
 fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
@@ -377,7 +387,20 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                 for name in &r.repaired_refs {
                     say!("added a repair line to the reflog of {name}");
                 }
-                if r.removed_locks.is_empty() && r.repaired_refs.is_empty() {
+                if r.indexed_packs > 0 {
+                    say!(
+                        "wrote a new index for {}",
+                        format::count(r.indexed_packs, "pack")
+                    );
+                }
+                for path in &r.removed_index_files {
+                    say!("removed damaged index {}", path.display());
+                }
+                if r.removed_locks.is_empty()
+                    && r.repaired_refs.is_empty()
+                    && r.indexed_packs == 0
+                    && r.removed_index_files.is_empty()
+                {
                     say!("Nothing to repair");
                 }
             });

@@ -126,7 +126,7 @@ flowchart TB
 | --- | --- |
 | `Repository::init(path)` | Boş bir depo oluşturur ve açar |
 | `Repository::open(path)` | Var olan bir depoyu açar |
-| `repo.info()` | Yolu, format sürümünü ve chunk bölme ayarlarını döndürür |
+| `repo.info()` | Yolu, format sürümünü, chunk bölme ayarlarını ve açılırken bozuk bulunan dosyaları döndürür |
 
 Bir `Repository` iş parçacıkları arasında paylaşılabilir (`Send + Sync`). Yalnızca okuyan işlemler paralel çalışır; yazan işlemler süreç içinde birbirini bekler. Her işlem çalışırken depo kilidini paylaşımlı, çöp toplama ise özel tutar ([FORMAT.tr.md](FORMAT.tr.md) §12); böylece çöp toplama hiçbir zaman başka bir programla aynı anda çalışmaz. Diğer yazıcılar aynı anda çalışabilir, çünkü ref'ler karşılaştır ve değiştir ile güncellenir.
 
@@ -147,7 +147,7 @@ Her işlem tek bir düz istek değeri alır ve tek bir düz sonuç değeri dönd
 | `reflog` | ref adı | `Vec<ReflogEntry>` | Hayır |
 | `resolve` | snapshot belirteci (bölüm 8.4) | snapshot kimliği | Hayır |
 | `delete_ref` | ref adı, beklenen snapshot | — | Hayır |
-| `repair` | — | `RepairReport`: kaldırılan kilitler, onarılan reflog'lar | Hayır |
+| `repair` | — | `RepairReport`: kaldırılan kilitler, onarılan reflog'lar, yeniden indekslenen paketler, silinen bozuk indeksler | Hayır |
 | `gc` | saklanacak reflog günü (varsayılan 90), deneme çalıştırması | `GcReport`: canlı nesneler; silinen nesneler, baytlar ve paketler; yazılan paketler | Evet |
 
 ### 8.4 Bir snapshot'ı adlandırma

@@ -40,7 +40,7 @@ CLI, Apeiron'un ilk arayüzüdür. Diğer tüm arayüzler gibi yalnızca herkese
 | `apeiron export <snapshot> <file> [--format <format>] [--path <path>]` | Bir snapshot'ı (ya da içindeki bir yolu) yeni bir `.tar`, `.zip` ya da `.7z` dosyasına yazar; `--format` verilmezse biçimi dosya uzantısı belirler | Tamamlandı |
 | `apeiron refs` | Tüm ref'leri ve gösterdikleri snapshot'ları listeler | Tamamlandı |
 | `apeiron verify` | Her paketi, indeksi ve nesneyi okuyup denetler | Tamamlandı |
-| `apeiron repair` | Bayat ref kilitlerini kaldırır ve kaybolan reflog satırlarını ekler | Tamamlandı |
+| `apeiron repair` | Bayat ref kilitlerini kaldırır, kaybolan reflog satırlarını ekler ve bozuk indeks dosyalarını yeniler | Tamamlandı |
 | `apeiron gc [--keep-days <days>] [--dry-run]` | Hiçbir ref'in ve son 90 günün (ya da `--keep-days`) hiçbir reflog satırının ulaşamadığı veriyi siler; `--dry-run` yalnızca raporlar | Tamamlandı |
 
 Bir `<snapshot>`; ref adı (`main`), tam snapshot kimliği ya da tek bir snapshot'a uyuyorsa kimliğin ilk 8 ya da daha fazla karakteri olarak yazılabilir. `~N` eki ilk ebeveynler üzerinden N adım geri gider: `main~1`, `main`'den önceki snapshot'tır.

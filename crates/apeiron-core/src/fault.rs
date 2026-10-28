@@ -260,7 +260,7 @@ fn every_crash_leaves_main_at_a_readable_snapshot_and_recovers() {
 
     for state in &states {
         let path = repo_path(state);
-        let repo = Repository::open(&path).unwrap();
+        let mut repo = Repository::open(&path).unwrap();
         let target = repo.read_ref("main").unwrap().unwrap();
         assert!(target == f.old || target == f.new);
         assert_eq!(repo.read_object(&target).unwrap().0, ObjectType::Snapshot);
@@ -403,7 +403,7 @@ fn repair_command_appends_lost_reflog_line() {
             repo.read_ref("main").unwrap() == Some(f.new) && last_logged(&repo) == Some(f.old)
         })
         .unwrap();
-    let repo = Repository::open(&repo_path(&state)).unwrap();
+    let mut repo = Repository::open(&repo_path(&state)).unwrap();
     assert_eq!(repo.repair().unwrap().repaired_refs, ["main"]);
     let last = repo.reflog("main").unwrap().pop().unwrap();
     assert_eq!(
@@ -478,13 +478,20 @@ fn bit_flip_anywhere_in_a_pack_is_never_silent() {
             Err(e) => panic!("byte {i}: {e}"),
         }
 
-        // Without an index, the pack is checked against its name when opened.
+        // Without an index, the pack is checked against its name when opened:
+        // it is reported as damaged and its object is not served.
         let hidden = tempfile::tempdir().unwrap();
         for name in &index_files {
             fs::rename(f.base.join("index").join(name), hidden.path().join(name)).unwrap();
         }
+        let reopened = Repository::open(&f.base).unwrap();
+        assert_eq!(
+            reopened.damaged_files(),
+            std::slice::from_ref(&pack),
+            "byte {i}"
+        );
         assert!(
-            matches!(Repository::open(&f.base), Err(Error::Corrupt { .. })),
+            matches!(reopened.read_object(&id), Err(Error::ObjectNotFound(_))),
             "byte {i}"
         );
         for name in &index_files {
@@ -735,5 +742,53 @@ mod gc {
         });
         assert!(matches!(result, Err(Error::ObjectNotFound(_))));
         assert_eq!(files(&path.join("packs")), before);
+    }
+}
+
+#[test]
+fn damaged_index_is_skipped_and_rebuilt_by_repair() {
+    let f = fixture();
+    let index_dir = f.base.join("index");
+    let index = index_dir.join(&files(&index_dir)[0]);
+    let mut bytes = fs::read(&index).unwrap();
+    bytes[40] ^= 0x01;
+    fs::write(&index, bytes).unwrap();
+
+    let mut repo = Repository::open(&f.base).unwrap();
+    assert_eq!(repo.damaged_files(), std::slice::from_ref(&index));
+    assert_eq!(repo.read_object(&f.old).unwrap().1, OLD);
+    assert_eq!(
+        repo.verify().unwrap().damaged_files,
+        std::slice::from_ref(&index)
+    );
+
+    let report = repo.repair().unwrap();
+    assert_eq!(report.removed_index_files, [index]);
+    assert_eq!(report.indexed_packs, 1);
+    let repo = Repository::open(&f.base).unwrap();
+    assert!(repo.damaged_files().is_empty());
+    // The fixture's snapshots are plain bytes, so only files are checked here.
+    assert!(repo.verify().unwrap().damaged_files.is_empty());
+    assert_eq!(repo.read_object(&f.old).unwrap().1, OLD);
+}
+
+#[test]
+fn every_crash_during_index_repair_keeps_objects_readable() {
+    let f = fixture();
+    let index_dir = f.base.join("index");
+    let index = index_dir.join(&files(&index_dir)[0]);
+    let mut bytes = fs::read(&index).unwrap();
+    bytes[40] ^= 0x01;
+    fs::write(&index, bytes).unwrap();
+
+    let states = crash_states_of(&f.base, |repo| repo.repair().map(drop));
+    assert!(states.len() > 3);
+    for state in &states {
+        let mut repo = Repository::open(&repo_path(state)).unwrap();
+        assert_eq!(repo.read_object(&f.old).unwrap().1, OLD);
+        repo.repair().unwrap();
+        let repo = Repository::open(&repo_path(state)).unwrap();
+        assert!(repo.damaged_files().is_empty());
+        assert!(repo.verify().unwrap().damaged_files.is_empty());
     }
 }

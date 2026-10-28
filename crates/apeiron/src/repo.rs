@@ -94,8 +94,10 @@ impl Repository {
     }
 
     pub fn info(&self) -> RepoInfo {
-        let chunker = self.read().chunker();
+        let core = self.read();
+        let chunker = core.chunker();
         RepoInfo {
+            damaged_files: core.damaged_files().to_vec(),
             path: self.inner.path.clone(),
             format_version: core::FORMAT_VERSION,
             api_version: crate::API_VERSION.to_owned(),
@@ -250,10 +252,14 @@ impl Repository {
             .update_ref(&request.name, Some(request.expected), None)?)
     }
 
-    /// Removes stale ref locks and adds reflog lines lost in a crash.
+    /// Removes stale ref locks, adds reflog lines lost in a crash and
+    /// replaces damaged index files.
     pub fn repair(&self) -> Result<RepairReport> {
         let _writer = self.lock_writer();
-        Ok(self.view()?.repair()?)
+        let _lock = core::RepoLock::shared(self.path())?;
+        let mut core = self.write();
+        core.refresh_index()?;
+        Ok(core.repair()?)
     }
 }
 

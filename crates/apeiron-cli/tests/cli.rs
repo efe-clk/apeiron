@@ -157,6 +157,35 @@ fn exit_codes() {
     assert_eq!(code(&s.run(&["verify"])), Some(4));
 }
 
+#[test]
+fn damaged_index_is_reported_and_repaired() {
+    let s = Setup::new();
+    s.ok(&["backup", &s.path("src")]);
+    let index_dir = s.repo().join("index");
+    let index = fs::read_dir(&index_dir)
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let mut bytes = fs::read(&index).unwrap();
+    bytes[30] ^= 0xff;
+    fs::write(&index, bytes).unwrap();
+
+    let out = s.run(&["log"]);
+    assert_eq!(code(&out), Some(0));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("warning: damaged file"));
+    assert_eq!(code(&s.run(&["verify"])), Some(4));
+    let repaired = s.ok(&["repair"]);
+    assert!(
+        repaired.contains("wrote a new index for 1 pack"),
+        "{repaired}"
+    );
+    let out = s.run(&["verify"]);
+    assert_eq!(code(&out), Some(0));
+    assert!(out.stderr.is_empty());
+}
+
 #[cfg(unix)]
 #[test]
 fn warnings_give_exit_code_3() {

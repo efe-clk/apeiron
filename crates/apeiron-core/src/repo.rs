@@ -37,6 +37,10 @@ pub struct Repository {
     index: HashMap<ObjectId, Location>,
     /// The index files `index` was loaded from.
     index_files: Vec<PathBuf>,
+    /// Healthy packs that no healthy index covers.
+    unindexed: Vec<(FileHash, Vec<PackEntry>)>,
+    /// Index and pack files that failed verification while loading.
+    damaged: Vec<PathBuf>,
     refs: RefStore,
 }
 
@@ -86,6 +90,8 @@ impl Repository {
             config,
             index: HashMap::new(),
             index_files: Vec::new(),
+            unindexed: Vec::new(),
+            damaged: Vec::new(),
             refs: RefStore::new(path.join(REFS), path.join(LOGS), path.join(TMP)),
         };
         repo.load_index()?;
@@ -125,7 +131,12 @@ impl Repository {
 
     /// Loads all index files, then reads the tables of packs no index covers
     /// (left behind by a crash between writing a pack and its index).
+    /// Damaged index files are skipped and their packs read directly; damaged
+    /// packs without an index are skipped (FORMAT.md §8.2). Both are recorded
+    /// in [`Repository::damaged_files`].
     fn load_index(&mut self) -> Result<()> {
+        self.unindexed.clear();
+        self.damaged.clear();
         let mut indexed: HashSet<FileHash> = HashSet::new();
         let index_dir = self.dir(INDEX);
         let mut index_files = list_files(&index_dir)?;
@@ -135,7 +146,15 @@ impl Repository {
             if index::hash_from_file_name(&path, ".idx").is_none() {
                 continue;
             }
-            for location in index::read_index(&path)? {
+            let locations = match index::read_index(&path) {
+                Ok(locations) => locations,
+                Err(Error::Corrupt { .. }) => {
+                    self.damaged.push(path);
+                    continue;
+                }
+                Err(e) => return Err(e),
+            };
+            for location in locations {
                 indexed.insert(location.pack);
                 self.index.entry(location.entry.id).or_insert(location);
             }
@@ -150,12 +169,23 @@ impl Repository {
                 if indexed.contains(&name) {
                     continue;
                 }
-                pack::verify_file_hash(&path, &name)?;
-                for entry in pack::read_table(&path)? {
-                    self.index
-                        .entry(entry.id)
-                        .or_insert(Location { pack: name, entry });
+                let entries = match pack::verify_file_hash(&path, &name)
+                    .and_then(|()| pack::read_table(&path))
+                {
+                    Ok(entries) => entries,
+                    Err(Error::Corrupt { .. }) => {
+                        self.damaged.push(path);
+                        continue;
+                    }
+                    Err(e) => return Err(e),
+                };
+                for entry in &entries {
+                    self.index.entry(entry.id).or_insert(Location {
+                        pack: name,
+                        entry: *entry,
+                    });
                 }
+                self.unindexed.push((name, entries));
             }
         }
         Ok(())
@@ -367,10 +397,41 @@ impl Repository {
         self.refs.reflog(name)
     }
 
-    /// Removes ref locks left behind more than 10 minutes ago and records ref
-    /// changes whose reflog line was lost in a crash (FORMAT.md §9.3, §9.4).
-    pub fn repair(&self) -> Result<RepairReport> {
-        self.refs.repair()
+    /// Removes ref locks left behind more than 10 minutes ago, records ref
+    /// changes whose reflog line was lost in a crash (FORMAT.md §9.3, §9.4)
+    /// and indexes packs without a healthy index (§8.2).
+    pub fn repair(&mut self) -> Result<RepairReport> {
+        let mut report = self.refs.repair()?;
+        let damaged_indexes: Vec<PathBuf> = self
+            .damaged
+            .iter()
+            .filter(|p| p.starts_with(self.dir(INDEX)))
+            .cloned()
+            .collect();
+        if self.unindexed.is_empty() && damaged_indexes.is_empty() {
+            return Ok(report);
+        }
+        // The new index covers every pack the damaged ones covered before
+        // they are deleted (FORMAT.md §8.2).
+        if !self.unindexed.is_empty() {
+            index::write_index(&self.dir(TMP), &self.dir(INDEX), &self.unindexed)?;
+            report.indexed_packs = self.unindexed.len() as u64;
+        }
+        for path in damaged_indexes {
+            fsutil::checkpoint()
+                .and_then(|()| fs::remove_file(&path))
+                .at(&path)?;
+            report.removed_index_files.push(path);
+        }
+        fsutil::sync_dir(&self.dir(INDEX))?;
+        self.reload_index()?;
+        Ok(report)
+    }
+
+    /// Index and pack files that failed verification when the index was
+    /// loaded. Objects only in damaged packs cannot be read.
+    pub fn damaged_files(&self) -> &[PathBuf] {
+        &self.damaged
     }
 }
 

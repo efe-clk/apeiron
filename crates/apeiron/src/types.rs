@@ -15,6 +15,9 @@ pub struct RepoInfo {
     pub chunk_min: u32,
     pub chunk_avg: u32,
     pub chunk_max: u32,
+    /// Index and pack files found damaged when the repository was opened;
+    /// `verify` checks everything and `repair` replaces damaged indexes.
+    pub damaged_files: Vec<PathBuf>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

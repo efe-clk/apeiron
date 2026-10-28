@@ -42,6 +42,12 @@ pub struct RepairReport {
     pub removed_locks: Vec<PathBuf>,
     /// Refs whose reflog got a `repair` line.
     pub repaired_refs: Vec<String>,
+    /// Packs added to a new index because no healthy index covered them.
+    #[serde(default)]
+    pub indexed_packs: u64,
+    /// Damaged index files that were deleted after the new index was written.
+    #[serde(default)]
+    pub removed_index_files: Vec<PathBuf>,
 }
 
 /// Kind of change recorded in a reflog line.
@@ -337,6 +343,7 @@ impl RefStore {
         Ok(RepairReport {
             removed_locks: removed,
             repaired_refs: repaired,
+            ..RepairReport::default()
         })
     }
 

@@ -40,7 +40,7 @@ If neither is given, the command stops with a usage error. A repository on an ex
 | `apeiron export <snapshot> <file> [--format <format>] [--path <path>]` | Writes a snapshot (or one path in it) into a new `.tar`, `.zip` or `.7z` file; the extension chooses the format unless `--format` is given | Done |
 | `apeiron refs` | Lists all refs and the snapshots they point to | Done |
 | `apeiron verify` | Reads and checks every pack, index and object | Done |
-| `apeiron repair` | Removes stale ref locks and adds lost reflog lines | Done |
+| `apeiron repair` | Removes stale ref locks, adds lost reflog lines and replaces damaged index files | Done |
 | `apeiron gc [--keep-days <days>] [--dry-run]` | Deletes data no ref and no reflog line of the last 90 days (or `--keep-days`) can reach; `--dry-run` only reports | Done |
 
 A `<snapshot>` can be written as a ref name (`main`), a full snapshot id, or the first 8 or more characters of an id if they match exactly one snapshot. A `~N` suffix goes N steps back through first parents: `main~1` is the snapshot before `main`.
