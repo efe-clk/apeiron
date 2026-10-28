@@ -85,7 +85,8 @@ apeiron verify
 
 | Crate | Role | Status |
 | --- | --- | --- |
-| `apeiron` | Public Rust API; re-exports what callers need from `apeiron-core` | Planned |
+| `apeiron` | Public Rust API ([API.md](API.md) §8) | Planned |
+| `apeiron-services` | Folder ↔ snapshot, diff and export logic used by the API | Planned |
 | `apeiron-cli` | The `apeiron` program | Planned |
 
 | Need | Proposed library | Reason |

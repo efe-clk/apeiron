@@ -22,6 +22,8 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [012](#adr-012-yapısal-nesneler-için-kanonik-cbor) | Yapısal nesneler | Kanonik CBOR | Kabul edildi |
 | [013](#adr-013-küçük-harfli-ascii-ref-adları) | Ref adları | Yalnızca küçük harfli ASCII | Kabul edildi |
 | [014](#adr-014-güvensiz-sistem-çağrıları-için-küçük-bir-sistem-cratei) | `unsafe` kod | Yalnızca FFI crate'inde ve küçük `apeiron-sys` crate'inde | Kabul edildi |
+| [015](#adr-015-c-abi-sınırında-json-değerler) | C ABI | Küçük ve sabit bir işlev kümesi; istekler ve sonuçlar JSON | Önerildi |
+| [016](#adr-016-senkron-herkese-açık-api-ve-iş-parçacığında-çalışan-işler) | Uzun işlemler | Senkron API; sorgulanan ilerlemeyle iş parçacığında çalışan işler | Önerildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
@@ -303,3 +305,43 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Üçüncü taraf bir sarmalayıcı crate | Bu çağrıyı sunan, bakımı yapılan ve yaygın kullanılan bir crate bulunamadı |
 
 **Sonuçlar.** `apeiron-sys` küçük kalmalıdır. Oraya yeni bir işlev yalnızca güvenli bir alternatif yoksa eklenir.
+
+## ADR-015: C ABI sınırında JSON değerler
+
+**Durum:** Önerildi (2026-10-28)
+
+**Bağlam.** Her SDK C ABI üzerine kurulur ([SDK.tr.md](SDK.tr.md)). Her işlem için bir C işlevi ve her istek ile sonuç için C yapıları ABI'yi büyütür; her yeni alan onu bozar.
+
+**Karar.** C ABI küçük ve sabit bir işlev kümesinden oluşur (aç, çağır, başlat, ilerleme, iptal, bekle, bırak). İşlem bir metinle adlandırılır; istekler, sonuçlar, ilerleme ve hatalar [API.tr.md](API.tr.md) §8.7 biçiminde UTF-8 JSON'dır ve Rust türlerinden üretilen JSON Schema'larla tanımlanır.
+
+**Gerekçe.** Yeni işlemler ve yeni isteğe bağlı alanlar ABI değişikliği gerektirmez. Her dil JSON okuyabilir ve aynı değerler CLI'ın `--json` çıktısına ve ileride uzak kullanıma da hizmet eder. Küçük değerleri JSON'a çevirmenin maliyeti disk ve ağ işinin yanında yok sayılabilir; dosya içeriği hiçbir zaman JSON'dan geçmez.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| C yapıları ve işlem başına bir işlev | Büyük ABI; bir alan eklemek ikili uyumluluğu bozar |
+| CBOR ya da Protocol Buffers gibi ikili bir kodlama | Daha hızlı, ama hata ayıklaması zor ve her SDK'da ek bir kütüphane gerektirir |
+| C ABI olmadan dile özgü bağlar (PyO3, …) | Her dilin kendi yapıştırıcı kodu olur; "her yerde aynı sonuç" hedefine ters düşer |
+
+**Sonuçlar.** SDK'lar tipli sınıflarını şemalardan üretir. İsteklerdeki tür hataları çalışma anında kütüphane tarafından bulunur ve `InvalidInput` olarak bildirilir.
+
+## ADR-016: Senkron herkese açık API ve iş parçacığında çalışan işler
+
+**Durum:** Önerildi (2026-10-28)
+
+**Bağlam.** Yedekleme ve geri yükleme dakikalar ya da saatler sürer. Çağıranların ilerlemeye ve iptale ihtiyacı vardır; çekirdek ise senkrondur (ADR-006).
+
+**Karar.** Herkese açık API senkrondur. Uzun bir işlem kendi iş parçacığında çalışır ve bir iş olarak döndürülür; çağıran ilerlemeyi sorgulayarak okur, işi `cancel` ile durdurur ve sonucu `wait` ile alır ([API.tr.md](API.tr.md) §8.5).
+
+**Gerekçe.** Çağıranın bir async çalışma zamanına ihtiyacı olmaz; sorgulama C ABI'yi geri çağrısız geçer, böylece Apeiron'un iş parçacıklarında yabancı kod çalışmaz; iptal, durmanın her zaman güvenli olduğu dosyalar ve chunk'lar arasında denetlenir.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Async bir API (Tokio) | Her çağırana ve her SDK'ya bir çalışma zamanı dayatır |
+| İlerleme geri çağrıları | Apeiron'un iş parçacıklarından yabancı kod çağırmak C ABI üzerinden kırılgandır (iş parçacıkları, istisnalar, çöp toplayıcılar) |
+| Yalnızca bloklayan çağrılar | İlerleme de iptal de olmaz |
+
+**Sonuçlar.** SDK'lar sorgulamanın üzerine kendi dillerinde geri çağrı ya da yineleyici ekleyebilir.

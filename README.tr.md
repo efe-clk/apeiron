@@ -109,6 +109,7 @@ Kod, commit ve format değişikliği kuralları: [CONTRIBUTING.tr.md](CONTRIBUTI
 | [Yol haritası](docs/ROADMAP.tr.md) | Aşama 0–5, kapsam, çıkış kriterleri, güncel durum |
 | [API](docs/API.tr.md) | Planlanan herkese açık API'nin tasarım ilkeleri (taslak) |
 | [CLI](docs/CLI.tr.md) | `apeiron` komutunun tasarımı (taslak) |
+| [SDK](docs/SDK.tr.md) | C ABI ve dil SDK'larının tasarımı (taslak) |
 | [Sözlük](docs/GLOSSARY.tr.md) | Terimler ve İngilizce–Türkçe karşılıkları |
 | [Katkı](CONTRIBUTING.tr.md) | Geliştirme ortamı ve kurallar |
 | [Güvenlik](SECURITY.tr.md) | Güvenlik açığı bildirme, güvenlik ilkeleri |

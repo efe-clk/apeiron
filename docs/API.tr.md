@@ -2,7 +2,7 @@
 
 # Apeiron Herkese Açık API — Tasarım İlkeleri
 
-> **Durum: Taslak.** Henüz herkese açık bir API yok. Bu belge API'nin uyacağı ilkeleri kayda geçirir; aşağıdaki adlar ve imzalar örnektir, bağlayıcı değildir. `apeiron-core` içindeki türler (ör. `Repository`) iç yapı taşlarıdır ve değişecektir.
+> **Durum: İncelemeye sunulan taslak.** Bölüm 1–7 API'nin ilkeleridir; bölüm 8 henüz yazılmamış olan herkese açık `apeiron` crate'inin spesifikasyonudur; bölüm 9 zaten var olan çekirdek işlevleri listeler. C ABI ve SDK'lar [SDK.tr.md](SDK.tr.md) içinde tanımlanır.
 
 Herkese açık API, Apeiron'a girmenin tek yoludur. CLI, arka plan hizmeti, masaüstü ve web arayüzleri ve tüm dış uygulamalar onu kullanır; gizli iç kapı yoktur ([VISION.tr.md](VISION.tr.md), ilke 8).
 
@@ -36,14 +36,7 @@ SDK'lar mantığı yeniden yazmaz, yalnızca C ABI'yi sarar. Aynı işlemin her 
 | Açık sonuç | Her kritik işlem açık bir başarıyla ya da tipli bir hatayla biter; "muhtemelen oldu" durumu yoktur | Planlandı |
 | Düz veri giriş ve çıkışları | İstekler ve sonuçlar, serileştirilebilen düz veri türleridir (uzak kullanım ve C ABI için) | Planlandı |
 
-Uzun işlemler (yedek, geri yükleme, senkron, doğrulama) **iş** (job) olarak başlatılır. Bir iş izlenebilir, iptal edilebilir ve sonucu sorgulanabilir. Örnek bir biçim:
-
-```rust
-// Yalnızca örnek — var olan bir API değildir.
-let job = repo.backup(BackupRequest { source, target_ref })?;
-job.on_progress(|p| println!("{} / {} bayt", p.done, p.total));
-let report = job.wait()?; // ya da job.cancel()
-```
+Uzun işlemler (yedek, geri yükleme, senkron, doğrulama) **iş** (job) olarak başlatılır. Bir iş izlenebilir, iptal edilebilir ve sonucu sorgulanabilir (bölüm 8.5).
 
 ## 3. İlerleme ve iptal
 
@@ -92,7 +85,7 @@ let report = job.wait()?; // ya da job.cancel()
 | Opak tutamaçlar | Depolar, işler ve yineleyiciler, açık serbest bırakma işlevleri olan opak işaretçilerdir (opaque handle) | Planlandı |
 | Hata kodları ve mesajlar | Her işlev bir durum kodu döndürür; mesajı ayrı bir çağrı verir | Planlandı |
 | Sahiplik açıktır | Her işlev hangi belleği kimin serbest bırakacağını belgeler | Planlandı |
-| İlerleme için geri çağrılar | İlerleme ve iptal, geri çağrılar (callback) ve iptal belirteçleriyle yapılır | Planlandı |
+| Sorgulanan ilerleme | İlerleme bir işlev çağrısıyla okunur, iş bir iptal çağrısıyla durdurulur; sınırı hiçbir geri çağrı (callback) geçmez (bölüm 8.5) | Planlandı |
 | Üretilen başlık dosyası | C başlık dosyası Rust kodundan üretilir ve CI'da denetlenir | Planlandı |
 | Ortak test paketi | Aynı senaryolar her SDK'da çalıştırılır ve sonuçlar karşılaştırılır | Planlandı |
 
@@ -101,57 +94,133 @@ let report = job.wait()?; // ya da job.cancel()
 | İlk | Rust (yerel), C (ABI), Python, C++ | Planlandı |
 | Sonraki | Go, C#, Java/Kotlin, Swift, JavaScript/TypeScript, Zig | Planlandı |
 
-## 8. Aşama 0 Rust API taslağı
+## 8. Rust API spesifikasyonu
 
-Aşama 0, depolama motorunun üzerinde Rust API'nin ilk taslağıyla biter. Taslak veri saklama ve okuma, ref'ler ve bütünlük işlerini kapsar; işler (job), ilerleme ve üstteki hizmetler sonraki aşamalarda gelir. Aşağıdaki işlevlerin tümü `apeiron-core` içinde vardır.
+Bu bölüm herkese açık `apeiron` crate'inin 0.1 sürümlü sözleşmesidir. Aşama 0 taslağının çekirdek işlevleri (bölüm 9) bunun altındaki yapı taşlarıdır ve sözleşmenin parçası değildir.
 
-### 8.1 Depo
+### 8.1 Crate'ler
 
-| İşlev | Ne yapar | Durum |
+```mermaid
+flowchart TB
+    CLI["apeiron-cli<br/>apeiron programı"]
+    FFI["apeiron-ffi<br/>C ABI"]
+    API["apeiron<br/>herkese açık Rust API"]
+    SVC["apeiron-services<br/>yedek, geri yükleme, fark, dışa aktarma"]
+    CORE["apeiron-core<br/>nesneler, paketler, ref'ler"]
+    SYS["apeiron-sys<br/>sistem çağrıları"]
+    CLI --> API
+    FFI --> API
+    API --> SVC --> CORE --> SYS
+```
+
+| Crate | Görev | Durum |
 | --- | --- | --- |
-| `Repository::init(path)` | Yeni ya da boş bir klasörde boş bir depo oluşturur | Tamamlandı |
-| `Repository::open(path)` | Depoyu açar; bir çökme yüzünden indekssiz kalan paketleri bulur | Tamamlandı |
-| `repo.repair()` | 10 dakikadan eski ref kilitlerini kaldırır ve çökmede kaybolan reflog satırlarını ekler | Tamamlandı |
-| `repo.verify()` | Her paketi, indeksi ve nesneyi okuyup denetler; bozuk olanların raporunu döndürür | Tamamlandı |
+| `apeiron` | Uygulamaların kullandığı tek crate: depo tutamacı, işlemler, işler, hatalar | Planlandı (Aşama 1) |
+| `apeiron-services` | Klasörleri tree ve snapshot'a, onları da geri klasöre çevirir; fark; tar/zip dışa aktarma | Planlandı (Aşama 1) |
+| `apeiron-cli` | `apeiron` komutu ([CLI.tr.md](CLI.tr.md)) | Planlandı (Aşama 1) |
+| `apeiron-ffi` | `apeiron` üzerinde C ABI ([SDK.tr.md](SDK.tr.md)) | Planlandı (Aşama 3) |
 
-### 8.2 Veri yazma
+### 8.2 Depo tutamacı
 
-| İşlev | Ne yapar | Durum |
+| İşlev | Ne yapar |
+| --- | --- |
+| `Repository::init(path)` | Boş bir depo oluşturur ve açar |
+| `Repository::open(path)` | Var olan bir depoyu açar |
+| `repo.info()` | Yolu, format sürümünü ve chunk bölme ayarlarını döndürür |
+
+Bir `Repository` iş parçacıkları arasında paylaşılabilir (`Send + Sync`). Yalnızca okuyan işlemler paralel çalışır; yazan işlemler süreç içinde birbirini bekler. Süreçler arasında bunu bir depo kilidi sağlar (Aşama 1 için planlandı, [FORMAT.tr.md](FORMAT.tr.md) §12).
+
+### 8.3 İşlemler
+
+Her işlem tek bir düz istek değeri alır ve tek bir düz sonuç değeri döndürür. Uzun işlemler bir iş döndürür (bölüm 8.5).
+
+| İşlem | İstek | Sonuç | Uzun |
+| --- | --- | --- | --- |
+| `backup` | kaynak klasör, ref adı, açıklama, yazar, cihaz, meta | `BackupReport`: snapshot kimliği, dosya, klasör ve bayt sayıları, yeni saklanan baytlar, uyarılar | Evet |
+| `restore` | snapshot, hedef klasör, isteğe bağlı snapshot içi yol | `RestoreReport`: sayılar, uyarılar | Evet |
+| `export` | snapshot, çıktı dosyası, biçim (`tar` ya da `zip`), isteğe bağlı yol | `ExportReport`: sayılar, uyarılar | Evet |
+| `verify` | — | `VerifyReport`: denetlenen nesneler, bozuk dosyalar ve nesneler | Evet |
+| `log` | başlangıç snapshot'ı, en fazla sayı | `LogPage`: en yeniden başlayan snapshot'lar ve sonraki sayfanın başladığı yer | Hayır |
+| `list` | snapshot, yol | `Vec<EntryInfo>`: ad, tür, boyut, izinler, değişiklik zamanı | Hayır |
+| `diff` | iki snapshot | `Vec<Change>`: yol ve eklendi, silindi ya da değişti | Hayır |
+| `refs` | — | `Vec<RefInfo>`: ad ve snapshot kimliği | Hayır |
+| `reflog` | ref adı | `Vec<ReflogEntry>` | Hayır |
+| `resolve` | snapshot belirteci (bölüm 8.4) | snapshot kimliği | Hayır |
+| `delete_ref` | ref adı, beklenen snapshot | — | Hayır |
+| `repair` | — | `RepairReport`: kaldırılan kilitler, onarılan reflog'lar | Hayır |
+
+### 8.4 Bir snapshot'ı adlandırma
+
+| Biçim | Örnek | Anlamı |
 | --- | --- | --- |
-| `repo.writer()` | Bir yazma grubu başlatır; `finish` çağrılana kadar hiçbir şey görünmez | Tamamlandı |
-| `writer.put_file(reader)` | Bir akışı chunk'lara böler, onları ve blob'u saklar; boyutu ve blob kimliğini döndürür (boş dosyada kimlik yok) | Tamamlandı |
-| `writer.put_tree(&tree)` | Bir tree'yi denetler ve saklar | Tamamlandı |
-| `writer.put_snapshot(&snapshot)` | Bir snapshot'ı denetler ve saklar; tree'si ve ebeveynleri önceden saklanmış olmalıdır | Tamamlandı |
-| `writer.finish()` | Gruptaki tüm nesneleri kalıcı ve okunabilir yapar | Tamamlandı |
-| `writer.put(type, bytes)`, `writer.put_chunks(reader)` | Yukarıdaki işlevlerin kullandığı alt düzey yazma | Tamamlandı; iç kullanıma alınacak |
+| Ref adı | `main`, `backup/home` | Ref'in gösterdiği snapshot |
+| Tam kimlik | 64 hex karakter | O snapshot |
+| Kimlik öneki | 8 ya da daha fazla hex karakter | Kimliği bunlarla başlayan tek saklı snapshot; hiç yoksa ya da birden fazlaysa hata |
+| `~N` eki | `main~2` | İlk ebeveynler üzerinden N adım geri gider |
 
-### 8.3 Veri okuma
+### 8.5 İşler, ilerleme ve iptal
 
-| İşlev | Ne yapar | Durum |
+```rust
+// API'nin biçimi, son kod değildir.
+let job = repo.backup(BackupRequest::new("/home/ada/Documents", "main"))?;
+while !job.is_finished() {
+    let p = job.progress();           // anlık ilerlemenin bir kopyası
+    println!("{} dosya, {} bayt", p.items_done, p.bytes_done);
+    std::thread::sleep(Duration::from_millis(200));
+}
+let report = job.wait()?;            // ya da job.cancel()
+```
+
+| Kural | Açıklama |
+| --- | --- |
+| Async değil, iş parçacığı | Bir iş kendi iş parçacığında çalışır. Herkese açık API senkrondur; kullanmak için bir async çalışma zamanı gerekmez |
+| Sorgulanan ilerleme | `job.progress()`, `Progress`'in bir kopyasını döndürür: aşama, tamamlanan öğe ve baytlar, biliniyorsa toplamlar, o anki yol. Çağıran istediği sıklıkta okur; geri çağrı yoktur, bu da C ABI'yi basit tutar |
+| İptal | `job.cancel()` işin durmasını ister. İş, dosyalar ve chunk'lar arasında denetler, kısa sürede durur ve `Cancelled` hatasını döndürür. O ana kadar yazılan veri görünmez kalır; ref'ler taşınmaz |
+| Tek sonuç | `job.wait()` sonucu tam bir kez döndürür; `job.wait_timeout(d)` iş hâlâ sürüyorsa erken döner |
+| İşi bırakmak | Beklemeden bırakılan (drop) bir iş iptal edilir |
+
+### 8.6 Hatalar
+
+Her hatanın sabit numaralı bir türü, bir mesajı ve gerekiyorsa bir yolu vardır. Numaralar C ABI ve tüm SDK'larca paylaşılır ve anlamları asla değişmez.
+
+| Kod | Tür | Anlamı |
 | --- | --- | --- |
-| `repo.read_file(blob_id, writer)` | Bir dosyanın içeriğini chunk chunk bir akışa yazar, her chunk'ı doğrular | Tamamlandı |
-| `repo.read_tree(id)` | Bir tree'yi okur, doğrular ve çözer | Tamamlandı |
-| `repo.read_snapshot(id)` | Bir snapshot'ı okur, doğrular ve çözer | Tamamlandı |
-| `repo.history(id)` | `id`'den başlayıp ilk ebeveynler üzerinden geriye doğru snapshot'ları, gerektikçe okuyarak dolaşır | Tamamlandı |
-| `repo.contains(id)`, `repo.read_object(id)` | Alt düzey nesne erişimi | Tamamlandı; iç kullanıma alınacak |
+| 1 | `Io` | İşletim sistemi bir hata bildirdi (disk dolu, izin reddedildi, …) |
+| 2 | `NotFound` | Depo, ref, snapshot ya da yol yok |
+| 3 | `AlreadyExists` | Hedef var ve işlem üzerine yazmaz |
+| 4 | `InvalidInput` | Bir istek değeri geçersiz (hatalı ref adı, hatalı snapshot belirteci, …) |
+| 5 | `Ambiguous` | Bir kimlik öneki birden fazla snapshot'a uyuyor |
+| 6 | `Corrupt` | Saklanan veri doğrulamadan geçemedi |
+| 7 | `Locked` | Başka bir yazıcı bir kilidi tutuyor |
+| 8 | `Conflict` | Bir ref eşzamanlı olarak değişti (karşılaştır ve değiştir başarısız) |
+| 9 | `Cancelled` | İş iptal edildi |
+| 10 | `Unsupported` | Bilinmeyen format sürümü ya da desteklenmeyen özellik |
+| 11 | `Internal` | Apeiron'da bir hata; lütfen bildirin |
 
-### 8.4 Ref'ler
+Bir işlemi durdurmayan sorunlar (yedek sırasında okunamayan bir dosya, okunurken değişen bir dosya, atlanan bir aygıt dosyası) sonuçta **uyarı** olarak yer alır; her birinin bir yolu, türü ve mesajı vardır.
 
-| İşlev | Ne yapar | Durum |
+### 8.7 Düz veri
+
+| Kural | Açıklama |
+| --- | --- |
+| Serileştirilebilir | Her istek, sonuç, ilerleme ve hata değeri JSON olarak yazılabilir (`serde`). CLI'ın `--json` çıktısı, C ABI ve ileride uzak kullanım bu biçimi kullanır |
+| Kimlikler | Nesne kimlikleri JSON'da 64 karakterlik küçük harfli hex metinlerdir |
+| Zamanlar | Unix saniyesi ve nanosaniye, UTC |
+| Yollar ve adlar | Baytlar geçerli UTF-8 ise metin; değilse ham baytları tutan bir `{"hex": "…"}` nesnesi; böylece hiçbir ad kaybolmaz |
+| Eklemeli değişiklik | Ara sürümlerde isteklere ve sonuçlara yeni isteğe bağlı alanlar eklenebilir; okuyucular bilinmeyen alanları yok sayar |
+
+### 8.8 Sürümleme
+
+`apeiron::API_VERSION` bu sözleşmenin sürümünü (0.1) tutar. 1.0'dan önce geriye uyumsuz değişiklikler ara sürümü yükseltir ve sürüm notlarında listelenir (bölüm 6).
+
+## 9. Aşama 0 çekirdek işlevleri
+
+`apeiron-core`'un bu işlevleri bölüm 8'in yapı taşlarıdır. Uygulamalar bunları doğrudan çağırmaz.
+
+| Alan | İşlevler | Durum |
 | --- | --- | --- |
-| `repo.read_ref(name)` | Ref'in gösterdiği snapshot'ı (varsa) döndürür | Tamamlandı |
-| `repo.update_ref(name, expected, new)` | Ref'i yalnızca hâlâ `expected`'ı gösteriyorsa taşır, oluşturur ya da siler | Tamamlandı |
-| `repo.reflog(name)` | Bir ref'in değişiklik geçmişini döndürür | Tamamlandı |
-| `repo.list_refs()` | Tüm ref'leri ve hedeflerini listeler | Tamamlandı |
-
-### 8.5 Veri türleri
-
-| Tür | İçerik | Durum |
-| --- | --- | --- |
-| `ObjectId`, `ObjectType` | 32 baytlık nesne kimliği; chunk, blob, tree ya da snapshot | Tamamlandı |
-| `Blob`, `Tree`, `TreeEntry`, `EntryKind`, `Snapshot`, `Time` | [FORMAT.tr.md](FORMAT.tr.md) §6'daki yapısal nesneler | Tamamlandı |
-| `ReflogEntry`, `RefOp` | Bir reflog satırı | Tamamlandı |
-| `VerifyReport` | `verify`'ın bulduğu bozuk paketler, indeksler ve nesneler | Tamamlandı |
-| `Error` | Tipli hatalar (bölüm 5) | Tamamlandı |
-
-Açık soru: herkese açık API, yalnızca çağıranların ihtiyaç duyduğunu dışa açan ayrı bir `apeiron` crate'inde olabilir; böylece `apeiron-core` serbestçe değişebilir. Öneri, bu crate'in çekirdek dışındaki ilk kullanıcı (CLI) ortaya çıkınca oluşturulmasıdır.
+| Depo | `init`, `open`, `repair`, `verify` | Tamamlandı |
+| Yazma | `writer`, `put_file`, `put_tree`, `put_snapshot`, `finish` | Tamamlandı |
+| Okuma | `read_file`, `read_tree`, `read_snapshot`, `history` | Tamamlandı |
+| Ref'ler | `read_ref`, `update_ref`, `reflog`, `list_refs` | Tamamlandı |
+| Türler | `ObjectId`, `Blob`, `Tree`, `TreeEntry`, `EntryKind`, `Snapshot`, `Time`, `ReflogEntry`, `VerifyReport`, `Error` | Tamamlandı |

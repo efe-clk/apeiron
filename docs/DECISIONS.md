@@ -22,6 +22,8 @@ This document records every technical decision made so far, in ADR (architecture
 | [012](#adr-012-canonical-cbor-for-structured-objects) | Structured objects | Canonical CBOR | Accepted |
 | [013](#adr-013-lowercase-ascii-ref-names) | Ref names | Lowercase ASCII only | Accepted |
 | [014](#adr-014-a-small-system-crate-for-unsafe-os-calls) | `unsafe` code | Only in the FFI crate and the small `apeiron-sys` crate | Accepted |
+| [015](#adr-015-json-values-at-the-c-abi-boundary) | C ABI | A small fixed set of functions; requests and results as JSON | Proposed |
+| [016](#adr-016-synchronous-public-api-with-jobs-on-threads) | Long operations | Synchronous API; jobs on threads with polled progress | Proposed |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28.
 
@@ -303,3 +305,43 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | A third-party wrapper crate | No maintained, widely used crate offering this call was found |
 
 **Consequences.** `apeiron-sys` must stay small. A new function is added there only when no safe alternative exists.
+
+## ADR-015: JSON values at the C ABI boundary
+
+**Status:** Proposed (2026-10-28)
+
+**Context.** Every SDK is built on the C ABI ([SDK.md](SDK.md)). A C function per operation with C structs for every request and result would make the ABI large, and every new field would break it.
+
+**Decision.** The C ABI has a small fixed set of functions (open, call, start, progress, cancel, wait, free). The operation is named by a string; requests, results, progress and errors are UTF-8 JSON in the form of [API.md](API.md) §8.7, described by JSON Schemas generated from the Rust types.
+
+**Rationale.** New operations and new optional fields need no ABI change. Every language can read JSON, and the same values serve the CLI's `--json` output and the future remote mode. Converting small values to JSON costs nothing next to disk and network work; file content never passes through JSON.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| C structs and one function per operation | Large ABI; adding a field breaks binary compatibility |
+| A binary encoding such as CBOR or Protocol Buffers | Faster, but harder to debug and needs an extra library in every SDK |
+| Language-specific bindings without a C ABI (PyO3, …) | Each language would have its own glue code, against the "same result everywhere" goal |
+
+**Consequences.** SDKs generate their typed classes from the schemas. Type errors in requests are found at run time by the library and reported as `InvalidInput`.
+
+## ADR-016: Synchronous public API with jobs on threads
+
+**Status:** Proposed (2026-10-28)
+
+**Context.** Backups and restores take minutes or hours. Callers need progress and cancellation, and the core is synchronous (ADR-006).
+
+**Decision.** The public API is synchronous. A long operation runs on its own thread and is returned as a job; callers read progress by polling, stop it with `cancel` and collect the result with `wait` ([API.md](API.md) §8.5).
+
+**Rationale.** Callers need no async runtime; polling crosses the C ABI without callbacks, so no foreign code runs on Apeiron's threads; cancellation is checked between files and chunks, where stopping is always safe.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| An async API (Tokio) | Forces a runtime on every caller and every SDK |
+| Progress callbacks | Calling foreign code from Apeiron's threads is fragile across the C ABI (threads, exceptions, garbage collectors) |
+| Blocking calls only | No progress and no cancellation |
+
+**Consequences.** SDKs may add callbacks or iterators on top of polling in their own language.

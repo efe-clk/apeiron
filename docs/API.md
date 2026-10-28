@@ -2,7 +2,7 @@
 
 # Apeiron Public API — Design Principles
 
-> **Status: Draft.** No public API exists yet. This document records the principles the API will follow; names and signatures below are illustrative, not a contract. The types inside `apeiron-core` (for example `Repository`) are internal building blocks and will change.
+> **Status: Draft for review.** Sections 1–7 are the principles of the API; section 8 is the specification of the public `apeiron` crate, which is not written yet; section 9 lists the core functions that already exist. The C ABI and the SDKs are specified in [SDK.md](SDK.md).
 
 The public API is the only way into Apeiron. The CLI, the background service, the desktop and web interfaces and every external application use it; there is no hidden back door ([VISION.md](VISION.md), principle 8).
 
@@ -36,14 +36,7 @@ SDKs never re-implement logic; they only wrap the C ABI. That is how the same op
 | Explicit results | Every critical operation ends in an explicit success or a typed error; there is no "probably done" state | Planned |
 | Plain-data inputs and outputs | Requests and results are plain data types that can be serialised (for the remote mode and the C ABI) | Planned |
 
-Long operations (backup, restore, sync, verification) are started as **jobs**. A job can be observed, cancelled and queried for its result. An illustrative shape:
-
-```rust
-// Illustrative only — not an existing API.
-let job = repo.backup(BackupRequest { source, target_ref })?;
-job.on_progress(|p| println!("{} / {} bytes", p.done, p.total));
-let report = job.wait()?; // or job.cancel()
-```
+Long operations (backup, restore, sync, verification) are started as **jobs**. A job can be observed, cancelled and queried for its result (section 8.5).
 
 ## 3. Progress and cancellation
 
@@ -92,7 +85,7 @@ Cancellation is safe by construction: objects become visible only after they are
 | Opaque handles | Repositories, jobs and iterators are opaque pointers with explicit free functions | Planned |
 | Error codes and messages | Every function returns a status code; a separate call returns the message | Planned |
 | Ownership is explicit | Every function documents who frees which memory | Planned |
-| Callbacks for progress | Progress and cancellation use callbacks and cancel tokens | Planned |
+| Polled progress | Progress is read with a function call and a job is stopped with a cancel call; no callbacks cross the boundary (section 8.5) | Planned |
 | Generated header | The C header is generated from the Rust code and checked in CI | Planned |
 | Shared test suite | The same scenarios run against every SDK and their results are compared | Planned |
 
@@ -101,57 +94,133 @@ Cancellation is safe by construction: objects become visible only after they are
 | First | Rust (native), C (ABI), Python, C++ | Planned |
 | Next | Go, C#, Java/Kotlin, Swift, JavaScript/TypeScript, Zig | Planned |
 
-## 8. Stage 0 Rust API draft
+## 8. Rust API specification
 
-Stage 0 ends with a first draft of the Rust API on top of the storage engine. It covers storing and reading data, refs and integrity; jobs, progress and the services above come in later stages. All functions below exist in `apeiron-core`.
+This section is the contract of the public `apeiron` crate, version 0.1. The core functions of the Stage 0 draft (section 9) are building blocks below it and are not part of the contract.
 
-### 8.1 Repository
+### 8.1 Crates
 
-| Function | What it does | Status |
+```mermaid
+flowchart TB
+    CLI["apeiron-cli<br/>the apeiron program"]
+    FFI["apeiron-ffi<br/>C ABI"]
+    API["apeiron<br/>public Rust API"]
+    SVC["apeiron-services<br/>backup, restore, diff, export"]
+    CORE["apeiron-core<br/>objects, packs, refs"]
+    SYS["apeiron-sys<br/>OS calls"]
+    CLI --> API
+    FFI --> API
+    API --> SVC --> CORE --> SYS
+```
+
+| Crate | Role | Status |
 | --- | --- | --- |
-| `Repository::init(path)` | Creates an empty repository in a new or empty folder | Done |
-| `Repository::open(path)` | Opens a repository; finds packs left without an index by a crash | Done |
-| `repo.repair()` | Removes ref locks older than 10 minutes and adds reflog lines lost in a crash | Done |
-| `repo.verify()` | Reads and checks every pack, index and object; returns a report of what is damaged | Done |
+| `apeiron` | The only crate applications use: repository handle, operations, jobs, errors | Planned (Stage 1) |
+| `apeiron-services` | Turns folders into trees and snapshots and back; diff; tar/zip export | Planned (Stage 1) |
+| `apeiron-cli` | The `apeiron` command ([CLI.md](CLI.md)) | Planned (Stage 1) |
+| `apeiron-ffi` | C ABI over `apeiron` ([SDK.md](SDK.md)) | Planned (Stage 3) |
 
-### 8.2 Writing data
+### 8.2 Repository handle
 
-| Function | What it does | Status |
+| Function | What it does |
+| --- | --- |
+| `Repository::init(path)` | Creates an empty repository and opens it |
+| `Repository::open(path)` | Opens an existing repository |
+| `repo.info()` | Returns the path, format version and chunker settings |
+
+A `Repository` can be shared between threads (`Send + Sync`). Operations that only read run in parallel; operations that write wait for each other inside the process. Between processes, a repository lock does the same (planned for Stage 1, [FORMAT.md](FORMAT.md) §12).
+
+### 8.3 Operations
+
+Every operation takes one plain request value and returns one plain result value. Long operations return a job (section 8.5).
+
+| Operation | Request | Result | Long |
+| --- | --- | --- | --- |
+| `backup` | source folder, ref name, message, author, host, meta | `BackupReport`: snapshot id, counts of files, folders and bytes, bytes newly stored, warnings | Yes |
+| `restore` | snapshot, target folder, optional path inside the snapshot | `RestoreReport`: counts, warnings | Yes |
+| `export` | snapshot, output file, format (`tar` or `zip`), optional path | `ExportReport`: counts, warnings | Yes |
+| `verify` | — | `VerifyReport`: objects checked, damaged files and objects | Yes |
+| `log` | start snapshot, maximum count | `LogPage`: snapshots, newest first, and where the next page starts | No |
+| `list` | snapshot, path | `Vec<EntryInfo>`: name, kind, size, mode, mtime | No |
+| `diff` | two snapshots | `Vec<Change>`: path and added, removed or modified | No |
+| `refs` | — | `Vec<RefInfo>`: name and snapshot id | No |
+| `reflog` | ref name | `Vec<ReflogEntry>` | No |
+| `resolve` | snapshot spec (section 8.4) | snapshot id | No |
+| `delete_ref` | ref name, expected snapshot | — | No |
+| `repair` | — | `RepairReport`: removed locks, repaired reflogs | No |
+
+### 8.4 Naming a snapshot
+
+| Form | Example | Meaning |
 | --- | --- | --- |
-| `repo.writer()` | Starts a batch of writes; nothing is visible until `finish` | Done |
-| `writer.put_file(reader)` | Splits a stream into chunks, stores them and the blob; returns the size and blob id (none for an empty file) | Done |
-| `writer.put_tree(&tree)` | Checks and stores a tree | Done |
-| `writer.put_snapshot(&snapshot)` | Checks and stores a snapshot; its tree and parents must already be stored | Done |
-| `writer.finish()` | Makes every object of the batch durable and readable | Done |
-| `writer.put(type, bytes)`, `writer.put_chunks(reader)` | Low-level writes used by the functions above | Done; to become internal |
+| Ref name | `main`, `backup/home` | The snapshot the ref points to |
+| Full id | 64 hex characters | That snapshot |
+| Id prefix | 8 or more hex characters | The only stored snapshot whose id starts with them; an error if none or several |
+| `~N` suffix | `main~2` | Go N steps back through first parents |
 
-### 8.3 Reading data
+### 8.5 Jobs, progress and cancellation
 
-| Function | What it does | Status |
+```rust
+// Shape of the API, not final code.
+let job = repo.backup(BackupRequest::new("/home/ada/Documents", "main"))?;
+while !job.is_finished() {
+    let p = job.progress();           // a copy of the current progress
+    println!("{} files, {} bytes", p.items_done, p.bytes_done);
+    std::thread::sleep(Duration::from_millis(200));
+}
+let report = job.wait()?;            // or job.cancel()
+```
+
+| Rule | Description |
+| --- | --- |
+| Threads, not async | A job runs on its own thread. The public API is synchronous; no async runtime is needed to use it |
+| Polled progress | `job.progress()` returns a copy of `Progress`: phase, items and bytes done, totals when known, current path. Callers read it as often as they like; there are no callbacks, which keeps the C ABI simple |
+| Cancellation | `job.cancel()` asks the job to stop. The job checks between files and chunks, stops within a short time and returns the `Cancelled` error. Data written so far stays invisible; refs are not moved |
+| One result | `job.wait()` returns the result exactly once; `job.wait_timeout(d)` returns early if the job is still running |
+| Dropping a job | Dropping a job without waiting cancels it |
+
+### 8.6 Errors
+
+Every error has a kind with a stable number, a message and, when it applies, a path. The numbers are shared by the C ABI and all SDKs and never change meaning.
+
+| Code | Kind | Meaning |
 | --- | --- | --- |
-| `repo.read_file(blob_id, writer)` | Writes a file's content to a stream chunk by chunk, verifying each chunk | Done |
-| `repo.read_tree(id)` | Reads, verifies and decodes a tree | Done |
-| `repo.read_snapshot(id)` | Reads, verifies and decodes a snapshot | Done |
-| `repo.history(id)` | Walks snapshots from `id` back through their first parents, lazily | Done |
-| `repo.contains(id)`, `repo.read_object(id)` | Low-level object access | Done; to become internal |
+| 1 | `Io` | The operating system reported an error (disk full, permission denied, …) |
+| 2 | `NotFound` | Repository, ref, snapshot or path does not exist |
+| 3 | `AlreadyExists` | The target exists and the operation does not overwrite |
+| 4 | `InvalidInput` | A request value is not valid (bad ref name, bad snapshot spec, …) |
+| 5 | `Ambiguous` | An id prefix matches more than one snapshot |
+| 6 | `Corrupt` | Stored data failed verification |
+| 7 | `Locked` | Another writer holds a lock |
+| 8 | `Conflict` | A ref changed concurrently (compare-and-swap failed) |
+| 9 | `Cancelled` | The job was cancelled |
+| 10 | `Unsupported` | Unknown format version or unsupported feature |
+| 11 | `Internal` | A bug in Apeiron; please report it |
 
-### 8.4 Refs
+Problems that do not stop an operation (an unreadable file during a backup, a file that changed while it was read, a skipped device file) are **warnings** in the result, each with a path, a kind and a message.
 
-| Function | What it does | Status |
+### 8.7 Plain data
+
+| Rule | Description |
+| --- | --- |
+| Serialisable | Every request, result, progress and error value can be written as JSON (`serde`). The CLI's `--json` output, the C ABI and the future remote mode use this form |
+| Ids | Object ids are 64-character lowercase hex strings in JSON |
+| Times | Unix seconds and nanoseconds, UTC |
+| Paths and names | A string when the bytes are valid UTF-8; otherwise an object `{"hex": "…"}` holding the raw bytes, so no name is ever lost |
+| Additive changes | New optional fields can be added to requests and results in minor versions; readers ignore unknown fields |
+
+### 8.8 Versioning
+
+`apeiron::API_VERSION` holds the version of this contract (0.1). Before 1.0, breaking changes raise the minor version and are listed in the release notes (section 6).
+
+## 9. Stage 0 core functions
+
+These functions of `apeiron-core` are the building blocks of section 8. Applications do not call them directly.
+
+| Area | Functions | Status |
 | --- | --- | --- |
-| `repo.read_ref(name)` | Returns the snapshot a ref points to, if any | Done |
-| `repo.update_ref(name, expected, new)` | Moves, creates or deletes a ref only if it still points to `expected` | Done |
-| `repo.reflog(name)` | Returns the change history of a ref | Done |
-| `repo.list_refs()` | Lists all refs and their targets | Done |
-
-### 8.5 Data types
-
-| Type | Content | Status |
-| --- | --- | --- |
-| `ObjectId`, `ObjectType` | 32-byte object id; chunk, blob, tree or snapshot | Done |
-| `Blob`, `Tree`, `TreeEntry`, `EntryKind`, `Snapshot`, `Time` | The structured objects of [FORMAT.md](FORMAT.md) §6 | Done |
-| `ReflogEntry`, `RefOp` | One reflog line | Done |
-| `VerifyReport` | Damaged packs, indexes and objects found by `verify` | Done |
-| `Error` | Typed errors (section 5) | Done |
-
-Open question: the public API may live in a separate `apeiron` crate that only re-exports what callers need, so that `apeiron-core` can change freely. The proposal is to create it when the first caller outside the core (the CLI) appears.
+| Repository | `init`, `open`, `repair`, `verify` | Done |
+| Writing | `writer`, `put_file`, `put_tree`, `put_snapshot`, `finish` | Done |
+| Reading | `read_file`, `read_tree`, `read_snapshot`, `history` | Done |
+| Refs | `read_ref`, `update_ref`, `reflog`, `list_refs` | Done |
+| Types | `ObjectId`, `Blob`, `Tree`, `TreeEntry`, `EntryKind`, `Snapshot`, `Time`, `ReflogEntry`, `VerifyReport`, `Error` | Done |

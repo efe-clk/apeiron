@@ -85,7 +85,8 @@ apeiron verify
 
 | Crate | Görev | Durum |
 | --- | --- | --- |
-| `apeiron` | Herkese açık Rust API'si; çağıranların ihtiyaç duyduğunu `apeiron-core`'dan dışa açar | Planlandı |
+| `apeiron` | Herkese açık Rust API'si ([API.tr.md](API.tr.md) §8) | Planlandı |
+| `apeiron-services` | API'nin kullandığı klasör ↔ snapshot, fark ve dışa aktarma mantığı | Planlandı |
 | `apeiron-cli` | `apeiron` programı | Planlandı |
 
 | İhtiyaç | Önerilen kütüphane | Gerekçe |
