@@ -262,6 +262,8 @@ Kurallar:
 - Girdiler `id`'ye göre küçükten büyüğe sıralıdır.
 - Dosya adı = `BLAKE3(dosyanın tüm baytları)`, hex.
 - Okuyucu tüm indeks dosyalarını birleştirir. Bir paket hiçbir indekste yoksa (yarıda kalan yazma), okuyucu onun girdi tablosunu doğrudan okuyabilir.
+- Doğrulamadan geçemeyen bir indeks dosyası (adı baytlarına uymuyor ya da yapısı geçersiz) deponun açılmasını engellemez. Okuyucu onu yok sayar, kapsadığı paketleri indekssiz paket olarak okur ve bozuk dosyayı bildirir. Adı baytlarına uymayan indekssiz bir paket bildirilir ve atlanır; nesnelerine, başka bir kopyadan onarılana kadar ulaşılamaz.
+- Onarım komutu, sağlam bir indeksi olmayan her paket için tek bir yeni indeks yazar ve ardından bozuk indeks dosyalarını siler. Hiçbir zaman paket silmez.
 
 ## 9. Yazma ve atomik güncelleme kuralları
 
@@ -358,6 +360,7 @@ Aşağıdaki tablo, Aşama 0'ın güç kesintisi testlerinin beklenen sonuçlar�
 | Ref taşındı, reflog yazılmadı | Ref yeni snapshot'ı gösterir | Sonraki güncellemede `repair` satırı eklenir |
 | Disk doldu (herhangi bir adımda) | Değişiklik yok; hata ref taşındıktan sonra gelirse bir üstteki satırdaki gibi | Hata raporlanır, geçici dosya silinir |
 | Paket içinde bit bozulması | Okuma "bozulma" hatası verir | Başka bir kopyadan onarım (Aşama 1) |
+| İndeks dosyası içinde bit bozulması | Depo açılır; bozuk indeks bildirilir ve paketleri doğrudan okunur | `repair` yeni bir indeks yazar ve bozuk olanı siler |
 
 Hiçbir satırda "ref, var olmayan veya yarım yazılmış bir nesneyi gösteriyor" durumu oluşmamalıdır.
 

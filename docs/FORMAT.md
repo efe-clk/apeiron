@@ -262,6 +262,8 @@ An index answers "which object is in which pack, and where" without opening pack
 - Entries are sorted by `id` in ascending order.
 - File name = `BLAKE3(all bytes of the file)`, hex.
 - A reader merges all index files. If a pack is in no index (an interrupted write), the reader may read its entry table directly.
+- An index file that fails verification (its name does not match its bytes, or its structure is invalid) does not stop the repository from opening. The reader ignores it, reads the packs it covered as packs without an index, and reports the damaged file. A pack without an index whose name does not match its bytes is reported and skipped; its objects are unavailable until it is repaired from another copy.
+- The repair command writes one new index for every pack without a healthy index and then deletes the damaged index files. It never deletes a pack.
 
 ## 9. Writing and atomic update rules
 
@@ -358,6 +360,7 @@ The table below lists the expected results of the Stage 0 power-failure tests. E
 | Ref moved, reflog not written | Ref points to the new snapshot | A `repair` line is appended on the next update |
 | Disk full (at any step) | No change; if the error comes after the ref was moved, as in the row above | The error is reported, the temporary file is deleted |
 | Bit corruption inside a pack | Reading gives a "corruption" error | Repair from another copy (Stage 1) |
+| Bit corruption inside an index file | The repository opens; the damaged index is reported and its packs are read directly | `repair` writes a new index and deletes the damaged one |
 
 In no row may the state "a ref points to a missing or half-written object" arise.
 
