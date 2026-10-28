@@ -41,7 +41,7 @@ flowchart LR
 | 5 | Power-failure and corruption tests ([FORMAT.md](FORMAT.md) §10) | Done | A crash and a full disk are simulated at every change to the disk; a bit flip is tested at every byte of a pack |
 | 6 | Rust API draft | Done | [API.md](API.md) §8, implemented in `apeiron-core`; the separate `apeiron` crate comes with the CLI |
 
-Known gap: on Windows, `MOVEFILE_WRITE_THROUGH` is not used yet ([FORMAT.md](FORMAT.md) §9.1). It needs `unsafe` code, which is only allowed in the FFI crate; how to solve this is an open decision.
+On Windows, renames use `MOVEFILE_WRITE_THROUGH` ([FORMAT.md](FORMAT.md) §9.1) through the small `apeiron-sys` crate ([ADR-014](DECISIONS.md#adr-014-a-small-system-crate-for-unsafe-os-calls)).
 
 ## 3. Stage 1 — Local MVP
 

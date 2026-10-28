@@ -14,7 +14,7 @@ Uygulama durumu (`apeiron-core`):
 | 6 | Blob, tree ve snapshot için kanonik CBOR | Tamamlandı |
 | 7 | Chunk bölme (FastCDC) | Tamamlandı |
 | 8 | Paket ve indeks dosyaları | Tamamlandı |
-| 9 | Kalıcı yazma, ref ve reflog | Tamamlandı (Windows'ta `MOVEFILE_WRITE_THROUGH` Planlandı) |
+| 9 | Kalıcı yazma, ref ve reflog | Tamamlandı |
 | 10 | Güç kesintisi testleri | Tamamlandı |
 
 ## Sade anlatım

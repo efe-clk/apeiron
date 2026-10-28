@@ -41,7 +41,7 @@ flowchart LR
 | 5 | Güç kesintisi ve bozulma testleri ([FORMAT.tr.md](FORMAT.tr.md) §10) | Tamamlandı | Diskteki her değişiklikte çökme ve disk dolması taklit edilir; bit bozulması bir paketin her baytında denenir |
 | 6 | Rust API taslağı | Tamamlandı | [API.tr.md](API.tr.md) §8, `apeiron-core` içinde uygulandı; ayrı `apeiron` crate'i CLI ile gelecek |
 
-Bilinen eksik: Windows'ta `MOVEFILE_WRITE_THROUGH` henüz kullanılmıyor ([FORMAT.tr.md](FORMAT.tr.md) §9.1). Bu, yalnızca FFI crate'inde izin verilen `unsafe` kod gerektiriyor; nasıl çözüleceği açık bir karardır.
+Windows'ta yeniden adlandırmalar küçük `apeiron-sys` crate'i üzerinden `MOVEFILE_WRITE_THROUGH` kullanır ([FORMAT.tr.md](FORMAT.tr.md) §9.1, [ADR-014](DECISIONS.tr.md#adr-014-güvensiz-sistem-çağrıları-için-küçük-bir-sistem-cratei)).
 
 ## 3. Aşama 1 — Yerel MVP
 

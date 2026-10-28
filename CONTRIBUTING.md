@@ -8,7 +8,7 @@ This guide explains how to set up a development environment, which checks every 
 
 | Path | Content |
 | --- | --- |
-| `crates/` | Cargo workspace; one crate per layer (today only `apeiron-core`) |
+| `crates/` | Cargo workspace; one crate per layer (today `apeiron-core`, plus `apeiron-sys` for operating system calls) |
 | `docs/` | Documentation, in English (`X.md`) and Turkish (`X.tr.md`) |
 | `.github/workflows/` | CI: formatting, lints and tests |
 | `LICENSE-MIT`, `LICENSE-APACHE` | The two licences |
@@ -48,7 +48,7 @@ cargo test
 | --- | --- |
 | Rust wherever possible | C only in the outward-facing ABI layer ([ADR-001](docs/DECISIONS.md#adr-001-rust-as-the-main-language)) |
 | Strict layering | Each layer is a separate crate and uses only the layer directly below it |
-| No `unsafe` | `unsafe` is allowed only in the FFI crate; every other crate has `#![forbid(unsafe_code)]` |
+| No `unsafe` | `unsafe` is allowed only in the FFI crate and in `apeiron-sys`, which holds operating system calls ([ADR-014](docs/DECISIONS.md#adr-014-a-small-system-crate-for-unsafe-os-calls)); every other crate has `#![forbid(unsafe_code)]` |
 | Typed errors | Library crates use `thiserror`; no `unwrap`/`expect` in library code (tests may use them) |
 | Fault-injection tests | Data-integrity code (writing, ref updates, recovery) is verified with fault-injection tests |
 | English in code | Code, identifiers, comments and commit messages are in English |

@@ -22,7 +22,7 @@ flowchart TB
 | Katman | Rol | Durum |
 | --- | --- | --- |
 | Rust API | Tek doğruluk kaynağı; her işlem burada tanımlanır | Devam ediyor (Aşama 0 taslağı `apeiron-core` içinde, bölüm 8) |
-| C ABI | Rust API üzerinde kararlı bir C arayüzü; `unsafe` kullanabilen tek crate | Planlandı (Aşama 3) |
+| C ABI | Rust API üzerinde kararlı bir C arayüzü; `unsafe` kullanabilen iki crate'ten biri (`apeiron-sys` ile birlikte) | Planlandı (Aşama 3) |
 | SDK'lar | C ABI'yi saran, her dilin alışkanlıklarına uyan ince katmanlar | Planlandı (Aşama 3 ve sonrası) |
 
 SDK'lar mantığı yeniden yazmaz, yalnızca C ABI'yi sarar. Aynı işlemin her dilde aynı sonucu vermesi böyle sağlanır.

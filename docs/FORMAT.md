@@ -14,7 +14,7 @@ Implementation status (`apeiron-core`):
 | 6 | Canonical CBOR for blob, tree and snapshot | Done |
 | 7 | Chunking (FastCDC) | Done |
 | 8 | Pack and index files | Done |
-| 9 | Durable writes, refs and reflogs | Done (`MOVEFILE_WRITE_THROUGH` on Windows Planned) |
+| 9 | Durable writes, refs and reflogs | Done |
 | 10 | Power-failure tests | Done |
 
 ## Plain summary

@@ -21,8 +21,9 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [011](#adr-011-sıkıştırma-için-zstd) | Sıkıştırma | zstd | Kabul edildi |
 | [012](#adr-012-yapısal-nesneler-için-kanonik-cbor) | Yapısal nesneler | Kanonik CBOR | Kabul edildi |
 | [013](#adr-013-küçük-harfli-ascii-ref-adları) | Ref adları | Yalnızca küçük harfli ASCII | Kabul edildi |
+| [014](#adr-014-güvensiz-sistem-çağrıları-için-küçük-bir-sistem-cratei) | `unsafe` kod | Yalnızca FFI crate'inde ve küçük `apeiron-sys` crate'inde | Kabul edildi |
 
-ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)).
+ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
 ## ADR-001: Ana dil olarak Rust
 
@@ -42,7 +43,7 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Go | Çöp toplayıcı ve çalışma zamanı, C ABI üzerinden gömmeyi zorlaştırır ve küçük cihazlarda bellek kullanımını öngörülemez kılar |
 | Zig | Umut verici, ama uzun ömürlü bir depolama formatı için dil ve ekosistem henüz yeterince kararlı değil |
 
-**Sonuçlar.** Katkı verenlerin Rust bilmesi gerekir. Olgun bir Rust alternatifi olmayan yerlerde bazı C kütüphaneleri bağlayıcılar (binding) üzerinden kullanılabilir (bkz. ADR-011). `unsafe` gerektiren platform çağrıları FFI crate'inde yer almalı ya da güvenli bir sarmalayıcıyı beklemelidir.
+**Sonuçlar.** Katkı verenlerin Rust bilmesi gerekir. Olgun bir Rust alternatifi olmayan yerlerde bazı C kütüphaneleri bağlayıcılar (binding) üzerinden kullanılabilir (bkz. ADR-011). `unsafe` gerektiren platform çağrıları `apeiron-sys` crate'inde yer alır (ADR-014).
 
 ## ADR-002: Git uyumu için gitoxide
 
@@ -282,3 +283,23 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Adları dosya adına kodlamak (ör. hex) | Ref dosyaları artık insan tarafından okunamaz |
 
 **Sonuçlar.** Serbest görünen adlar (Türkçe karakterler dahil) hizmet katmanında tutulur ve ref adlarına eşlenir.
+
+## ADR-014: Güvensiz sistem çağrıları için küçük bir sistem crate'i
+
+**Durum:** Kabul edildi (2026-10-28)
+
+**Bağlam.** Windows'ta bir yeniden adlandırma, çağrı dönmeden diske ancak `MoveFileExW(MOVEFILE_WRITE_THROUGH)` ile ulaşır ([FORMAT.tr.md](FORMAT.tr.md) §9.1). Standart kütüphane bunu sunmaz ve Windows API'sini çağırmak `unsafe` kod gerektirir. Şimdiye kadar `unsafe` yalnızca çekirdeğin üstünde duran ve çekirdeğin kullanamadığı FFI (C ABI) crate'inde serbestti.
+
+**Karar.** `unsafe` gerektiren işletim sistemi çağrıları, çekirdeğin bağımlı olduğu ayrı ve küçük bir `apeiron-sys` crate'inde yer alır. Microsoft'un resmi `windows-sys` bağlarını kullanır. Her `unsafe` bloğunun neden güvenli olduğunu açıklayan bir yorumu, her işlevin bir testi vardır. FFI crate'i dışındaki tüm diğer crate'ler `#![forbid(unsafe_code)]` kuralını korur.
+
+**Gerekçe.** Güvensiz kod, incelenmesi kolay tek bir yerde kalır ve katman kuralı (her katman yalnızca altındakileri kullanır) korunur.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Windows'ta write-through'u ertelemek | NTFS yarım durumları zaten engeller, ama elektrik kesintisinden sonra son işlem geri alınmış gibi görünebilir |
+| Çağrıyı C ABI crate'ine koymak | Çekirdek üstündeki bir crate'e bağımlı olur; katman kuralı bozulur |
+| Üçüncü taraf bir sarmalayıcı crate | Bu çağrıyı sunan, bakımı yapılan ve yaygın kullanılan bir crate bulunamadı |
+
+**Sonuçlar.** `apeiron-sys` küçük kalmalıdır. Oraya yeni bir işlev yalnızca güvenli bir alternatif yoksa eklenir.

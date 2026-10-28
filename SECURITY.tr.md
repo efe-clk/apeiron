@@ -28,9 +28,9 @@ Bildiriminizi yalnızca proje yürütücüleri görür. En kısa sürede yanıt 
 | İlke | Kural | Durum |
 | --- | --- | --- |
 | Bütünlük | Her nesne kriptografik bir özetle (BLAKE3) doğrulanır; bozulma hiçbir zaman sessiz kalmaz | Tamamlandı |
-| Kesinti güvenliği | Yaz → `fsync` → atomik yeniden adlandır; elektrik kesintisi hiçbir zaman yarım bir durumu görünür bırakmaz | Tamamlandı (Windows'ta write-through Planlandı) |
+| Kesinti güvenliği | Yaz → `fsync` → atomik yeniden adlandır; elektrik kesintisi hiçbir zaman yarım bir durumu görünür bırakmaz | Tamamlandı |
 | İçerik gizliliği | Nesne kimlikleri anahtarlı özettir; saklanan içerik kimliklerden tahmin edilemez | Tamamlandı |
-| Bellek güvenliği | Rust ile yazılır; `unsafe` yalnızca FFI crate'inde | Uygulanıyor |
+| Bellek güvenliği | Rust ile yazılır; `unsafe` yalnızca FFI crate'inde ve küçük `apeiron-sys` crate'inde | Uygulanıyor |
 | Şifreleme | İstemci tarafında; anahtarlar kullanıcıya aittir; uzak hedef düz metni hiç görmez | Planlandı (Aşama 2) |
 | İzinler | Okuma, yazma, silme, paylaşma ve yönetme izinleri ayrıdır | Planlandı (Aşama 4) |
 | Denetim kaydı | Hassas işlemler kaydedilir; hassas veri hiçbir zaman kaydedilmez | Planlandı (Aşama 4) |

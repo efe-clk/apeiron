@@ -22,7 +22,7 @@ flowchart TB
 | Layer | Role | Status |
 | --- | --- | --- |
 | Rust API | The single source of truth; every operation is defined here | In progress (Stage 0 draft in `apeiron-core`, section 8) |
-| C ABI | A stable C interface over the Rust API; the only crate allowed to use `unsafe` | Planned (Stage 3) |
+| C ABI | A stable C interface over the Rust API; one of the two crates allowed to use `unsafe` (with `apeiron-sys`) | Planned (Stage 3) |
 | SDKs | Thin wrappers over the C ABI that follow each language's habits | Planned (Stage 3 onward) |
 
 SDKs never re-implement logic; they only wrap the C ABI. That is how the same operation gives the same result in every language.

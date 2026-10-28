@@ -48,7 +48,7 @@ Key design ideas:
 Rules that apply to every crate:
 
 - Every layer is a separate crate under `crates/`.
-- `unsafe` is allowed only in the FFI (C ABI) crate; every other crate has `#![forbid(unsafe_code)]`.
+- `unsafe` is allowed only in the FFI (C ABI) crate and in `apeiron-sys`, which holds operating system calls for the core (ADR-014); every other crate has `#![forbid(unsafe_code)]`.
 - Library crates use typed errors (`thiserror`) and never call `unwrap`/`expect`.
 
 What `apeiron-core` contains today:
@@ -214,12 +214,12 @@ flowchart LR
 | Integrity | Pack and index files are named by their plain BLAKE3 hash, so anyone can check them without the key | Done |
 | Integrity | Ref files and reflog lines carry checksums | Done |
 | Privacy | Object identifiers use keyed BLAKE3, so a remote target cannot test whether a known file is stored | Done |
-| Crash safety | Write → `fsync` → rename → directory `fsync`; refs are updated with compare-and-swap | Done (Windows write-through Planned) |
+| Crash safety | Write → `fsync` → rename → directory `fsync`; refs are updated with compare-and-swap | Done |
 | Encryption | Client-side encryption; the remote target never sees plaintext; keys stay with the user | Planned (Stage 2) |
 | Identity and permissions | Separate read, write, delete, share and admin permissions | Planned (Stage 4) |
 | Audit log | Sensitive operations are logged; sensitive data never is | Planned (Stage 4) |
 | Plugins | WASM sandbox with declared, user-approved permissions | Planned (Stage 3) |
-| Memory safety | `unsafe` only in the FFI crate | In effect |
+| Memory safety | `unsafe` only in the FFI crate and `apeiron-sys` | In effect |
 | Remote access | Off by default; configured explicitly | Planned (Stage 2) |
 | Telemetry | Off by default; data is never sent to a third party as a requirement | In effect (there is no telemetry) |
 

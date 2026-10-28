@@ -50,7 +50,8 @@ Each layer uses only the layer directly below it. Details: [docs/ARCHITECTURE.md
 | Storage targets | — | Local, external, SFTP, S3 targets | Planned |
 | Services | — | Versioning, archive, backup, sync, search, policy | Planned |
 | Public API | — | Stable Rust API for all operations | Planned |
-| C ABI | — | Stable C interface; the only crate allowed to use `unsafe` | Planned |
+| System calls | `apeiron-sys` | Operating system calls that need `unsafe` (Windows write-through) | Done |
+| C ABI | — | Stable C interface; may use `unsafe` | Planned |
 | CLI | — | Command-line interface | Planned |
 | Plugins | — | WebAssembly plugin host | Planned |
 

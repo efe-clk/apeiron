@@ -225,7 +225,7 @@ impl RefStore {
             None => {
                 let graveyard = self.tmp_dir.join(fsutil::random_name()?);
                 fsutil::checkpoint()
-                    .and_then(|()| fs::rename(&path, &graveyard))
+                    .and_then(|()| apeiron_sys::rename(&path, &graveyard))
                     .at(&path)?;
                 fsutil::sync_dir(parent)?;
                 drop(lock);

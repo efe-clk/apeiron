@@ -48,7 +48,7 @@ Temel tasarım fikirleri:
 Her crate için geçerli kurallar:
 
 - Her katman `crates/` altında ayrı bir crate'tir.
-- `unsafe` yalnızca FFI (C ABI) crate'inde serbesttir; diğer her crate'te `#![forbid(unsafe_code)]` vardır.
+- `unsafe` yalnızca FFI (C ABI) crate'inde ve çekirdek için işletim sistemi çağrılarını tutan `apeiron-sys` içinde serbesttir (ADR-014); diğer her crate'te `#![forbid(unsafe_code)]` vardır.
 - Kütüphane crate'leri tipli hatalar (`thiserror`) kullanır, `unwrap`/`expect` çağırmaz.
 
 `apeiron-core` bugün şunları içeriyor:
@@ -214,12 +214,12 @@ flowchart LR
 | Bütünlük | Paket ve indeks dosyalarının adı düz BLAKE3 özetidir; anahtarı bilmeyen de denetleyebilir | Tamamlandı |
 | Bütünlük | Ref dosyaları ve reflog satırları sağlama özeti taşır | Tamamlandı |
 | Gizlilik | Nesne kimlikleri anahtarlı BLAKE3'tür; uzak hedef bilinen bir dosyanın saklanıp saklanmadığını sınayamaz | Tamamlandı |
-| Kesinti güvenliği | Yaz → `fsync` → yeniden adlandır → klasör `fsync`; ref'ler karşılaştır-ve-değiştir ile güncellenir | Tamamlandı (Windows'ta write-through Planlandı) |
+| Kesinti güvenliği | Yaz → `fsync` → yeniden adlandır → klasör `fsync`; ref'ler karşılaştır-ve-değiştir ile güncellenir | Tamamlandı |
 | Şifreleme | İstemci tarafı şifreleme; uzak hedef düz metni hiç görmez; anahtarlar kullanıcıda kalır | Planlandı (Aşama 2) |
 | Kimlik ve izinler | Okuma, yazma, silme, paylaşma ve yönetme izinleri ayrıdır | Planlandı (Aşama 4) |
 | Denetim kaydı | Hassas işlemler kaydedilir; hassas veri hiçbir zaman kaydedilmez | Planlandı (Aşama 4) |
 | Eklentiler | Bildirilmiş ve kullanıcının onayladığı izinlerle WASM sandbox | Planlandı (Aşama 3) |
-| Bellek güvenliği | `unsafe` yalnızca FFI crate'inde | Uygulanıyor |
+| Bellek güvenliği | `unsafe` yalnızca FFI crate'inde ve `apeiron-sys` içinde | Uygulanıyor |
 | Uzak erişim | Varsayılan olarak kapalı; açıkça yapılandırılır | Planlandı (Aşama 2) |
 | Telemetri | Varsayılan olarak kapalı; veri hiçbir zaman zorunlu olarak üçüncü tarafa gönderilmez | Uygulanıyor (telemetri yok) |
 

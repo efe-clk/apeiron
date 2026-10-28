@@ -28,9 +28,9 @@ Your report is visible only to the maintainers. You will get an answer as soon a
 | Principle | Rule | Status |
 | --- | --- | --- |
 | Integrity | Every object is verified with a cryptographic hash (BLAKE3); corruption is never silent | Done |
-| Crash safety | Write → `fsync` → atomic rename; a power failure never leaves a half-finished state visible | Done (Windows write-through Planned) |
+| Crash safety | Write → `fsync` → atomic rename; a power failure never leaves a half-finished state visible | Done |
 | Content privacy | Object identifiers are keyed hashes, so stored content cannot be guessed from them | Done |
-| Memory safety | Written in Rust; `unsafe` only in the FFI crate | In effect |
+| Memory safety | Written in Rust; `unsafe` only in the FFI crate and the small `apeiron-sys` crate | In effect |
 | Encryption | Client-side; keys belong to the user; the remote target never sees plaintext | Planned (Stage 2) |
 | Permissions | Separate read, write, delete, share and admin permissions | Planned (Stage 4) |
 | Audit log | Sensitive operations are logged; sensitive data never is | Planned (Stage 4) |

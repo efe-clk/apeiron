@@ -50,7 +50,8 @@ Her katman yalnızca hemen altındaki katmanı kullanır. Ayrıntılar: [docs/AR
 | Depolama hedefleri | — | Yerel, harici, SFTP, S3 hedefleri | Planlandı |
 | Hizmetler | — | Sürümleme, arşiv, yedek, senkron, arama, politika | Planlandı |
 | Herkese açık API | — | Tüm işlemler için kararlı Rust API | Planlandı |
-| C ABI | — | Kararlı C arayüzü; `unsafe` kullanabilen tek crate | Planlandı |
+| Sistem çağrıları | `apeiron-sys` | `unsafe` gerektiren işletim sistemi çağrıları (Windows write-through) | Tamamlandı |
+| C ABI | — | Kararlı C arayüzü; `unsafe` kullanabilir | Planlandı |
 | CLI | — | Komut satırı arayüzü | Planlandı |
 | Eklentiler | — | WebAssembly eklenti ortamı | Planlandı |
 

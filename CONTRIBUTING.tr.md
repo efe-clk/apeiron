@@ -8,7 +8,7 @@ Bu rehber geliştirme ortamının nasıl kurulacağını, her değişikliğin ha
 
 | Yol | İçerik |
 | --- | --- |
-| `crates/` | Cargo workspace; her katman için bir crate (bugün yalnızca `apeiron-core`) |
+| `crates/` | Cargo workspace; her katman için bir crate (bugün `apeiron-core` ve işletim sistemi çağrıları için `apeiron-sys`) |
 | `docs/` | Belgeler; İngilizce (`X.md`) ve Türkçe (`X.tr.md`) |
 | `.github/workflows/` | CI: biçim, lint ve testler |
 | `LICENSE-MIT`, `LICENSE-APACHE` | İki lisans |
@@ -48,7 +48,7 @@ cargo test
 | --- | --- |
 | Mümkün olan her yerde Rust | C yalnızca dışa açılan ABI katmanında ([ADR-001](docs/DECISIONS.tr.md#adr-001-ana-dil-olarak-rust)) |
 | Katı katmanlama | Her katman ayrı bir crate'tir ve yalnızca hemen altındaki katmanı kullanır |
-| `unsafe` yok | `unsafe` yalnızca FFI crate'inde serbesttir; diğer her crate'te `#![forbid(unsafe_code)]` vardır |
+| `unsafe` yok | `unsafe` yalnızca FFI crate'inde ve işletim sistemi çağrılarını tutan `apeiron-sys` içinde serbesttir ([ADR-014](docs/DECISIONS.tr.md#adr-014-güvensiz-sistem-çağrıları-için-küçük-bir-sistem-cratei)); diğer her crate'te `#![forbid(unsafe_code)]` vardır |
 | Tipli hatalar | Kütüphane crate'leri `thiserror` kullanır; kütüphane kodunda `unwrap`/`expect` yoktur (testlerde kullanılabilir) |
 | Hata enjeksiyonu testleri | Veri bütünlüğü kodu (yazma, ref güncelleme, kurtarma) hata enjeksiyonu testleriyle doğrulanır |
 | Kodda İngilizce | Kod, tanımlayıcılar, yorumlar ve commit mesajları İngilizcedir |

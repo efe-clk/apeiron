@@ -71,7 +71,7 @@ pub(crate) fn persist(tmp_path: &Path, dest: &Path) -> Result<()> {
     let parent = parent_of(dest);
     let moved = ensure_dir(parent).and_then(|()| {
         checkpoint()
-            .and_then(|()| fs::rename(tmp_path, dest))
+            .and_then(|()| apeiron_sys::rename(tmp_path, dest))
             .at(dest)
     });
     if let Err(e) = moved {

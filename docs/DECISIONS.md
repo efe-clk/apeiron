@@ -21,8 +21,9 @@ This document records every technical decision made so far, in ADR (architecture
 | [011](#adr-011-zstd-for-compression) | Compression | zstd | Accepted |
 | [012](#adr-012-canonical-cbor-for-structured-objects) | Structured objects | Canonical CBOR | Accepted |
 | [013](#adr-013-lowercase-ascii-ref-names) | Ref names | Lowercase ASCII only | Accepted |
+| [014](#adr-014-a-small-system-crate-for-unsafe-os-calls) | `unsafe` code | Only in the FFI crate and the small `apeiron-sys` crate | Accepted |
 
-ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)).
+ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28.
 
 ## ADR-001: Rust as the main language
 
@@ -42,7 +43,7 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Go | Garbage collector and runtime make embedding through a C ABI harder and memory use less predictable on small devices |
 | Zig | Promising, but the language and ecosystem are not yet stable enough for a long-lived storage format |
 
-**Consequences.** Contributors need Rust. Some C libraries may still be used through bindings where no mature Rust alternative exists (see ADR-011). Platform calls that need `unsafe` must live in the FFI crate or wait for a safe wrapper.
+**Consequences.** Contributors need Rust. Some C libraries may still be used through bindings where no mature Rust alternative exists (see ADR-011). Platform calls that need `unsafe` live in the `apeiron-sys` crate (ADR-014).
 
 ## ADR-002: gitoxide for Git compatibility
 
@@ -282,3 +283,23 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Encoding names into file names (e.g. hex) | Ref files would no longer be readable by humans |
 
 **Consequences.** Free-form display names (including Turkish characters) are kept in the service layer and mapped to ref names.
+
+## ADR-014: A small system crate for unsafe OS calls
+
+**Status:** Accepted (2026-10-28)
+
+**Context.** On Windows a rename reaches the disk before the call returns only with `MoveFileExW(MOVEFILE_WRITE_THROUGH)` ([FORMAT.md](FORMAT.md) §9.1). The standard library does not offer this, and calling the Windows API needs `unsafe` code. Until now `unsafe` was allowed only in the FFI (C ABI) crate, which sits above the core and cannot be used by it.
+
+**Decision.** Operating system calls that need `unsafe` live in a separate, small `apeiron-sys` crate that the core depends on. It uses Microsoft's official `windows-sys` bindings. Every `unsafe` block has a comment explaining why it is sound, and every function has a test. All other crates except the FFI crate keep `#![forbid(unsafe_code)]`.
+
+**Rationale.** The unsafe code stays in one place that is easy to review, and the layer rule (each layer uses only the layers below it) is kept.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| Postpone write-through on Windows | NTFS already prevents half-finished states, but the last operation could look undone after a power failure |
+| Put the call in the C ABI crate | The core would depend on a crate above it, breaking the layer rule |
+| A third-party wrapper crate | No maintained, widely used crate offering this call was found |
+
+**Consequences.** `apeiron-sys` must stay small. A new function is added there only when no safe alternative exists.
