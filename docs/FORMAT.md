@@ -16,6 +16,8 @@ Implementation status (`apeiron-core`):
 | 8 | Pack and index files | Done |
 | 9 | Durable writes, refs and reflogs | Done |
 | 10 | Power-failure tests | Done |
+| 12 | Repository lock | Planned (draft for review) |
+| 13 | Garbage collection | Planned (draft for review) |
 
 ## Plain summary
 
@@ -47,7 +49,7 @@ Implementation status (`apeiron-core`):
 │   └── backup/home        # Ref files; a "/" in the name becomes a subfolder
 ├── logs/
 │   └── backup/home        # Change log of each ref (reflog)
-├── locks/                 # Repository-level locks (to be defined in Stage 1, reserved)
+├── locks/                 # Repository lock, section 12
 ├── keys/                  # Encryption keys (to be defined in Stage 2, reserved)
 └── tmp/                   # Temporary files being written
 ```
@@ -341,7 +343,7 @@ Fields are separated by a single space and the line ends with `\n`. `check` is t
 - If the last line of the file is invalid (does not end with `\n` or `check` does not match), it is treated as a power-failure leftover and ignored. Before appending a new line, the writer cuts this leftover off the file (truncate).
 - An invalid line other than the last one is corruption and is reported as an error.
 - If the ref value differs from the last `new` value in the reflog (the ref was updated but the line could not be written), a `repair` line is appended right before the next update of that ref (or by an explicit repair command). No information is lost, because the old value is already recorded in the previous line.
-- The reflog is also used to decide which snapshots garbage collection (Stage 1) treats as live.
+- The reflog is also used to decide which snapshots garbage collection treats as live (section 13.1).
 
 ## 10. Interruption and corruption cases
 
@@ -372,9 +374,53 @@ The tests interrupt a full write (new chunks, snapshot, ref update) once at ever
 | Ref | `check` line | No |
 | Reflog line | `check` field | No |
 
-## 12. Left for later versions
+## 12. Repository lock
+
+Garbage collection deletes packs. It must never run while another program reads or writes the repository: a backup could otherwise reuse an object that is being deleted and end up with a snapshot that points to a missing object.
+
+1. The lock is the empty file `locks/repository`. It is created if it does not exist and is never deleted.
+2. The lock is an operating system file lock (`flock` on Linux and macOS, `LockFileEx` on Windows), not the presence of the file. The system releases it when the program ends, even after a crash or power failure, so a stale lock cannot remain.
+3. Every operation that reads or writes objects or refs takes the lock **shared**; any number of programs can hold it shared at once. Garbage collection takes it **exclusive**.
+4. A writer loads the index files **after** taking the lock and keeps the lock until its ref update is finished. Index contents remembered from before the lock was taken must not be used to skip writing an object.
+5. If the lock cannot be taken at once, the operation stops with a "locked" error; it does not wait.
+6. File locks are not reliable on some network file systems (for example older NFS). A repository on such a file system must not be used by more than one program at a time.
+
+The ref lock files of section 9.3 stay as they are; they serialise updates of one ref, while this lock separates garbage collection from everything else.
+
+## 13. Garbage collection
+
+Garbage collection removes objects that no ref and no recent reflog entry can reach, and rewrites packs that are partly dead.
+
+### 13.1 Live objects
+
+1. The roots are the target of every ref and every snapshot id (`old` and `new`) in reflog lines younger than the **keep period** (default 90 days; 0 means refs only). Older reflog lines stay in the files but no longer protect anything.
+2. Every object reachable from a root is live: a snapshot's tree and parents, a tree's blobs and subtrees, a blob's chunks.
+3. If a reachable object is missing or damaged, garbage collection stops without deleting anything.
+
+### 13.2 Steps
+
+1. Take the repository lock exclusive (section 12) and load all index files.
+2. Mark the live objects (13.1).
+3. For every pack: if all of its objects are live, keep it; if none is live, mark it for deletion; otherwise copy its live objects into new packs (section 8.1, the stored bytes are copied unchanged) and mark the old pack for deletion.
+4. Write the new packs durably (section 9.1).
+5. Write one new index file that covers every kept and every new pack, durably.
+6. Delete all other index files, then flush the `index/` folder.
+7. Delete the packs marked for deletion, then flush their folders.
+8. Delete temporary files in `tmp/`.
+
+A dry run performs steps 1–3 and reports what would be removed without changing anything.
+
+### 13.3 Interruptions
+
+| Moment of interruption | State visible in the repository | Recovery |
+| --- | --- | --- |
+| Before step 5 ends | Old packs and indexes unchanged; new packs not indexed | The new packs are found as unindexed packs and hold only copies; the next run removes them |
+| After step 5, before step 7 ends | Every live object is covered by the new index; some dead packs remain | Remaining dead packs are found as unindexed packs; the next run removes them |
+
+In no case does a ref point to a missing object: an object is deleted only after a durable index covers another copy of it, or after it was found dead.
+
+## 14. Left for later versions
 
 - Encryption (`keys/`, pack `flags`, `encryption.mode`): Stage 2.
-- Garbage collection, repository locks (`locks/`), pack merging: Stage 1.
 - Multi-level blobs, hard links, Windows ACLs, device files.
 - Format upgrade tool: automatic and reversible migration when the format version changes.

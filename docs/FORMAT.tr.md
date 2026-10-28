@@ -16,6 +16,8 @@ Uygulama durumu (`apeiron-core`):
 | 8 | Paket ve indeks dosyaları | Tamamlandı |
 | 9 | Kalıcı yazma, ref ve reflog | Tamamlandı |
 | 10 | Güç kesintisi testleri | Tamamlandı |
+| 12 | Depo kilidi | Planlandı (incelemeye sunulan taslak) |
+| 13 | Çöp toplama | Planlandı (incelemeye sunulan taslak) |
 
 ## Sade anlatım
 
@@ -47,7 +49,7 @@ Uygulama durumu (`apeiron-core`):
 │   └── backup/home        # Ref dosyaları; ad içindeki "/" alt klasör olur
 ├── logs/
 │   └── backup/home        # Her ref'in değişiklik günlüğü (reflog)
-├── locks/                 # Depo düzeyi kilitler (Aşama 1'de tanımlanacak, ayrılmış)
+├── locks/                 # Depo kilidi, bölüm 12
 ├── keys/                  # Şifreleme anahtarları (Aşama 2'de tanımlanacak, ayrılmış)
 └── tmp/                   # Yazılmakta olan geçici dosyalar
 ```
@@ -341,7 +343,7 @@ Alanlar tek boşlukla ayrılır, satır `\n` ile biter. `check`, satırın `chec
 - Dosyanın son satırı geçersizse (`\n` ile bitmiyorsa veya `check` tutmuyorsa) güç kesintisi kalıntısı sayılır ve yok sayılır. Yazıcı, yeni satır eklemeden önce bu kalıntıyı dosyadan keser (truncate).
 - Son satır dışındaki bir satır geçersizse bu bozulmadır ve hata olarak raporlanır.
 - Ref değeri reflog'daki son `yeni` değerden farklıysa (ref güncellendi ama satır yazılamadı), o ref bir sonraki kez güncellenmeden hemen önce (veya açık bir onarım komutuyla) `repair` satırı eklenir. Eski değer zaten önceki satırda kayıtlı olduğu için bilgi kaybolmaz.
-- Reflog, çöp toplamanın (Aşama 1) hangi snapshot'ları canlı sayacağını belirlemek için de kullanılır.
+- Reflog, çöp toplamanın hangi snapshot'ları canlı sayacağını belirlemek için de kullanılır (bölüm 13.1).
 
 ## 10. Kesinti ve bozulma durumları
 
@@ -372,9 +374,53 @@ Testler tam bir yazma işlemini (yeni chunk'lar, snapshot, ref güncellemesi) di
 | Ref | `check` satırı | Hayır |
 | Reflog satırı | `check` alanı | Hayır |
 
-## 12. Sonraki sürümlere bırakılanlar
+## 12. Depo kilidi
+
+Çöp toplama paketleri siler. Başka bir program depoyu okurken ya da depoya yazarken asla çalışmamalıdır: aksi hâlde bir yedek, silinmekte olan bir nesneyi yeniden kullanabilir ve var olmayan bir nesneyi gösteren bir snapshot'la sonuçlanabilir.
+
+1. Kilit, `locks/repository` adlı boş dosyadır. Yoksa oluşturulur ve hiç silinmez.
+2. Kilit, dosyanın varlığı değil, işletim sisteminin dosya kilididir (Linux ve macOS'ta `flock`, Windows'ta `LockFileEx`). Sistem onu program bitince, bir çökme ya da elektrik kesintisinden sonra bile bırakır; bu yüzden bayat kilit kalamaz.
+3. Nesneleri ya da ref'leri okuyan veya yazan her işlem kilidi **paylaşımlı** alır; istenen sayıda program onu aynı anda paylaşımlı tutabilir. Çöp toplama onu **özel** (exclusive) alır.
+4. Bir yazıcı indeks dosyalarını kilidi **aldıktan sonra** yükler ve kilidi ref güncellemesi bitene kadar tutar. Kilit alınmadan önce hatırlanan indeks içeriği, bir nesneyi yazmayı atlamak için kullanılamaz.
+5. Kilit hemen alınamazsa işlem "kilitli" hatasıyla durur; beklemez.
+6. Dosya kilitleri bazı ağ dosya sistemlerinde (ör. eski NFS) güvenilir değildir. Böyle bir dosya sistemindeki depo aynı anda birden fazla program tarafından kullanılmamalıdır.
+
+Bölüm 9.3'teki ref kilit dosyaları olduğu gibi kalır; onlar tek bir ref'in güncellemelerini sıraya koyar, bu kilit ise çöp toplamayı diğer her şeyden ayırır.
+
+## 13. Çöp toplama
+
+Çöp toplama, hiçbir ref'in ve hiçbir yeni reflog satırının ulaşamadığı nesneleri siler ve kısmen ölü paketleri yeniden yazar.
+
+### 13.1 Canlı nesneler
+
+1. Kökler; her ref'in hedefi ve **saklama süresinden** (varsayılan 90 gün; 0 yalnızca ref'ler demektir) daha yeni reflog satırlarındaki her snapshot kimliğidir (`old` ve `new`). Daha eski reflog satırları dosyalarda kalır ama artık hiçbir şeyi korumaz.
+2. Bir kökten ulaşılabilen her nesne canlıdır: bir snapshot'ın tree'si ve ebeveynleri, bir tree'nin blob'ları ve alt tree'leri, bir blob'un chunk'ları.
+3. Ulaşılabilen bir nesne eksik ya da bozuksa çöp toplama hiçbir şey silmeden durur.
+
+### 13.2 Adımlar
+
+1. Depo kilidini özel olarak al (bölüm 12) ve tüm indeks dosyalarını yükle.
+2. Canlı nesneleri işaretle (13.1).
+3. Her paket için: tüm nesneleri canlıysa koru; hiçbiri canlı değilse silinmek üzere işaretle; aksi hâlde canlı nesnelerini yeni paketlere kopyala (bölüm 8.1, saklanan baytlar değiştirilmeden kopyalanır) ve eski paketi silinmek üzere işaretle.
+4. Yeni paketleri kalıcı olarak yaz (bölüm 9.1).
+5. Korunan ve yeni olan her paketi kapsayan tek bir yeni indeks dosyasını kalıcı olarak yaz.
+6. Diğer tüm indeks dosyalarını sil, ardından `index/` klasörünü diske sabitle.
+7. Silinmek üzere işaretlenen paketleri sil, ardından klasörlerini diske sabitle.
+8. `tmp/` içindeki geçici dosyaları sil.
+
+Deneme çalıştırması (dry run) 1–3. adımları yapar ve hiçbir şeyi değiştirmeden nelerin silineceğini raporlar.
+
+### 13.3 Kesintiler
+
+| Kesinti anı | Depoda görünen durum | Kurtarma |
+| --- | --- | --- |
+| 5. adım bitmeden önce | Eski paketler ve indeksler değişmemiş; yeni paketler indekslenmemiş | Yeni paketler indekssiz paket olarak bulunur ve yalnızca kopyalar içerir; sonraki çalıştırma onları siler |
+| 5. adımdan sonra, 7. adım bitmeden önce | Her canlı nesne yeni indeks tarafından kapsanır; bazı ölü paketler kalır | Kalan ölü paketler indekssiz paket olarak bulunur; sonraki çalıştırma onları siler |
+
+Hiçbir durumda bir ref var olmayan bir nesneyi göstermez: bir nesne ancak kalıcı bir indeks onun başka bir kopyasını kapsadıktan sonra ya da ölü olduğu anlaşıldıktan sonra silinir.
+
+## 14. Sonraki sürümlere bırakılanlar
 
 - Şifreleme (`keys/`, paket `flags`, `encryption.mode`): Aşama 2.
-- Çöp toplama, depo kilitleri (`locks/`), paket birleştirme: Aşama 1.
 - Çok katmanlı blob, sabit bağlantılar, Windows ACL'leri, aygıt dosyaları.
 - Format yükseltme aracı: format sürümü değiştiğinde otomatik ve geri alınabilir geçiş.
