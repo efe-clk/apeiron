@@ -59,6 +59,12 @@ pub enum Error {
     KeyRequired(PathBuf),
     #[error("wrong password or recovery key")]
     WrongKey,
+    #[error("the repository is not encrypted")]
+    NotEncrypted,
+    #[error("no key with id {0:?}")]
+    KeyNotFound(String),
+    #[error("cannot remove the last key; add another password first")]
+    LastKey,
     #[error("random number generator failed: {0}")]
     Random(getrandom::Error),
 }

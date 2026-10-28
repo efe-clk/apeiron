@@ -13,7 +13,8 @@ use crate::error::{Error, IoContext, Result};
 use crate::fsutil;
 use crate::id::{IdKey, ObjectId, ObjectType};
 use crate::index::{self, Location};
-use crate::keyfile;
+use crate::keyfile::{self, KeyInfo};
+use crate::lock::RepoLock;
 use crate::object::{Blob, EntryKind, Snapshot, Tree};
 use crate::pack::{self, FileHash, PackEntry, PackWriter};
 use crate::refs::{RefStore, ReflogEntry, RepairReport};
@@ -38,6 +39,8 @@ pub struct Repository {
     root: PathBuf,
     config: Config,
     keys: Keys,
+    /// The key file an encrypted repository was opened with.
+    key_id: Option<String>,
     index: HashMap<ObjectId, Location>,
     /// The index files `index` was loaded from.
     index_files: Vec<PathBuf>,
@@ -74,15 +77,18 @@ impl Repository {
         let config = Config::generate(chunker, None)?;
         let (id_key, data_key) = (IdKey::generate()?, SecretKey::generate()?);
         let (keys_dir, tmp) = (path.join(KEYS), path.join(TMP));
-        keyfile::write_password(&keys_dir, &tmp, &config.id, &id_key, &data_key, password)?;
-        let recovery = keyfile::write_recovery(&keys_dir, &tmp, &config.id, &id_key, &data_key)?;
+        let key_id =
+            keyfile::write_password(&keys_dir, &tmp, &config.id, &id_key, &data_key, password)?;
+        let (_, recovery) =
+            keyfile::write_recovery(&keys_dir, &tmp, &config.id, &id_key, &data_key)?;
         fsutil::sync_dir(&keys_dir)?;
         write_config(path, &config)?;
         let keys = Keys {
             id: id_key,
             data: Some(data_key),
         };
-        Ok((Repository::open_with(path, Unlock::Keys(keys))?, recovery))
+        let repo = Repository::open_with(path, Unlock::Keys(keys, Some(key_id)))?;
+        Ok((repo, recovery))
     }
 
     /// Opens a repository. An encrypted one fails with
@@ -100,7 +106,10 @@ impl Repository {
     /// Opens the same repository again, with the keys this one was opened
     /// with, and loads its index from disk.
     pub fn reopen(&self) -> Result<Self> {
-        Repository::open_with(&self.root, Unlock::Keys(self.keys.clone()))
+        Repository::open_with(
+            &self.root,
+            Unlock::Keys(self.keys.clone(), self.key_id.clone()),
+        )
     }
 
     fn open_with(path: &Path, unlock: Unlock<'_>) -> Result<Self> {
@@ -116,21 +125,26 @@ impl Repository {
             Err(e) => return Err(e).at(&config_path),
         };
         let config = Config::from_toml(&config_path, &text)?;
-        let keys = match (&config.id_key, unlock) {
-            (Some(id), _) => Keys {
-                id: id.clone(),
-                data: None,
-            },
+        let (keys, key_id) = match (&config.id_key, unlock) {
+            (Some(id), _) => {
+                let keys = Keys {
+                    id: id.clone(),
+                    data: None,
+                };
+                (keys, None)
+            }
             (None, Unlock::None) => return Err(Error::KeyRequired(path.to_path_buf())),
             (None, Unlock::Secret(secret)) => {
-                keyfile::unlock(&path.join(KEYS), &config.id, secret)?
+                let (keys, key_id) = keyfile::unlock(&path.join(KEYS), &config.id, secret)?;
+                (keys, Some(key_id))
             }
-            (None, Unlock::Keys(keys)) => keys,
+            (None, Unlock::Keys(keys, key_id)) => (keys, key_id),
         };
         let mut repo = Repository {
             root: path.to_path_buf(),
             config,
             keys,
+            key_id,
             index: HashMap::new(),
             index_files: Vec::new(),
             unindexed: Vec::new(),
@@ -156,6 +170,49 @@ impl Repository {
 
     fn dir(&self, name: &str) -> PathBuf {
         self.root.join(name)
+    }
+
+    fn data_key(&self) -> Result<&SecretKey> {
+        self.keys.data.as_ref().ok_or(Error::NotEncrypted)
+    }
+
+    /// The passwords and recovery keys of an encrypted repository, oldest
+    /// first (FORMAT.md §14.2).
+    pub fn list_keys(&self) -> Result<Vec<KeyInfo>> {
+        self.data_key()?;
+        keyfile::list(&self.dir(KEYS), self.key_id.as_deref())
+    }
+
+    /// Adds a password and returns the id of its key file.
+    pub fn add_password(&self, password: &str) -> Result<String> {
+        keyfile::write_password(
+            &self.dir(KEYS),
+            &self.dir(TMP),
+            &self.config.id,
+            &self.keys.id,
+            self.data_key()?,
+            password,
+        )
+    }
+
+    /// Adds a new recovery key. Returns the id of its key file and the
+    /// recovery key, which is shown to the user once and never stored.
+    pub fn add_recovery_key(&self) -> Result<(String, String)> {
+        keyfile::write_recovery(
+            &self.dir(KEYS),
+            &self.dir(TMP),
+            &self.config.id,
+            &self.keys.id,
+            self.data_key()?,
+        )
+    }
+
+    /// Removes a password or recovery key, unless it is the last one. Takes
+    /// the repository lock exclusive.
+    pub fn remove_key(&self, id: &str) -> Result<()> {
+        self.data_key()?;
+        let _lock = RepoLock::exclusive(&self.root)?;
+        keyfile::remove(&self.dir(KEYS), id)
     }
 
     /// Forgets the loaded index and loads it again from disk.
@@ -655,7 +712,7 @@ impl ObjectWriter<'_> {
 enum Unlock<'a> {
     None,
     Secret(&'a str),
-    Keys(Keys),
+    Keys(Keys, Option<String>),
 }
 
 /// Creates the folders of a new repository in a new or empty folder.
@@ -776,6 +833,53 @@ mod tests {
         let mut out = Vec::new();
         repo.reopen().unwrap().read_file(&blob, &mut out).unwrap();
         assert_eq!(out, secret);
+    }
+
+    #[test]
+    fn keys_can_be_added_listed_and_removed() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("repo");
+        let params = ChunkerParams::new(64 * 1024).unwrap();
+        let (repo, _) = Repository::init_encrypted(&path, params, "pw").unwrap();
+        let keys = repo.list_keys().unwrap();
+        assert_eq!(keys.len(), 2);
+        let first = keys.iter().find(|k| k.current).unwrap().id.clone();
+        let first_recovery = keys.iter().find(|k| !k.current).unwrap().id.clone();
+        assert_eq!(repo.reopen().unwrap().list_keys().unwrap(), keys);
+
+        let second = repo.add_password("second").unwrap();
+        let (third, recovery) = repo.add_recovery_key().unwrap();
+        let opened = Repository::unlock(&path, &recovery).unwrap();
+        let listed = opened.list_keys().unwrap();
+        assert_eq!(listed.len(), 4);
+        assert_eq!(
+            listed
+                .iter()
+                .filter(|k| k.current)
+                .map(|k| &k.id)
+                .collect::<Vec<_>>(),
+            [&third]
+        );
+
+        repo.remove_key(&first).unwrap();
+        assert!(matches!(
+            Repository::unlock(&path, "pw"),
+            Err(Error::WrongKey)
+        ));
+        Repository::unlock(&path, "second").unwrap();
+        let held = RepoLock::shared(&path).unwrap();
+        assert!(matches!(
+            repo.remove_key(&second),
+            Err(Error::RepoLocked(_))
+        ));
+        drop(held);
+        repo.remove_key(&second).unwrap();
+        repo.remove_key(&first_recovery).unwrap();
+        assert!(matches!(repo.remove_key(&third), Err(Error::LastKey)));
+
+        let (_dir, plain) = new_repo();
+        assert!(matches!(plain.list_keys(), Err(Error::NotEncrypted)));
+        assert!(matches!(plain.add_password("x"), Err(Error::NotEncrypted)));
     }
 
     fn walk(dir: &Path) -> Vec<PathBuf> {

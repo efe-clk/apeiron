@@ -39,6 +39,8 @@ CLI, Apeiron'un ilk arayüzüdür. Diğer tüm arayüzler gibi yalnızca herkese
 
 Dosyanın ilk satırı paroladır; `init --encrypt` yeni parolayı da oradan okur. Yanlış bir parola ya da kurtarma anahtarı komutu 1 çıkış koduyla ve `key` hata türüyle bitirir. `--json` ile `init`, `recovery_key` alanını ekler.
 
+Bir parolayı değiştirmek için yenisi `apeiron key add` ile eklenir, eskisi `apeiron key list` içinde bulunur (depoyu o açtıysa `(in use)` ile işaretlidir) ve `apeiron key remove <id>` ile silinir. Kimliğin ilk 8 karakteri yeterlidir. Son anahtar silinemez; `key remove`, `gc` gibi depoyu yalnız kullanmak ister.
+
 ## 3. Komutlar
 
 | Komut | Ne yapar | Durum |
@@ -54,6 +56,9 @@ Dosyanın ilk satırı paroladır; `init --encrypt` yeni parolayı da oradan oku
 | `apeiron verify` | Her paketi, indeksi ve nesneyi okuyup denetler | Tamamlandı |
 | `apeiron repair` | Bayat ref kilitlerini kaldırır, kaybolan reflog satırlarını ekler ve bozuk indeks dosyalarını yeniler | Tamamlandı |
 | `apeiron gc [--keep-days <days>] [--dry-run]` | Hiçbir ref'in ve son 90 günün (ya da `--keep-days`) hiçbir reflog satırının ulaşamadığı veriyi siler; `--dry-run` yalnızca raporlar | Tamamlandı |
+| `apeiron key list` | Şifreli bir deponun parolalarını ve kurtarma anahtarlarını listeler | Tamamlandı |
+| `apeiron key add [--recovery] [--new-password-file <file>]` | Bir parola ekler (iki kez sorulur ya da dosyadan okunur); `--recovery` ile bir kez yazdırılan yeni bir kurtarma anahtarı ekler | Tamamlandı |
+| `apeiron key remove <id>` | Bir parolayı ya da kurtarma anahtarını siler; sonuncusu silinemez | Tamamlandı |
 
 Bir `<snapshot>`; ref adı (`main`), tam snapshot kimliği ya da tek bir snapshot'a uyuyorsa kimliğin ilk 8 ya da daha fazla karakteri olarak yazılabilir. `~N` eki ilk ebeveynler üzerinden N adım geri gider: `main~1`, `main`'den önceki snapshot'tır.
 

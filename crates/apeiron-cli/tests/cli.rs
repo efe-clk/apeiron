@@ -239,4 +239,37 @@ fn encrypted_repository_with_password_file() {
     let out = run(&["ls", "main"], "recovery");
     assert_eq!(code(&out), Some(0));
     assert!(String::from_utf8_lossy(&out.stdout).contains("a.txt"));
+
+    // Change the password: add the new one, then remove the old one.
+    let json = |args: &[&str], password_file: &str| {
+        let out = run(&[&["--json"], args].concat(), password_file);
+        assert_eq!(
+            code(&out),
+            Some(0),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        serde_json::from_slice::<serde_json::Value>(&out.stdout).unwrap()
+    };
+    let keys = json(&["key", "list"], "pw");
+    let old = keys
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|k| k["current"] == true)
+        .unwrap();
+    assert_eq!(old["kind"], "password");
+    let old = old["id"].as_str().unwrap().to_owned();
+    let new_file = root.join("wrong").to_str().unwrap().to_owned();
+    json(&["key", "add", "--new-password-file", &new_file], "pw");
+    let doc = json(&["key", "remove", &old[..8]], "wrong");
+    assert_eq!(doc["removed"], old.as_str());
+    assert_eq!(code(&run(&["ls", "main"], "pw")), Some(1));
+    let out = run(&["key", "list"], "wrong");
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(text.lines().count(), 2, "{text}");
+    assert!(text.contains("(in use)"));
+
+    let doc = json(&["key", "add", "--recovery"], "wrong");
+    assert_eq!(doc["recovery_key"].as_str().unwrap().len(), 64);
 }

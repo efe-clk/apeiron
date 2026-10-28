@@ -93,7 +93,7 @@ impl From<apeiron_core::Error> for Error {
             E::UnsupportedVersion { path, .. } => {
                 Error::new(ErrorKind::Unsupported, message).with_path(path)
             }
-            E::ObjectNotFound(_) => Error::new(ErrorKind::NotFound, message),
+            E::ObjectNotFound(_) | E::KeyNotFound(_) => Error::new(ErrorKind::NotFound, message),
             E::KeyRequired(path) => Error::new(ErrorKind::Key, message).with_path(path),
             E::WrongKey => Error::new(ErrorKind::Key, message),
             E::RefLocked { lock, .. } | E::RepoLocked(lock) => {
@@ -107,7 +107,9 @@ impl From<apeiron_core::Error> for Error {
             | E::ObjectTooLarge(_)
             | E::InvalidChunkerParams(_)
             | E::InvalidRefName(_)
-            | E::InvalidObject { .. } => Error::new(ErrorKind::InvalidInput, message),
+            | E::InvalidObject { .. }
+            | E::NotEncrypted
+            | E::LastKey => Error::new(ErrorKind::InvalidInput, message),
             _ => Error::new(ErrorKind::Internal, message),
         }
     }

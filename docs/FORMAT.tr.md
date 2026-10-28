@@ -384,7 +384,7 @@ Testler tam bir yazma işlemini (yeni chunk'lar, snapshot, ref güncellemesi) di
 
 1. Kilit, `locks/repository` adlı boş dosyadır. Yoksa oluşturulur ve hiç silinmez.
 2. Kilit, dosyanın varlığı değil, işletim sisteminin dosya kilididir (Linux ve macOS'ta `flock`, Windows'ta `LockFileEx`). Sistem onu program bitince, bir çökme ya da elektrik kesintisinden sonra bile bırakır; bu yüzden bayat kilit kalamaz.
-3. Nesneleri ya da ref'leri okuyan veya yazan her işlem kilidi **paylaşımlı** alır; istenen sayıda program onu aynı anda paylaşımlı tutabilir. Çöp toplama onu **özel** (exclusive) alır.
+3. Nesneleri ya da ref'leri okuyan veya yazan her işlem kilidi **paylaşımlı** alır; istenen sayıda program onu aynı anda paylaşımlı tutabilir. Çöp toplama ve anahtar silme (bölüm 14.2) onu **özel** (exclusive) alır.
 4. Bir yazıcı indeks dosyalarını kilidi **aldıktan sonra** yükler ve kilidi ref güncellemesi bitene kadar tutar. Kilit alınmadan önce hatırlanan indeks içeriği, bir nesneyi yazmayı atlamak için kullanılamaz.
 5. Kilit hemen alınamazsa işlem "kilitli" hatasıyla durur; beklemez.
 6. Dosya kilitleri bazı ağ dosya sistemlerinde (ör. eski NFS) güvenilir değildir. Böyle bir dosya sistemindeki depo aynı anda birden fazla program tarafından kullanılmamalıdır.
@@ -464,6 +464,7 @@ keys = "…hex…"                              # id_key ‖ data_key'in mühür
 - Mühürlü kutunun ek verisi `"apeiron-key 1" ‖ depo kimliği`'dir (`config`'deki `id`'nin 16 baytı); böylece bir anahtar dosyası başka bir depoya taşınamaz.
 - Depoyu açmak için okuyucu anahtar dosyalarını tek tek dener; yanlış bir parola doğrulama etiketinde başarısız olur ve asla bozulma olarak değil, "yanlış parola" olarak bildirilir.
 - Bir parola eklemek ya da değiştirmek, eskisi silinmeden önce yeni bir anahtar dosyasını kalıcı olarak yazar (bölüm 9.1). Tüm parolalar ve kurtarma anahtarları kaybolursa veriyi hiç kimse kurtaramaz.
+- `<name>` aynı zamanda anahtarın kimliğidir; kullanıcı bir anahtarı silmek için onu verir. Silme, dosyayı siler ve `keys/` klasörünü diske yazar; bunu yaparken depo kilidini özel tutar (bölüm 12), böylece iki program birbirinin son anahtarını silemez. Yazıcı, ayrıştırabildiği son anahtar dosyasını asla silmez.
 
 ### 14.3 Mühürlü kutu
 

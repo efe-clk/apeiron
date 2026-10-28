@@ -83,6 +83,18 @@ export APEIRON_PASSWORD_FILE=~/.config/apeiron/password
 
 Anahtarı olmayan ve diski elinde tutan biri yalnızca veri dosyalarının sayısını ve boyutunu ve ref adlarını (`backup/documents`) görür; dosya adlarını ve içeriği göremez ([FORMAT.tr.md](FORMAT.tr.md) §14.5).
 
+### 3.2 Parolayı değiştirme
+
+Önce yeni parolayı ekleyin, sonra eskisini silin:
+
+```bash
+apeiron key add                 # önce mevcut parolayı, sonra yenisini iki kez sorar
+apeiron key list                # eski parola (in use) ile işaretlidir
+apeiron key remove <id>         # eski parolanın kimliğinin ilk 8 karakteri
+```
+
+Parola dosyası kullanılıyorsa `key add`'den sonra yeni parolayı dosyaya yazın. `apeiron key add --recovery` yeni bir kurtarma anahtarı oluşturur (örneğin eski kâğıt kaybolduğunda); eski kurtarma anahtarı da aynı yolla silinir. Son anahtar silinemez ve `key remove` hiçbir yedek çalışmıyorken yapılmalıdır.
+
 ## 4. Yedekleme
 
 Her klasöre kendi ref'ini verin; böylece her birinin kendi geçmişi olur:

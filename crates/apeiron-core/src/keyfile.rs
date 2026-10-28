@@ -66,7 +66,27 @@ struct RawSealed {
     keys: String,
 }
 
-/// Writes a new key file that opens with `password`.
+/// What a password or recovery key is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum KeyKind {
+    Password,
+    Recovery,
+}
+
+/// A key file of an encrypted repository.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct KeyInfo {
+    /// The name of the key file without `.key`.
+    pub id: String,
+    pub kind: KeyKind,
+    /// When the key was added, as written in the key file (RFC 3339, UTC).
+    pub created: String,
+    /// Whether the repository was opened with this key.
+    pub current: bool,
+}
+
+/// Writes a new key file that opens with `password` and returns its id.
 pub(crate) fn write_password(
     keys_dir: &Path,
     tmp_dir: &Path,
@@ -74,7 +94,7 @@ pub(crate) fn write_password(
     id_key: &IdKey,
     data_key: &SecretKey,
     password: &str,
-) -> Result<PathBuf> {
+) -> Result<String> {
     let salt: [u8; 16] = random_bytes()?;
     let kek = argon2id(password, &salt, MEMORY_KIB, ITERATIONS, PARALLELISM)
         .map_err(|e| Error::Encode(format!("key derivation failed: {e}")))?;
@@ -98,14 +118,14 @@ pub(crate) fn write_password(
 }
 
 /// Writes a new key file that opens with a new random recovery key and
-/// returns the recovery key as the user writes it down.
+/// returns its id and the recovery key as the user writes it down.
 pub(crate) fn write_recovery(
     keys_dir: &Path,
     tmp_dir: &Path,
     repo_id: &[u8; 16],
     id_key: &IdKey,
     data_key: &SecretKey,
-) -> Result<String> {
+) -> Result<(String, String)> {
     let recovery: [u8; 32] = random_bytes()?;
     let kdf = RawKdf {
         algorithm: BLAKE3_DERIVE.to_owned(),
@@ -115,7 +135,7 @@ pub(crate) fn write_recovery(
         salt: None,
     };
     let kek = recovery_kek(&recovery);
-    write(
+    let id = write(
         keys_dir,
         tmp_dir,
         repo_id,
@@ -125,7 +145,7 @@ pub(crate) fn write_recovery(
         kdf,
         &kek,
     )?;
-    Ok(format_recovery(&recovery))
+    Ok((id, format_recovery(&recovery)))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -138,7 +158,7 @@ fn write(
     kind: &str,
     kdf: RawKdf,
     kek: &SecretKey,
-) -> Result<PathBuf> {
+) -> Result<String> {
     let mut plain = Vec::with_capacity(64);
     plain.extend_from_slice(id_key.as_bytes());
     plain.extend_from_slice(data_key.as_bytes());
@@ -154,25 +174,82 @@ fn write(
     };
     // Serializing plain strings and integers cannot fail.
     let text = toml::to_string(&raw).unwrap_or_default();
-    let dest = keys_dir.join(format!("{}.key", fsutil::random_name()?));
+    let id = fsutil::random_name()?;
+    let dest = keys_dir.join(format!("{id}.key"));
     fsutil::write_durable_new(tmp_dir, &dest, text.as_bytes())?;
-    Ok(dest)
+    Ok(id)
 }
 
-/// Opens the repository keys with a password or a recovery key by trying
-/// every key file in `keys_dir`.
-pub(crate) fn unlock(keys_dir: &Path, repo_id: &[u8; 16], secret: &str) -> Result<Keys> {
+/// The key files in `keys_dir` with their ids, sorted by id.
+fn key_files(keys_dir: &Path) -> Result<Vec<(String, PathBuf)>> {
     let mut files = Vec::new();
     for entry in fs::read_dir(keys_dir).at(keys_dir)? {
         let path = entry.at(keys_dir)?.path();
-        if path.extension().is_some_and(|e| e == "key") {
-            files.push(path);
+        let id = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .filter(|_| path.extension().is_some_and(|e| e == "key"));
+        if let Some(id) = id {
+            files.push((id.to_owned(), path.clone()));
         }
     }
     files.sort();
+    Ok(files)
+}
+
+/// The key files that can be parsed, oldest first; `current` is the id of
+/// the key the repository was opened with.
+pub(crate) fn list(keys_dir: &Path, current: Option<&str>) -> Result<Vec<KeyInfo>> {
+    let mut keys = Vec::new();
+    for (id, path) in key_files(keys_dir)? {
+        let Some(raw) = parse(&fs::read_to_string(&path).at(&path)?) else {
+            continue;
+        };
+        let kind = match raw.kind.as_str() {
+            KIND_PASSWORD => KeyKind::Password,
+            KIND_RECOVERY => KeyKind::Recovery,
+            _ => continue,
+        };
+        keys.push(KeyInfo {
+            current: current == Some(id.as_str()),
+            id,
+            kind,
+            created: raw.created.to_string(),
+        });
+    }
+    keys.sort_by(|a, b| (&a.created, &a.id).cmp(&(&b.created, &b.id)));
+    Ok(keys)
+}
+
+/// Deletes the key file `id`, unless it is the last one that can be parsed.
+/// The caller holds the repository lock exclusive (FORMAT.md §14.2).
+pub(crate) fn remove(keys_dir: &Path, id: &str) -> Result<()> {
+    let files = key_files(keys_dir)?;
+    let Some((_, path)) = files.iter().find(|(name, _)| name == id) else {
+        return Err(Error::KeyNotFound(id.to_owned()));
+    };
+    let mut others = 0;
+    for (name, other) in &files {
+        if name != id && parse(&fs::read_to_string(other).at(other)?).is_some() {
+            others += 1;
+        }
+    }
+    if others == 0 {
+        return Err(Error::LastKey);
+    }
+    fsutil::checkpoint()
+        .and_then(|()| fs::remove_file(path))
+        .at(path)?;
+    fsutil::sync_dir(keys_dir)
+}
+
+/// Opens the repository keys with a password or a recovery key by trying
+/// every key file in `keys_dir`. Returns the keys and the id of the key
+/// file that opened.
+pub(crate) fn unlock(keys_dir: &Path, repo_id: &[u8; 16], secret: &str) -> Result<(Keys, String)> {
     let recovery = parse_recovery(secret);
     let mut readable = 0;
-    for path in files {
+    for (key_id, path) in key_files(keys_dir)? {
         let text = fs::read_to_string(&path).at(&path)?;
         let Some(raw) = parse(&text) else {
             continue;
@@ -192,10 +269,11 @@ pub(crate) fn unlock(keys_dir: &Path, repo_id: &[u8; 16], secret: &str) -> Resul
             let (Ok(id), Ok(data)) = (id.try_into(), data.try_into()) else {
                 continue;
             };
-            return Ok(Keys {
+            let keys = Keys {
                 id: IdKey::from_bytes(id),
                 data: Some(SecretKey::from_bytes(data)),
-            });
+            };
+            return Ok((keys, key_id));
         }
     }
     if readable == 0 {
@@ -307,7 +385,7 @@ mod tests {
 
         fn add_password(&self, password: &str) -> PathBuf {
             let tmp = self.dir.path().join("tmp");
-            write_password(
+            let id = write_password(
                 &self.keys(),
                 &tmp,
                 &[9; 16],
@@ -315,12 +393,15 @@ mod tests {
                 &self.data_key,
                 password,
             )
-            .unwrap()
+            .unwrap();
+            self.keys().join(format!("{id}.key"))
         }
 
         fn add_recovery(&self) -> String {
             let tmp = self.dir.path().join("tmp");
-            write_recovery(&self.keys(), &tmp, &[9; 16], &self.id_key, &self.data_key).unwrap()
+            write_recovery(&self.keys(), &tmp, &[9; 16], &self.id_key, &self.data_key)
+                .unwrap()
+                .1
         }
     }
 
@@ -334,7 +415,7 @@ mod tests {
 
         let lower = recovery.to_lowercase().replace('-', " ");
         for secret in ["first", "second", recovery.as_str(), lower.as_str()] {
-            let keys = unlock(&s.keys(), &[9; 16], secret).unwrap();
+            let (keys, _) = unlock(&s.keys(), &[9; 16], secret).unwrap();
             assert_eq!(keys.id, s.id_key);
             assert_eq!(keys.data, Some(s.data_key.clone()));
         }
@@ -390,6 +471,42 @@ mod tests {
             unlock(&s.keys(), &[9; 16], "pw"),
             Err(Error::WrongKey)
         ));
+    }
+
+    #[test]
+    fn list_and_remove_keep_one_key() {
+        let s = setup();
+        let first = s.add_password("first");
+        let first_id = first.file_stem().unwrap().to_str().unwrap().to_owned();
+        s.add_recovery();
+        fs::write(s.keys().join("ffff.key"), "not toml").unwrap();
+
+        let keys = list(&s.keys(), Some(&first_id)).unwrap();
+        assert_eq!(keys.len(), 2);
+        let password = keys.iter().find(|k| k.id == first_id).unwrap();
+        assert_eq!(password.kind, KeyKind::Password);
+        assert!(password.current);
+        let recovery = keys.iter().find(|k| k.id != first_id).unwrap();
+        assert_eq!(recovery.kind, KeyKind::Recovery);
+        assert!(!recovery.current);
+
+        assert!(matches!(
+            remove(&s.keys(), "nope"),
+            Err(Error::KeyNotFound(_))
+        ));
+        remove(&s.keys(), &first_id).unwrap();
+        assert!(!first.exists());
+        assert!(matches!(
+            unlock(&s.keys(), &[9; 16], "first"),
+            Err(Error::WrongKey)
+        ));
+        // The damaged file does not count as a key that still opens.
+        assert!(matches!(
+            remove(&s.keys(), &recovery.id),
+            Err(Error::LastKey)
+        ));
+        remove(&s.keys(), "ffff").unwrap();
+        assert_eq!(list(&s.keys(), None).unwrap().len(), 1);
     }
 
     #[test]

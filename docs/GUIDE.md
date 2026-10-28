@@ -83,6 +83,18 @@ export APEIRON_PASSWORD_FILE=~/.config/apeiron/password
 
 Without a key, someone holding the disk sees only the number and size of the data files and the ref names (`backup/documents`), not file names or content ([FORMAT.md](FORMAT.md) §14.5).
 
+### 3.2 Changing the password
+
+Add the new password first, then remove the old one:
+
+```bash
+apeiron key add                 # asks the current password, then the new one twice
+apeiron key list                # the old password is marked (in use)
+apeiron key remove <id>         # the first 8 characters of the old password's id
+```
+
+If a password file is used, write the new password into it after `key add`. `apeiron key add --recovery` makes a new recovery key, for example when the old paper is lost; remove the old recovery key the same way. The last key cannot be removed, and `key remove` works only while no backup is running.
+
 ## 4. Backing up
 
 Give every folder its own ref, so each has its own history:

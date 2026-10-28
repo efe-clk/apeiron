@@ -151,6 +151,10 @@ Her işlem tek bir düz istek değeri alır ve tek bir düz sonuç değeri dönd
 | `delete_ref` | ref adı, beklenen snapshot | — | Hayır |
 | `repair` | — | `RepairReport`: kaldırılan kilitler, onarılan reflog'lar, yeniden indekslenen paketler, silinen bozuk indeksler | Hayır |
 | `gc` | saklanacak reflog günü (varsayılan 90), deneme çalıştırması | `GcReport`: canlı nesneler; silinen nesneler, baytlar ve paketler; yazılan paketler | Evet |
+| `keys` | — | `Vec<KeyInfo>`: kimlik, tür (`password` ya da `recovery`), eklendiği zaman, depoyu onun açıp açmadığı | Hayır |
+| `add_password` | yeni parola | `AddedKey`: kimlik | Hayır |
+| `add_recovery_key` | — | `AddedKey`: kimlik ve kullanıcıya bir kez gösterilen yeni kurtarma anahtarı | Hayır |
+| `remove_key` | anahtar kimliği ya da ilk karakterleri | tam kimlik; son anahtar silinemez ve depo kilidi özel alınır | Hayır |
 
 ### 8.4 Bir snapshot'ı adlandırma
 

@@ -384,7 +384,7 @@ Garbage collection deletes packs. It must never run while another program reads 
 
 1. The lock is the empty file `locks/repository`. It is created if it does not exist and is never deleted.
 2. The lock is an operating system file lock (`flock` on Linux and macOS, `LockFileEx` on Windows), not the presence of the file. The system releases it when the program ends, even after a crash or power failure, so a stale lock cannot remain.
-3. Every operation that reads or writes objects or refs takes the lock **shared**; any number of programs can hold it shared at once. Garbage collection takes it **exclusive**.
+3. Every operation that reads or writes objects or refs takes the lock **shared**; any number of programs can hold it shared at once. Garbage collection and removing a key (section 14.2) take it **exclusive**.
 4. A writer loads the index files **after** taking the lock and keeps the lock until its ref update is finished. Index contents remembered from before the lock was taken must not be used to skip writing an object.
 5. If the lock cannot be taken at once, the operation stops with a "locked" error; it does not wait.
 6. File locks are not reliable on some network file systems (for example older NFS). A repository on such a file system must not be used by more than one program at a time.
@@ -464,6 +464,7 @@ keys = "…hex…"                              # sealed box (14.3) of id_key �
 - The additional data of the sealed box is `"apeiron-key 1" ‖ repository id` (the 16 bytes of `id` in `config`), so a key file cannot be moved into another repository.
 - To open the repository, a reader tries the key files one by one; a wrong password fails the authentication tag and is reported as "wrong password", never as corruption.
 - Adding or changing a password writes a new key file durably (section 9.1) before an old one is deleted. If every password and recovery key is lost, the data cannot be recovered by anyone.
+- `<name>` is also the key's id, which the user gives to remove a key. Removing one deletes its file and syncs `keys/`, holding the repository lock exclusive (section 12) so that two programs cannot each remove the other's last key. A writer never removes the last key file it can parse.
 
 ### 14.3 Sealed box
 

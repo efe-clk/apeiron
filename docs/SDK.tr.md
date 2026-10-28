@@ -54,7 +54,7 @@ ABI bilerek küçük tutulur: hiç değişmeyen birkaç işlev vardır; işlemle
 | `apeiron_repo_open(path, &repo)` | Bir depoyu açar |
 | `apeiron_repo_unlock(path, secret, &repo)` | Bir depoyu bir parola ya da kurtarma anahtarıyla açar |
 | `apeiron_repo_free(repo)` | Bir depo tutamacını kapatır |
-| `apeiron_call(repo, operation, request_json, &result_json)` | Kısa bir işlemi çalıştırır (`log`, `list`, `diff`, `refs`, `reflog`, `resolve`, `delete_ref`, `repair`, `info`) |
+| `apeiron_call(repo, operation, request_json, &result_json)` | Kısa bir işlemi çalıştırır (`log`, `list`, `diff`, `refs`, `reflog`, `resolve`, `delete_ref`, `repair`, `info`, `keys`, `add_password`, `add_recovery_key`, `remove_key`) |
 | `apeiron_start(repo, operation, request_json, &job)` | Uzun bir işlemi başlatır (`backup`, `restore`, `export`, `verify`, `gc`) |
 | `apeiron_job_progress(job, &progress_json)` | Anlık ilerlemeyi okur |
 | `apeiron_job_cancel(job)` | İşin durmasını ister |

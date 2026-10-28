@@ -6,6 +6,10 @@ pub(crate) fn short_id(id: &ObjectId) -> String {
     id.to_hex()[..12].to_owned()
 }
 
+pub(crate) fn short_key(id: &str) -> &str {
+    id.get(..8).unwrap_or(id)
+}
+
 /// `1 file`, `2 files`.
 pub(crate) fn count(n: u64, noun: &str) -> String {
     if n == 1 {

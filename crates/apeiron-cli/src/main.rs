@@ -21,10 +21,14 @@ use std::time::{Duration, Instant};
 
 use apeiron::{
     ArchiveFormat, BackupRequest, DiffRequest, Error, ErrorKind, ExportRequest, GcRequest, Job,
-    ListRequest, LogRequest, Name, Repository, RestoreRequest, Warning,
+    KeyKind, ListRequest, LogRequest, Name, Repository, RestoreRequest, Warning,
 };
 use clap::{Parser, Subcommand};
 use serde::Serialize;
+
+const RECOVERY_WARNING: &str = "Write the recovery key down and keep it apart from the password. \
+     It is shown only now. If every password and the recovery key are lost, \
+     nobody can recover the data.";
 
 /// Exit codes (docs/CLI.md §5).
 const EXIT_ERROR: u8 = 1;
@@ -136,6 +140,31 @@ enum Command {
         /// Only show what would be deleted
         #[arg(long)]
         dry_run: bool,
+    },
+    /// Manage the passwords and recovery keys of an encrypted repository
+    Key {
+        #[command(subcommand)]
+        command: KeyCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum KeyCommand {
+    /// List the passwords and recovery keys that open the repository
+    List,
+    /// Add a password, or a new recovery key with --recovery
+    Add {
+        /// Add a new recovery key instead of a password
+        #[arg(long)]
+        recovery: bool,
+        /// File holding the new password on its first line
+        #[arg(long, value_name = "PATH", conflicts_with = "recovery")]
+        new_password_file: Option<PathBuf>,
+    },
+    /// Remove a password or recovery key; the last one cannot be removed
+    Remove {
+        /// Key id from `apeiron key list`; its first characters are enough
+        id: String,
     },
 }
 
@@ -292,11 +321,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                         r.info.path.display()
                     );
                     say!("Recovery key: {key}");
-                    say!(
-                        "Write the recovery key down and keep it apart from the password. \
-                         It is shown only now. If every password and the recovery key are lost, \
-                         nobody can recover the data."
-                    );
+                    say!("{RECOVERY_WARNING}");
                 }
             });
             Ok(0)
@@ -467,6 +492,52 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     r.live_objects
                 );
             });
+            Ok(0)
+        }
+        Command::Key { command } => {
+            let repo = open(cli.repo, password_file)?;
+            match command {
+                KeyCommand::List => {
+                    let keys = repo.keys()?;
+                    out.result(&keys, |keys| {
+                        for k in keys {
+                            let kind = match k.kind {
+                                KeyKind::Password => "password",
+                                KeyKind::Recovery => "recovery",
+                            };
+                            let current = if k.current { "  (in use)" } else { "" };
+                            say!(
+                                "{}  {kind:8}  added {}{current}",
+                                format::short_key(&k.id),
+                                k.created.replace('T', " ").replace('Z', " UTC")
+                            );
+                        }
+                    });
+                }
+                KeyCommand::Add {
+                    recovery,
+                    new_password_file,
+                } => {
+                    let added = if recovery {
+                        repo.add_recovery_key()?
+                    } else {
+                        repo.add_password(&new_password(new_password_file.as_deref())?)?
+                    };
+                    out.result(&added, |a| {
+                        say!("Added key {}", format::short_key(&a.id));
+                        if let Some(key) = &a.recovery_key {
+                            say!("Recovery key: {key}");
+                            say!("{RECOVERY_WARNING}");
+                        }
+                    });
+                }
+                KeyCommand::Remove { id } => {
+                    let removed = repo.remove_key(&id)?;
+                    out.result(&serde_json::json!({ "removed": removed }), |_| {
+                        say!("Removed key {}", format::short_key(&removed));
+                    });
+                }
+            }
             Ok(0)
         }
         Command::Repair => {

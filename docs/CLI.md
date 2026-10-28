@@ -39,6 +39,8 @@ If neither is given, the command stops with a usage error. A repository on an ex
 
 The first line of the file is the password; `init --encrypt` also reads the new password from it. A wrong password or recovery key ends the command with exit code 1 and the error kind `key`. With `--json`, `init` adds the field `recovery_key`.
 
+To change a password, add the new one with `apeiron key add`, find the old one in `apeiron key list` (it is marked `(in use)` when it opened the repository) and remove it with `apeiron key remove <id>`. The first 8 characters of an id are enough. The last key cannot be removed, and `key remove`, like `gc`, needs the repository to itself.
+
 ## 3. Commands
 
 | Command | What it does | Status |
@@ -54,6 +56,9 @@ The first line of the file is the password; `init --encrypt` also reads the new 
 | `apeiron verify` | Reads and checks every pack, index and object | Done |
 | `apeiron repair` | Removes stale ref locks, adds lost reflog lines and replaces damaged index files | Done |
 | `apeiron gc [--keep-days <days>] [--dry-run]` | Deletes data no ref and no reflog line of the last 90 days (or `--keep-days`) can reach; `--dry-run` only reports | Done |
+| `apeiron key list` | Lists the passwords and recovery keys of an encrypted repository | Done |
+| `apeiron key add [--recovery] [--new-password-file <file>]` | Adds a password (asked twice, or read from the file), or with `--recovery` a new recovery key, printed once | Done |
+| `apeiron key remove <id>` | Removes a password or recovery key; the last one cannot be removed | Done |
 
 A `<snapshot>` can be written as a ref name (`main`), a full snapshot id, or the first 8 or more characters of an id if they match exactly one snapshot. A `~N` suffix goes N steps back through first parents: `main~1` is the snapshot before `main`.
 

@@ -908,3 +908,34 @@ fn every_crash_during_encrypted_init_leaves_no_repository_or_a_whole_one() {
         }
     }
 }
+
+#[test]
+fn every_crash_while_changing_the_password_keeps_a_key_that_opens() {
+    let f = fixture_of(true);
+    let new_password = "battery staple";
+
+    // Adding: the old password opens every crash state.
+    let states = crash_states_of(&f.base, |repo| repo.add_password(new_password).map(drop));
+    assert!(states.len() > 1);
+    for state in &states {
+        assert!(open(&repo_path(state)).unwrap().list_keys().unwrap().len() >= 2);
+    }
+    let added = repo_path(states.last().unwrap());
+    assert_eq!(open(&added).unwrap().list_keys().unwrap().len(), 3);
+
+    // Removing the old password: the new one opens every crash state.
+    let keys = open(&added).unwrap().list_keys().unwrap();
+    let old_id = keys.into_iter().find(|k| k.current).unwrap().id;
+    let old_file = |path: &Path| path.join("keys").join(format!("{old_id}.key"));
+    let states = crash_states_of(&added, |repo| repo.remove_key(&old_id));
+    assert!(states.len() > 1);
+    for state in &states {
+        let path = repo_path(state);
+        let repo = Repository::unlock(&path, new_password).unwrap();
+        assert_eq!(repo.read_object(&f.old).unwrap().1, OLD);
+        let kept = old_file(&path).exists();
+        assert_eq!(open(&path).is_ok(), kept);
+        assert_eq!(repo.list_keys().unwrap().len(), if kept { 3 } else { 2 });
+    }
+    assert!(!old_file(&repo_path(states.last().unwrap())).exists());
+}

@@ -151,6 +151,10 @@ Every operation takes one plain request value and returns one plain result value
 | `delete_ref` | ref name, expected snapshot | — | No |
 | `repair` | — | `RepairReport`: removed locks, repaired reflogs, packs indexed anew, damaged indexes removed | No |
 | `gc` | days of reflog to keep (default 90), dry run | `GcReport`: live objects, removed objects, bytes and packs, packs written | Yes |
+| `keys` | — | `Vec<KeyInfo>`: id, kind (`password` or `recovery`), when it was added, whether it opened the repository | No |
+| `add_password` | new password | `AddedKey`: id | No |
+| `add_recovery_key` | — | `AddedKey`: id and the new recovery key, shown to the user once | No |
+| `remove_key` | key id or its first characters | the whole id; the last key cannot be removed, and the repository lock is taken exclusive | No |
 
 ### 8.4 Naming a snapshot
 

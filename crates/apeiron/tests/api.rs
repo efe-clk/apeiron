@@ -4,8 +4,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use apeiron::{
-    BackupRequest, ChangeKind, DeleteRefRequest, DiffRequest, ErrorKind, ListRequest, LogRequest,
-    Phase, Repository, RestoreRequest,
+    BackupRequest, ChangeKind, DeleteRefRequest, DiffRequest, ErrorKind, KeyKind, ListRequest,
+    LogRequest, Phase, Repository, RestoreRequest,
 };
 
 struct Setup {
@@ -290,4 +290,42 @@ fn encrypted_repository_round_trip() {
     job.wait().unwrap();
     assert_eq!(fs::read(target.join("a.txt")).unwrap(), b"private");
     assert!(repo.verify().unwrap().wait().unwrap().is_ok());
+}
+
+#[test]
+fn change_the_password_of_an_encrypted_repository() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("repo");
+    let (repo, _) = Repository::init_encrypted(&path, "old").unwrap();
+    let keys = repo.keys().unwrap();
+    assert_eq!(keys.len(), 2);
+    let old = keys.iter().find(|k| k.current).unwrap();
+    assert_eq!(old.kind, KeyKind::Password);
+
+    assert_eq!(
+        repo.add_password("").unwrap_err().kind,
+        ErrorKind::InvalidInput
+    );
+    let added = repo.add_password("new").unwrap();
+    assert_eq!(added.recovery_key, None);
+    repo.remove_key(&old.id[..6]).unwrap();
+    assert_eq!(
+        Repository::unlock(&path, "old").unwrap_err().kind,
+        ErrorKind::Key
+    );
+    let repo = Repository::unlock(&path, "new").unwrap();
+    assert!(
+        repo.keys()
+            .unwrap()
+            .iter()
+            .any(|k| k.current && k.id == added.id)
+    );
+
+    let recovery = repo.add_recovery_key().unwrap();
+    Repository::unlock(&path, &recovery.recovery_key.unwrap()).unwrap();
+    assert_eq!(repo.remove_key("").unwrap_err().kind, ErrorKind::NotFound);
+    assert_eq!(repo.remove_key("zz").unwrap_err().kind, ErrorKind::NotFound);
+
+    let plain = Repository::init(dir.path().join("plain")).unwrap();
+    assert_eq!(plain.keys().unwrap_err().kind, ErrorKind::InvalidInput);
 }

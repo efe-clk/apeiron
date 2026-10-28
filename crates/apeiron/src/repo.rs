@@ -10,12 +10,12 @@ use crate::error::{Error, ErrorKind, Result};
 use crate::job::Job;
 use crate::spec;
 use crate::types::{
-    DeleteRefRequest, DiffRequest, ExportRequest, ListRequest, LogPage, LogRequest, RefInfo,
-    RepoInfo, RestoreRequest, SnapshotInfo,
+    AddedKey, DeleteRefRequest, DiffRequest, ExportRequest, ListRequest, LogPage, LogRequest,
+    RefInfo, RepoInfo, RestoreRequest, SnapshotInfo,
 };
 use crate::{
     ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo, ExportReport, GcReport,
-    GcRequest, ObjectId, ReflogEntry, RepairReport, RestoreReport, VerifyReport,
+    GcRequest, KeyInfo, ObjectId, ReflogEntry, RepairReport, RestoreReport, VerifyReport,
 };
 
 /// An open repository. Cloning is cheap; clones share the same state and can
@@ -279,6 +279,62 @@ impl Repository {
         Ok(self
             .view()?
             .update_ref(&request.name, Some(request.expected), None)?)
+    }
+
+    /// The passwords and recovery keys of an encrypted repository, oldest
+    /// first.
+    pub fn keys(&self) -> Result<Vec<KeyInfo>> {
+        Ok(self.read().list_keys()?)
+    }
+
+    /// Adds a password to an encrypted repository.
+    pub fn add_password(&self, password: &str) -> Result<AddedKey> {
+        if password.is_empty() {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "the password must not be empty",
+            ));
+        }
+        Ok(AddedKey {
+            id: self.read().add_password(password)?,
+            recovery_key: None,
+        })
+    }
+
+    /// Adds a new recovery key to an encrypted repository. The key is in the
+    /// result only; it is shown to the user once.
+    pub fn add_recovery_key(&self) -> Result<AddedKey> {
+        let (id, recovery_key) = self.read().add_recovery_key()?;
+        Ok(AddedKey {
+            id,
+            recovery_key: Some(recovery_key),
+        })
+    }
+
+    /// Removes a password or recovery key by its id or the start of it and
+    /// returns the whole id. The last key cannot be removed. Fails with
+    /// [`ErrorKind::Locked`] while any other operation uses the repository.
+    pub fn remove_key(&self, id: &str) -> Result<String> {
+        let core = self.read();
+        let matches: Vec<KeyInfo> = core
+            .list_keys()?
+            .into_iter()
+            .filter(|k| !id.is_empty() && k.id.starts_with(id))
+            .collect();
+        match matches.as_slice() {
+            [key] => {
+                core.remove_key(&key.id)?;
+                Ok(key.id.clone())
+            }
+            [] => Err(Error::new(
+                ErrorKind::NotFound,
+                format!("no key with id {id:?}"),
+            )),
+            _ => Err(Error::new(
+                ErrorKind::Ambiguous,
+                format!("{id:?} is the start of more than one key id"),
+            )),
+        }
     }
 
     /// Removes stale ref locks, adds reflog lines lost in a crash and

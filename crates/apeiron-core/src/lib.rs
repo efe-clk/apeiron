@@ -25,6 +25,7 @@ pub use chunker::ChunkerParams;
 pub use config::FORMAT_VERSION;
 pub use error::{Error, Result};
 pub use id::{ID_LEN, ObjectId, ObjectType};
+pub use keyfile::{KeyInfo, KeyKind};
 pub use lock::RepoLock;
 pub use object::{Blob, EntryKind, Snapshot, Time, Tree, TreeEntry};
 pub use refs::{RefOp, ReflogEntry, RepairReport, validate_ref_name};

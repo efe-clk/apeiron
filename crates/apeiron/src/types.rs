@@ -119,3 +119,12 @@ pub struct DeleteRefRequest {
     /// The snapshot the ref must still point to.
     pub expected: ObjectId,
 }
+
+/// A password or recovery key added to an encrypted repository.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AddedKey {
+    pub id: String,
+    /// The new recovery key, shown to the user once; absent for a password.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recovery_key: Option<String>,
+}
