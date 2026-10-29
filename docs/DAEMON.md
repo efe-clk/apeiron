@@ -108,7 +108,7 @@ A backup is proven only by restoring it (VISION.md). The restore test does this 
 
 | Item | Where |
 | --- | --- |
-| Operating the daemon from another device (remote API) | With sync, work item 4 |
+| Operating the daemon from another device (remote API) | The desktop and web interfaces (Stage 4) |
 | Backup triggered by file changes | Later; the schedule covers Stage 2 |
 | CPU, disk and network limits for jobs | Later; jobs run one at a time |
 | Desktop notifications on failure | With the desktop interface (Stage 4) |

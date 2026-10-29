@@ -27,6 +27,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [017](#adr-017-xchacha20-poly1305-and-argon2id-for-encryption) | Encryption | XChaCha20-Poly1305 for data, Argon2id for passwords | Accepted |
 | [018](#adr-018-whole-repository-copies-as-remotes-russh-for-sftp-object_store-for-s3) | Remote targets | Remotes are whole repository copies; `russh` for SFTP, `object_store` for S3 | Accepted |
 | [019](#adr-019-the-background-service-is-a-user-process-with-a-jobs-file) | Background service | A user process with a TOML jobs file, started by the operating system; missed jobs catch up | Accepted |
+| [020](#adr-020-sync-through-a-remote-with-a-three-way-merge-and-conflict-copies) | Sync | Devices meet at a remote; a three-way merge per path; conflicting versions are kept as copies | Proposed |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28.
 
@@ -412,3 +413,24 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | A cron-style schedule (`30 2 * * *`) | Hard to read for the first users; `every` and `at` cover personal backups |
 
 **Consequences.** Jobs run only while the user is logged in. Two users of one computer each run their own daemon. A server without a logged-in user runs `apeiron daemon run` as a system service by hand; the guide shows how.
+
+## ADR-020: Sync through a remote, with a three-way merge and conflict copies
+
+**Status:** Proposed (2026-10-29)
+
+**Context.** Stage 2 ends with one month of trouble-free sync between two devices and a remote server ([SYNC.md](SYNC.md)). The devices are laptops and desktops that are often off; the remote is a disk, an SFTP server or S3 (ADR-018). Sync must never lose a change silently and must not become a way for a deletion to destroy the only copy (VISION.md).
+
+**Decision.** A sync round backs up the folder, pulls the remote ref, and either pushes, applies the remote snapshot to the folder, or merges the two with their last common snapshot as base. The merge works per path; when both sides changed a file differently, the local version stays and the other is added as a conflict copy named after its device and time. The folder is changed only where it still equals the snapshot taken at the start of the round. A new device starts with `clone`, which copies the remote's config and keys.
+
+**Rationale.** Everything is made of snapshots, so every round is history that can be restored, and push already guarantees that two devices cannot overwrite each other's ref. Meeting at a remote works when the devices are never online together. Conflict copies are what people know from Dropbox and Syncthing and need no tool to resolve; a resolution tool can come with the desktop interface.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| Peer-to-peer sync between devices | Both devices must be online at once; needs discovery and NAT traversal; the remote already exists |
+| Last writer wins | Silently loses the other device's change |
+| Stopping the round on a conflict until the user decides | Sync stalls for every other file; the user may not look for days |
+| Per-file version vectors instead of snapshots | A second model beside snapshots; loses the history that protects against spreading deletions |
+
+**Consequences.** Conflict copies appear in the folder and must be cleaned up by hand. A file changed during a round waits for the next round. The repository history grows by one snapshot per round with changes; garbage collection with retention rules keeps it in check later.

@@ -112,6 +112,7 @@ Rules for code, commits and format changes: [CONTRIBUTING.md](CONTRIBUTING.md).
 | [CLI](docs/CLI.md) | Design of the `apeiron` command (draft) |
 | [SDK](docs/SDK.md) | Design of the C ABI and language SDKs (draft) |
 | [Background service](docs/DAEMON.md) | Scheduled jobs and the restore test |
+| [Sync](docs/SYNC.md) | Design of folder sync between devices and conflict detection (draft) |
 | [User guide](docs/GUIDE.md) | Installation, daily backup, restore and the one-month test |
 | [Glossary](docs/GLOSSARY.md) | Terms with English–Turkish equivalents |
 | [Contributing](CONTRIBUTING.md) | Development environment and rules |

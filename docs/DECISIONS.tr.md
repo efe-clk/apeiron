@@ -27,6 +27,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [017](#adr-017-şifreleme-için-xchacha20-poly1305-ve-argon2id) | Şifreleme | Veri için XChaCha20-Poly1305, parolalar için Argon2id | Kabul edildi |
 | [018](#adr-018-uzak-depo-olarak-deponun-tam-kopyası-sftp-için-russh-s3-için-object_store) | Uzak hedefler | Uzak depolar deponun tam kopyasıdır; SFTP için `russh`, S3 için `object_store` | Kabul edildi |
 | [019](#adr-019-arka-plan-hizmeti-iş-dosyalı-bir-kullanıcı-sürecidir) | Arka plan hizmeti | İşletim sisteminin başlattığı, TOML iş dosyalı bir kullanıcı süreci; kaçırılan işler telafi edilir | Kabul edildi |
+| [020](#adr-020-üç-yönlü-birleştirme-ve-çatışma-kopyalarıyla-bir-uzak-depo-üzerinden-senkron) | Senkron | Cihazlar bir uzak depoda buluşur; yol başına üç yönlü birleştirme; çatışan sürümler kopya olarak tutulur | Önerildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
@@ -412,3 +413,24 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | cron biçiminde bir zamanlama (`30 2 * * *`) | İlk kullanıcılar için okunması zordur; kişisel yedekler için `every` ve `at` yeterlidir |
 
 **Sonuçlar.** İşler yalnızca kullanıcı oturum açmışken çalışır. Bir bilgisayarın iki kullanıcısı kendi daemon'larını çalıştırır. Oturum açmış kullanıcısı olmayan bir sunucu, `apeiron daemon run` komutunu elle bir sistem hizmeti olarak çalıştırır; rehber bunun nasıl yapılacağını gösterir.
+
+## ADR-020: Üç yönlü birleştirme ve çatışma kopyalarıyla bir uzak depo üzerinden senkron
+
+**Durum:** Önerildi (2026-10-29)
+
+**Bağlam.** Aşama 2, iki cihaz ve bir uzak sunucu arasında bir ay sorunsuz senkronla biter ([SYNC.tr.md](SYNC.tr.md)). Cihazlar çoğu zaman kapalı olan dizüstü ve masaüstü bilgisayarlardır; uzak depo bir disk, bir SFTP sunucusu ya da S3'tür (ADR-018). Senkron hiçbir değişikliği sessizce kaybetmemeli ve bir silmenin tek kopyayı yok etmesinin yolu olmamalıdır (VISION.tr.md).
+
+**Karar.** Bir senkron turu klasörü yedekler, uzaktaki ref'i pull eder ve ya push eder, ya uzaktaki snapshot'ı klasöre uygular, ya da ikisini son ortak snapshot'ı taban alarak birleştirir. Birleştirme yol başına çalışır; iki taraf da bir dosyayı farklı değiştirdiyse yerel sürüm kalır, öteki cihazının ve zamanının adını taşıyan bir çatışma kopyası olarak eklenir. Klasör yalnızca, turun başında alınan snapshot'a hâlâ eşit olduğu yerlerde değiştirilir. Yeni bir cihaz, uzak deponun config'ini ve anahtarlarını kopyalayan `clone` ile başlar.
+
+**Gerekçe.** Her şey snapshot'lardan yapıldığı için her tur geri yüklenebilir bir geçmiştir ve push, iki cihazın birbirinin ref'inin üzerine yazamamasını zaten güvence altına alır. Bir uzak depoda buluşmak, cihazlar hiç birlikte çevrim içi olmasa da çalışır. Çatışma kopyaları insanların Dropbox ve Syncthing'den bildiği şeydir ve çözmek için bir araç gerektirmez; bir çözüm aracı masaüstü arayüzüyle gelebilir.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Cihazlar arasında eşler arası senkron | İki cihazın aynı anda çevrim içi olması gerekir; keşif ve NAT geçişi gerektirir; uzak depo zaten var |
+| Son yazan kazanır | Öteki cihazın değişikliğini sessizce kaybeder |
+| Kullanıcı karar verene kadar turu bir çatışmada durdurmak | Senkron diğer her dosya için durur; kullanıcı günlerce bakmayabilir |
+| Snapshot'lar yerine dosya başına sürüm vektörleri | Snapshot'ların yanında ikinci bir model; yayılan silmelere karşı koruyan geçmişi kaybeder |
+
+**Sonuçlar.** Çatışma kopyaları klasörde belirir ve elle temizlenmelidir. Bir tur sırasında değişen bir dosya sonraki turu bekler. Depo geçmişi, değişiklik içeren her tur için bir snapshot büyür; ileride saklama kurallarıyla çöp toplama bunu dengeler.

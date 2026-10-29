@@ -112,6 +112,7 @@ Kod, commit ve format değişikliği kuralları: [CONTRIBUTING.tr.md](CONTRIBUTI
 | [CLI](docs/CLI.tr.md) | `apeiron` komutunun tasarımı (taslak) |
 | [SDK](docs/SDK.tr.md) | C ABI ve dil SDK'larının tasarımı (taslak) |
 | [Arka plan hizmeti](docs/DAEMON.tr.md) | Zamanlanmış işler ve geri yükleme testi |
+| [Senkron](docs/SYNC.tr.md) | Klasörlerin cihazlar arası senkronunun ve çatışma tespitinin tasarımı (taslak) |
 | [Kullanım rehberi](docs/GUIDE.tr.md) | Kurulum, günlük yedek, geri yükleme ve bir aylık deneme |
 | [Sözlük](docs/GLOSSARY.tr.md) | Terimler ve İngilizce–Türkçe karşılıkları |
 | [Katkı](CONTRIBUTING.tr.md) | Geliştirme ortamı ve kurallar |

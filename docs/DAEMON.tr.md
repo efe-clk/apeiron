@@ -108,7 +108,7 @@ Bir yedek ancak geri yüklenerek kanıtlanır (VISION.tr.md). Geri yükleme test
 
 | Konu | Nerede |
 | --- | --- |
-| Daemon'u başka bir cihazdan yönetmek (uzak API) | Senkronla, 4. iş |
+| Daemon'u başka bir cihazdan yönetmek (uzak API) | Masaüstü ve web arayüzleri (Aşama 4) |
 | Dosya değişikliğiyle tetiklenen yedek | Daha sonra; Aşama 2 için zamanlama yeterlidir |
 | İşler için işlemci, disk ve ağ sınırları | Daha sonra; işler birer birer çalışır |
 | Başarısızlıkta masaüstü bildirimi | Masaüstü arayüzüyle (Aşama 4) |

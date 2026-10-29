@@ -20,6 +20,7 @@ Implementation status (`apeiron-core`):
 | 13 | Garbage collection | Done |
 | 14 | Encryption | Done |
 | 15 | Remote repositories, push and pull: folders, SFTP and S3 | Done |
+| 15.6 | Clone (draft, awaiting approval) | Planned |
 
 ## Plain summary
 
@@ -562,6 +563,17 @@ Pull runs the steps of push in the other direction, with the local repository as
 - Two programs pushing the same ref at once: the conditional replace lets one win; the other stops with a conflict and changes nothing.
 - An interrupted push or pull is simply run again; it copies the objects that are still not listed. Packs the interruption left without an index take up space until garbage collection of that copy removes them.
 - Garbage collection of a remote copy and two-way sync are left for later work items ([ROADMAP.md](ROADMAP.md) §4).
+
+### 15.6 Clone
+
+Clone makes a new local repository from a remote, for a second device ([SYNC.md](SYNC.md) §6):
+
+1. Read the remote `config`; there must be one. The local folder must not exist or be empty.
+2. Create the folders of section 2, copy every key file of the remote `keys/` and check that the given password or recovery key opens one of them (section 14.2); a wrong password stops here and removes the new folder.
+3. Write the copied `config` last (section 9.2): from then on the folder is a repository.
+4. Pull every ref of the remote (section 15.4).
+
+A clone of an unencrypted remote copies no keys. Clone is the only operation that copies keys from a remote; pull never does. An interrupted clone leaves a folder without `config`, which is deleted and cloned again.
 
 ## 16. Left for later versions
 

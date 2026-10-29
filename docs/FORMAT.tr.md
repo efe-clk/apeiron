@@ -20,6 +20,7 @@ Uygulama durumu (`apeiron-core`):
 | 13 | Çöp toplama | Tamamlandı |
 | 14 | Şifreleme | Tamamlandı |
 | 15 | Uzak depolar, push ve pull: klasörler, SFTP ve S3 | Tamamlandı |
+| 15.6 | Klon (taslak, onay bekliyor) | Planlandı |
 
 ## Sade anlatım
 
@@ -562,6 +563,17 @@ Pull, push'un adımlarını ters yönde, hedef olarak yerel depoyla çalıştır
 - Aynı ref'i aynı anda push eden iki program: koşullu değiştirme birinin kazanmasını sağlar; öteki bir çatışmayla durur ve hiçbir şeyi değiştirmez.
 - Yarıda kalan bir push ya da pull yeniden çalıştırılır; hâlâ listelenmemiş nesneleri kopyalar. Kesintinin indekssiz bıraktığı paketler, o kopyanın çöp toplaması onları silene kadar yer kaplar.
 - Bir uzak kopyanın çöp toplaması ve çift yönlü senkron sonraki işlere bırakılmıştır ([ROADMAP.tr.md](ROADMAP.tr.md) §4).
+
+### 15.6 Klon
+
+Klon, ikinci bir cihaz için bir uzak depodan yeni bir yerel depo oluşturur ([SYNC.tr.md](SYNC.tr.md) §6):
+
+1. Uzaktaki `config`'i oku; olmalıdır. Yerel klasör var olmamalı ya da boş olmalıdır.
+2. Bölüm 2'deki klasörleri oluştur, uzaktaki `keys/` içindeki her anahtar dosyasını kopyala ve verilen parolanın ya da kurtarma anahtarının bunlardan birini açtığını denetle (bölüm 14.2); yanlış bir parola burada durdurur ve yeni klasörü siler.
+3. Kopyalanan `config`'i en son yaz (bölüm 9.2): o andan itibaren klasör bir depodur.
+4. Uzak deponun her ref'ini pull et (bölüm 15.4).
+
+Şifresiz bir uzak deponun klonu anahtar kopyalamaz. Klon, uzak depodan anahtar kopyalayan tek işlemdir; pull asla kopyalamaz. Yarıda kalan bir klon, `config`'i olmayan bir klasör bırakır; bu klasör silinir ve yeniden klonlanır.
 
 ## 16. Sonraki sürümlere bırakılanlar
 
