@@ -30,6 +30,7 @@ pub use apeiron_services::{
     RestoreTestOutcome as RestoreTestReport, SyncAction, SyncMode, SyncOutcome as SyncReport,
     Warning, WarningKind,
 };
+pub use apeiron_services::{MergeAction, MergeOutcome as MergeReport};
 pub use error::{Error, ErrorKind, Result};
 pub use job::Job;
 pub use repo::Repository;
@@ -38,3 +39,4 @@ pub use types::{
     GitRequest, ListRequest, LogPage, LogRequest, RefInfo, RepoInfo, RestoreRequest,
     RestoreTestRequest, SnapshotInfo, SyncRequest, TransferRequest,
 };
+pub use types::{CreateRefRequest, MergeRequest};

@@ -115,6 +115,7 @@ Rules for code, commits and format changes: [CONTRIBUTING.md](CONTRIBUTING.md).
 | [Background service](docs/DAEMON.md) | Scheduled jobs and the restore test |
 | [Sync](docs/SYNC.md) | Folder sync between devices and conflict detection |
 | [Git](docs/GIT.md) | Importing a Git repository with its history and exporting it back |
+| [Branches](docs/BRANCH.md) | Branching and merging |
 | [User guide](docs/GUIDE.md) | Installation, daily backup, restore and the one-month test |
 | [Glossary](docs/GLOSSARY.md) | Terms with English–Turkish equivalents |
 | [Contributing](CONTRIBUTING.md) | Development environment and rules |

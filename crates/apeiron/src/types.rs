@@ -120,6 +120,46 @@ pub struct DeleteRefRequest {
     pub expected: ObjectId,
 }
 
+/// A new ref and the snapshot it starts at.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CreateRefRequest {
+    pub name: String,
+    /// A snapshot spec (API.md §8.4).
+    pub snapshot: String,
+}
+
+/// Which snapshot to merge into which ref.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MergeRequest {
+    /// A snapshot spec (API.md §8.4), usually a branch name.
+    pub from: String,
+    /// The ref that moves; `main` by default.
+    #[serde(default = "default_into")]
+    pub into: String,
+    #[serde(default)]
+    pub message: Option<String>,
+    #[serde(default)]
+    pub author: Option<String>,
+    #[serde(default)]
+    pub dry_run: bool,
+}
+
+fn default_into() -> String {
+    "main".to_owned()
+}
+
+impl MergeRequest {
+    pub fn new(from: impl Into<String>, into: impl Into<String>) -> Self {
+        MergeRequest {
+            from: from.into(),
+            into: into.into(),
+            message: None,
+            author: None,
+            dry_run: false,
+        }
+    }
+}
+
 /// A password or recovery key added to an encrypted repository.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AddedKey {

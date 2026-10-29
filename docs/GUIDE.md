@@ -211,6 +211,20 @@ apeiron git export ~/restored/project.git   # the same history, with the same co
 
 Run `git import` again to store new commits; after `git export`, `git clone ~/restored/project.git` gives a working copy.
 
+### 6.7 Trying something on a branch
+
+A branch keeps an experiment apart from `main` ([BRANCH.md](BRANCH.md)):
+
+```bash
+apeiron ref create trial                      # a branch starting where main is
+apeiron restore trial ~/trial                 # work on it in its own folder
+apeiron backup ~/trial --ref trial            # record the changes
+apeiron merge trial --dry-run                 # see what joining it would change
+apeiron merge trial                           # join it into main
+```
+
+When both `main` and the branch changed the same file, `main` keeps its version and the branch's version is added as `name (conflict trial).ext`.
+
 ## 7. Routine
 
 | How often | Command | Why |

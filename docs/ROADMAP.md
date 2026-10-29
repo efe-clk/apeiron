@@ -79,7 +79,7 @@ The exit criterion comes first; it was met on 2026-10-29 with item 1, and the st
 | # | Work item | Status |
 | --- | --- | --- |
 | 1 | Git import/export ([GIT.md](GIT.md); the Git network protocol remains a goal) | Done |
-| 2 | Branching and merging | Planned |
+| 2 | Branching and merging ([BRANCH.md](BRANCH.md)) | Done |
 | 3 | Search | Planned |
 | 4 | C ABI and Python SDK | Planned |
 | 5 | WebAssembly plugin system | Planned |

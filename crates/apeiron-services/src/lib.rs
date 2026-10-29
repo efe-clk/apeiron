@@ -10,6 +10,7 @@ mod diff;
 mod error;
 mod export;
 mod list;
+mod merge;
 mod name;
 mod os;
 mod restore;
@@ -22,9 +23,8 @@ pub use diff::{Change, ChangeKind, diff};
 pub use error::{Error, Result};
 pub use export::{ArchiveFormat, ExportOutcome, export};
 pub use list::{EntryInfo, Kind, list};
+pub use merge::{Conflict, ConflictKind, MergeAction, MergeOptions, MergeOutcome, merge};
 pub use name::Name;
 pub use restore::{RestoreOutcome, restore};
 pub use restore_test::{RestoreProblem, RestoreTestOutcome, restore_test};
-pub use sync::{
-    Conflict, ConflictKind, SyncAction, SyncMode, SyncOptions, SyncOutcome, folder_ref, sync,
-};
+pub use sync::{SyncAction, SyncMode, SyncOptions, SyncOutcome, folder_ref, sync};

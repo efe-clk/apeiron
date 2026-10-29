@@ -211,6 +211,20 @@ apeiron git export ~/restored/project.git   # aynı geçmiş, aynı commit kimli
 
 Yeni commit'leri saklamak için `git import`'u yeniden çalıştırın; `git export`'tan sonra `git clone ~/restored/project.git` bir çalışma kopyası verir.
 
+### 6.7 Bir dalda bir şey denemek
+
+Bir dal, bir denemeyi `main`'den ayrı tutar ([BRANCH.tr.md](BRANCH.tr.md)):
+
+```bash
+apeiron ref create trial                      # main'in olduğu yerden başlayan bir dal
+apeiron restore trial ~/trial                 # kendi klasöründe üzerinde çalışın
+apeiron backup ~/trial --ref trial            # değişiklikleri kaydedin
+apeiron merge trial --dry-run                 # birleştirmenin neyi değiştireceğini görün
+apeiron merge trial                           # onu main'e birleştirin
+```
+
+Hem `main` hem dal aynı dosyayı değiştirdiyse `main` kendi sürümünü tutar ve dalın sürümü `name (conflict trial).ext` olarak eklenir.
+
 ## 7. Düzen
 
 | Ne sıklıkla | Komut | Neden |

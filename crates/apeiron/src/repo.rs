@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard, Rw
 use apeiron_core as core;
 use apeiron_services as services;
 
+use crate::MergeReport;
 use crate::error::{Error, ErrorKind, Result};
 use crate::job::Job;
 use crate::spec;
@@ -14,6 +15,7 @@ use crate::types::{
     GitRequest, ListRequest, LogPage, LogRequest, RefInfo, RepoInfo, RestoreRequest,
     RestoreTestRequest, SnapshotInfo, SyncRequest, TransferRequest,
 };
+use crate::types::{CreateRefRequest, MergeRequest};
 use crate::{
     ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo, ExportReport, GcReport,
     GcRequest, GitExportReport, GitImportReport, KeyInfo, ObjectId, Phase, ReflogEntry, Remote,
@@ -393,6 +395,42 @@ impl Repository {
         Ok(self
             .view()?
             .update_ref(&request.name, Some(request.expected), None)?)
+    }
+
+    /// Creates the ref `name` pointing to a snapshot; fails with
+    /// [`ErrorKind::AlreadyExists`] if the ref exists (BRANCH.md §1).
+    pub fn create_ref(&self, request: &CreateRefRequest) -> Result<ObjectId> {
+        let _writer = self.lock_writer();
+        let view = self.view()?;
+        let snapshot = spec::resolve(&view, &request.snapshot)?;
+        if view.read_ref(&request.name)?.is_some() {
+            return Err(Error::new(
+                ErrorKind::AlreadyExists,
+                format!("ref {} already exists", request.name),
+            ));
+        }
+        view.update_ref(&request.name, None, Some(snapshot))?;
+        Ok(snapshot)
+    }
+
+    /// Merges a snapshot into a ref (BRANCH.md §2): nothing to do, a
+    /// fast-forward, or a new snapshot with both as parents.
+    pub fn merge(&self, request: &MergeRequest) -> Result<MergeReport> {
+        let _writer = self.lock_writer();
+        let _lock = core::RepoLock::shared(self.path())?;
+        let mut core = self.read().reopen()?;
+        let options = services::MergeOptions {
+            from: spec::resolve(&core, &request.from)?,
+            from_name: request.from.clone(),
+            into: request.into.clone(),
+            message: request.message.clone(),
+            author: request.author.clone(),
+            host: gethostname::gethostname().into_string().ok(),
+            dry_run: request.dry_run,
+        };
+        let report = services::merge(&mut core, &options);
+        *self.write() = core;
+        Ok(report?)
     }
 
     /// The passwords and recovery keys of an encrypted repository, oldest

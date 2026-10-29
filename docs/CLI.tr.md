@@ -73,6 +73,9 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | `apeiron remote remove <name>` | Bir uzak depoyu unutur; kopyanın kendisine dokunulmaz | Tamamlandı |
 | `apeiron clone <url> <path>` | Bir uzak kopyadan aynı parolayla yeni bir depo oluşturur, her ref'i pull eder ve uzak depoya `origin` adını verir; ikinci bir cihazı kurmanın yolu | Tamamlandı |
 | `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run]` | Bir klasörü bir uzak depo üzerinden birkaç cihazda eşit tutar: yedekler, pull eder, birleştirir, klasörü değiştirir ve push eder ([SYNC.tr.md](SYNC.tr.md)); eklenen, silinen ve değişen dosyalar için `+`, `-` ve `~`, her çatışma için bir satır yazar | Tamamlandı |
+| `apeiron ref create <name> [<snapshot>]` | Bir snapshot'ta (varsayılan `main`) dal gibi bir ref oluşturur ([BRANCH.tr.md](BRANCH.tr.md)) | Tamamlandı |
+| `apeiron ref delete <name>` | Bir ref'i siler; `apeiron reflog <name>` onun nereye işaret ettiğini yine gösterir | Tamamlandı |
+| `apeiron merge <from> [--into <ref>] [--message <text>] [--dry-run]` | Bir snapshot'ı, genellikle bir dalı, bir ref'e (varsayılan `main`) birleştirir; çatışma varsa çıkış kodu 3'tür | Tamamlandı |
 | `apeiron git import <git-repo> [--prefix <name>]` | Bir Git deposunun her dalını, etiketini ve uzak takip dalını geçmişiyle `git/` altında saklar ([GIT.tr.md](GIT.tr.md)) | Tamamlandı |
 | `apeiron git export <git-repo> [--prefix <name>]` | Onları aynı commit kimlikleriyle bir Git deposuna geri yazar; biri yeniden üretilemezse çıkış kodu 3'tür | Tamamlandı |
 | `apeiron push <remote> [<ref>]` | Bir ref'in (varsayılan `main`) snapshot'larını uzak depoya kopyalar ve ref'i orada taşır | Tamamlandı |
@@ -101,7 +104,7 @@ Okunurken değişen bir dosya okunduğu hâliyle saklanır ve uyarı olarak rapo
 | 0 | Başarılı |
 | 1 | Hata; depoda hiçbir şey değişmedi |
 | 2 | Kullanım hatası (yanlış komut ya da seçenek) |
-| 3 | Uyarılarla bitti (ör. atlanan dosyalar) ya da `sync` çatışma buldu veya dosyaları sonraki tura bıraktı |
+| 3 | Uyarılarla bitti (ör. atlanan dosyalar) ya da `sync` veya `merge` çatışma buldu ya da `sync` dosyaları sonraki tura bıraktı |
 | 4 | `verify` bozulma buldu |
 | 130 | Ctrl+C ile iptal edildi |
 

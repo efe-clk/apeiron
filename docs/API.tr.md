@@ -157,6 +157,8 @@ Her işlem tek bir düz istek değeri alır ve tek bir düz sonuç değeri dönd
 | `add_password` | yeni parola | `AddedKey`: kimlik | Hayır |
 | `add_recovery_key` | — | `AddedKey`: kimlik ve kullanıcıya bir kez gösterilen yeni kurtarma anahtarı | Hayır |
 | `remove_key` | anahtar kimliği ya da ilk karakterleri | tam kimlik; son anahtar silinemez ve depo kilidi özel alınır | Hayır |
+| `create_ref` | ref adı, snapshot belirteci | snapshot kimliği; ref varsa `already_exists` ([BRANCH.tr.md](BRANCH.tr.md)) | Hayır |
+| `merge` | birleştirilecek snapshot belirteci, taşınacak ref (varsayılan `main`), mesaj, yazar, deneme çalışması | `MergeReport`: eylem (`up_to_date`, `fast_forward` ya da `merged`), ref'in şimdi ve önceden işaret ettiği snapshot, değişen yollar, kopyalarıyla çatışmalar | Hayır |
 | `remotes` | — | `Vec<Remote>`: ad ve URL, ada göre sıralı | Hayır |
 | `add_remote` | ad, URL: bir klasör yolu (mutlak ya da göreli) `sftp://[user@]host[:port]/path` ya da `s3://bucket/path?endpoint=…&region=…` | `Remote`, klasör mutlak yol olarak; SFTP ve S3 uzak depoları şifreli bir depo ister | Hayır |
 | `remove_remote` | ad | —; uzak kopyanın kendisine dokunulmaz | Hayır |

@@ -25,6 +25,7 @@ use apeiron::{
     Repository, RestoreRequest, RestoreTestRequest, SyncAction, SyncMode, SyncReport, SyncRequest,
     TransferReport, TransferRequest, Warning,
 };
+use apeiron::{CreateRefRequest, DeleteRefRequest, MergeAction, MergeRequest};
 use clap::{Parser, Subcommand};
 use serde::Serialize;
 
@@ -156,6 +157,23 @@ enum Command {
         #[command(subcommand)]
         command: KeyCommand,
     },
+    /// Create or delete a ref, such as a branch
+    Ref {
+        #[command(subcommand)]
+        command: RefCommand,
+    },
+    /// Merge a snapshot, usually a branch, into a ref
+    Merge {
+        from: String,
+        /// The ref that moves
+        #[arg(long, default_value = "main")]
+        into: String,
+        #[arg(long)]
+        message: Option<String>,
+        /// Only show what the merge would do
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// Import a Git repository with its history, or export it back
     Git {
         #[command(subcommand)]
@@ -219,6 +237,18 @@ enum DaemonCommand {
     Once,
     /// Show each job's last run, its result and the next run
     Status,
+}
+
+#[derive(Subcommand)]
+enum RefCommand {
+    /// Create a ref pointing to a snapshot
+    Create {
+        name: String,
+        #[arg(default_value = "main")]
+        snapshot: String,
+    },
+    /// Delete a ref; its reflog keeps the history until garbage collection
+    Delete { name: String },
 }
 
 #[derive(Subcommand)]
@@ -679,6 +709,83 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                 }
             }
             Ok(0)
+        }
+        Command::Ref { command } => {
+            let repo = open(cli.repo, password_file)?;
+            match command {
+                RefCommand::Create { name, snapshot } => {
+                    let id = repo.create_ref(&CreateRefRequest {
+                        name: name.clone(),
+                        snapshot,
+                    })?;
+                    out.result(&id, |id| say!("Created {name} at {}", format::short_id(id)));
+                }
+                RefCommand::Delete { name } => {
+                    let expected = repo.resolve(&name)?;
+                    repo.delete_ref(&DeleteRefRequest {
+                        name: name.clone(),
+                        expected,
+                    })?;
+                    out.result(&expected, |id| {
+                        say!(
+                            "Deleted {name} (was {}); `apeiron reflog {name}` keeps it",
+                            format::short_id(id)
+                        );
+                    });
+                }
+            }
+            Ok(0)
+        }
+        Command::Merge {
+            from,
+            into,
+            message,
+            dry_run,
+        } => {
+            let repo = open(cli.repo, password_file)?;
+            let mut request = MergeRequest::new(from.clone(), into.clone());
+            request.message = message;
+            request.dry_run = dry_run;
+            let report = repo.merge(&request)?;
+            out.result(&report, |r| {
+                for change in &r.changes {
+                    let mark = match change.kind {
+                        ChangeKind::Added => '+',
+                        ChangeKind::Removed => '-',
+                        ChangeKind::Modified => '~',
+                    };
+                    say!("{mark} {}", change.path);
+                }
+                for c in &r.conflicts {
+                    match &c.copy {
+                        Some(copy) => {
+                            say!("conflict: {}; the version from {from} is {copy}", c.path)
+                        }
+                        None => say!(
+                            "conflict: {} (deleted on one side, changed on the other; kept)",
+                            c.path
+                        ),
+                    }
+                }
+                let would = if dry_run { "would be " } else { "" };
+                let id = format::short_id(&r.snapshot);
+                match r.action {
+                    MergeAction::UpToDate => say!("{into} already has everything in {from}"),
+                    MergeAction::FastForward => {
+                        say!("{into} {would}moved forward to {from} ({id})")
+                    }
+                    MergeAction::Merged => say!(
+                        "{from} {would}merged into {into} ({}, {})",
+                        format::count(r.changes.len() as u64, "change"),
+                        format::count(r.conflicts.len() as u64, "conflict")
+                    ),
+                }
+            });
+            Ok(if report.conflicts.is_empty() {
+                0
+            } else {
+                EXIT_WARNINGS
+            })
         }
         Command::Git { command } => {
             let repo = open(cli.repo, password_file)?;

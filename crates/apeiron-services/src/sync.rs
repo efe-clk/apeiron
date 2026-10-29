@@ -1,6 +1,5 @@
 //! Sync of a folder between devices through a remote (SYNC.md).
 
-use std::collections::BTreeSet;
 use std::fs::{self, DirEntry, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
@@ -8,8 +7,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use apeiron_core::{
-    EntryKind, ObjectId, ObjectWriter, Repository, Snapshot, Store, Time, TransferReport, Tree,
-    TreeEntry,
+    EntryKind, ObjectId, Repository, Snapshot, Store, Time, TransferReport, Tree, TreeEntry,
 };
 use serde::{Deserialize, Serialize};
 
@@ -17,6 +15,10 @@ use crate::backup;
 use crate::control::{Control, Phase, Warning, WarningKind};
 use crate::diff::{Change, ChangeKind};
 use crate::error::{Error, IoContext, Result};
+use crate::merge::{
+    Conflict, ConflictKind, Merge, by_name, free_name, is_dir, is_file, same, same_content,
+    tree_of, write_items,
+};
 use crate::name::Name;
 use crate::os::{self, Attrs};
 
@@ -71,31 +73,6 @@ pub enum SyncAction {
     Received,
     /// Both had changes; they were merged, applied and pushed.
     Merged,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ConflictKind {
-    /// Both devices changed the file differently; the other version is the
-    /// conflict copy.
-    BothChanged,
-    /// Deleted here and changed on the other device; the changed file is
-    /// kept.
-    DeletedHere,
-    /// Changed here and deleted on the other device; the changed file is
-    /// kept.
-    DeletedThere,
-    /// Changed here while the round ran; the incoming version is the
-    /// conflict copy.
-    ChangedDuringSync,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Conflict {
-    pub path: Name,
-    pub kind: ConflictKind,
-    /// Where the other version was put.
-    pub copy: Option<Name>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -437,224 +414,6 @@ fn copied(ctl: &Control, report: &TransferReport) -> apeiron_core::Result<()> {
     Ok(())
 }
 
-/// Two entries are the same when their kind, content and permission bits
-/// are; times and owners do not count (SYNC.md §4).
-fn same(a: Option<&TreeEntry>, b: Option<&TreeEntry>) -> bool {
-    match (a, b) {
-        (None, None) => true,
-        (Some(a), Some(b)) => a.kind == b.kind && a.mode == b.mode,
-        _ => false,
-    }
-}
-
-/// Whether two trees hold the same entries by [`same`], at every depth.
-fn same_content(repo: &Repository, a: ObjectId, b: ObjectId) -> Result<bool> {
-    if a == b {
-        return Ok(true);
-    }
-    let (a, b) = (repo.read_tree(&a)?, repo.read_tree(&b)?);
-    for [x, y] in by_name([&a, &b]) {
-        let equal = match (x, y) {
-            (
-                Some(TreeEntry {
-                    kind: EntryKind::Directory { tree: x },
-                    mode: mx,
-                    ..
-                }),
-                Some(TreeEntry {
-                    kind: EntryKind::Directory { tree: y },
-                    mode: my,
-                    ..
-                }),
-            ) => mx == my && same_content(repo, *x, *y)?,
-            _ => same(x, y),
-        };
-        if !equal {
-            return Ok(false);
-        }
-    }
-    Ok(true)
-}
-
-fn is_file(e: &TreeEntry) -> bool {
-    matches!(e.kind, EntryKind::File { .. })
-}
-
-fn is_dir(e: Option<&TreeEntry>) -> bool {
-    matches!(
-        e,
-        Some(TreeEntry {
-            kind: EntryKind::Directory { .. },
-            ..
-        })
-    )
-}
-
-fn tree_of(repo: &Repository, e: Option<&TreeEntry>) -> Result<Tree> {
-    match e {
-        Some(TreeEntry {
-            kind: EntryKind::Directory { tree },
-            ..
-        }) => Ok(repo.read_tree(tree)?),
-        _ => Ok(Tree {
-            entries: Vec::new(),
-        }),
-    }
-}
-
-/// The names in any of `trees`, sorted, with each tree's entry. Tree
-/// entries are sorted by name (FORMAT.md §6.3).
-fn by_name<const N: usize>(trees: [&Tree; N]) -> Vec<[Option<&TreeEntry>; N]> {
-    let mut at = [0usize; N];
-    let mut out = Vec::new();
-    loop {
-        let next = (0..N)
-            .filter_map(|i| trees[i].entries.get(at[i]).map(|e| e.name.as_slice()))
-            .min();
-        let Some(name) = next else {
-            return out;
-        };
-        out.push(std::array::from_fn(|i| match trees[i].entries.get(at[i]) {
-            Some(e) if e.name == name => {
-                at[i] += 1;
-                Some(e)
-            }
-            _ => None,
-        }));
-    }
-}
-
-/// An entry of the merged tree.
-enum Item {
-    Entry(TreeEntry),
-    /// A folder whose content was merged; `entry` gives its name and
-    /// attributes.
-    Dir {
-        entry: TreeEntry,
-        items: Vec<Item>,
-    },
-}
-
-struct Merge<'a> {
-    repo: &'a Repository,
-    suffix: &'a str,
-    conflicts: Vec<Conflict>,
-}
-
-impl Merge<'_> {
-    fn run(
-        mut self,
-        base: Option<ObjectId>,
-        local: ObjectId,
-        remote: ObjectId,
-    ) -> Result<(Vec<Item>, Vec<Conflict>)> {
-        let base = match base {
-            Some(id) => self.repo.read_tree(&id)?,
-            None => Tree {
-                entries: Vec::new(),
-            },
-        };
-        let local = self.repo.read_tree(&local)?;
-        let remote = self.repo.read_tree(&remote)?;
-        let items = self.trees(&base, &local, &remote, &Name::default())?;
-        Ok((items, self.conflicts))
-    }
-
-    fn trees(&mut self, base: &Tree, local: &Tree, remote: &Tree, rel: &Name) -> Result<Vec<Item>> {
-        let mut items = Vec::new();
-        let mut copies = Vec::new();
-        for [b, l, r] in by_name([base, local, remote]) {
-            let Some(any) = l.or(r).or(b) else { continue };
-            let path = rel.join(&any.name);
-            let changed_l = !same(b, l);
-            let changed_r = !same(b, r);
-            // Folders on both sides, or a folder deleted on one side and
-            // changed on the other, are merged inside.
-            let dir_or_gone = |e: Option<&TreeEntry>| is_dir(e) || e.is_none() && is_dir(b);
-            if changed_l && changed_r && dir_or_gone(l) && dir_or_gone(r) && !same(l, r) {
-                let inner = self.trees(
-                    &tree_of(self.repo, b)?,
-                    &tree_of(self.repo, l)?,
-                    &tree_of(self.repo, r)?,
-                    &path,
-                )?;
-                if (l.is_none() || r.is_none()) && inner.is_empty() {
-                    continue;
-                }
-                let entry = l
-                    .or(r)
-                    .cloned()
-                    .ok_or(Error::InvalidInput(path.to_string()))?;
-                items.push(Item::Dir {
-                    entry,
-                    items: inner,
-                });
-                continue;
-            }
-            let (keep, conflict) = if !changed_r {
-                (l, None)
-            } else if !changed_l {
-                (r, None)
-            } else if same(l, r) {
-                (l, None)
-            } else {
-                match (l, r) {
-                    (None, Some(_)) => (r, Some((ConflictKind::DeletedHere, None))),
-                    (Some(_), None) => (l, Some((ConflictKind::DeletedThere, None))),
-                    _ => (l, Some((ConflictKind::BothChanged, r))),
-                }
-            };
-            if let Some(entry) = keep {
-                items.push(Item::Entry(entry.clone()));
-            }
-            if let Some((kind, other)) = conflict {
-                if let Some(other) = other {
-                    copies.push((self.conflicts.len(), other.clone()));
-                }
-                self.conflicts.push(Conflict {
-                    path,
-                    kind,
-                    copy: None,
-                });
-            }
-        }
-        // Conflict copies get free names once every other name is known.
-        let mut taken: BTreeSet<Vec<u8>> = items.iter().map(|i| item_name(i).to_vec()).collect();
-        for (conflict, mut other) in copies {
-            let name = free_name(&other.name, self.suffix, |n| taken.contains(n));
-            taken.insert(name.clone());
-            self.conflicts[conflict].copy = Some(rel.join(&name));
-            other.name = name;
-            items.push(Item::Entry(other));
-        }
-        Ok(items)
-    }
-}
-
-fn item_name(item: &Item) -> &[u8] {
-    match item {
-        Item::Entry(e) | Item::Dir { entry: e, .. } => &e.name,
-    }
-}
-
-/// Writes the merged folders; returns the root tree.
-fn write_items(writer: &mut ObjectWriter<'_>, items: Vec<Item>) -> Result<ObjectId> {
-    let mut entries = Vec::with_capacity(items.len());
-    for item in items {
-        entries.push(match item {
-            Item::Entry(e) => e,
-            Item::Dir { mut entry, items } => {
-                entry.kind = EntryKind::Directory {
-                    tree: write_items(writer, items)?,
-                };
-                entry
-            }
-        });
-    }
-    entries.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(writer.put_tree(&Tree { entries })?)
-}
-
 /// ` (conflict HOST YYYY-MM-DD HH-MM)` for the snapshot that brought the
 /// other version; the time is UTC.
 fn conflict_suffix(snapshot: &Snapshot) -> String {
@@ -690,30 +449,6 @@ fn utc(t: Time) -> (i64, u32, u32, u32, u32) {
     let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
     let y = yoe + era * 400 + i64::from(m <= 2);
     (y, m, d, (secs / 3600) as u32, (secs % 3600 / 60) as u32)
-}
-
-/// `name` with `suffix` before its extension, and a number after it while
-/// that is taken.
-fn free_name(name: &[u8], suffix: &str, taken: impl Fn(&[u8]) -> bool) -> Vec<u8> {
-    let split = match name.iter().rposition(|&b| b == b'.') {
-        Some(i) if i > 0 => i,
-        _ => name.len(),
-    };
-    let (stem, ext) = name.split_at(split);
-    for n in 1.. {
-        let mut out = stem.to_vec();
-        out.extend_from_slice(suffix.as_bytes());
-        if n > 1 {
-            // " (conflict …)" becomes " (conflict … 2)".
-            out.pop();
-            out.extend_from_slice(format!(" {n})").as_bytes());
-        }
-        out.extend_from_slice(ext);
-        if !taken(&out) {
-            return out;
-        }
-    }
-    unreachable!("an unbounded range always yields")
 }
 
 /// Changes the folder from what the snapshot L recorded to a new tree,

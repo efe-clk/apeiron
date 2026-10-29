@@ -29,6 +29,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [019](#adr-019-the-background-service-is-a-user-process-with-a-jobs-file) | Background service | A user process with a TOML jobs file, started by the operating system; missed jobs catch up | Accepted |
 | [020](#adr-020-sync-through-a-remote-with-a-three-way-merge-and-conflict-copies) | Sync | Devices meet at a remote; a three-way merge per path; conflicting versions are kept as copies | Accepted |
 | [021](#adr-021-git-import-and-export-with-exact-object-ids-in-a-crate-of-its-own) | Git | `apeiron-git` with `gix`; raw headers in `meta` so exported commits keep their ids | Accepted |
+| [022](#adr-022-branches-are-refs-one-three-way-merge-for-sync-and-branches) | Branches | Branches are refs; one per-path three-way merge with conflict copies for sync and `merge` | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28.
 
@@ -456,3 +457,24 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Write the import as a WebAssembly plugin first | Needs the plugin system and a file system interface first; blocks the exit criterion |
 
 **Consequences.** Snapshots imported from Git carry `git.*` keys in `meta`. Tree entries hold no times, so restoring a Git snapshot gives files the time of the restore. Export writes loose objects. SHA-256 repositories and shallow clones are refused for now.
+
+## ADR-022: Branches are refs; one three-way merge for sync and branches
+
+**Status:** Accepted (2026-10-29)
+
+**Context.** Stage 3 adds branching and merging ([BRANCH.md](BRANCH.md)). Refs already name snapshots of any kind (ADR-013), and sync already merges two lines of history per path with conflict copies (ADR-020).
+
+**Decision.** A branch is an ordinary ref; `ref create` and `ref delete` manage them. `merge` joins a snapshot into a ref: nothing to do, a fast-forward, or a new snapshot with both as parents, made by the same per-path three-way merge as sync, now in its own module of the services. Two different versions of a file are both kept, the incoming one as `name (conflict <from>).ext`. A merge works on snapshots only; folders are changed by `restore`, `backup` and sync.
+
+**Rationale.** One merge means one set of rules to test and explain, for devices and for branches alike. Conflict copies never stop a merge and lose nothing; resolving them needs no special tool. Keeping folders out of the merge avoids a second way of changing a user's files beside sync, whose safety rules were made for that.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| A separate branch type beside refs | Two concepts for the same thing; ADR-013 made refs serve every purpose |
+| Stopping a merge on a conflict until it is resolved, as Git does | Needs a state for a half-done merge and a tool to finish it; conflict copies need neither |
+| Merging text line by line now | Belongs to type drivers (VISION.md); the text diff plugin brings it |
+| A working folder that follows a branch (`checkout`) | A second way of changing user files; `restore`, `backup` and sync cover the need for now |
+
+**Consequences.** Two edits to different lines of one text file are a conflict until the text diff plugin exists. Conflict copies appear in the merged snapshot and are cleaned up by the next change. Rebase and cherry-pick are not available.

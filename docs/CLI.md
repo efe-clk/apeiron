@@ -73,6 +73,9 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | `apeiron remote remove <name>` | Forgets a remote; the copy itself is not touched | Done |
 | `apeiron clone <url> <path>` | Makes a new repository from a remote copy, with the same password, pulls every ref and names the remote `origin`; the way to set up a second device | Done |
 | `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run]` | Keeps a folder equal on several devices through a remote: backs it up, pulls, merges, changes the folder and pushes ([SYNC.md](SYNC.md)); prints `+`, `-` and `~` for added, removed and changed files and one line per conflict | Done |
+| `apeiron ref create <name> [<snapshot>]` | Creates a ref, such as a branch, at a snapshot (default `main`) ([BRANCH.md](BRANCH.md)) | Done |
+| `apeiron ref delete <name>` | Deletes a ref; `apeiron reflog <name>` still shows where it pointed | Done |
+| `apeiron merge <from> [--into <ref>] [--message <text>] [--dry-run]` | Merges a snapshot, usually a branch, into a ref (default `main`); exit code 3 when there are conflicts | Done |
 | `apeiron git import <git-repo> [--prefix <name>]` | Stores every branch, tag and remote-tracking branch of a Git repository, with its history, under `git/` ([GIT.md](GIT.md)) | Done |
 | `apeiron git export <git-repo> [--prefix <name>]` | Writes them back into a Git repository with the same commit ids; exit code 3 if one could not be reproduced | Done |
 | `apeiron push <remote> [<ref>]` | Copies the snapshots of a ref (default `main`) to a remote and moves the ref there | Done |
@@ -101,7 +104,7 @@ A file that changes while it is being read is stored as read and reported as a w
 | 0 | Success |
 | 1 | Error; nothing was changed in the repository |
 | 2 | Usage error (wrong command or option) |
-| 3 | Finished with warnings (for example skipped files), or `sync` found conflicts or left files for the next round |
+| 3 | Finished with warnings (for example skipped files), or `sync` or `merge` found conflicts, or `sync` left files for the next round |
 | 4 | Damage found by `verify` |
 | 130 | Cancelled with Ctrl+C |
 

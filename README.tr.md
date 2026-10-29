@@ -115,6 +115,7 @@ Kod, commit ve format değişikliği kuralları: [CONTRIBUTING.tr.md](CONTRIBUTI
 | [Arka plan hizmeti](docs/DAEMON.tr.md) | Zamanlanmış işler ve geri yükleme testi |
 | [Senkron](docs/SYNC.tr.md) | Klasörlerin cihazlar arası senkronu ve çatışma tespiti |
 | [Git](docs/GIT.tr.md) | Bir Git deposunu geçmişiyle içe almak ve geri dışa aktarmak |
+| [Dallar](docs/BRANCH.tr.md) | Dallanma ve birleştirme |
 | [Kullanım rehberi](docs/GUIDE.tr.md) | Kurulum, günlük yedek, geri yükleme ve bir aylık deneme |
 | [Sözlük](docs/GLOSSARY.tr.md) | Terimler ve İngilizce–Türkçe karşılıkları |
 | [Katkı](CONTRIBUTING.tr.md) | Geliştirme ortamı ve kurallar |

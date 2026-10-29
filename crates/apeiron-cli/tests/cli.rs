@@ -469,3 +469,42 @@ fn git_import_and_export_keep_commit_ids() {
     let missing = s.run(&["--json", "git", "import", &s.path("nothing")]);
     assert_eq!(code(&missing), Some(1));
 }
+
+#[test]
+fn branches_are_created_merged_and_deleted() {
+    let s = Setup::new();
+    let src = s.path("src");
+    s.ok(&["backup", &src]);
+    assert!(
+        s.ok(&["ref", "create", "feature"])
+            .starts_with("Created feature at ")
+    );
+    assert_eq!(code(&s.run(&["ref", "create", "feature"])), Some(1));
+
+    fs::write(s.root.join("src/a.txt"), b"on feature").unwrap();
+    s.ok(&["backup", &src, "--ref", "feature"]);
+    let doc = s.json(&["merge", "feature", "--dry-run"]);
+    assert_eq!(doc["action"], "fast_forward");
+    let out = s.ok(&["merge", "feature"]);
+    assert!(
+        out.contains("~ a.txt") && out.contains("main moved forward to feature"),
+        "{out}"
+    );
+
+    // Both sides change a.txt: a conflict, exit code 3.
+    fs::write(s.root.join("src/a.txt"), b"feature again").unwrap();
+    s.ok(&["backup", &src, "--ref", "feature"]);
+    fs::write(s.root.join("src/a.txt"), b"main again").unwrap();
+    s.ok(&["backup", &src]);
+    let out = s.run(&["merge", "feature"]);
+    assert_eq!(code(&out), Some(3));
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(text.contains("a (conflict feature).txt"), "{text}");
+    assert!(s.ok(&["ls", "main"]).contains("a (conflict feature).txt"));
+
+    assert!(
+        s.ok(&["ref", "delete", "feature"])
+            .contains("Deleted feature")
+    );
+    assert!(!s.ok(&["refs"]).contains("feature"));
+}
