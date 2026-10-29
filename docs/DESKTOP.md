@@ -2,7 +2,7 @@
 
 # Desktop Interface
 
-> **Status: In progress.** This is the design of Stage 4 work item 1 ([ROADMAP.md](ROADMAP.md) §6): a window in which a user who has never seen a command line backs up, looks at and restores folders. The decision behind it is ADR-026 ([DECISIONS.md](DECISIONS.md)).
+> **Status: Done.** This is the design of Stage 4 work item 1 ([ROADMAP.md](ROADMAP.md) §6): a window in which a user who has never seen a command line backs up, looks at and restores folders. The decision behind it is ADR-026 ([DECISIONS.md](DECISIONS.md)).
 
 Stage 4 ends when a non-technical user can back up and restore without the CLI. The desktop interface is that path; the web interface (work item 2) reuses its pages.
 
@@ -20,7 +20,7 @@ flowchart LR
 | --- | --- | --- |
 | Pages | One set of HTML, CSS and JavaScript files without a build step, compiled into the program | Done |
 | Local server | `apeiron-server`: serves the pages and a JSON API over HTTP, only on `127.0.0.1`, to holders of a token | Done |
-| Desktop app | `apeiron-desktop`: starts the server inside itself and shows the pages in a window of the operating system's web view | In progress |
+| Desktop app | `apeiron-desktop`: starts the server inside itself and shows the pages in a window of the operating system's web view | Done |
 | `apeiron ui` | Starts the server and opens the pages in the default browser; for systems without the desktop app | Done |
 
 The pages call only the JSON API, and the JSON API calls only the public API (ARCHITECTURE.md §1); there is no other way into a repository.
@@ -84,5 +84,5 @@ An error is the error value of API.md §8.6 with status 400 for `invalid_input`,
 | --- | --- | --- |
 | `apeiron` | Operations by name with JSON values, shared by the C ABI and the server | Done |
 | `apeiron-server` | The local server and the pages | Done |
-| `apeiron-desktop` | The window | In progress |
+| `apeiron-desktop` | The window | Done |
 | `apeiron-cli` | `apeiron ui` | Done |

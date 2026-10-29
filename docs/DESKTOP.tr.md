@@ -2,7 +2,7 @@
 
 # Masaüstü Arayüzü
 
-> **Durum: Devam ediyor.** Aşama 4'ün 1. işinin tasarımıdır ([ROADMAP.tr.md](ROADMAP.tr.md) §6): komut satırı hiç görmemiş bir kullanıcının klasörleri yedeklediği, onlara baktığı ve geri yüklediği bir pencere. Arkasındaki karar ADR-026'dır ([DECISIONS.tr.md](DECISIONS.tr.md)).
+> **Durum: Tamamlandı.** Aşama 4'ün 1. işinin tasarımıdır ([ROADMAP.tr.md](ROADMAP.tr.md) §6): komut satırı hiç görmemiş bir kullanıcının klasörleri yedeklediği, onlara baktığı ve geri yüklediği bir pencere. Arkasındaki karar ADR-026'dır ([DECISIONS.tr.md](DECISIONS.tr.md)).
 
 Aşama 4, teknik olmayan bir kullanıcı CLI'sız yedek alıp geri yükleyebildiğinde biter. Masaüstü arayüzü bu yoldur; web arayüzü (2. iş) onun sayfalarını yeniden kullanır.
 
@@ -20,7 +20,7 @@ flowchart LR
 | --- | --- | --- |
 | Sayfalar | Derleme adımı olmayan, programın içine gömülen tek bir HTML, CSS ve JavaScript dosyaları takımı | Tamamlandı |
 | Yerel sunucu | `apeiron-server`: sayfaları ve HTTP üzerinden bir JSON API'yi yalnızca `127.0.0.1` üzerinde, bir jetona sahip olanlara sunar | Tamamlandı |
-| Masaüstü uygulaması | `apeiron-desktop`: sunucuyu kendi içinde başlatır ve sayfaları işletim sisteminin web görünümünün bir penceresinde gösterir | Devam ediyor |
+| Masaüstü uygulaması | `apeiron-desktop`: sunucuyu kendi içinde başlatır ve sayfaları işletim sisteminin web görünümünün bir penceresinde gösterir | Tamamlandı |
 | `apeiron ui` | Sunucuyu başlatır ve sayfaları varsayılan tarayıcıda açar; masaüstü uygulaması olmayan sistemler için | Tamamlandı |
 
 Sayfalar yalnızca JSON API'yi, JSON API de yalnızca herkese açık API'yi çağırır (ARCHITECTURE.tr.md §1); bir depoya başka bir yol yoktur.
@@ -84,5 +84,5 @@ Bir hata, API.tr.md §8.6'daki hata değeridir; durum kodu `invalid_input`, `amb
 | --- | --- | --- |
 | `apeiron` | C ABI ve sunucunun paylaştığı, JSON değerlerle adlarıyla işlemler | Tamamlandı |
 | `apeiron-server` | Yerel sunucu ve sayfalar | Tamamlandı |
-| `apeiron-desktop` | Pencere | Devam ediyor |
+| `apeiron-desktop` | Pencere | Tamamlandı |
 | `apeiron-cli` | `apeiron ui` | Tamamlandı |

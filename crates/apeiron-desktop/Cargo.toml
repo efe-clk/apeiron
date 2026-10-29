@@ -1,0 +1,14 @@
+[package]
+name = "apeiron-desktop"
+description = "Desktop app of Apeiron: its pages in a window"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+apeiron-server = { path = "../apeiron-server" }
+tao = "0.37.2"
+wry = "0.57.1"

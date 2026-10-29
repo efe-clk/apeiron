@@ -241,6 +241,17 @@ apeiron diff main~1 main --text               # hangi satırların değiştiğin
 
 Klasörü senkronlayan her bilgisayara kurun; kurulu olmayan bir bilgisayar bunun yerine çatışma kopyası oluşturur, bu da hiçbir şey kaybettirmez.
 
+### 6.9 Komut satırı olmadan
+
+Masaüstü uygulaması, 3. ile 6. bölümler arasında çoğu kişinin ihtiyaç duyduğu her şeyi bir pencerede yapar: yedek klasörünü açmak ya da oluşturmak, yedeklemek, sürümlere bakmak, geri yüklemek ve denetlemek ([DESKTOP.tr.md](DESKTOP.tr.md)). Linux'ta önce WebKitGTK dosyalarını ister (Debian ve Ubuntu'da `sudo apt install libwebkit2gtk-4.1-dev`, Arch'ta `sudo pacman -S webkit2gtk-4.1`):
+
+```bash
+cargo install --locked --path crates/apeiron-desktop
+apeiron-desktop
+```
+
+Masaüstü uygulamasının derlenemediği yerde `apeiron ui` aynı sayfaları tarayıcınızda gösterir; durdurmak için terminali kapatın ya da Ctrl+C'ye basın.
+
 ## 7. Düzen
 
 | Ne sıklıkla | Komut | Neden |

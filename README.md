@@ -54,6 +54,7 @@ Each layer uses only the layer directly below it. Details: [docs/ARCHITECTURE.md
 | C ABI | `apeiron-ffi` | Stable C interface `libapeiron` with the header `apeiron.h`, and the Python SDK over it ([docs/SDK.md](docs/SDK.md)); may use `unsafe` | Done |
 | CLI | `apeiron-cli` | The `apeiron` command ([docs/CLI.md](docs/CLI.md)) | In progress |
 | Background service | `apeiron-daemon` | Scheduled jobs and the restore test ([docs/DAEMON.md](docs/DAEMON.md)) | Done |
+| Desktop interface | `apeiron-server`, `apeiron-desktop` | Pages, a local server and a window for backing up and restoring without the command line ([docs/DESKTOP.md](docs/DESKTOP.md)) | Done |
 | Git | `apeiron-git` | Import and export of Git repositories with the same commit ids ([docs/GIT.md](docs/GIT.md)) | Done |
 | Plugins | `apeiron-plugin` | WebAssembly plugin host; type drivers merge files ([docs/PLUGIN.md](docs/PLUGIN.md)) | Done |
 

@@ -241,6 +241,17 @@ apeiron diff main~1 main --text               # see which lines changed
 
 Install it on every computer that syncs the folder; a computer without it makes conflict copies instead, which loses nothing.
 
+### 6.9 Without the command line
+
+The desktop app does everything in sections 3 to 6 that most people need, in a window: opening or creating the backup folder, backing up, looking at versions, restoring and checking ([DESKTOP.md](DESKTOP.md)). On Linux it needs the WebKitGTK files first (`sudo apt install libwebkit2gtk-4.1-dev` on Debian and Ubuntu, `sudo pacman -S webkit2gtk-4.1` on Arch):
+
+```bash
+cargo install --locked --path crates/apeiron-desktop
+apeiron-desktop
+```
+
+Where the desktop app cannot be built, `apeiron ui` shows the same pages in your browser; close the terminal or press Ctrl+C to stop it.
+
 ## 7. Routine
 
 | How often | Command | Why |

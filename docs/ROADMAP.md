@@ -93,7 +93,7 @@ The desktop interface comes first, because it alone meets the exit criterion; th
 
 | # | Work item | Status |
 | --- | --- | --- |
-| 1 | Desktop interface ([DESKTOP.md](DESKTOP.md)) | In progress |
+| 1 | Desktop interface ([DESKTOP.md](DESKTOP.md)) | Done |
 | 2 | Web interface | Planned |
 | 3 | Users and permissions | Planned |
 | 4 | Audit log | Planned |
