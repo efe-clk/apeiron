@@ -3,7 +3,7 @@
 //! `APEIRON_SFTP_TEST` is set, as it is in CI.
 
 use std::fs;
-use std::net::{TcpListener, TcpStream};
+use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant, SystemTime};
@@ -62,6 +62,23 @@ fn server() -> Option<Server> {
     keygen(&d.join("user_key"));
     fs::copy(d.join("user_key.pub"), d.join("authorized_keys")).unwrap();
     fs::create_dir(d.join("data")).unwrap();
+    // Tests run in parallel and may pick the same free port; an sshd that
+    // cannot listen exits, and the next port is tried. sshd writes its pid
+    // file only once it listens.
+    let (child, port) = (0..10)
+        .find_map(|_| start_sshd(&sshd, d))
+        .expect("sshd did not start");
+    let host_key = fs::read_to_string(d.join("host_key.pub")).unwrap();
+    fs::write(
+        d.join("known_hosts"),
+        format!("[127.0.0.1]:{port} {host_key}"),
+    )
+    .unwrap();
+    Some(Server { dir, child, port })
+}
+
+/// Starts sshd on a port that was free a moment ago; `None` if it exited.
+fn start_sshd(sshd: &Path, d: &Path) -> Option<(Child, u16)> {
     let port = TcpListener::bind("127.0.0.1:0")
         .unwrap()
         .local_addr()
@@ -75,7 +92,8 @@ fn server() -> Option<Server> {
         d = d.display()
     );
     fs::write(d.join("sshd_config"), config).unwrap();
-    let child = Command::new(sshd)
+    let _ = fs::remove_file(d.join("sshd.pid"));
+    let mut child = Command::new(sshd)
         .arg("-D")
         .arg("-e")
         .arg("-f")
@@ -85,20 +103,15 @@ fn server() -> Option<Server> {
         .spawn()
         .unwrap();
     let start = Instant::now();
-    while TcpStream::connect(("127.0.0.1", port)).is_err() {
-        assert!(
-            start.elapsed() < Duration::from_secs(10),
-            "sshd did not start"
-        );
-        std::thread::sleep(Duration::from_millis(50));
+    while !d.join("sshd.pid").exists() {
+        if child.try_wait().unwrap().is_some() || start.elapsed() > Duration::from_secs(10) {
+            let _ = child.kill();
+            let _ = child.wait();
+            return None;
+        }
+        std::thread::sleep(Duration::from_millis(20));
     }
-    let host_key = fs::read_to_string(d.join("host_key.pub")).unwrap();
-    fs::write(
-        d.join("known_hosts"),
-        format!("[127.0.0.1]:{port} {host_key}"),
-    )
-    .unwrap();
-    Some(Server { dir, child, port })
+    Some((child, port))
 }
 
 impl Server {
