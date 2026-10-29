@@ -33,6 +33,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [023](#adr-023-arama-saklanan-bir-dizin-olmadan-snapshotları-okur) | Arama | Snapshot'lar doğrudan okunur, her klasör ve içerik arama başına bir kez; saklanan dizin yok | Kabul edildi |
 | [024](#adr-024-python-sdksı-c-abiyi-ctypes-ile-çağırır) | Python SDK | C ABI üzerinde `ctypes` ile saf Python; her dil için tek bir uygunluk test paketi | Kabul edildi |
 | [025](#adr-025-eklentiler-hiçbir-şey-verilmeden-çalışır-önce-tür-sürücüleri-gelir) | Eklentiler | İzinsiz, süre ve bellek sınırlı, kullanıcı başına bileşenler; tür sürücüleri çatışma kopyasından önce birleştirir; Rust 1.97 | Kabul edildi |
+| [026](#adr-026-yerelde-sunulan-ve-yerel-bir-pencerede-gösterilen-tek-bir-web-sayfaları-takımı) | Masaüstü arayüzü | Derleme adımı olmayan HTML sayfaları, `127.0.0.1` üzerinde jetonlu bir JSON API, bir `wry` penceresi | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
@@ -542,3 +543,24 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Rust 1.85 için en yenisi olan Wasmtime 34 | Sandbox'a bir yıldan fazla düzeltmeyi kaçırır |
 
 **Sonuçlar.** Eklentisi olmayan bir cihaz, başka bir cihazın birleştirdiği yerde çatışma kopyası oluşturur; iki sonuç da güvenlidir. Apeiron'u derlemek Rust 1.97 ya da daha yenisini, eklenti ortamını sınamak `wasm32-wasip2` hedefini gerektirir. Fark işlevi, gösterilmek için metin diff eklentisini bekler.
+
+## ADR-026: Yerelde sunulan ve yerel bir pencerede gösterilen tek bir web sayfaları takımı
+
+**Durum:** Kabul edildi (2026-10-30)
+
+**Bağlam.** Aşama 4, teknik bilgisi az olan kullanıcılar için bir masaüstü arayüzü ve ardından sunucu yöneticileri için bir web arayüzü gerektirir ([DESKTOP.tr.md](DESKTOP.tr.md), VISION.tr.md). İkisi de yalnızca herkese açık API'yi kullanmalıdır. Proje sahibi kodu elle sürdürmez; bu yüzden iki ayrı arayüz işi ikiye katlardı.
+
+**Karar.** Arayüz, derleme adımı ve dış kütüphanesi olmayan, programın içine gömülen tek bir HTML, CSS ve JavaScript sayfaları takımıdır. `axum` üzerindeki yerel sunucu `apeiron-server` onları ve HTTP üzerindeki C ABI olan bir JSON API'yi yalnızca `127.0.0.1` üzerinde ve yalnızca adresin parça kısmında verilen rastgele bir jetona sahip olanlara sunar; `Host` ve `Origin` başlıklarını denetler. Masaüstü uygulaması sayfaları `wry` ve `tao` aracılığıyla işletim sisteminin web görünümünün bir penceresinde gösterir; `apeiron ui` onları bir tarayıcıda açar.
+
+**Gerekçe.** 2. işin web arayüzü aynı sayfaları ve aynı JSON API'yi, oturum açmayla ağa sunarak yeniden kullanır. Web sayfaları ekran okuyuculara ve klavye kullanıcılarına erişilebilirdir ve ek iş olmadan açık ve koyu temada doğru görünür. Derleme adımı olmayınca güncel tutulacak bir JavaScript araç zinciri yoktur ve sayfalar herkesin okuyabileceği düz dosyalardır. `wry`, sistemin zaten sahip olduğu web görünümünü (WebKitGTK, WebKit, WebView2) kullanır; böylece tarayıcı dağıtılmaz; Tauri'nin temelidir ama Tauri'nin yapılandırması ve derleme araçları olmadan.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Yerel bir Rust araç takımı (egui, iced, Slint) | Web için yine ikinci bir arayüz gerekirdi; erişilebilirlik daha zayıf; Slint'in lisansı koşullar ekler |
+| Tauri | Derleme araçları ve yapılandırması, programın kendi sunduğu sayfaların etrafındaki bir pencereye pek bir şey katmaz |
+| Electron | Koca bir tarayıcı dağıtır; Raspberry Pi'de büyüktür |
+| Derleme adımı olan bir JavaScript çatısı | Birkaç ekran için güncel tutulacak bir araç zinciri |
+
+**Sonuçlar.** Masaüstü uygulamasını Linux'ta derlemek WebKitGTK geliştirme dosyalarını gerektirir. Sayfalar yalnızca program çalışırken çalışır. Masaüstü uygulamasının diske hiç yazmadığı jetonu okuyabilen herkes, kullanıcının açtığı depoyu kullanabilir.

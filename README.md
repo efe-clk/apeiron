@@ -6,7 +6,7 @@
 
 Apeiron treats a developer's repository, a musician's project and a family photo archive the same way: as snapshots of content-addressed, immutable objects. Backup, archive, sync and versioning are different policies over the same object graph, not four separate engines. It is local first: no core function needs a cloud, an account or an internet connection.
 
-> **Status:** Early development. Stage 0 (format and core) is done; Stage 1 (local MVP) is done; Stage 2 (remote and sync) is done; Stage 3 (developer and ecosystem) is done. The `apeiron` command can already back up, sync, branch, merge, search and restore folders and import Git repositories, but there is no release or stable API yet. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status:** Early development. Stage 0 (format and core) is done; Stage 1 (local MVP) is done; Stage 2 (remote and sync) is done; Stage 3 (developer and ecosystem) is done; Stage 4 (interfaces and multi-user) is in progress. The `apeiron` command can already back up, sync, branch, merge, search and restore folders and import Git repositories, but there is no release or stable API yet. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Core principles
 
@@ -85,7 +85,7 @@ Why each choice was made: [docs/DECISIONS.md](docs/DECISIONS.md).
 | 1. Local MVP | CLI, snapshots, history, restore, local backup targets, tar, zip and 7z export | Done |
 | 2. Remote and sync | Daemon, encryption, SFTP/S3, sync, restore test | Done |
 | 3. Developer and ecosystem | Branch/merge, Git import/export, C ABI, Python SDK, plugins | Done |
-| 4. Interfaces and multi-user | Desktop and web UI, permissions, audit log, sharing | Planned |
+| 4. Interfaces and multi-user | Desktop and web UI, permissions, audit log, sharing | In progress |
 | 5. Enterprise | Central identity, replication, high availability | Planned |
 
 Details and exit criteria: [docs/ROADMAP.md](docs/ROADMAP.md).
@@ -119,6 +119,7 @@ Rules for code, commits and format changes: [CONTRIBUTING.md](CONTRIBUTING.md).
 | [Search](docs/SEARCH.md) | Finding files by name, metadata and text, also in the history |
 | [Plugins](docs/PLUGIN.md) | WebAssembly plugins and type drivers |
 | [Text plugin](docs/TEXT.md) | Merging text files line by line and showing their differences |
+| [Desktop interface](docs/DESKTOP.md) | Backing up and restoring in a window, without the command line |
 | [User guide](docs/GUIDE.md) | Installation, daily backup, restore and the one-month test |
 | [Glossary](docs/GLOSSARY.md) | Terms with English–Turkish equivalents |
 | [Contributing](CONTRIBUTING.md) | Development environment and rules |

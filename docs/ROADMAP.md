@@ -4,7 +4,7 @@
 
 The expensive decisions (format, object model, API and plugin boundary) are made in Stage 0; everything else is built on top of that foundation. Every stage leaves a product that is usable on its own. The stages and exit criteria come from [VISION.md](VISION.md).
 
-**Current stage: Stage 4 — Interfaces and multi-user (Planned).** Stage 0 and Stage 1 were completed on 2026-10-28, Stage 2 and Stage 3 on 2026-10-29; the one-month tests of Stage 1 and Stage 2 were skipped by the owner's decision.
+**Current stage: Stage 4 — Interfaces and multi-user (In progress).** Stage 0 and Stage 1 were completed on 2026-10-28, Stage 2 and Stage 3 on 2026-10-29; the one-month tests of Stage 1 and Stage 2 were skipped by the owner's decision.
 
 ## 1. Overview
 
@@ -14,7 +14,7 @@ flowchart LR
     S1["Stage 1<br/>Local MVP<br/>Done"]
     S2["Stage 2<br/>Remote and sync<br/>Done"]
     S3["Stage 3<br/>Developer and ecosystem<br/>Done"]
-    S4["Stage 4<br/>Interfaces and multi-user<br/>Planned"]
+    S4["Stage 4<br/>Interfaces and multi-user<br/>In progress"]
     S5["Stage 5<br/>Enterprise<br/>Planned"]
     S0 --> S1 --> S2 --> S3 --> S4 --> S5
 ```
@@ -25,7 +25,7 @@ flowchart LR
 | 1. Local MVP | CLI; taking snapshots, history, file-level diff, restore, verification; local and external disk backup targets; tar, zip and 7z export | Backing up and restoring your own data with nothing but Apeiron for one month | Done (one-month test skipped) |
 | 2. Remote and sync | Background service, scheduled backup, encryption, SFTP and S3 targets, one-/two-way sync, conflict detection, restore test | One month of trouble-free sync between two devices and a remote server | Done (one-month test skipped) |
 | 3. Developer and ecosystem | Branching and merging, Git import/export (goal: Git network protocol), C ABI and Python SDK, WebAssembly plugin system, text diff plugin, search | A real Git repository can be moved into Apeiron and back | Done |
-| 4. Interfaces and multi-user | Desktop and web interface, users and permissions, audit log, sharing | A non-technical user can back up and restore without the CLI | Planned |
+| 4. Interfaces and multi-user | Desktop and web interface, users and permissions, audit log, sharing | A non-technical user can back up and restore without the CLI | In progress |
 | 5. Enterprise | Central identity, multi-tenant use, replication, high availability, immutable archive, compliance reports | First enterprise pilot installation | Planned |
 
 ## 2. Stage 0 — Format and core
@@ -89,13 +89,15 @@ The exit criterion came first; it was met on 2026-10-29 with item 1, and the sta
 
 **Exit criterion:** A non-technical user can back up and restore without the CLI.
 
-| Work item | Status |
-| --- | --- |
-| Desktop interface | Planned |
-| Web interface | Planned |
-| Users and permissions | Planned |
-| Audit log | Planned |
-| Sharing | Planned |
+The desktop interface comes first, because it alone meets the exit criterion; the web interface reuses its pages; users and permissions come before the audit log and sharing, which record and use them.
+
+| # | Work item | Status |
+| --- | --- | --- |
+| 1 | Desktop interface ([DESKTOP.md](DESKTOP.md)) | In progress |
+| 2 | Web interface | Planned |
+| 3 | Users and permissions | Planned |
+| 4 | Audit log | Planned |
+| 5 | Sharing | Planned |
 
 ## 7. Stage 5 — Enterprise
 

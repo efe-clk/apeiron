@@ -10,14 +10,13 @@
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 #![allow(non_camel_case_types)]
 
-mod ops;
-
 use std::cell::RefCell;
 use std::ffi::{CStr, CString, c_char};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
 use std::time::Duration;
 
+use api::json as ops;
 use api::{Error, ErrorKind, Repository};
 
 /// The job is not finished yet.
@@ -30,7 +29,7 @@ pub const APEIRON_ABI_VERSION: u32 = 1;
 pub struct apeiron_repo(Repository);
 
 /// A running long operation. Use it from one thread at a time.
-pub struct apeiron_job(Box<dyn ops::AnyJob>);
+pub struct apeiron_job(Box<dyn ops::JsonJob>);
 
 thread_local! {
     static LAST_ERROR: RefCell<Option<CString>> = const { RefCell::new(None) };

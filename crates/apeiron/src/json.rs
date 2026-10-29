@@ -1,25 +1,29 @@
 //! Operations by name: JSON requests in, JSON results out (SDK.md §2.1).
+//! The C ABI and the local server (DESKTOP.md §3) are built on these.
 
 use std::path::PathBuf;
 use std::time::Duration;
 
-use api::{Error, ErrorKind, Job, Progress, Repository};
+use crate::error::{Error, ErrorKind, Result};
+use crate::{Job, Progress, Repository};
 use serde::Deserialize;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use crate::{Result, invalid};
+fn invalid(message: impl Into<String>) -> Error {
+    Error::new(ErrorKind::InvalidInput, message)
+}
 
 /// A job whose result is turned into JSON.
-pub(crate) trait AnyJob: Send {
+pub trait JsonJob: Send {
     fn progress(&self) -> Progress;
     fn cancel(&self);
     /// `None` while the job runs; `timeout` `None` waits without limit.
     fn wait(&mut self, timeout: Option<Duration>) -> Option<Result<Value>>;
 }
 
-impl<T: Serialize + Send + 'static> AnyJob for Job<T> {
+impl<T: Serialize + Send + 'static> JsonJob for Job<T> {
     fn progress(&self) -> Progress {
         Job::progress(self)
     }
@@ -46,10 +50,10 @@ fn json(value: &impl Serialize) -> Result<Value> {
 }
 
 fn parse<T: DeserializeOwned>(request: Value) -> Result<T> {
-    serde_json::from_value(request).map_err(|e| invalid(format!("request_json: {e}")))
+    serde_json::from_value(request).map_err(|e| invalid(format!("request: {e}")))
 }
 
-fn boxed<T: Serialize + Send + 'static>(job: Job<T>) -> Box<dyn AnyJob> {
+fn boxed<T: Serialize + Send + 'static>(job: Job<T>) -> Box<dyn JsonJob> {
     Box::new(job)
 }
 
@@ -107,7 +111,7 @@ fn unknown(operation: &str) -> Error {
 }
 
 /// Runs a short operation.
-pub(crate) fn call(repo: &Repository, operation: &str, request: Value) -> Result<Value> {
+pub fn call(repo: &Repository, operation: &str, request: Value) -> Result<Value> {
     match operation {
         "info" => json(&repo.info()),
         "resolve" => json(&repo.resolve(&parse::<Spec>(request)?.spec)?),
@@ -137,16 +141,18 @@ pub(crate) fn call(repo: &Repository, operation: &str, request: Value) -> Result
 
 /// Runs an operation that needs no repository: the plugins of the user
 /// (PLUGIN.md §1).
-pub(crate) fn call_global(operation: &str, request: Value) -> Result<Value> {
+pub fn call_global(operation: &str, request: Value) -> Result<Value> {
     match operation {
-        "plugins" => json(&api::plugins(parse::<PluginDir>(request)?.dir.as_deref())?),
+        "plugins" => json(&crate::plugins(
+            parse::<PluginDir>(request)?.dir.as_deref(),
+        )?),
         "plugin_add" => {
             let r: PluginFile = parse(request)?;
-            json(&api::add_plugin(&r.file, r.dir.as_deref())?)
+            json(&crate::add_plugin(&r.file, r.dir.as_deref())?)
         }
         "plugin_remove" => {
             let r: PluginName = parse(request)?;
-            json(&api::remove_plugin(&r.name, r.dir.as_deref())?)
+            json(&crate::remove_plugin(&r.name, r.dir.as_deref())?)
         }
         _ => Err(invalid(format!(
             "operation {operation:?} needs a repository; repo is NULL"
@@ -155,7 +161,7 @@ pub(crate) fn call_global(operation: &str, request: Value) -> Result<Value> {
 }
 
 /// Starts a long operation on a repository.
-pub(crate) fn start(repo: &Repository, operation: &str, request: Value) -> Result<Box<dyn AnyJob>> {
+pub fn start(repo: &Repository, operation: &str, request: Value) -> Result<Box<dyn JsonJob>> {
     Ok(match operation {
         "backup" => boxed(repo.backup(parse(request)?)?),
         "restore" => boxed(repo.restore(parse(request)?)?),
@@ -174,6 +180,6 @@ pub(crate) fn start(repo: &Repository, operation: &str, request: Value) -> Resul
 }
 
 /// Starts `clone`, which makes a new repository from a remote.
-pub(crate) fn clone(request: Value) -> Result<Box<dyn AnyJob>> {
+pub fn clone(request: Value) -> Result<Box<dyn JsonJob>> {
     Ok(boxed(Repository::clone_from(parse(request)?)?))
 }

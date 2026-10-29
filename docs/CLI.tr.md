@@ -77,6 +77,7 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | `apeiron ref delete <name>` | Bir ref'i siler; `apeiron reflog <name>` onun nereye işaret ettiğini yine gösterir | Tamamlandı |
 | `apeiron merge <from> [--into <ref>] [--message <text>] [--dry-run]` | Bir snapshot'ı, genellikle bir dalı, bir ref'e (varsayılan `main`) birleştirir; çatışma varsa çıkış kodu 3'tür | Tamamlandı |
 | `apeiron search [<pattern>] [--text <text>] [--larger <size>] [--smaller <size>] [--after <date>] [--before <date>] [--in <snapshot>] [--history] [--limit <n>]` | Bir snapshot'ta (varsayılan `main`) ya da `--history` ile önceki her snapshot'ta da dosyaları, klasörleri ve bağlantıları ada, boyuta, değiştirilme gününe ve metne göre bulur; metin eşleşmeleri için `path:line: text` yazar, `--history` ile her sonucun önüne snapshot'ı ve zamanını koyar ([SEARCH.tr.md](SEARCH.tr.md)) | Tamamlandı |
+| `apeiron ui [--no-browser]` | Masaüstü arayüzünü varsayılan tarayıcıda, verilmişse `--repo` deposu açık olarak açar; `--no-browser` bunun yerine adresi yazar ([DESKTOP.tr.md](DESKTOP.tr.md)) | Tamamlandı |
 | `apeiron plugin add <file.wasm>` | Bir eklentiyi denetler ve kullanıcı için kurar; bundan sonra bir birleştirme ya da senkron, işlediği dosyaları çatışma kopyası yerine onun birleştirmesine bırakır ([PLUGIN.tr.md](PLUGIN.tr.md)) | Tamamlandı |
 | `apeiron plugin list` | Kurulu eklentileri listeler | Tamamlandı |
 | `apeiron plugin remove <name>` | Bir eklentiyi kaldırır | Tamamlandı |

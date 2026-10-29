@@ -65,4 +65,10 @@ Apeiron; sürüm kontrolü, arşivleme, yedekleme, senkronizasyon ve bütünlük
 5. ~~WebAssembly eklenti sistemi (`docs/PLUGIN.md`).~~ Tamamlandı (2026-10-29).
 6. ~~Metin diff eklentisi (`docs/TEXT.md`).~~ Tamamlandı (2026-10-29).
 
-**Aşama 4 — Arayüzler ve çok kullanıcı.** Planlandı; işlerin sırası `docs/ROADMAP.md` §6'da belirlenecek.
+**Aşama 4 — Arayüzler ve çok kullanıcı.** Devam ediyor. İşler `docs/ROADMAP.md` §6'da, sırasıyla:
+
+1. Masaüstü arayüzü (`docs/DESKTOP.md`): sayfalar, yerel sunucu ve `apeiron ui` tamamlandı; pencere (`apeiron-desktop`) devam ediyor.
+2. Web arayüzü.
+3. Kullanıcılar ve izinler.
+4. Denetim kaydı.
+5. Paylaşım.

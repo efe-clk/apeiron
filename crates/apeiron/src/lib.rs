@@ -8,6 +8,7 @@
 
 mod error;
 mod job;
+pub mod json;
 mod plugins;
 mod repo;
 mod spec;

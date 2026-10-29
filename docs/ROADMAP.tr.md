@@ -4,7 +4,7 @@
 
 Pahalı kararlar (format, nesne modeli, API ve eklenti sınırı) Aşama 0'da verilir; geri kalan her şey bu temelin üstüne kurulur. Her aşama kendi başına kullanılabilir bir ürün bırakır. Aşamalar ve çıkış kriterleri [VISION.tr.md](VISION.tr.md) belgesinden alınmıştır.
 
-**Şu anki aşama: Aşama 4 — Arayüzler ve çok kullanıcı (Planlandı).** Aşama 0 ve Aşama 1 2026-10-28'de, Aşama 2 ve Aşama 3 2026-10-29'da tamamlandı; Aşama 1'in ve Aşama 2'nin bir aylık denemeleri proje sahibinin kararıyla atlandı.
+**Şu anki aşama: Aşama 4 — Arayüzler ve çok kullanıcı (Devam ediyor).** Aşama 0 ve Aşama 1 2026-10-28'de, Aşama 2 ve Aşama 3 2026-10-29'da tamamlandı; Aşama 1'in ve Aşama 2'nin bir aylık denemeleri proje sahibinin kararıyla atlandı.
 
 ## 1. Genel bakış
 
@@ -14,7 +14,7 @@ flowchart LR
     S1["Aşama 1<br/>Yerel MVP<br/>Tamamlandı"]
     S2["Aşama 2<br/>Uzak ve senkron<br/>Tamamlandı"]
     S3["Aşama 3<br/>Geliştirici ve ekosistem<br/>Tamamlandı"]
-    S4["Aşama 4<br/>Arayüzler ve çok kullanıcı<br/>Planlandı"]
+    S4["Aşama 4<br/>Arayüzler ve çok kullanıcı<br/>Devam ediyor"]
     S5["Aşama 5<br/>Kurumsal<br/>Planlandı"]
     S0 --> S1 --> S2 --> S3 --> S4 --> S5
 ```
@@ -25,7 +25,7 @@ flowchart LR
 | 1. Yerel MVP | CLI; snapshot alma, geçmiş, dosya düzeyi diff, geri yükleme, doğrulama; yerel ve harici disk yedek hedefi; tar, zip ve 7z dışa aktarma | Kendi verini bir ay boyunca yalnızca Apeiron ile yedekleyip geri yükleyebilmek | Tamamlandı (bir aylık deneme atlandı) |
 | 2. Uzak ve senkron | Arka plan hizmeti, zamanlanmış yedek, şifreleme, SFTP ve S3 hedefleri, tek/çift yönlü senkron, çatışma tespiti, geri yükleme testi | İki cihaz ve bir uzak sunucu arasında bir ay sorunsuz senkron | Tamamlandı (bir aylık deneme atlandı) |
 | 3. Geliştirici ve ekosistem | Dal ve birleştirme, Git içe/dışa aktarma (hedef: Git ağ protokolü), C ABI ve Python SDK, WebAssembly eklenti sistemi, metin diff eklentisi, arama | Gerçek bir Git deposu Apeiron'a taşınıp geri alınabiliyor | Tamamlandı |
-| 4. Arayüzler ve çok kullanıcı | Masaüstü ve web arayüzü, kullanıcı ve izinler, denetim kaydı, paylaşım | Teknik olmayan bir kullanıcı CLI'sız yedek alıp geri yükleyebiliyor | Planlandı |
+| 4. Arayüzler ve çok kullanıcı | Masaüstü ve web arayüzü, kullanıcı ve izinler, denetim kaydı, paylaşım | Teknik olmayan bir kullanıcı CLI'sız yedek alıp geri yükleyebiliyor | Devam ediyor |
 | 5. Kurumsal | Merkezi kimlik, çok kiracılı kullanım, replikasyon, yüksek erişilebilirlik, değiştirilemez arşiv, uyumluluk raporları | İlk kurumsal pilot kurulum | Planlandı |
 
 ## 2. Aşama 0 — Format ve çekirdek
@@ -89,13 +89,15 @@ Windows'ta yeniden adlandırmalar küçük `apeiron-sys` crate'i üzerinden `MOV
 
 **Çıkış kriteri:** Teknik olmayan bir kullanıcı CLI'sız yedek alıp geri yükleyebiliyor.
 
-| İş | Durum |
-| --- | --- |
-| Masaüstü arayüzü | Planlandı |
-| Web arayüzü | Planlandı |
-| Kullanıcılar ve izinler | Planlandı |
-| Denetim kaydı | Planlandı |
-| Paylaşım | Planlandı |
+Masaüstü arayüzü önce gelir, çünkü çıkış kriterini tek başına karşılar; web arayüzü onun sayfalarını yeniden kullanır; kullanıcılar ve izinler, onları kaydeden ve kullanan denetim kaydı ile paylaşımdan önce gelir.
+
+| # | İş | Durum |
+| --- | --- | --- |
+| 1 | Masaüstü arayüzü ([DESKTOP.tr.md](DESKTOP.tr.md)) | Devam ediyor |
+| 2 | Web arayüzü | Planlandı |
+| 3 | Kullanıcılar ve izinler | Planlandı |
+| 4 | Denetim kaydı | Planlandı |
+| 5 | Paylaşım | Planlandı |
 
 ## 7. Aşama 5 — Kurumsal
 

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Apeiron</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header>
+    <span class="brand">Apeiron</span>
+    <nav id="nav" hidden></nav>
+  </header>
+  <main id="main" tabindex="-1" aria-live="polite"></main>
+  <dialog id="picker" aria-labelledby="picker-title">
+    <h2 id="picker-title"></h2>
+    <form id="picker-form">
+      <input id="picker-path" type="text" spellcheck="false" aria-label="Folder">
+      <button type="button" id="picker-up"></button>
+    </form>
+    <ul id="picker-list" class="folders"></ul>
+    <div class="actions">
+      <button type="button" id="picker-cancel"></button>
+      <button type="button" id="picker-ok" class="primary"></button>
+    </div>
+  </dialog>
+</body>
+</html>

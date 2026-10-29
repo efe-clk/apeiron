@@ -225,6 +225,12 @@ enum Command {
         #[command(subcommand)]
         command: RemoteCommand,
     },
+    /// Open the desktop interface in the browser (docs/DESKTOP.md)
+    Ui {
+        /// Print the address instead of opening a browser
+        #[arg(long)]
+        no_browser: bool,
+    },
     /// Run scheduled jobs: backups, pushes, checks and restore tests
     Daemon {
         #[command(subcommand)]
@@ -923,6 +929,23 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                 EXIT_WARNINGS
             })
         }
+        Command::Ui { no_browser } => {
+            let mut options = apeiron_server::Options::with_memory();
+            if cli.repo.is_some() {
+                options.repo = Some(open(cli.repo, password_file)?);
+            }
+            let server = apeiron_server::Local::start(options)
+                .map_err(|e| Failure::Api(Error::new(ErrorKind::Io, e.to_string())))?;
+            let opened = !no_browser && open_browser(server.url()).is_ok();
+            if opened {
+                say!("The interface is open in your browser. Press Ctrl+C to stop it.");
+            } else {
+                say!("Open this address in a browser; press Ctrl+C to stop:");
+                say!("{}", server.url());
+            }
+            server.wait();
+            Ok(0)
+        }
         Command::Plugin { command } => {
             match command {
                 PluginCommand::Add { file } => {
@@ -1217,6 +1240,40 @@ fn run_daemon(
             Ok(if any_failed { EXIT_DAMAGED } else { 0 })
         }
     }
+}
+
+/// Opens the interface in the default browser through a page only this
+/// user can read, so the token never appears in a process list.
+fn open_browser(url: &str) -> std::io::Result<()> {
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let page = std::env::temp_dir().join(format!("apeiron-ui-{}-{nanos}.html", std::process::id()));
+    let mut file = std::fs::OpenOptions::new();
+    file.write(true).create_new(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut file, 0o600);
+    let html = format!(
+        "<!doctype html><meta charset=utf-8><meta http-equiv=refresh content=\"0;url={url}\"><title>Apeiron</title>"
+    );
+    file.open(&page)?.write_all(html.as_bytes())?;
+    let launched = if cfg!(target_os = "windows") {
+        std::process::Command::new("cmd")
+            .args(["/C", "start", ""])
+            .arg(&page)
+            .spawn()
+    } else if cfg!(target_os = "macos") {
+        std::process::Command::new("open").arg(&page).spawn()
+    } else {
+        std::process::Command::new("xdg-open").arg(&page).spawn()
+    };
+    // The browser reads the page within seconds; then it goes.
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_secs(30));
+        let _ = std::fs::remove_file(page);
+    });
+    launched.map(|_| ())
 }
 
 fn result_name(result: apeiron_daemon::RunResult) -> &'static str {

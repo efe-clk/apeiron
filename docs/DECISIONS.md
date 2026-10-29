@@ -33,6 +33,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [023](#adr-023-search-reads-the-snapshots-without-a-stored-index) | Search | Snapshots are read directly, each folder and content once per search; no stored index | Accepted |
 | [024](#adr-024-the-python-sdk-calls-the-c-abi-through-ctypes) | Python SDK | Pure Python over the C ABI with `ctypes`; one conformance suite for every language | Accepted |
 | [025](#adr-025-plugins-run-with-nothing-granted-type-drivers-come-first) | Plugins | Per-user components with no permissions, time and memory limits; type drivers merge before a conflict copy; Rust 1.97 | Accepted |
+| [026](#adr-026-one-set-of-web-pages-served-locally-shown-in-a-native-window) | Desktop interface | HTML pages without a build step, a JSON API on `127.0.0.1` with a token, a `wry` window | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28.
 
@@ -542,3 +543,24 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Wasmtime 34, the newest for Rust 1.85 | Misses more than a year of fixes to the sandbox |
 
 **Consequences.** A device without the plugin makes a conflict copy where another device merged; both results are safe. Building Apeiron needs Rust 1.97 or newer, and testing the plugin host needs the `wasm32-wasip2` target. The diff function waits for the text diff plugin to be shown.
+
+## ADR-026: One set of web pages, served locally, shown in a native window
+
+**Status:** Accepted (2026-10-30)
+
+**Context.** Stage 4 needs a desktop interface for users with little technical knowledge and then a web interface for server administrators ([DESKTOP.md](DESKTOP.md), VISION.md). Both must use only the public API. The owner of the project does not maintain code by hand, so two separate interfaces would double the work.
+
+**Decision.** The interface is one set of HTML, CSS and JavaScript pages without a build step or outside libraries, compiled into the program. A local server, `apeiron-server` on `axum`, serves them and a JSON API that is the C ABI over HTTP, only on `127.0.0.1` and only to holders of a random token given in the address fragment; it checks `Host` and `Origin`. The desktop app shows the pages in a window of the operating system's web view through `wry` and `tao`; `apeiron ui` opens them in a browser.
+
+**Rationale.** The web interface of work item 2 reuses the same pages and the same JSON API, served to the network with logins. Web pages are accessible to screen readers and keyboard users and look right in light and dark themes without extra work. Without a build step there is no JavaScript tool chain to keep current, and the pages are plain files anyone can read. `wry` uses the web view the system already has (WebKitGTK, WebKit, WebView2), so no browser is shipped, and it is the base of Tauri without Tauri's configuration and build tools.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| A native Rust toolkit (egui, iced, Slint) | A second interface would still be needed for the web; weaker accessibility; Slint's licence adds terms |
+| Tauri | Its build tools and configuration add little to a window around pages served by the program itself |
+| Electron | Ships a whole browser; large on a Raspberry Pi |
+| A JavaScript framework with a build step | A tool chain to keep current for a few screens |
+
+**Consequences.** Building the desktop app on Linux needs the WebKitGTK development files. The pages work only while the program runs. Anyone who can read the token, which is never written to disk by the desktop app, can use the repository the user opened.
