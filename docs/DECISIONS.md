@@ -28,6 +28,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [018](#adr-018-whole-repository-copies-as-remotes-russh-for-sftp-object_store-for-s3) | Remote targets | Remotes are whole repository copies; `russh` for SFTP, `object_store` for S3 | Accepted |
 | [019](#adr-019-the-background-service-is-a-user-process-with-a-jobs-file) | Background service | A user process with a TOML jobs file, started by the operating system; missed jobs catch up | Accepted |
 | [020](#adr-020-sync-through-a-remote-with-a-three-way-merge-and-conflict-copies) | Sync | Devices meet at a remote; a three-way merge per path; conflicting versions are kept as copies | Accepted |
+| [021](#adr-021-git-import-and-export-with-exact-object-ids-in-a-crate-of-its-own) | Git | `apeiron-git` with `gix`; raw headers in `meta` so exported commits keep their ids | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28.
 
@@ -434,3 +435,24 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Per-file version vectors instead of snapshots | A second model beside snapshots; loses the history that protects against spreading deletions |
 
 **Consequences.** Conflict copies appear in the folder and must be cleaned up by hand. A file changed during a round waits for the next round. The repository history grows by one snapshot per round with changes; garbage collection with retention rules keeps it in check later.
+
+## ADR-021: Git import and export with exact object ids, in a crate of its own
+
+**Status:** Accepted (2026-10-29)
+
+**Context.** Stage 3 ends when a real Git repository can be moved into Apeiron and back ([GIT.md](GIT.md)). Git concepts belong in a plugin, not in the core (VISION.md principle 1), but the plugin system comes later in the same stage. Git ref names allow characters that Apeiron ref names do not (ADR-013).
+
+**Decision.** A new crate `apeiron-git`, beside the services and outside the core, imports and exports with `gix`. Commits and annotated tags become snapshots; whatever the snapshot fields cannot hold, such as the committer, time zones and signatures, is kept as the raw header lines in the snapshot's `meta`. Export rebuilds each object from raw bytes and checks that it gets its old id. Git ref names are escaped into Apeiron ref names. The crate moves behind the plugin interface once that exists.
+
+**Rationale.** Keeping the raw headers makes the round trip exact for every commit Git itself writes, including signed ones, without teaching the core anything about Git. A separate crate keeps `gix` out of every other crate and is easy to wrap as a plugin later. Waiting for the plugin system would block the stage's exit criterion behind its largest item.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| Map only author, time and message | Committer, time zones and signatures are lost; every exported commit gets a new id |
+| Store the raw Git objects beside the snapshots | A second copy of all metadata; snapshots would not be usable on their own |
+| Allow capitals and more characters in ref names | Refs are files; names differing only in case collide on Windows and macOS |
+| Write the import as a WebAssembly plugin first | Needs the plugin system and a file system interface first; blocks the exit criterion |
+
+**Consequences.** Snapshots imported from Git carry `git.*` keys in `meta`. Tree entries hold no times, so restoring a Git snapshot gives files the time of the restore. Export writes loose objects. SHA-256 repositories and shallow clones are refused for now.

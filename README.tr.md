@@ -6,7 +6,7 @@
 
 Apeiron, bir yazılımcının deposuna, bir müzisyenin projesine ve bir ailenin fotoğraf arşivine aynı gözle bakar: hepsi, içerik adresli ve değişmez nesnelerden oluşan snapshot'lardır. Yedek, arşiv, senkron ve sürümleme dört ayrı motor değil, aynı nesne grafiği üzerinde çalışan farklı politikalardır. Yerel önceliklidir: hiçbir temel işlev bulut, hesap ya da internet bağlantısı istemez.
 
-> **Durum:** Erken geliştirme. Aşama 0 (format ve çekirdek) tamamlandı; Aşama 1 (yerel MVP) tamamlandı; Aşama 2 (uzak ve senkron) devam ediyor. `apeiron` komutu klasörleri yedekleyebiliyor, listeleyebiliyor, karşılaştırabiliyor ve geri yükleyebiliyor; ancak henüz bir sürüm ya da kararlı API yok. Bkz. [docs/ROADMAP.tr.md](docs/ROADMAP.tr.md).
+> **Durum:** Erken geliştirme. Aşama 0 (format ve çekirdek) tamamlandı; Aşama 1 (yerel MVP) tamamlandı; Aşama 2 (uzak ve senkron) tamamlandı; Aşama 3 (geliştirici ve ekosistem) devam ediyor. `apeiron` komutu klasörleri yedekleyebiliyor, listeleyebiliyor, karşılaştırabiliyor ve geri yükleyebiliyor; ancak henüz bir sürüm ya da kararlı API yok. Bkz. [docs/ROADMAP.tr.md](docs/ROADMAP.tr.md).
 
 ## Temel ilkeler
 
@@ -82,8 +82,8 @@ Her seçimin gerekçesi: [docs/DECISIONS.tr.md](docs/DECISIONS.tr.md).
 | --- | --- | --- |
 | 0. Format ve çekirdek | Format spesifikasyonu, depolama motoru, bütünlük, Rust API taslağı | Tamamlandı |
 | 1. Yerel MVP | CLI, snapshot, geçmiş, geri yükleme, yerel yedek hedefleri, tar, zip ve 7z dışa aktarma | Tamamlandı |
-| 2. Uzak ve senkron | Arka plan hizmeti, şifreleme, SFTP/S3, senkron, geri yükleme testi | Devam ediyor |
-| 3. Geliştirici ve ekosistem | Dal/birleştirme, Git içe/dışa aktarma, C ABI, Python SDK, eklentiler | Planlandı |
+| 2. Uzak ve senkron | Arka plan hizmeti, şifreleme, SFTP/S3, senkron, geri yükleme testi | Tamamlandı |
+| 3. Geliştirici ve ekosistem | Dal/birleştirme, Git içe/dışa aktarma, C ABI, Python SDK, eklentiler | Devam ediyor |
 | 4. Arayüzler ve çok kullanıcı | Masaüstü ve web arayüzü, izinler, denetim kaydı, paylaşım | Planlandı |
 | 5. Kurumsal | Merkezi kimlik, replikasyon, yüksek erişilebilirlik | Planlandı |
 
@@ -113,6 +113,7 @@ Kod, commit ve format değişikliği kuralları: [CONTRIBUTING.tr.md](CONTRIBUTI
 | [SDK](docs/SDK.tr.md) | C ABI ve dil SDK'larının tasarımı (taslak) |
 | [Arka plan hizmeti](docs/DAEMON.tr.md) | Zamanlanmış işler ve geri yükleme testi |
 | [Senkron](docs/SYNC.tr.md) | Klasörlerin cihazlar arası senkronu ve çatışma tespiti |
+| [Git](docs/GIT.tr.md) | Bir Git deposunu geçmişiyle içe almak ve geri dışa aktarmak |
 | [Kullanım rehberi](docs/GUIDE.tr.md) | Kurulum, günlük yedek, geri yükleme ve bir aylık deneme |
 | [Sözlük](docs/GLOSSARY.tr.md) | Terimler ve İngilizce–Türkçe karşılıkları |
 | [Katkı](CONTRIBUTING.tr.md) | Geliştirme ortamı ve kurallar |

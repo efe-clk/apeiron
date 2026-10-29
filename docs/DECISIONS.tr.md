@@ -28,6 +28,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [018](#adr-018-uzak-depo-olarak-deponun-tam-kopyası-sftp-için-russh-s3-için-object_store) | Uzak hedefler | Uzak depolar deponun tam kopyasıdır; SFTP için `russh`, S3 için `object_store` | Kabul edildi |
 | [019](#adr-019-arka-plan-hizmeti-iş-dosyalı-bir-kullanıcı-sürecidir) | Arka plan hizmeti | İşletim sisteminin başlattığı, TOML iş dosyalı bir kullanıcı süreci; kaçırılan işler telafi edilir | Kabul edildi |
 | [020](#adr-020-üç-yönlü-birleştirme-ve-çatışma-kopyalarıyla-bir-uzak-depo-üzerinden-senkron) | Senkron | Cihazlar bir uzak depoda buluşur; yol başına üç yönlü birleştirme; çatışan sürümler kopya olarak tutulur | Kabul edildi |
+| [021](#adr-021-kesin-nesne-kimlikleriyle-kendi-crateinde-git-içe-ve-dışa-aktarma) | Git | `gix` ile `apeiron-git`; dışa aktarılan commit'ler kimliklerini korusun diye ham başlıklar `meta` içinde | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
@@ -434,3 +435,24 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Snapshot'lar yerine dosya başına sürüm vektörleri | Snapshot'ların yanında ikinci bir model; yayılan silmelere karşı koruyan geçmişi kaybeder |
 
 **Sonuçlar.** Çatışma kopyaları klasörde belirir ve elle temizlenmelidir. Bir tur sırasında değişen bir dosya sonraki turu bekler. Depo geçmişi, değişiklik içeren her tur için bir snapshot büyür; ileride saklama kurallarıyla çöp toplama bunu dengeler.
+
+## ADR-021: Kesin nesne kimlikleriyle, kendi crate'inde Git içe ve dışa aktarma
+
+**Durum:** Kabul edildi (2026-10-29)
+
+**Bağlam.** Aşama 3, gerçek bir Git deposu Apeiron'a taşınıp geri alınabildiğinde biter ([GIT.tr.md](GIT.tr.md)). Git kavramları çekirdeğe değil bir eklentiye aittir (VISION.tr.md 1. ilke), ama eklenti sistemi aynı aşamada daha sonra gelir. Git ref adları, Apeiron ref adlarının izin vermediği karakterlere izin verir (ADR-013).
+
+**Karar.** Hizmetlerin yanında ve çekirdeğin dışında yeni bir crate, `apeiron-git`, `gix` ile içe ve dışa aktarır. Commit'ler ve açıklamalı etiketler snapshot olur; snapshot alanlarının tutamadığı her şey, örneğin commit'i yazan, saat dilimleri ve imzalar, snapshot'ın `meta`'sında ham başlık satırları olarak saklanır. Dışa aktarma her nesneyi ham baytlardan yeniden kurar ve eski kimliğini aldığını denetler. Git ref adları kaçışlanarak Apeiron ref adlarına çevrilir. Crate, eklenti arayüzü olunca onun arkasına taşınır.
+
+**Gerekçe.** Ham başlıkları tutmak, çekirdeğe Git hakkında hiçbir şey öğretmeden, Git'in kendisinin yazdığı her commit için, imzalılar da dahil, gidiş-dönüşü kesin yapar. Ayrı bir crate, `gix`'i diğer her crate'in dışında tutar ve ileride eklenti olarak sarmalanması kolaydır. Eklenti sistemini beklemek, aşamanın çıkış kriterini en büyük işinin arkasında bekletirdi.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Yalnızca yazar, zaman ve mesajı eşlemek | Commit'i yazan, saat dilimleri ve imzalar kaybolur; dışa aktarılan her commit yeni bir kimlik alır |
+| Ham Git nesnelerini snapshot'ların yanında saklamak | Tüm üst verinin ikinci bir kopyası; snapshot'lar tek başlarına kullanılamazdı |
+| Ref adlarında büyük harflere ve daha çok karaktere izin vermek | Ref'ler dosyadır; yalnızca harf büyüklüğüyle ayrılan adlar Windows ve macOS'ta çakışır |
+| İçe almayı önce bir WebAssembly eklentisi olarak yazmak | Önce eklenti sistemi ve bir dosya sistemi arayüzü gerekir; çıkış kriterini bekletir |
+
+**Sonuçlar.** Git'ten alınan snapshot'lar `meta` içinde `git.*` anahtarları taşır. Tree girdileri zaman tutmaz; bu yüzden bir Git snapshot'ını geri yüklemek dosyalara geri yükleme anının zamanını verir. Dışa aktarma gevşek nesneler yazar. SHA-256 depoları ve sığ klonlar şimdilik reddedilir.
