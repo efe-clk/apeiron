@@ -50,6 +50,7 @@ pub enum RemoteUrl {
     /// A folder, given as an absolute path.
     Folder(PathBuf),
     Sftp(SftpUrl),
+    S3(S3Url),
 }
 
 /// `sftp://[user@]host[:port]/path`
@@ -60,6 +61,17 @@ pub struct SftpUrl {
     pub port: u16,
     /// The repository folder on the server, starting with `/`.
     pub path: String,
+}
+
+/// `s3://bucket[/prefix][?endpoint=URL][&region=NAME]`
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct S3Url {
+    pub bucket: String,
+    /// The folder inside the bucket, without `/` at either end; may be empty.
+    pub prefix: String,
+    /// The service address for S3-compatible storage other than Amazon's.
+    pub endpoint: Option<String>,
+    pub region: Option<String>,
 }
 
 impl RemoteUrl {
@@ -99,6 +111,31 @@ impl RemoteUrl {
                 port,
                 path: path.to_owned(),
             }));
+        }
+        if let Some(rest) = url.strip_prefix("s3://") {
+            let (location, query) = rest.split_once('?').unwrap_or((rest, ""));
+            let (bucket, prefix) = location.split_once('/').unwrap_or((location, ""));
+            if bucket.is_empty() {
+                return Err(invalid("the bucket name is empty"));
+            }
+            let mut s3 = S3Url {
+                bucket: bucket.to_owned(),
+                prefix: prefix.trim_matches('/').to_owned(),
+                endpoint: None,
+                region: None,
+            };
+            for pair in query.split('&').filter(|p| !p.is_empty()) {
+                match pair.split_once('=') {
+                    Some(("endpoint", value)) if !value.is_empty() => {
+                        s3.endpoint = Some(value.to_owned());
+                    }
+                    Some(("region", value)) if !value.is_empty() => {
+                        s3.region = Some(value.to_owned());
+                    }
+                    _ => return Err(invalid(&format!("unknown setting {pair:?}"))),
+                }
+            }
+            return Ok(RemoteUrl::S3(s3));
         }
         if url.contains("://") {
             return Err(Error::UnsupportedRemote(url.to_owned()));
@@ -307,9 +344,28 @@ mod tests {
             assert!(validate_remote_name(bad).is_err(), "{bad:?}");
         }
         assert!(matches!(
-            validate_url("s3://bucket/apeiron"),
+            validate_url("ftp://host/apeiron"),
             Err(Error::UnsupportedRemote(_))
         ));
+        assert_eq!(
+            RemoteUrl::parse("s3://b/x/y/?endpoint=http://h:9000&region=eu-1").unwrap(),
+            RemoteUrl::S3(S3Url {
+                bucket: "b".to_owned(),
+                prefix: "x/y".to_owned(),
+                endpoint: Some("http://h:9000".to_owned()),
+                region: Some("eu-1".to_owned()),
+            })
+        );
+        assert!(matches!(
+            RemoteUrl::parse("s3://b").unwrap(),
+            RemoteUrl::S3(S3Url { prefix, endpoint: None, .. }) if prefix.is_empty()
+        ));
+        for bad in ["s3:///x", "s3://b/x?colour=red", "s3://b?region="] {
+            assert!(
+                matches!(RemoteUrl::parse(bad), Err(Error::InvalidRemote(_))),
+                "{bad}"
+            );
+        }
         let sftp = |user: Option<&str>, host: &str, port, path: &str| {
             RemoteUrl::Sftp(SftpUrl {
                 user: user.map(str::to_owned),

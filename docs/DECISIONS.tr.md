@@ -389,4 +389,4 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Her uzak depo için `opendal` | Onun SFTP desteği de sistemdeki `ssh` programını çalıştırır |
 | Koşullu yazma yerine S3'te kilit dosyaları | S3'te koşullu yazma olmadan atomik "yoksa oluştur" yoktur |
 
-**Sonuçlar.** `russh`, Rust 1.85'i destekleyen en yeni sürüm olan 0.63'e, saf Rust `ring` şifreleme altyapısıyla sabitlenir. Koşullu yazma desteği olmayan S3 uyumlu hizmetler reddedilir. SFTP, sunucunun `~/.ssh/known_hosts` içinde olmasını ister. SFTP ve S3 kopyalarının reflog'u yoktur. Bir uzak kopyanın çöp toplaması sonraki bir iştir; bir klasör kopyası, bir depo olarak açılarak bugün de toplanabilir.
+**Sonuçlar.** `russh`, Rust 1.85'i destekleyen en yeni sürüm olan 0.63'e, saf Rust `ring` şifreleme altyapısıyla sabitlenir; `object_store`, HTTPS için `aws-lc-rs` getirir. Koşullu yazma desteği olmayan S3 uyumlu hizmetler reddedilir. SFTP, sunucunun `~/.ssh/known_hosts` içinde olmasını ister. SFTP ve S3 kopyalarının reflog'u yoktur. Bir uzak kopyanın çöp toplaması sonraki bir iştir; bir klasör kopyası, bir depo olarak açılarak bugün de toplanabilir.

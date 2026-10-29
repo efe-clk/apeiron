@@ -13,6 +13,7 @@ apeiron-core = { path = "../apeiron-core" }
 russh = { version = "=0.63.1", default-features = false, features = ["ring", "rsa"] }
 russh-sftp = "3.0.1"
 thiserror = "2.0.21"
+object_store = { version = "0.14.2", default-features = false, features = ["aws"] }
 tokio = { version = "1", features = ["io-util", "net", "rt-multi-thread", "time"] }
 
 [dev-dependencies]

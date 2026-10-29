@@ -19,8 +19,7 @@ Implementation status (`apeiron-core`):
 | 12 | Repository lock | Done |
 | 13 | Garbage collection | Done |
 | 14 | Encryption | Done |
-| 15 | Remote repositories, push and pull: folders and SFTP | Done |
-| 15 | Remote repositories, push and pull: S3 | Planned |
+| 15 | Remote repositories, push and pull: folders, SFTP and S3 | Done |
 
 ## Plain summary
 

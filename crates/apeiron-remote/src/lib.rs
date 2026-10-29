@@ -5,6 +5,8 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 
+mod s3;
 mod sftp;
 
+pub use s3::S3Store;
 pub use sftp::{SftpStore, SshOptions};

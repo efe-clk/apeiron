@@ -422,22 +422,28 @@ impl Repository {
 /// Connects to a remote. Only an encrypted repository is sent over the
 /// network (FORMAT.md §15.1).
 fn open_store(remote: &Remote, encrypted: bool) -> Result<Box<dyn core::Store>> {
-    match core::RemoteUrl::parse(&remote.url)? {
-        core::RemoteUrl::Folder(path) => Ok(Box::new(core::FolderStore::open(&path)?)),
-        core::RemoteUrl::Sftp(url) => {
-            if !encrypted {
-                return Err(Error::new(
-                    ErrorKind::InvalidInput,
-                    "only an encrypted repository can use an SFTP remote; \
-                     create one with `init --encrypt`",
-                ));
-            }
-            let options = apeiron_remote::SshOptions::from_home()?;
-            Ok(Box::new(apeiron_remote::SftpStore::connect(
-                &url, &options,
-            )?))
+    let network_needs_encryption = || {
+        if encrypted {
+            return Ok(());
         }
-    }
+        Err(Error::new(
+            ErrorKind::InvalidInput,
+            "only an encrypted repository can use an SFTP or S3 remote; \
+             create one with `init --encrypt`",
+        ))
+    };
+    Ok(match core::RemoteUrl::parse(&remote.url)? {
+        core::RemoteUrl::Folder(path) => Box::new(core::FolderStore::open(&path)?),
+        core::RemoteUrl::Sftp(url) => {
+            network_needs_encryption()?;
+            let options = apeiron_remote::SshOptions::from_home()?;
+            Box::new(apeiron_remote::SftpStore::connect(&url, &options)?)
+        }
+        core::RemoteUrl::S3(url) => {
+            network_needs_encryption()?;
+            Box::new(apeiron_remote::S3Store::connect(&url)?)
+        }
+    })
 }
 
 /// Reports the progress of a push or pull and stops it once cancelled.

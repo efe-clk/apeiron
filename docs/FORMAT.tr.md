@@ -19,8 +19,7 @@ Uygulama durumu (`apeiron-core`):
 | 12 | Depo kilidi | Tamamlandı |
 | 13 | Çöp toplama | Tamamlandı |
 | 14 | Şifreleme | Tamamlandı |
-| 15 | Uzak depolar, push ve pull: klasörler ve SFTP | Tamamlandı |
-| 15 | Uzak depolar, push ve pull: S3 | Planlandı |
+| 15 | Uzak depolar, push ve pull: klasörler, SFTP ve S3 | Tamamlandı |
 
 ## Sade anlatım
 

@@ -45,7 +45,9 @@ Bir parolayı değiştirmek için yenisi `apeiron key add` ile eklenir, eskisi `
 
 Uzak depo, deponun başka bir yerdeki eksiksiz bir kopyasıdır ([FORMAT.tr.md](FORMAT.tr.md) §15). `apeiron remote add disk /run/media/user/disk/apeiron` bir klasöre ad verir; `apeiron push disk` yalnızca klasörde henüz olmayanı kopyalar ve klasör daha sonra her depo gibi, aynı parolayla açılabilir. `apeiron pull disk` snapshot'ları geri getirir. Bir ref yalnızca ileri gider: iki kopyada da ötekinde olmayan snapshot'lar varsa komut bir çatışmayla durur ve hiçbir şeyi değiştirmez.
 
-Bir ev sunucusuna SFTP ile ulaşılır: `apeiron remote add nas sftp://user@nas.local/srv/apeiron`. Apeiron, `ssh` gibi, SSH ajanındaki anahtarlarla ya da parolasız `~/.ssh/id_ed25519`, `id_ecdsa` veya `id_rsa` ile oturum açar ve sunucuyu `~/.ssh/known_hosts` ile denetler; orada olmayan bir sunucu reddedilir, bu yüzden önce bir kez `ssh` ile bağlanılır. SFTP uzak deposunu yalnızca şifreli bir depo kullanabilir. S3 uzak depoları planlanmıştır.
+Bir ev sunucusuna SFTP ile ulaşılır: `apeiron remote add nas sftp://user@nas.local/srv/apeiron`. Apeiron, `ssh` gibi, SSH ajanındaki anahtarlarla ya da parolasız `~/.ssh/id_ed25519`, `id_ecdsa` veya `id_rsa` ile oturum açar ve sunucuyu `~/.ssh/known_hosts` ile denetler; orada olmayan bir sunucu reddedilir, bu yüzden önce bir kez `ssh` ile bağlanılır. SFTP uzak deposunu yalnızca şifreli bir depo kullanabilir.
+
+Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apeiron?endpoint=https://s3.example.com&region=eu-1'`. `endpoint`, Amazon dışındaki S3 uyumlu hizmetler için gerekir. Anahtarlar `AWS_ACCESS_KEY_ID` ve `AWS_SECRET_ACCESS_KEY` değişkenlerinden okunur; asla kaydedilmez. Hizmet koşullu yazmayı desteklemelidir ve S3 uzak deposunu yalnızca şifreli bir depo kullanabilir.
 
 ## 3. Komutlar
 
@@ -64,7 +66,7 @@ Bir ev sunucusuna SFTP ile ulaşılır: `apeiron remote add nas sftp://user@nas.
 | `apeiron gc [--keep-days <days>] [--dry-run]` | Hiçbir ref'in ve son 90 günün (ya da `--keep-days`) hiçbir reflog satırının ulaşamadığı veriyi siler; `--dry-run` yalnızca raporlar | Tamamlandı |
 | `apeiron key list` | Şifreli bir deponun parolalarını ve kurtarma anahtarlarını listeler | Tamamlandı |
 | `apeiron key add [--recovery] [--new-password-file <file>]` | Bir parola ekler (iki kez sorulur ya da dosyadan okunur); `--recovery` ile bir kez yazdırılan yeni bir kurtarma anahtarı ekler | Tamamlandı |
-| `apeiron remote add <name> <url>` | Bir uzak depo ekler: harici diskteki gibi bir klasör ya da `sftp://[user@]host[:port]/path` (bölüm 2.2) | Tamamlandı |
+| `apeiron remote add <name> <url>` | Bir uzak depo ekler: harici diskteki gibi bir klasör `sftp://[user@]host[:port]/path` ya da `s3://bucket/path?endpoint=…&region=…` (bölüm 2.2) | Tamamlandı |
 | `apeiron remote list` | Uzak depoları listeler | Tamamlandı |
 | `apeiron remote remove <name>` | Bir uzak depoyu unutur; kopyanın kendisine dokunulmaz | Tamamlandı |
 | `apeiron push <remote> [<ref>]` | Bir ref'in (varsayılan `main`) snapshot'larını uzak depoya kopyalar ve ref'i orada taşır | Tamamlandı |
@@ -117,7 +119,7 @@ apeiron verify
 | `apeiron` | Herkese açık Rust API'si ([API.tr.md](API.tr.md) §8) | Devam ediyor |
 | `apeiron-services` | API'nin kullandığı klasör ↔ snapshot, fark ve dışa aktarma mantığı | Devam ediyor |
 | `apeiron-cli` | `apeiron` programı | Devam ediyor |
-| `apeiron-remote` | SFTP uzak depoları, ileride S3 olanlar (ADR-018) | Devam ediyor |
+| `apeiron-remote` | SFTP ve S3 uzak depoları (ADR-018) | Devam ediyor |
 
 | İhtiyaç | Önerilen kütüphane | Gerekçe |
 | --- | --- | --- |
@@ -126,6 +128,7 @@ apeiron verify
 | Ctrl+C | `ctrlc` | Küçük ve yaygın; Linux, macOS ve Windows'ta aynı kod |
 | Gizli parola sorma | `rpassword` | Küçük ve yaygın; Linux, macOS ve Windows'ta terminalden ekrana yansıtmadan okur |
 | SFTP | `russh`, `russh-sftp` | Saf Rust SSH ve SFTP, Windows'ta da (ADR-018) |
+| S3 | `object_store` | Apache Arrow tarafından bakılır; S3'te koşullu yazma (ADR-018) |
 | tar, zip ve 7z dışa aktarma | `tar`, `zip`, `sevenz-rust2` | Saf Rust; arşivler standart `tar`, `unzip` ve `7z` araçlarıyla izinler ve sembolik bağlar korunarak açılır |
 
 ## 8. Açık sorular

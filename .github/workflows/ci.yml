@@ -35,3 +35,25 @@ jobs:
       - run: cargo test --all-targets
         env:
           APEIRON_SFTP_TEST: ${{ runner.os != 'Windows' && '1' || '' }}
+
+  # S3 remotes against LocalStack, an S3-compatible service with conditional writes.
+  s3:
+    runs-on: ubuntu-latest
+    services:
+      localstack:
+        image: localstack/localstack:4.9
+        env:
+          SERVICES: s3
+        ports:
+          - 4566:4566
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - run: |
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:4566/_localstack/health && break; sleep 2; done
+          curl -sf -X PUT http://127.0.0.1:4566/apeiron-test
+      - run: cargo test -p apeiron-remote --test s3 -- --nocapture
+        env:
+          APEIRON_S3_TEST_URL: s3://apeiron-test?endpoint=http://127.0.0.1:4566&region=us-east-1
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test

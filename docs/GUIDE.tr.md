@@ -157,6 +157,22 @@ Evde ya da başka bir yerde `ssh` ile ulaştığınız bir sunucu da bir kopya t
 2. `apeiron remote add nas sftp://user@nas.local/srv/apeiron` (başka bir port için sunucu adından sonra `:2222` ekleyin).
 3. Diskteki gibi `apeiron push nas backup/documents`.
 
+### 6.3 Bulut depolamada bir kopya (S3)
+
+Amazon S3 ve başka pek çok hizmet (Backblaze B2, Cloudflare R2, Wasabi ve diğerleri) S3 uyumlu depolama sunar. Depo şifreli olmalıdır (bölüm 3.1).
+
+1. Hizmette bir bucket ve bir erişim anahtarı oluşturun. Anahtarı ortam değişkenlerine koyun; örneğin yalnızca sizin okuyabildiğiniz `~/.config/apeiron/env` dosyasına:
+
+   ```bash
+   export AWS_ACCESS_KEY_ID=…
+   export AWS_SECRET_ACCESS_KEY=…
+   ```
+
+2. `apeiron remote add cloud 's3://BUCKET/apeiron?endpoint=https://HIZMET-ADRESI&region=BOLGE'` (Amazon'un kendisi için `endpoint` yazmayın).
+3. `source ~/.config/apeiron/env && apeiron push cloud backup/documents`.
+
+Hizmet koşullu yazmayı desteklemelidir; aksi hâlde Apeiron bir ref'i taşımayı reddeder.
+
 ## 7. Düzen
 
 | Ne sıklıkla | Komut | Neden |

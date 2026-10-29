@@ -340,10 +340,7 @@ fn push_and_pull_through_a_folder_remote() {
         ErrorKind::InvalidInput
     );
     assert_eq!(
-        s.repo
-            .add_remote("cloud", "s3://bucket/x")
-            .unwrap_err()
-            .kind,
+        s.repo.add_remote("cloud", "ftp://host/x").unwrap_err().kind,
         ErrorKind::Unsupported
     );
     // Only encrypted data goes over the network.
@@ -356,6 +353,15 @@ fn push_and_pull_through_a_folder_remote() {
         .unwrap_err();
     assert_eq!(err.kind, ErrorKind::InvalidInput);
     s.repo.remove_remote("nas").unwrap();
+    s.repo.add_remote("cloud", "s3://bucket/x").unwrap();
+    let err = s
+        .repo
+        .push(TransferRequest::new("cloud", "main"))
+        .unwrap()
+        .wait()
+        .unwrap_err();
+    assert_eq!(err.kind, ErrorKind::InvalidInput);
+    s.repo.remove_remote("cloud").unwrap();
     let remote = s.repo.add_remote("disk", disk.to_str().unwrap()).unwrap();
     assert_eq!(s.repo.remotes().unwrap(), vec![remote]);
     assert_eq!(

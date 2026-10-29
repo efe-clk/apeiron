@@ -156,7 +156,7 @@ Every operation takes one plain request value and returns one plain result value
 | `add_recovery_key` | — | `AddedKey`: id and the new recovery key, shown to the user once | No |
 | `remove_key` | key id or its first characters | the whole id; the last key cannot be removed, and the repository lock is taken exclusive | No |
 | `remotes` | — | `Vec<Remote>`: name and URL, sorted by name | No |
-| `add_remote` | name, URL: a folder path (absolute or relative) or `sftp://[user@]host[:port]/path` | `Remote`, a folder as an absolute path; an SFTP remote needs an encrypted repository | No |
+| `add_remote` | name, URL: a folder path (absolute or relative) `sftp://[user@]host[:port]/path` or `s3://bucket/path?endpoint=…&region=…` | `Remote`, a folder as an absolute path; SFTP and S3 remotes need an encrypted repository | No |
 | `remove_remote` | name | —; the remote copy itself is not touched | No |
 | `push` | remote name, ref name (default `main`) | `TransferReport`: snapshot the remote ref points to now, the one before, objects and stored bytes copied; `conflict` if the remote has snapshots this copy does not | Yes |
 | `pull` | remote name, ref name (default `main`) | `TransferReport`, the same for the local ref; `conflict` if the local ref has snapshots the remote does not | Yes |

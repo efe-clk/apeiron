@@ -157,6 +157,22 @@ A server at home or elsewhere that you reach with `ssh` can hold a copy too. The
 2. `apeiron remote add nas sftp://user@nas.local/srv/apeiron` (add `:2222` after the host for another port).
 3. `apeiron push nas backup/documents`, as with a disk.
 
+### 6.3 A copy in cloud storage (S3)
+
+Amazon S3 and many other services (Backblaze B2, Cloudflare R2, Wasabi and others) offer S3-compatible storage. The repository must be encrypted (section 3.1).
+
+1. Create a bucket and an access key at the service. Put the key into the environment, for example in `~/.config/apeiron/env`, readable only by you:
+
+   ```bash
+   export AWS_ACCESS_KEY_ID=…
+   export AWS_SECRET_ACCESS_KEY=…
+   ```
+
+2. `apeiron remote add cloud 's3://BUCKET/apeiron?endpoint=https://SERVICE-ADDRESS&region=REGION'` (for Amazon itself, leave out `endpoint`).
+3. `source ~/.config/apeiron/env && apeiron push cloud backup/documents`.
+
+The service must support conditional writes; Apeiron refuses to move a ref otherwise.
+
 ## 7. Routine
 
 | How often | Command | Why |
