@@ -185,6 +185,27 @@ impl PackWriter {
 
     /// Writes the entry table, syncs and moves the pack into `packs_dir`.
     pub(crate) fn finish(mut self, packs_dir: &Path) -> Result<(FileHash, Vec<PackEntry>)> {
+        self.write_table()?;
+        fsutil::checkpoint()
+            .and_then(|()| self.file.get_ref().sync_all())
+            .at(&self.tmp_path)?;
+
+        let name = *self.hasher.finalize().as_bytes();
+        fsutil::persist_new(&self.tmp_path, &pack_path(packs_dir, &name))?;
+        self.persisted = true;
+        Ok((name, std::mem::take(&mut self.entries)))
+    }
+
+    /// Writes the entry table and returns the pack's name, entries and
+    /// bytes; the temporary file is removed.
+    pub(crate) fn finish_to_bytes(mut self) -> Result<(FileHash, Vec<PackEntry>, Vec<u8>)> {
+        self.write_table()?;
+        let bytes = fs::read(&self.tmp_path).at(&self.tmp_path)?;
+        let name = *self.hasher.finalize().as_bytes();
+        Ok((name, std::mem::take(&mut self.entries), bytes))
+    }
+
+    fn write_table(&mut self) -> Result<()> {
         let mut table = Vec::with_capacity(self.entries.len() * ENTRY_LEN + FOOTER_LEN as usize);
         for entry in &self.entries {
             table.extend_from_slice(entry.id.as_bytes());
@@ -198,15 +219,7 @@ impl PackWriter {
         table.extend_from_slice(&count.to_le_bytes());
         table.extend_from_slice(END_MAGIC);
         self.write(&table)?;
-        self.file.flush().at(&self.tmp_path)?;
-        fsutil::checkpoint()
-            .and_then(|()| self.file.get_ref().sync_all())
-            .at(&self.tmp_path)?;
-
-        let name = *self.hasher.finalize().as_bytes();
-        fsutil::persist_new(&self.tmp_path, &pack_path(packs_dir, &name))?;
-        self.persisted = true;
-        Ok((name, std::mem::take(&mut self.entries)))
+        self.file.flush().at(&self.tmp_path)
     }
 }
 
@@ -323,7 +336,14 @@ fn read_stored_unchecked(path: &Path, entry: &PackEntry) -> Result<Vec<u8>> {
     Ok(stored)
 }
 
-fn decode_stored(path: &Path, entry: &PackEntry, keys: &Keys, stored: &[u8]) -> Result<Vec<u8>> {
+/// Decrypts and decompresses the stored bytes of an object read from the
+/// pack at `path` and checks its id.
+pub(crate) fn decode_stored(
+    path: &Path,
+    entry: &PackEntry,
+    keys: &Keys,
+    stored: &[u8],
+) -> Result<Vec<u8>> {
     let opened;
     let stored = match &keys.data {
         Some(key) => {

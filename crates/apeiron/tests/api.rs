@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use apeiron::{
     BackupRequest, ChangeKind, DeleteRefRequest, DiffRequest, ErrorKind, KeyKind, ListRequest,
-    LogRequest, Phase, Repository, RestoreRequest,
+    LogRequest, Phase, Repository, RestoreRequest, TransferRequest,
 };
 
 struct Setup {
@@ -328,4 +328,68 @@ fn change_the_password_of_an_encrypted_repository() {
 
     let plain = Repository::init(dir.path().join("plain")).unwrap();
     assert_eq!(plain.keys().unwrap_err().kind, ErrorKind::InvalidInput);
+}
+
+#[test]
+fn push_and_pull_through_a_folder_remote() {
+    let s = setup();
+    let first = backup(&s, "one");
+    let disk = s.root.join("disk");
+    assert_eq!(
+        s.repo.add_remote("Disk", "x").unwrap_err().kind,
+        ErrorKind::InvalidInput
+    );
+    assert_eq!(
+        s.repo.add_remote("nas", "sftp://nas/srv").unwrap_err().kind,
+        ErrorKind::Unsupported
+    );
+    let remote = s.repo.add_remote("disk", disk.to_str().unwrap()).unwrap();
+    assert_eq!(s.repo.remotes().unwrap(), vec![remote]);
+    assert_eq!(
+        s.repo.add_remote("disk", "y").unwrap_err().kind,
+        ErrorKind::AlreadyExists
+    );
+
+    let request = || TransferRequest::new("disk", "main");
+    let report = s.repo.push(request()).unwrap().wait().unwrap();
+    assert_eq!((report.snapshot, report.previous), (first.snapshot, None));
+
+    // A second copy made from the disk pulls what the first one pushes.
+    fs::write(s.root.join("src/a.txt"), b"changed").unwrap();
+    let second = backup(&s, "two");
+    s.repo.push(request()).unwrap().wait().unwrap();
+    let copy = s.root.join("copy");
+    copy_dir(&disk, &copy);
+    let copy = Repository::open(&copy).unwrap();
+    copy.add_remote("disk", disk.to_str().unwrap()).unwrap();
+    let report = copy.pull(request()).unwrap().wait().unwrap();
+    assert_eq!(report.objects, 0);
+    assert_eq!(copy.resolve("main").unwrap(), second.snapshot);
+
+    fs::write(s.root.join("src/a.txt"), b"again").unwrap();
+    let third = backup(&s, "three");
+    s.repo.push(request()).unwrap().wait().unwrap();
+    let report = copy.pull(request()).unwrap().wait().unwrap();
+    assert_eq!(report.snapshot, third.snapshot);
+    assert!(report.objects > 0);
+    assert_eq!(copy.resolve("main").unwrap(), third.snapshot);
+
+    let err = copy
+        .pull(TransferRequest::new("nowhere", "main"))
+        .unwrap_err();
+    assert_eq!(err.kind, ErrorKind::NotFound);
+    s.repo.remove_remote("disk").unwrap();
+    assert!(s.repo.remotes().unwrap().is_empty());
+}
+
+fn copy_dir(src: &std::path::Path, dest: &std::path::Path) {
+    fs::create_dir_all(dest).unwrap();
+    for entry in fs::read_dir(src).unwrap() {
+        let entry = entry.unwrap();
+        if entry.file_type().unwrap().is_dir() {
+            copy_dir(&entry.path(), &dest.join(entry.file_name()));
+        } else {
+            fs::copy(entry.path(), dest.join(entry.file_name())).unwrap();
+        }
+    }
 }

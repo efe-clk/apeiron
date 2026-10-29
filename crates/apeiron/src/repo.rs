@@ -11,11 +11,12 @@ use crate::job::Job;
 use crate::spec;
 use crate::types::{
     AddedKey, DeleteRefRequest, DiffRequest, ExportRequest, ListRequest, LogPage, LogRequest,
-    RefInfo, RepoInfo, RestoreRequest, SnapshotInfo,
+    RefInfo, RepoInfo, RestoreRequest, SnapshotInfo, TransferRequest,
 };
 use crate::{
     ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo, ExportReport, GcReport,
-    GcRequest, KeyInfo, ObjectId, ReflogEntry, RepairReport, RestoreReport, VerifyReport,
+    GcRequest, KeyInfo, ObjectId, Phase, ReflogEntry, Remote, RepairReport, RestoreReport,
+    TransferReport, VerifyReport,
 };
 
 /// An open repository. Cloning is cheap; clones share the same state and can
@@ -337,6 +338,76 @@ impl Repository {
         }
     }
 
+    /// The remotes of this copy, sorted by name.
+    pub fn remotes(&self) -> Result<Vec<Remote>> {
+        Ok(self.read().remotes()?)
+    }
+
+    /// Adds a remote. A folder may be given relative to the current folder;
+    /// it is stored as an absolute path.
+    pub fn add_remote(&self, name: &str, url: &str) -> Result<Remote> {
+        let url = if url.contains("://") {
+            url.to_owned()
+        } else {
+            let path = std::path::absolute(url)
+                .map_err(|e| Error::new(ErrorKind::InvalidInput, format!("{url}: {e}")))?;
+            path.to_str()
+                .ok_or_else(|| {
+                    Error::new(
+                        ErrorKind::InvalidInput,
+                        format!("{} is not valid UTF-8", path.display()),
+                    )
+                })?
+                .to_owned()
+        };
+        self.read().add_remote(name, &url)?;
+        Ok(Remote {
+            name: name.to_owned(),
+            url,
+        })
+    }
+
+    /// Forgets a remote; the copy it names is not touched.
+    pub fn remove_remote(&self, name: &str) -> Result<()> {
+        Ok(self.read().remove_remote(name)?)
+    }
+
+    /// Copies the snapshots of a ref to a remote and moves the ref there.
+    /// Fails with [`ErrorKind::Conflict`] if the remote ref has snapshots
+    /// this copy does not have.
+    pub fn push(&self, request: TransferRequest) -> Result<Job<TransferReport>> {
+        let remote = self.read().remote(&request.remote)?;
+        let repo = self.clone();
+        Job::spawn("push", move |ctl| {
+            ctl.update(|p| p.phase = Phase::Copying);
+            let store = core::FolderStore::open(Path::new(&remote.url))?;
+            let report = repo
+                .view()?
+                .push(&store, &request.ref_name, &mut |r| copied(ctl, r))?;
+            ctl.update(|p| p.phase = Phase::Done);
+            Ok(report)
+        })
+    }
+
+    /// Copies the snapshots of a ref from a remote and moves the local ref
+    /// forward. Fails with [`ErrorKind::Conflict`] if the local ref has
+    /// snapshots the remote does not have.
+    pub fn pull(&self, request: TransferRequest) -> Result<Job<TransferReport>> {
+        let remote = self.read().remote(&request.remote)?;
+        let repo = self.clone();
+        Job::spawn("pull", move |ctl| {
+            ctl.update(|p| p.phase = Phase::Copying);
+            let store = core::FolderStore::open(Path::new(&remote.url))?;
+            let _writer = repo.lock_writer();
+            let _lock = core::RepoLock::shared(repo.path())?;
+            let mut core = repo.read().reopen()?;
+            let report = core.pull(&store, &request.ref_name, &mut |r| copied(ctl, r))?;
+            *repo.write() = core;
+            ctl.update(|p| p.phase = Phase::Done);
+            Ok(report)
+        })
+    }
+
     /// Removes stale ref locks, adds reflog lines lost in a crash and
     /// replaces damaged index files.
     pub fn repair(&self) -> Result<RepairReport> {
@@ -346,6 +417,18 @@ impl Repository {
         core.refresh_index()?;
         Ok(core.repair()?)
     }
+}
+
+/// Reports the progress of a push or pull and stops it once cancelled.
+fn copied(ctl: &services::Control, report: &TransferReport) -> core::Result<()> {
+    ctl.update(|p| {
+        p.items_done = report.objects;
+        p.bytes_done = report.bytes;
+    });
+    if ctl.is_cancelled() {
+        return Err(core::Error::Cancelled);
+    }
+    Ok(())
 }
 
 /// A view of the repository while the repository lock is held shared.

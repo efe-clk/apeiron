@@ -30,6 +30,17 @@ pub(crate) fn write_index(
     packs: &[(FileHash, Vec<PackEntry>)],
     keys: &Keys,
 ) -> Result<PathBuf> {
+    let (name, bytes) = encode_index(packs, keys)?;
+    let dest = index_dir.join(name);
+    fsutil::write_durable_new(tmp_dir, &dest, &bytes)?;
+    Ok(dest)
+}
+
+/// The file name and bytes of one index file covering `packs`.
+pub(crate) fn encode_index(
+    packs: &[(FileHash, Vec<PackEntry>)],
+    keys: &Keys,
+) -> Result<(String, Vec<u8>)> {
     let pack_count = u32::try_from(packs.len()).map_err(|_| Error::ObjectTooLarge(packs.len()))?;
     let mut entries: Vec<(u32, &PackEntry)> = Vec::new();
     for (pack_no, (_, pack_entries)) in (0u32..).zip(packs) {
@@ -67,9 +78,7 @@ pub(crate) fn write_index(
     }
 
     let name = to_hex(blake3::hash(&out).as_bytes());
-    let dest = index_dir.join(format!("{name}.idx"));
-    fsutil::write_durable_new(tmp_dir, &dest, &out)?;
-    Ok(dest)
+    Ok((format!("{name}.idx"), out))
 }
 
 /// Parses the hash from an index or pack file name such as `<hex>.idx`.
@@ -81,11 +90,15 @@ pub(crate) fn hash_from_file_name(path: &Path, extension: &str) -> Option<FileHa
 /// Reads an index file, verifying its hash and structure. An encrypted
 /// repository accepts only encrypted indexes and a plain one only plain ones.
 pub(crate) fn read_index(path: &Path, keys: &Keys) -> Result<Vec<Location>> {
-    let bytes = fs::read(path).at(path)?;
+    decode_index(path, &fs::read(path).at(path)?, keys)
+}
+
+/// Checks and decodes the bytes of the index file at `path`.
+pub(crate) fn decode_index(path: &Path, bytes: &[u8], keys: &Keys) -> Result<Vec<Location>> {
     let corrupt = |reason: &str| Error::corrupt(path, reason);
 
     let expected = hash_from_file_name(path, ".idx").ok_or_else(|| corrupt("bad file name"))?;
-    if blake3::hash(&bytes).as_bytes() != &expected {
+    if blake3::hash(bytes).as_bytes() != &expected {
         return Err(corrupt("file hash does not match its name"));
     }
     if bytes.len() < HEADER_LEN || &bytes[..8] != MAGIC {

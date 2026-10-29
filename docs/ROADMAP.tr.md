@@ -66,7 +66,7 @@ Windows'ta yeniden adlandırmalar küçük `apeiron-sys` crate'i üzerinden `MOV
 | # | İş | Durum |
 | --- | --- | --- |
 | 1 | İstemci tarafı şifreleme ([FORMAT.tr.md](FORMAT.tr.md) §14) | Tamamlandı |
-| 2 | Uzak hedefler (klasör, SFTP, S3), push ve pull ile | Planlandı |
+| 2 | Uzak hedefler (klasör, SFTP, S3), push ve pull ile ([FORMAT.tr.md](FORMAT.tr.md) §15); klasörler tamamlandı | Devam ediyor |
 | 3 | Arka plan hizmeti (daemon), zamanlanmış yedek, geri yükleme testi | Planlandı |
 | 4 | Tek ve çift yönlü senkron, çatışma tespiti | Planlandı |
 

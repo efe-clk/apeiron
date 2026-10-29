@@ -42,7 +42,7 @@ Key design ideas:
 | Public API | Stable Rust API; C ABI for other languages; SDKs on top | `apeiron` | In progress (Rust API) |
 | Services | Versioning, archive, backup, sync, search, policy | `apeiron-services` | In progress (backup, restore, diff) |
 | Core | Object model, storage engine, integrity, encryption, operation log | `apeiron-core` | In progress |
-| Storage targets | Local disk, external disk, network storage, remote targets | — | Planned |
+| Storage targets | Local disk, external disk, network storage, remote targets | `apeiron-core` (`Store`, folders) | In progress (folders) |
 | Plugins | Type drivers, storage backends, importers/exporters, hooks | — | Planned |
 
 Rules that apply to every crate:
@@ -64,6 +64,7 @@ What `apeiron-core` contains today:
 | `repo` | Opening/creating a repository, writing and reading objects | Done |
 | Blob, tree, snapshot encoding | Canonical CBOR (FORMAT.md §6) | Planned |
 | `crypto`, `keyfile` | Encryption: sealed boxes and key files (FORMAT.md §14) | Done |
+| `remote`, `repo::transfer` | The `remotes` file, the `Store` interface, folder remotes, push and pull (FORMAT.md §15) | Done (folders) |
 | Operation log | — | Planned |
 
 ## 3. Object model

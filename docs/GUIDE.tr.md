@@ -138,11 +138,23 @@ Ardından ihtiyacınız olanı `~/restored`'dan yerine kopyalayın. İzinler ve 
 
 Bir yedeği Apeiron'u olmayan birine vermek için onu bir arşive yazın: `apeiron export backup/documents ~/documents.zip` (`.tar` ve `.7z` de çalışır).
 
+### 6.1 Harici diskte ikinci bir kopya
+
+Aynı bilgisayardaki bir yedek, bilgisayarla birlikte kaybolur. Harici bir diskte ikinci bir kopya tutun:
+
+```bash
+apeiron remote add disk /run/media/$USER/DISK/apeiron   # bir kez; diskin klasörünü yazın
+apeiron push disk backup/documents                      # her yedekten sonra
+```
+
+İlk push her şeyi kopyalar; sonrakiler yalnızca yeni olanı. Diskteki klasör aynı parolaya sahip eksiksiz bir depodur: bilgisayar kaybolursa doğrudan ondan geri yükleyin: `apeiron --repo /run/media/$USER/DISK/apeiron restore backup/documents ~/restored`. Yarıda kalan bir push yeniden çalıştırılır.
+
 ## 7. Düzen
 
 | Ne sıklıkla | Komut | Neden |
 | --- | --- | --- |
 | Günlük (ya da otomatik, bölüm 8) | Her klasör için `apeiron backup …` | Değişenlerin yeni bir snapshot'ı |
+| Her yedekten sonra ya da haftalık | Her ref için `apeiron push disk …` (bölüm 6.1) | Bilgisayardan bağımsız ikinci bir kopya |
 | Haftalık | `apeiron verify` | Saklanan her baytı okur ve denetler. `OK: …` bozulma yok demektir; çıkış kodu 4 bozuk dosyaları listeler |
 | Aylık | `apeiron gc` | Hiçbir ref'in ulaşmadığı ve 90 günden eski veriyi siler. Önce `apeiron gc --dry-run` ile deneyin |
 | Aylık | Birkaç dosyayı yeni bir klasöre geri yükleyip açın | Bir yedek ancak geri yüklenerek kanıtlanır |

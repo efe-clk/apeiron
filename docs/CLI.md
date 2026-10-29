@@ -41,6 +41,10 @@ The first line of the file is the password; `init --encrypt` also reads the new 
 
 To change a password, add the new one with `apeiron key add`, find the old one in `apeiron key list` (it is marked `(in use)` when it opened the repository) and remove it with `apeiron key remove <id>`. The first 8 characters of an id are enough. The last key cannot be removed, and `key remove`, like `gc`, needs the repository to itself.
 
+### 2.2 Remotes
+
+A remote is a complete copy of the repository in another place ([FORMAT.md](FORMAT.md) §15). `apeiron remote add disk /run/media/user/disk/apeiron` names a folder; `apeiron push disk` copies only what the folder does not have yet, and the folder can then be opened like any repository, with the same password. `apeiron pull disk` brings snapshots back. A ref only moves forward: if both copies have snapshots the other lacks, the command stops with a conflict and changes nothing. SFTP and S3 remotes are planned.
+
 ## 3. Commands
 
 | Command | What it does | Status |
@@ -58,6 +62,11 @@ To change a password, add the new one with `apeiron key add`, find the old one i
 | `apeiron gc [--keep-days <days>] [--dry-run]` | Deletes data no ref and no reflog line of the last 90 days (or `--keep-days`) can reach; `--dry-run` only reports | Done |
 | `apeiron key list` | Lists the passwords and recovery keys of an encrypted repository | Done |
 | `apeiron key add [--recovery] [--new-password-file <file>]` | Adds a password (asked twice, or read from the file), or with `--recovery` a new recovery key, printed once | Done |
+| `apeiron remote add <name> <folder>` | Adds a remote: a folder, such as one on an external disk (section 2.2) | Done |
+| `apeiron remote list` | Lists the remotes | Done |
+| `apeiron remote remove <name>` | Forgets a remote; the copy itself is not touched | Done |
+| `apeiron push <remote> [<ref>]` | Copies the snapshots of a ref (default `main`) to a remote and moves the ref there | Done |
+| `apeiron pull <remote> [<ref>]` | Copies the snapshots of a ref from a remote and moves the local ref forward | Done |
 | `apeiron key remove <id>` | Removes a password or recovery key; the last one cannot be removed | Done |
 
 A `<snapshot>` can be written as a ref name (`main`), a full snapshot id, or the first 8 or more characters of an id if they match exactly one snapshot. A `~N` suffix goes N steps back through first parents: `main~1` is the snapshot before `main`.

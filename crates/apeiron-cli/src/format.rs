@@ -103,6 +103,7 @@ pub(crate) fn progress(p: &Progress) -> String {
         Phase::Storing => "storing",
         Phase::Restoring => "restoring",
         Phase::Exporting => "exporting",
+        Phase::Copying => "copying",
         Phase::Verifying => "verifying",
         Phase::Finishing => "finishing",
         Phase::Done => "done",
@@ -111,8 +112,13 @@ pub(crate) fn progress(p: &Progress) -> String {
         Some(total) => format!("{} / {}", f(done), f(total)),
         None => f(done),
     };
+    let items = if p.phase == Phase::Copying {
+        "objects"
+    } else {
+        "files"
+    };
     let mut line = format!(
-        "{phase}: {} files, {}",
+        "{phase}: {} {items}, {}",
         of(p.items_done, p.items_total, |n| n.to_string()),
         of(p.bytes_done, p.bytes_total, bytes)
     );

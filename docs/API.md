@@ -155,6 +155,11 @@ Every operation takes one plain request value and returns one plain result value
 | `add_password` | new password | `AddedKey`: id | No |
 | `add_recovery_key` | — | `AddedKey`: id and the new recovery key, shown to the user once | No |
 | `remove_key` | key id or its first characters | the whole id; the last key cannot be removed, and the repository lock is taken exclusive | No |
+| `remotes` | — | `Vec<Remote>`: name and URL, sorted by name | No |
+| `add_remote` | name, URL (for now an absolute or relative folder path) | `Remote` with the folder as an absolute path | No |
+| `remove_remote` | name | —; the remote copy itself is not touched | No |
+| `push` | remote name, ref name (default `main`) | `TransferReport`: snapshot the remote ref points to now, the one before, objects and stored bytes copied; `conflict` if the remote has snapshots this copy does not | Yes |
+| `pull` | remote name, ref name (default `main`) | `TransferReport`, the same for the local ref; `conflict` if the local ref has snapshots the remote does not | Yes |
 
 ### 8.4 Naming a snapshot
 

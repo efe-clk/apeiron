@@ -54,8 +54,8 @@ ABI bilerek küçük tutulur: hiç değişmeyen birkaç işlev vardır; işlemle
 | `apeiron_repo_open(path, &repo)` | Bir depoyu açar |
 | `apeiron_repo_unlock(path, secret, &repo)` | Bir depoyu bir parola ya da kurtarma anahtarıyla açar |
 | `apeiron_repo_free(repo)` | Bir depo tutamacını kapatır |
-| `apeiron_call(repo, operation, request_json, &result_json)` | Kısa bir işlemi çalıştırır (`log`, `list`, `diff`, `refs`, `reflog`, `resolve`, `delete_ref`, `repair`, `info`, `keys`, `add_password`, `add_recovery_key`, `remove_key`) |
-| `apeiron_start(repo, operation, request_json, &job)` | Uzun bir işlemi başlatır (`backup`, `restore`, `export`, `verify`, `gc`) |
+| `apeiron_call(repo, operation, request_json, &result_json)` | Kısa bir işlemi çalıştırır (`log`, `list`, `diff`, `refs`, `reflog`, `resolve`, `delete_ref`, `repair`, `info`, `keys`, `add_password`, `add_recovery_key`, `remove_key`, `remotes`, `add_remote`, `remove_remote`) |
+| `apeiron_start(repo, operation, request_json, &job)` | Uzun bir işlemi başlatır (`backup`, `restore`, `export`, `verify`, `gc`, `push`, `pull`) |
 | `apeiron_job_progress(job, &progress_json)` | Anlık ilerlemeyi okur |
 | `apeiron_job_cancel(job)` | İşin durmasını ister |
 | `apeiron_job_wait(job, timeout_ms, &result_json)` | Sonucu bekler; süre önce dolarsa `APEIRON_PENDING` döndürür (`-1` sonsuza kadar bekler) |

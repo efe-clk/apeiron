@@ -138,11 +138,23 @@ Then copy what you need from `~/restored` to its place. Permissions and times ar
 
 To hand a backup to someone without Apeiron, write it into an archive: `apeiron export backup/documents ~/documents.zip` (`.tar` and `.7z` work as well).
 
+### 6.1 A second copy on an external disk
+
+A backup on the same computer is lost with the computer. Keep a second copy on an external disk:
+
+```bash
+apeiron remote add disk /run/media/$USER/DISK/apeiron   # once; use the disk's folder
+apeiron push disk backup/documents                      # after each backup
+```
+
+The first push copies everything; later ones copy only what is new. The folder on the disk is a complete repository with the same password: if the computer is lost, restore straight from it with `apeiron --repo /run/media/$USER/DISK/apeiron restore backup/documents ~/restored`. An interrupted push is simply run again.
+
 ## 7. Routine
 
 | How often | Command | Why |
 | --- | --- | --- |
 | Daily (or automatic, section 8) | `apeiron backup …` for each folder | New snapshot of what changed |
+| After each backup, or weekly | `apeiron push disk …` for each ref (section 6.1) | A second copy that survives the computer |
 | Weekly | `apeiron verify` | Reads every stored byte and checks it. `OK: …` means no damage; exit code 4 lists damaged files |
 | Monthly | `apeiron gc` | Deletes data that no ref reaches and that is older than 90 days. Try `apeiron gc --dry-run` first |
 | Monthly | Restore a few files to a new folder and open them | A backup is only proven by restoring it |

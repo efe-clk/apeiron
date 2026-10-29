@@ -21,7 +21,8 @@ use std::time::{Duration, Instant};
 
 use apeiron::{
     ArchiveFormat, BackupRequest, DiffRequest, Error, ErrorKind, ExportRequest, GcRequest, Job,
-    KeyKind, ListRequest, LogRequest, Name, Repository, RestoreRequest, Warning,
+    KeyKind, ListRequest, LogRequest, Name, Repository, RestoreRequest, TransferReport,
+    TransferRequest, Warning,
 };
 use clap::{Parser, Subcommand};
 use serde::Serialize;
@@ -146,6 +147,33 @@ enum Command {
         #[command(subcommand)]
         command: KeyCommand,
     },
+    /// Manage the remote copies of the repository
+    Remote {
+        #[command(subcommand)]
+        command: RemoteCommand,
+    },
+    /// Copy the snapshots of a ref to a remote and move the ref there
+    Push {
+        remote: String,
+        #[arg(default_value = "main")]
+        ref_name: String,
+    },
+    /// Copy the snapshots of a ref from a remote and move the local ref forward
+    Pull {
+        remote: String,
+        #[arg(default_value = "main")]
+        ref_name: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum RemoteCommand {
+    /// List the remotes
+    List,
+    /// Add a remote; for now a folder, such as one on an external disk
+    Add { name: String, url: String },
+    /// Forget a remote; the copy itself is not touched
+    Remove { name: String },
 }
 
 #[derive(Subcommand)]
@@ -540,6 +568,44 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             }
             Ok(0)
         }
+        Command::Remote { command } => {
+            let repo = open(cli.repo, password_file)?;
+            match command {
+                RemoteCommand::List => {
+                    let remotes = repo.remotes()?;
+                    out.result(&remotes, |remotes| {
+                        for r in remotes {
+                            say!("{}  {}", r.name, r.url);
+                        }
+                    });
+                }
+                RemoteCommand::Add { name, url } => {
+                    let remote = repo.add_remote(&name, &url)?;
+                    out.result(&remote, |r| say!("Added remote {} at {}", r.name, r.url));
+                }
+                RemoteCommand::Remove { name } => {
+                    repo.remove_remote(&name)?;
+                    out.result(&serde_json::json!({ "removed": name }), |_| {
+                        say!("Removed remote {name}");
+                    });
+                }
+            }
+            Ok(0)
+        }
+        Command::Push { remote, ref_name } => {
+            let repo = open(cli.repo, password_file)?;
+            let request = TransferRequest::new(remote.clone(), ref_name.clone());
+            let report = watch(out, repo.push(request)?)?;
+            out.result(&report, |r| say!("{}", transferred(r, &ref_name, &remote)));
+            Ok(0)
+        }
+        Command::Pull { remote, ref_name } => {
+            let repo = open(cli.repo, password_file)?;
+            let request = TransferRequest::new(remote.clone(), ref_name.clone());
+            let report = watch(out, repo.pull(request)?)?;
+            out.result(&report, |r| say!("{}", transferred(r, &ref_name, &remote)));
+            Ok(0)
+        }
         Command::Repair => {
             let repo = open(cli.repo, password_file)?;
             let report = repo.repair()?;
@@ -570,6 +636,25 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             Ok(0)
         }
     }
+}
+
+/// One line about a push or pull.
+fn transferred(r: &TransferReport, ref_name: &str, remote: &str) -> String {
+    if r.previous == Some(r.snapshot) || r.objects == 0 && r.previous.is_some() {
+        return format!(
+            "{ref_name} is up to date with {remote} ({})",
+            format::short_id(&r.snapshot)
+        );
+    }
+    let from = r
+        .previous
+        .map_or("new".to_owned(), |p| format::short_id(&p));
+    format!(
+        "{ref_name}: {from} → {}, {} ({}) copied",
+        format::short_id(&r.snapshot),
+        format::count(r.objects, "object"),
+        format::bytes(r.bytes)
+    )
 }
 
 fn warnings_exit(out: &Output, warnings: &[Warning]) -> u8 {

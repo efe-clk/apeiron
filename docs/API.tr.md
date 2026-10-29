@@ -155,6 +155,11 @@ Her işlem tek bir düz istek değeri alır ve tek bir düz sonuç değeri dönd
 | `add_password` | yeni parola | `AddedKey`: kimlik | Hayır |
 | `add_recovery_key` | — | `AddedKey`: kimlik ve kullanıcıya bir kez gösterilen yeni kurtarma anahtarı | Hayır |
 | `remove_key` | anahtar kimliği ya da ilk karakterleri | tam kimlik; son anahtar silinemez ve depo kilidi özel alınır | Hayır |
+| `remotes` | — | `Vec<Remote>`: ad ve URL, ada göre sıralı | Hayır |
+| `add_remote` | ad, URL (şimdilik mutlak ya da göreli bir klasör yolu) | klasörü mutlak yol olarak tutan `Remote` | Hayır |
+| `remove_remote` | ad | —; uzak kopyanın kendisine dokunulmaz | Hayır |
+| `push` | uzak depo adı, ref adı (varsayılan `main`) | `TransferReport`: uzaktaki ref'in şimdi ve önceden gösterdiği snapshot'lar, kopyalanan nesneler ve saklanan baytlar; uzak depoda bu kopyada olmayan snapshot'lar varsa `conflict` | Evet |
+| `pull` | uzak depo adı, ref adı (varsayılan `main`) | yerel ref için aynısı, `TransferReport`; yerel ref'te uzak depoda olmayan snapshot'lar varsa `conflict` | Evet |
 
 ### 8.4 Bir snapshot'ı adlandırma
 

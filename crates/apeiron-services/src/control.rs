@@ -19,6 +19,8 @@ pub enum Phase {
     Storing,
     Restoring,
     Exporting,
+    /// Copying objects to or from a remote.
+    Copying,
     Verifying,
     /// Making the result durable and moving refs.
     Finishing,

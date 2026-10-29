@@ -19,7 +19,8 @@ Implementation status (`apeiron-core`):
 | 12 | Repository lock | Done |
 | 13 | Garbage collection | Done |
 | 14 | Encryption | Done |
-| 15 | Remote repositories, push and pull (draft, awaiting approval) | Planned |
+| 15 | Remote repositories, push and pull: folders | Done |
+| 15 | Remote repositories, push and pull: SFTP and S3 | Planned |
 
 ## Plain summary
 
@@ -532,18 +533,19 @@ Every remote kind offers the same small set of operations on paths of the layout
 | Write a new file atomically | Write into `tmp/`, flush, rename (section 9.1) | `PUT` with `If-None-Match: *` |
 | Replace a ref (compare and swap) | Lock file as in section 9.3 | `PUT` with `If-Match: <etag read before>` |
 | Delete a file | Delete | `DELETE` |
+| Create the folders of a new copy | Create the folders of section 2 | Nothing; S3 has no folders |
 
-A file is either completely there or not there at all. A remote that cannot do a conditional `PUT` is refused, because without it two writers could overwrite each other's ref.
+A file is either completely there or not there at all. A remote that cannot do a conditional `PUT` is refused, because without it two writers could overwrite each other's ref. A folder that already holds a repository is also locked shared while it is used (section 12), so that garbage collection run on it directly waits.
 
 ### 15.3 Push
 
-1. Take the local repository lock shared (section 12). Read the remote `config`. If there is none, the remote is new: write `keys/` and then `config`. If its `id` differs from the local one, stop: it is another repository.
+1. Take the local repository lock shared (section 12). Read the remote `config`. If there is none, the remote is new: create its folders, write `keys/` and then `config`. A new remote must be empty apart from the folders of section 2; any other content stops the push. If its `id` differs from the local one, stop: it is another repository.
 2. Make the remote `keys/` equal to the local one: write missing key files first, then delete the ones removed locally.
 3. Read the remote index files; together they give the set of objects the remote has.
 4. Read the remote ref. If it points to a snapshot that is not the local ref's snapshot or one of its ancestors, stop with a conflict: the remote has history this copy does not, and must be pulled first.
 5. Walk the objects reachable from the local ref. An object the remote already has is not entered, because everything reachable from it is there too (15.5).
 6. Copy the missing objects as stored bytes, without decrypting them, into new packs; write each pack, then its index, to the remote.
-7. Replace the remote ref, expecting the value read in step 4. Remote copies keep no reflog; the history of a ref is its chain of parent snapshots.
+7. Replace the remote ref, expecting the value read in step 4. A folder remote keeps a reflog like any repository; SFTP and S3 remotes keep none, and there the history of a ref is its chain of parent snapshots.
 
 ### 15.4 Pull
 
@@ -552,14 +554,14 @@ Pull runs the steps of push in the other direction, with the local repository as
 1. Check that the remote `config` has the local `id`. Read the remote index files and the remote ref.
 2. Walk the objects reachable from the remote ref, reading tree and snapshot objects from the remote; objects the local repository has are not entered. Adjacent byte ranges of one pack are read together.
 3. Write the missing objects into new local packs and their index (section 9.2).
-4. Move the local ref with compare and swap and a reflog line, but only forward: if the local ref points to a snapshot that is not an ancestor of the remote one, stop with a conflict. Keys are never pulled.
+4. Move the local ref with compare and swap and a reflog line, but only forward. If the remote snapshot is an ancestor of the local one, nothing is done; if neither is an ancestor of the other, stop with a conflict. Keys are never pulled.
 
 ### 15.5 Rules and interruptions
 
 - Closure: if a copy has an object, it has every object reachable from it. Push and pull write objects before the index that lists them and the index before the ref, so an interruption leaves only unlisted packs, which the next push or pull covers.
 - A remote ref is replaced only after every object it reaches is written on the remote, as in section 9.2.
 - Two programs pushing the same ref at once: the conditional replace lets one win; the other stops with a conflict and changes nothing.
-- An interrupted push or pull is simply run again. Packs already written are content-addressed and are not written twice.
+- An interrupted push or pull is simply run again; it copies the objects that are still not listed. Packs the interruption left without an index take up space until garbage collection of that copy removes them.
 - Garbage collection of a remote copy and two-way sync are left for later work items ([ROADMAP.md](ROADMAP.md) §4).
 
 ## 16. Left for later versions

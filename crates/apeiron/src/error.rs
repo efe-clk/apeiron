@@ -93,15 +93,24 @@ impl From<apeiron_core::Error> for Error {
             E::UnsupportedVersion { path, .. } => {
                 Error::new(ErrorKind::Unsupported, message).with_path(path)
             }
-            E::ObjectNotFound(_) | E::KeyNotFound(_) => Error::new(ErrorKind::NotFound, message),
+            E::ObjectNotFound(_) | E::KeyNotFound(_) | E::RefNotFound(_) | E::RemoteNotFound(_) => {
+                Error::new(ErrorKind::NotFound, message)
+            }
+            E::RemoteExists(_) => Error::new(ErrorKind::AlreadyExists, message),
+            E::Cancelled => Error::new(ErrorKind::Cancelled, message),
+            E::UnsupportedRemote(_) => Error::new(ErrorKind::Unsupported, message),
+            E::OtherRepository(path) => {
+                Error::new(ErrorKind::InvalidInput, message).with_path(path)
+            }
             E::KeyRequired(path) => Error::new(ErrorKind::Key, message).with_path(path),
             E::WrongKey => Error::new(ErrorKind::Key, message),
             E::RefLocked { lock, .. } | E::RepoLocked(lock) => {
                 Error::new(ErrorKind::Locked, message).with_path(lock)
             }
-            E::RefConflict { .. } | E::RefNameConflict(_) => {
-                Error::new(ErrorKind::Conflict, message)
-            }
+            E::RefConflict { .. }
+            | E::RefNameConflict(_)
+            | E::RemoteAhead(_)
+            | E::LocalAhead(_) => Error::new(ErrorKind::Conflict, message),
             E::NotASnapshot(_)
             | E::WrongObjectType { .. }
             | E::ObjectTooLarge(_)
@@ -109,7 +118,8 @@ impl From<apeiron_core::Error> for Error {
             | E::InvalidRefName(_)
             | E::InvalidObject { .. }
             | E::NotEncrypted
-            | E::LastKey => Error::new(ErrorKind::InvalidInput, message),
+            | E::LastKey
+            | E::InvalidRemote(_) => Error::new(ErrorKind::InvalidInput, message),
             _ => Error::new(ErrorKind::Internal, message),
         }
     }

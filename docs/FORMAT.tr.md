@@ -19,7 +19,8 @@ Uygulama durumu (`apeiron-core`):
 | 12 | Depo kilidi | Tamamlandı |
 | 13 | Çöp toplama | Tamamlandı |
 | 14 | Şifreleme | Tamamlandı |
-| 15 | Uzak depolar, push ve pull (taslak, onay bekliyor) | Planlandı |
+| 15 | Uzak depolar, push ve pull: klasörler | Tamamlandı |
+| 15 | Uzak depolar, push ve pull: SFTP ve S3 | Planlandı |
 
 ## Sade anlatım
 
@@ -532,18 +533,19 @@ Her uzak depo türü, bölüm 2'deki düzenin yolları üzerinde aynı küçük 
 | Yeni bir dosyayı atomik yazma | `tmp/` içine yazma, diske yazma, yeniden adlandırma (bölüm 9.1) | `If-None-Match: *` ile `PUT` |
 | Bir ref'i değiştirme (karşılaştır ve değiştir) | Bölüm 9.3'teki gibi kilit dosyası | `If-Match: <önce okunan etag>` ile `PUT` |
 | Bir dosyayı silme | Silme | `DELETE` |
+| Yeni bir kopyanın klasörlerini oluşturma | Bölüm 2'deki klasörleri oluşturma | Hiçbir şey; S3'te klasör yoktur |
 
-Bir dosya ya tamamen vardır ya hiç yoktur. Koşullu `PUT` yapamayan bir uzak depo reddedilir; çünkü o olmadan iki yazıcı birbirinin ref'inin üzerine yazabilir.
+Bir dosya ya tamamen vardır ya hiç yoktur. Koşullu `PUT` yapamayan bir uzak depo reddedilir; çünkü o olmadan iki yazıcı birbirinin ref'inin üzerine yazabilir. Zaten bir depo tutan bir klasör, kullanıldığı sürece paylaşımlı olarak da kilitlenir (bölüm 12); böylece doğrudan onun üzerinde çalıştırılan çöp toplama bekler.
 
 ### 15.3 Push
 
-1. Yerel depo kilidini paylaşımlı al (bölüm 12). Uzaktaki `config`'i oku. Yoksa uzak depo yenidir: önce `keys/`, sonra `config` yazılır. `id`'si yereldekinden farklıysa dur: bu başka bir depodur.
+1. Yerel depo kilidini paylaşımlı al (bölüm 12). Uzaktaki `config`'i oku. Yoksa uzak depo yenidir: klasörleri oluşturulur, önce `keys/`, sonra `config` yazılır. Yeni bir uzak depo, bölüm 2'deki klasörler dışında boş olmalıdır; başka bir içerik push'u durdurur. `id`'si yereldekinden farklıysa dur: bu başka bir depodur.
 2. Uzaktaki `keys/`'i yereldekiyle aynı yap: önce eksik anahtar dosyalarını yaz, sonra yerelde silinmiş olanları sil.
 3. Uzaktaki indeks dosyalarını oku; birlikte, uzak deponun sahip olduğu nesnelerin kümesini verirler.
 4. Uzaktaki ref'i oku. Yerel ref'in snapshot'ı ya da onun atalarından biri olmayan bir snapshot'ı gösteriyorsa bir çatışmayla dur: uzak depoda bu kopyada olmayan bir geçmiş vardır ve önce pull yapılmalıdır.
 5. Yerel ref'ten ulaşılabilen nesneleri dolaş. Uzak deponun zaten sahip olduğu bir nesnenin içine girilmez; çünkü ondan ulaşılabilen her şey de oradadır (15.5).
 6. Eksik nesneleri saklandıkları baytlarla, şifrelerini çözmeden yeni paketlere kopyala; her paketi, sonra onun indeksini uzak depoya yaz.
-7. Uzaktaki ref'i, 4. adımda okunan değeri bekleyerek değiştir. Uzak kopyalar reflog tutmaz; bir ref'in geçmişi, ebeveyn snapshot'larının zinciridir.
+7. Uzaktaki ref'i, 4. adımda okunan değeri bekleyerek değiştir. Bir klasör uzak deposu her depo gibi reflog tutar; SFTP ve S3 uzak depoları tutmaz ve orada bir ref'in geçmişi, ebeveyn snapshot'larının zinciridir.
 
 ### 15.4 Pull
 
@@ -552,14 +554,14 @@ Pull, push'un adımlarını ters yönde, hedef olarak yerel depoyla çalıştır
 1. Uzaktaki `config`'in yerel `id`'yi taşıdığını denetle. Uzaktaki indeks dosyalarını ve uzaktaki ref'i oku.
 2. Uzaktaki ref'ten ulaşılabilen nesneleri, tree ve snapshot nesnelerini uzak depodan okuyarak dolaş; yerel deponun sahip olduğu nesnelerin içine girilmez. Bir paketin bitişik bayt aralıkları birlikte okunur.
 3. Eksik nesneleri yeni yerel paketlere ve onların indeksine yaz (bölüm 9.2).
-4. Yerel ref'i karşılaştır ve değiştir ile ve bir reflog satırıyla taşı; ama yalnızca ileri: yerel ref, uzaktakinin atası olmayan bir snapshot'ı gösteriyorsa bir çatışmayla dur. Anahtarlar asla pull edilmez.
+4. Yerel ref'i karşılaştır ve değiştir ile ve bir reflog satırıyla taşı; ama yalnızca ileri. Uzaktaki snapshot yereldekinin atasıysa hiçbir şey yapılmaz; ikisi de ötekinin atası değilse bir çatışmayla dur. Anahtarlar asla pull edilmez.
 
 ### 15.5 Kurallar ve kesintiler
 
 - Kapanış: bir kopya bir nesneye sahipse, ondan ulaşılabilen her nesneye de sahiptir. Push ve pull nesneleri, onları listeleyen indeksten önce; indeksi de ref'ten önce yazar. Böylece bir kesinti yalnızca listelenmemiş paketler bırakır ve sonraki push ya da pull bunları kapsar.
 - Uzaktaki bir ref, ancak ulaştığı her nesne uzak depoya yazıldıktan sonra değiştirilir (bölüm 9.2'deki gibi).
 - Aynı ref'i aynı anda push eden iki program: koşullu değiştirme birinin kazanmasını sağlar; öteki bir çatışmayla durur ve hiçbir şeyi değiştirmez.
-- Yarıda kalan bir push ya da pull yeniden çalıştırılır. Zaten yazılmış paketler içerik adreslidir ve iki kez yazılmaz.
+- Yarıda kalan bir push ya da pull yeniden çalıştırılır; hâlâ listelenmemiş nesneleri kopyalar. Kesintinin indekssiz bıraktığı paketler, o kopyanın çöp toplaması onları silene kadar yer kaplar.
 - Bir uzak kopyanın çöp toplaması ve çift yönlü senkron sonraki işlere bırakılmıştır ([ROADMAP.tr.md](ROADMAP.tr.md) §4).
 
 ## 16. Sonraki sürümlere bırakılanlar

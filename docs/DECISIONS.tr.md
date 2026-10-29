@@ -25,7 +25,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [015](#adr-015-c-abi-sınırında-json-değerler) | C ABI | Küçük ve sabit bir işlev kümesi; istekler ve sonuçlar JSON | Önerildi |
 | [016](#adr-016-senkron-herkese-açık-api-ve-iş-parçacığında-çalışan-işler) | Uzun işlemler | Senkron API; sorgulanan ilerlemeyle iş parçacığında çalışan işler | Önerildi |
 | [017](#adr-017-şifreleme-için-xchacha20-poly1305-ve-argon2id) | Şifreleme | Veri için XChaCha20-Poly1305, parolalar için Argon2id | Kabul edildi |
-| [018](#adr-018-uzak-depo-olarak-deponun-tam-kopyası-sftp-için-russh-s3-için-object_store) | Uzak hedefler | Uzak depolar deponun tam kopyasıdır; SFTP için `russh`, S3 için `object_store` | Önerildi |
+| [018](#adr-018-uzak-depo-olarak-deponun-tam-kopyası-sftp-için-russh-s3-için-object_store) | Uzak hedefler | Uzak depolar deponun tam kopyasıdır; SFTP için `russh`, S3 için `object_store` | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
@@ -371,11 +371,11 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 
 ## ADR-018: Uzak depo olarak deponun tam kopyası; SFTP için `russh`, S3 için `object_store`
 
-**Durum:** Önerildi (2026-10-28)
+**Durum:** Kabul edildi (2026-10-29)
 
 **Bağlam.** Aşama 2, yedekleri harici bir diske, bir ev sunucusuna ve bulut depolamaya gönderir ([FORMAT.tr.md](FORMAT.tr.md) §15). Uzak depolama yavaştır ve her an kesilebilir; bulut depolamada dosya yeniden adlandırma ve kilit yoktur. Windows, macOS ve Linux'un hepsi desteklenir ve çekirdek senkron kalır (ADR-006).
 
-**Karar.** Uzak depo, aynı anahtarlara sahip, deponun eksiksiz bir kopyasıdır; push ve pull yalnızca bir ref'in eksik olan nesnelerini saklandıkları (hâlâ şifreli) baytlarla kopyalar ve ref'leri yalnızca ileri taşır. Her uzak depo aynı beş işlemi sunar (okuma, listeleme, yeni bir dosyayı atomik yazma, bir ref'i koşullu değiştirme, silme). Klasörler Apeiron'un kendi kalıcı yazma yolunu kullanır. SFTP `russh` ve `russh-sftp` kullanır. S3 ve S3 uyumlu depolama `object_store` kullanır. Bu kütüphaneler, yeni `apeiron-remote` crate'inin içinde, bekleyen (blocking) bir arayüzün arkasında Tokio üzerinde çalışır.
+**Karar.** Uzak depo, aynı anahtarlara sahip, deponun eksiksiz bir kopyasıdır; push ve pull yalnızca bir ref'in eksik olan nesnelerini saklandıkları (hâlâ şifreli) baytlarla kopyalar ve ref'leri yalnızca ileri taşır. Her uzak depo aynı küçük işlem kümesini sunar (okuma, listeleme, yeni bir dosyayı atomik yazma, bir ref'i koşullu değiştirme, silme, yeni bir kopyanın klasörlerini oluşturma). Bu `Store` arayüzü ve klasör deposu `apeiron-core` içindedir; böylece push ve pull her uzak depo türü için bir kez yazılır. Klasörler Apeiron'un kendi kalıcı yazma yolunu kullanır. SFTP `russh` ve `russh-sftp` kullanır. S3 ve S3 uyumlu depolama `object_store` kullanır. Bu kütüphaneler, yeni `apeiron-remote` crate'inin içinde, bekleyen (blocking) bir arayüzün arkasında Tokio üzerinde çalışır.
 
 **Gerekçe.** Tam bir kopya, asıl bilgisayar olmadan geri yüklenebilir ve yeni dosya türleri gerektirmez. Saklanan baytları kopyalamak, uzak deponun hiçbir zaman parolaya ihtiyaç duymaması ve verinin yolda hiç çözülmemesi demektir. `russh` saf Rust'tır ve sistemdeki `ssh` programını çalıştıran kütüphanelerin aksine Windows'ta çalışır. `object_store` Apache Arrow projesi tarafından bakılır ve güvenli bir ref güncellemesinin gerektirdiği koşullu yazmayı S3'te destekler. İkisi de Rust 1.85'i destekler.
 
@@ -389,4 +389,4 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Her uzak depo için `opendal` | Onun SFTP desteği de sistemdeki `ssh` programını çalıştırır |
 | Koşullu yazma yerine S3'te kilit dosyaları | S3'te koşullu yazma olmadan atomik "yoksa oluştur" yoktur |
 
-**Sonuçlar.** Koşullu yazma desteği olmayan S3 uyumlu hizmetler reddedilir. SFTP, sunucunun `~/.ssh/known_hosts` içinde olmasını ister. Uzak kopyaların reflog'u yoktur ve onların çöp toplaması sonraki bir iştir.
+**Sonuçlar.** Koşullu yazma desteği olmayan S3 uyumlu hizmetler reddedilir. SFTP, sunucunun `~/.ssh/known_hosts` içinde olmasını ister. SFTP ve S3 kopyalarının reflog'u yoktur. Bir uzak kopyanın çöp toplaması sonraki bir iştir; bir klasör kopyası, bir depo olarak açılarak bugün de toplanabilir.

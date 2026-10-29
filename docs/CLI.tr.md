@@ -41,6 +41,10 @@ Dosyanın ilk satırı paroladır; `init --encrypt` yeni parolayı da oradan oku
 
 Bir parolayı değiştirmek için yenisi `apeiron key add` ile eklenir, eskisi `apeiron key list` içinde bulunur (depoyu o açtıysa `(in use)` ile işaretlidir) ve `apeiron key remove <id>` ile silinir. Kimliğin ilk 8 karakteri yeterlidir. Son anahtar silinemez; `key remove`, `gc` gibi depoyu yalnız kullanmak ister.
 
+### 2.2 Uzak depolar
+
+Uzak depo, deponun başka bir yerdeki eksiksiz bir kopyasıdır ([FORMAT.tr.md](FORMAT.tr.md) §15). `apeiron remote add disk /run/media/user/disk/apeiron` bir klasöre ad verir; `apeiron push disk` yalnızca klasörde henüz olmayanı kopyalar ve klasör daha sonra her depo gibi, aynı parolayla açılabilir. `apeiron pull disk` snapshot'ları geri getirir. Bir ref yalnızca ileri gider: iki kopyada da ötekinde olmayan snapshot'lar varsa komut bir çatışmayla durur ve hiçbir şeyi değiştirmez. SFTP ve S3 uzak depoları planlanmıştır.
+
 ## 3. Komutlar
 
 | Komut | Ne yapar | Durum |
@@ -58,6 +62,11 @@ Bir parolayı değiştirmek için yenisi `apeiron key add` ile eklenir, eskisi `
 | `apeiron gc [--keep-days <days>] [--dry-run]` | Hiçbir ref'in ve son 90 günün (ya da `--keep-days`) hiçbir reflog satırının ulaşamadığı veriyi siler; `--dry-run` yalnızca raporlar | Tamamlandı |
 | `apeiron key list` | Şifreli bir deponun parolalarını ve kurtarma anahtarlarını listeler | Tamamlandı |
 | `apeiron key add [--recovery] [--new-password-file <file>]` | Bir parola ekler (iki kez sorulur ya da dosyadan okunur); `--recovery` ile bir kez yazdırılan yeni bir kurtarma anahtarı ekler | Tamamlandı |
+| `apeiron remote add <name> <folder>` | Bir uzak depo ekler: harici diskteki gibi bir klasör (bölüm 2.2) | Tamamlandı |
+| `apeiron remote list` | Uzak depoları listeler | Tamamlandı |
+| `apeiron remote remove <name>` | Bir uzak depoyu unutur; kopyanın kendisine dokunulmaz | Tamamlandı |
+| `apeiron push <remote> [<ref>]` | Bir ref'in (varsayılan `main`) snapshot'larını uzak depoya kopyalar ve ref'i orada taşır | Tamamlandı |
+| `apeiron pull <remote> [<ref>]` | Bir ref'in snapshot'larını uzak depodan kopyalar ve yerel ref'i ileri taşır | Tamamlandı |
 | `apeiron key remove <id>` | Bir parolayı ya da kurtarma anahtarını siler; sonuncusu silinemez | Tamamlandı |
 
 Bir `<snapshot>`; ref adı (`main`), tam snapshot kimliği ya da tek bir snapshot'a uyuyorsa kimliğin ilk 8 ya da daha fazla karakteri olarak yazılabilir. `~N` eki ilk ebeveynler üzerinden N adım geri gider: `main~1`, `main`'den önceki snapshot'tır.

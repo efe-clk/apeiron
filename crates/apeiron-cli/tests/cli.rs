@@ -273,3 +273,36 @@ fn encrypted_repository_with_password_file() {
     let doc = json(&["key", "add", "--recovery"], "wrong");
     assert_eq!(doc["recovery_key"].as_str().unwrap().len(), 64);
 }
+
+#[test]
+fn push_and_pull_with_a_folder_remote() {
+    let s = Setup::new();
+    let src = s.path("src");
+    s.ok(&["backup", &src]);
+    let doc = s.json(&["remote", "add", "disk", &s.path("disk")]);
+    assert_eq!(doc["url"], s.path("disk").as_str());
+    assert!(s.ok(&["remote", "list"]).starts_with("disk  "));
+
+    let doc = s.json(&["push", "disk"]);
+    assert!(doc["previous"].is_null());
+    assert!(doc["objects"].as_u64().unwrap() > 0);
+    assert!(
+        s.ok(&["push", "disk"])
+            .contains("main is up to date with disk")
+    );
+
+    // The disk is a complete repository on its own.
+    let disk = Command::new(env!("CARGO_BIN_EXE_apeiron"))
+        .args(["--repo", &s.path("disk"), "ls", "main"])
+        .output()
+        .unwrap();
+    assert!(String::from_utf8_lossy(&disk.stdout).contains("a.txt"));
+    assert!(s.ok(&["pull", "disk"]).contains("up to date"));
+
+    let out = s.run(&["--json", "push", "nowhere"]);
+    assert_eq!(code(&out), Some(1));
+    let doc: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(doc["error"]["kind"], "not_found");
+    s.ok(&["remote", "remove", "disk"]);
+    assert_eq!(s.ok(&["remote", "list"]), "");
+}

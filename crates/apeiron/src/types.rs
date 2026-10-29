@@ -128,3 +128,25 @@ pub struct AddedKey {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recovery_key: Option<String>,
 }
+
+/// Which ref to push to or pull from which remote.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TransferRequest {
+    /// The name of a remote.
+    pub remote: String,
+    #[serde(rename = "ref", default = "default_ref")]
+    pub ref_name: String,
+}
+
+fn default_ref() -> String {
+    "main".to_owned()
+}
+
+impl TransferRequest {
+    pub fn new(remote: impl Into<String>, ref_name: impl Into<String>) -> Self {
+        TransferRequest {
+            remote: remote.into(),
+            ref_name: ref_name.into(),
+        }
+    }
+}

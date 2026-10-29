@@ -65,6 +65,24 @@ pub enum Error {
     KeyNotFound(String),
     #[error("cannot remove the last key; add another password first")]
     LastKey,
+    #[error("ref {0:?} not found")]
+    RefNotFound(String),
+    #[error("{0}")]
+    InvalidRemote(String),
+    #[error("remote {0:?} already exists")]
+    RemoteExists(String),
+    #[error("no remote named {0:?}")]
+    RemoteNotFound(String),
+    #[error("{0}: only folder remotes are supported so far")]
+    UnsupportedRemote(String),
+    #[error("{} holds another repository", .0.display())]
+    OtherRepository(PathBuf),
+    #[error("the remote ref {0:?} has snapshots this copy does not have; pull it first")]
+    RemoteAhead(String),
+    #[error("the local ref {0:?} has snapshots the remote does not have")]
+    LocalAhead(String),
+    #[error("cancelled")]
+    Cancelled,
     #[error("random number generator failed: {0}")]
     Random(getrandom::Error),
 }

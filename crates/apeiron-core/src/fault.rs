@@ -939,3 +939,208 @@ fn every_crash_while_changing_the_password_keeps_a_key_that_opens() {
     }
     assert!(!old_file(&repo_path(states.last().unwrap())).exists());
 }
+
+mod transfer {
+    use super::*;
+    use crate::object::{EntryKind, Snapshot, Time, Tree, TreeEntry};
+    use crate::remote::FolderStore;
+
+    /// A folder holding the repository `local`, where `main` points to
+    /// `second` with parent `first`, and the repository `remote`, a copy
+    /// where `main` points to `first`.
+    struct TransferFixture {
+        _dir: TempDir,
+        base: PathBuf,
+        first: ObjectId,
+        second: ObjectId,
+    }
+
+    fn data(seed: u64) -> Vec<u8> {
+        noise(200 * 1024, seed)
+    }
+
+    fn commit(repo: &mut Repository, seed: u64, parent: Option<ObjectId>) -> ObjectId {
+        let mut writer = repo.writer();
+        let (size, blob) = writer.put_file(data(seed).as_slice()).unwrap();
+        let tree = writer
+            .put_tree(&Tree {
+                entries: vec![TreeEntry {
+                    name: b"file".to_vec(),
+                    kind: EntryKind::File { size, blob },
+                    mode: None,
+                    mtime: None,
+                    uid: None,
+                    gid: None,
+                    xattrs: vec![],
+                }],
+            })
+            .unwrap();
+        let snapshot = writer
+            .put_snapshot(&Snapshot {
+                tree,
+                parents: parent.into_iter().collect(),
+                time: Time {
+                    seconds: 1_700_000_000,
+                    nanos: 0,
+                },
+                author: None,
+                host: None,
+                message: None,
+                meta: vec![],
+            })
+            .unwrap();
+        writer.finish().unwrap();
+        repo.update_ref("main", parent, Some(snapshot)).unwrap();
+        snapshot
+    }
+
+    fn transfer_fixture() -> TransferFixture {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().to_path_buf();
+        let mut local = init(&base.join("local"), true);
+        let first = commit(&mut local, 1, None);
+        local
+            .push(
+                &FolderStore::open(&base.join("remote")).unwrap(),
+                "main",
+                &mut |_| Ok(()),
+            )
+            .unwrap();
+        let second = commit(&mut local, 2, Some(first));
+        TransferFixture {
+            _dir: dir,
+            base,
+            first,
+            second,
+        }
+    }
+
+    /// Both repositories as a crash at each checkpoint of `op` leaves them,
+    /// followed by their state after `op` completed. `op` gets the local
+    /// repository and the remote folder.
+    fn transfer_states(
+        base: &Path,
+        op: impl Fn(&mut Repository, &Path) -> Result<()>,
+    ) -> Vec<TempDir> {
+        let mut states = Vec::new();
+        for n in 0.. {
+            let work = tempfile::tempdir().unwrap();
+            copy_dir(base, work.path());
+            let crash = tempfile::tempdir().unwrap();
+            let mut local = open(&work.path().join("local")).unwrap();
+            PLAN.set(Some(Plan {
+                fault: Fault::Crash {
+                    repo: work.path().to_path_buf(),
+                    dest: crash.path().to_path_buf(),
+                },
+                remaining: n,
+                fired: false,
+            }));
+            let result = op(&mut local, &work.path().join("remote"));
+            drop(local);
+            if !PLAN.take().is_some_and(|p| p.fired) {
+                result.unwrap();
+                states.push(work);
+                break;
+            }
+            assert!(result.is_err());
+            states.push(crash);
+        }
+        states
+    }
+
+    fn push(local: &mut Repository, remote: &Path) -> Result<()> {
+        local
+            .push(&FolderStore::open(remote)?, "main", &mut |_| Ok(()))
+            .map(drop)
+    }
+
+    fn pull(local: &mut Repository, remote: &Path) -> Result<()> {
+        local
+            .pull(&FolderStore::open(remote)?, "main", &mut |_| Ok(()))
+            .map(drop)
+    }
+
+    /// The snapshot `main` points to, with its whole history readable.
+    fn readable_main(repo: &Repository, f: &TransferFixture) -> Option<ObjectId> {
+        let target = repo.read_ref("main").unwrap()?;
+        assert!(target == f.first || target == f.second);
+        for (id, snapshot) in repo.history(target).map(Result::unwrap) {
+            let tree = repo.read_tree(&snapshot.tree).unwrap();
+            let EntryKind::File {
+                blob: Some(blob), ..
+            } = tree.entries[0].kind
+            else {
+                panic!("expected a file");
+            };
+            let mut out = Vec::new();
+            repo.read_file(&blob, &mut out).unwrap();
+            assert_eq!(out, data(if id == f.first { 1 } else { 2 }));
+        }
+        Some(target)
+    }
+
+    /// Lets stale temporary files and ref locks expire and repairs.
+    fn recover(path: &Path) {
+        age_files(&path.join("tmp"));
+        age_files(&path.join("refs"));
+        open(path).unwrap().repair().unwrap();
+    }
+
+    #[test]
+    fn every_crash_during_a_first_push_leaves_no_copy_or_a_readable_one() {
+        let f = transfer_fixture();
+        fs::remove_dir_all(f.base.join("remote")).unwrap();
+        let states = transfer_states(&f.base, push);
+        assert!(states.len() > 10, "only {} checkpoints", states.len());
+        for state in &states {
+            let remote = state.path().join("remote");
+            if remote.join("config").exists() {
+                let target = readable_main(&open(&remote).unwrap(), &f);
+                assert!(target.is_none() || target == Some(f.second));
+                recover(&remote);
+            }
+            push(&mut open(&state.path().join("local")).unwrap(), &remote).unwrap();
+            let copy = open(&remote).unwrap();
+            assert_eq!(readable_main(&copy, &f), Some(f.second));
+            assert!(copy.verify().unwrap().is_ok());
+        }
+    }
+
+    #[test]
+    fn every_crash_during_a_push_keeps_the_remote_readable() {
+        let f = transfer_fixture();
+        let states = transfer_states(&f.base, push);
+        assert!(states.len() > 10, "only {} checkpoints", states.len());
+        for state in &states {
+            let remote = state.path().join("remote");
+            assert!(readable_main(&open(&remote).unwrap(), &f).is_some());
+            recover(&remote);
+            push(&mut open(&state.path().join("local")).unwrap(), &remote).unwrap();
+            let copy = open(&remote).unwrap();
+            assert_eq!(readable_main(&copy, &f), Some(f.second));
+            assert!(copy.verify().unwrap().is_ok());
+        }
+    }
+
+    #[test]
+    fn every_crash_during_a_pull_keeps_the_local_copy_readable() {
+        let f = transfer_fixture();
+        // Swap the roles: the remote is ahead and the local copy pulls.
+        let base = f.base.join("swapped");
+        copy_dir(&f.base.join("local"), &base.join("remote"));
+        copy_dir(&f.base.join("remote"), &base.join("local"));
+        let states = transfer_states(&base, pull);
+        assert!(states.len() > 10, "only {} checkpoints", states.len());
+        for state in &states {
+            let local = state.path().join("local");
+            assert!(readable_main(&open(&local).unwrap(), &f).is_some());
+            recover(&local);
+            let mut repo = open(&local).unwrap();
+            pull(&mut repo, &state.path().join("remote")).unwrap();
+            assert_eq!(readable_main(&repo, &f), Some(f.second));
+            assert!(repo.verify().unwrap().is_ok());
+            assert_reflog_chain(&repo);
+        }
+    }
+}

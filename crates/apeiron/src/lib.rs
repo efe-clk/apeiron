@@ -16,8 +16,8 @@ mod types;
 pub const API_VERSION: &str = "0.1";
 
 pub use apeiron_core::{
-    GcOptions as GcRequest, GcReport, KeyInfo, KeyKind, ObjectId, RefOp, ReflogEntry, RepairReport,
-    Time, VerifyReport,
+    GcOptions as GcRequest, GcReport, KeyInfo, KeyKind, ObjectId, RefOp, ReflogEntry, Remote,
+    RepairReport, Time, TransferReport, VerifyReport,
 };
 pub use apeiron_services::{
     ArchiveFormat, BackupOptions as BackupRequest, BackupOutcome as BackupReport, Change,
@@ -29,5 +29,5 @@ pub use job::Job;
 pub use repo::Repository;
 pub use types::{
     AddedKey, DeleteRefRequest, DiffRequest, ExportRequest, ListRequest, LogPage, LogRequest,
-    RefInfo, RepoInfo, RestoreRequest, SnapshotInfo,
+    RefInfo, RepoInfo, RestoreRequest, SnapshotInfo, TransferRequest,
 };

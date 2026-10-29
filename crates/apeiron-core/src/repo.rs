@@ -20,8 +20,10 @@ use crate::pack::{self, FileHash, PackEntry, PackWriter};
 use crate::refs::{RefStore, ReflogEntry, RepairReport};
 
 mod gc;
+mod transfer;
 
 pub use gc::{GcOptions, GcReport};
+pub use transfer::{OnCopy, TransferReport};
 
 const CONFIG: &str = "config";
 const PACKS: &str = "packs";
@@ -31,6 +33,7 @@ const LOGS: &str = "logs";
 const LOCKS: &str = "locks";
 const KEYS: &str = "keys";
 const TMP: &str = "tmp";
+const REMOTES: &str = "remotes";
 const TMP_MAX_AGE: Duration = Duration::from_secs(3600);
 
 /// An open repository.
@@ -603,6 +606,35 @@ impl ObjectWriter<'_> {
             self.finish_pack()?;
         }
         Ok(id)
+    }
+
+    /// Stores an object exactly as the pack at `from` stored it, after
+    /// checking that the bytes decode to it.
+    pub(crate) fn put_stored(
+        &mut self,
+        entry: &PackEntry,
+        stored: &[u8],
+        from: &Path,
+    ) -> Result<()> {
+        if self.repo.contains(&entry.id) || self.pending.contains_key(&entry.id) {
+            return Ok(());
+        }
+        pack::decode_stored(from, entry, &self.repo.keys, stored)?;
+        let pack = match &mut self.pack {
+            Some(pack) => pack,
+            None => self
+                .pack
+                .insert(PackWriter::new(&self.repo.dir(TMP), &self.repo.keys)?),
+        };
+        pack.add_stored(entry, stored)?;
+        self.pending.insert(entry.id, entry.ty);
+        if entry.ty == ObjectType::Chunk {
+            self.new_bytes += u64::from(entry.raw_len);
+        }
+        if pack.len() >= pack::TARGET_SIZE {
+            self.finish_pack()?;
+        }
+        Ok(())
     }
 
     /// Splits `reader` into chunks, stores them and returns each chunk's id and length.

@@ -25,7 +25,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [015](#adr-015-json-values-at-the-c-abi-boundary) | C ABI | A small fixed set of functions; requests and results as JSON | Proposed |
 | [016](#adr-016-synchronous-public-api-with-jobs-on-threads) | Long operations | Synchronous API; jobs on threads with polled progress | Proposed |
 | [017](#adr-017-xchacha20-poly1305-and-argon2id-for-encryption) | Encryption | XChaCha20-Poly1305 for data, Argon2id for passwords | Accepted |
-| [018](#adr-018-whole-repository-copies-as-remotes-russh-for-sftp-object_store-for-s3) | Remote targets | Remotes are whole repository copies; `russh` for SFTP, `object_store` for S3 | Proposed |
+| [018](#adr-018-whole-repository-copies-as-remotes-russh-for-sftp-object_store-for-s3) | Remote targets | Remotes are whole repository copies; `russh` for SFTP, `object_store` for S3 | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28.
 
@@ -371,11 +371,11 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 
 ## ADR-018: Whole repository copies as remotes; `russh` for SFTP, `object_store` for S3
 
-**Status:** Proposed (2026-10-28)
+**Status:** Accepted (2026-10-29)
 
 **Context.** Stage 2 sends backups to an external disk, a home server and cloud storage ([FORMAT.md](FORMAT.md) §15). Remote storage is slow and may be interrupted at any moment; cloud storage has no file renames or locks. Windows, macOS and Linux are all supported, and the core stays synchronous (ADR-006).
 
-**Decision.** A remote is a complete copy of the repository with the same keys; push and pull copy only the objects a ref is missing, as stored (still encrypted) bytes, and move refs forward only. Every remote offers the same five operations (read, list, write a new file atomically, replace a ref conditionally, delete). Folders use Apeiron's own durable writes. SFTP uses `russh` and `russh-sftp`. S3 and S3-compatible storage use `object_store`. These libraries run on Tokio inside a new crate, `apeiron-remote`, behind a blocking interface.
+**Decision.** A remote is a complete copy of the repository with the same keys; push and pull copy only the objects a ref is missing, as stored (still encrypted) bytes, and move refs forward only. Every remote offers the same small set of operations (read, list, write a new file atomically, replace a ref conditionally, delete, create the folders of a new copy). This `Store` interface and the folder store are in `apeiron-core`, so push and pull are written once for every kind of remote. Folders use Apeiron's own durable writes. SFTP uses `russh` and `russh-sftp`. S3 and S3-compatible storage use `object_store`. These libraries run on Tokio inside a new crate, `apeiron-remote`, behind a blocking interface.
 
 **Rationale.** A whole copy can be restored without the original computer, and needs no new file kinds. Copying stored bytes means a remote never needs the password and data is never decrypted on the way. `russh` is pure Rust and works on Windows, unlike libraries that drive the system `ssh` program. `object_store` is maintained by the Apache Arrow project and supports conditional writes on S3, which a safe ref update needs. Both support Rust 1.85.
 
@@ -389,4 +389,4 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | `opendal` for every remote | Its SFTP support also drives the system `ssh` program |
 | Lock files on S3 instead of conditional writes | S3 has no atomic create-if-absent without conditional writes |
 
-**Consequences.** S3-compatible services without conditional writes are refused. SFTP needs the server in `~/.ssh/known_hosts`. Remote copies have no reflog, and their garbage collection is a later work item.
+**Consequences.** S3-compatible services without conditional writes are refused. SFTP needs the server in `~/.ssh/known_hosts`. SFTP and S3 copies have no reflog. Garbage collection of a remote copy is a later work item; a folder copy can already be collected by opening it as a repository.

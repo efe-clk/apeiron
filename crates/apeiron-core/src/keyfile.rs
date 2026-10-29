@@ -181,7 +181,7 @@ fn write(
 }
 
 /// The key files in `keys_dir` with their ids, sorted by id.
-fn key_files(keys_dir: &Path) -> Result<Vec<(String, PathBuf)>> {
+pub(crate) fn key_files(keys_dir: &Path) -> Result<Vec<(String, PathBuf)>> {
     let mut files = Vec::new();
     for entry in fs::read_dir(keys_dir).at(keys_dir)? {
         let path = entry.at(keys_dir)?.path();
