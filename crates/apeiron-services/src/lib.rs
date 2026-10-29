@@ -1,5 +1,5 @@
 //! Services of Apeiron: turning folders into snapshots and back, listing,
-//! diff and export. The public `apeiron` crate exposes them.
+//! diff, search and export. The public `apeiron` crate exposes them.
 
 #![forbid(unsafe_code)]
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
@@ -15,6 +15,7 @@ mod name;
 mod os;
 mod restore;
 mod restore_test;
+mod search;
 mod sync;
 
 pub use backup::{BackupOptions, BackupOutcome, backup};
@@ -27,4 +28,5 @@ pub use merge::{Conflict, ConflictKind, MergeAction, MergeOptions, MergeOutcome,
 pub use name::Name;
 pub use restore::{RestoreOutcome, restore};
 pub use restore_test::{RestoreProblem, RestoreTestOutcome, restore_test};
+pub use search::{Query, SearchHit, SearchOptions, SearchOutcome, TextLine, search};
 pub use sync::{SyncAction, SyncMode, SyncOptions, SyncOutcome, folder_ref, sync};

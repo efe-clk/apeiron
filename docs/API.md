@@ -159,6 +159,7 @@ Every operation takes one plain request value and returns one plain result value
 | `remove_key` | key id or its first characters | the whole id; the last key cannot be removed, and the repository lock is taken exclusive | No |
 | `create_ref` | ref name, snapshot spec | the snapshot id; `already_exists` if the ref exists ([BRANCH.md](BRANCH.md)) | No |
 | `merge` | snapshot spec to merge, ref to move (default `main`), message, author, dry run | `MergeReport`: action (`up_to_date`, `fast_forward` or `merged`), the snapshot the ref points to now and before, changed paths, conflicts with their copies | No |
+| `search` | snapshot spec (absent: `main`, or every ref with history), history, name pattern, text, larger, smaller, after, before, limit (default 1000) | `SearchReport`: hits (path, entry, the newest snapshot holding that version and its time, the first line with the text), whether there were more, snapshots searched, files too large for text ([SEARCH.md](SEARCH.md)); `invalid_input` without a criterion | Yes |
 | `remotes` | — | `Vec<Remote>`: name and URL, sorted by name | No |
 | `add_remote` | name, URL: a folder path (absolute or relative) `sftp://[user@]host[:port]/path` or `s3://bucket/path?endpoint=…&region=…` | `Remote`, a folder as an absolute path; SFTP and S3 remotes need an encrypted repository | No |
 | `remove_remote` | name | —; the remote copy itself is not touched | No |

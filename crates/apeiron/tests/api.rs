@@ -5,8 +5,8 @@ use std::path::PathBuf;
 
 use apeiron::{
     BackupRequest, ChangeKind, CloneRequest, DeleteRefRequest, DiffRequest, ErrorKind, KeyKind,
-    ListRequest, LogRequest, Phase, Repository, RestoreRequest, SyncAction, SyncMode, SyncRequest,
-    TransferRequest,
+    ListRequest, LogRequest, Phase, Query, Repository, RestoreRequest, SearchRequest, SyncAction,
+    SyncMode, SyncRequest, TransferRequest,
 };
 
 struct Setup {
@@ -496,4 +496,51 @@ fn copy_dir(src: &std::path::Path, dest: &std::path::Path) {
             fs::copy(entry.path(), dest.join(entry.file_name())).unwrap();
         }
     }
+}
+
+#[test]
+fn search_a_snapshot_and_the_history_of_every_ref() {
+    let s = setup();
+    backup(&s, "one");
+    fs::remove_file(s.root.join("src/a.txt")).unwrap();
+    backup(&s, "two");
+    s.repo
+        .create_ref(&apeiron::CreateRefRequest {
+            name: "old".to_owned(),
+            snapshot: "main~1".to_owned(),
+        })
+        .unwrap();
+
+    let request: SearchRequest = serde_json::from_str(r#"{"pattern": "*.TXT"}"#).unwrap();
+    assert_eq!(request.limit, 1000);
+    let report = s.repo.search(request.clone()).unwrap().wait().unwrap();
+    let found: Vec<String> = report.hits.iter().map(|h| h.path.to_string()).collect();
+    assert_eq!(found, ["sub/b.txt"]);
+
+    let old = SearchRequest {
+        snapshot: Some("old".to_owned()),
+        ..request.clone()
+    };
+    assert_eq!(s.repo.search(old).unwrap().wait().unwrap().hits.len(), 2);
+
+    let history = SearchRequest {
+        history: true,
+        query: Query {
+            text: Some("FIRST".to_owned()),
+            ..Query::default()
+        },
+        ..request
+    };
+    let report = s.repo.search(history).unwrap().wait().unwrap();
+    assert_eq!(report.hits.len(), 1);
+    assert_eq!(report.hits[0].path.to_string(), "a.txt");
+    assert_eq!(report.snapshots, 2);
+
+    let err = s
+        .repo
+        .search(SearchRequest::new(Query::default()))
+        .unwrap()
+        .wait()
+        .unwrap_err();
+    assert_eq!(err.kind, ErrorKind::InvalidInput);
 }

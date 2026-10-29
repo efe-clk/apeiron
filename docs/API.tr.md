@@ -159,6 +159,7 @@ Her işlem tek bir düz istek değeri alır ve tek bir düz sonuç değeri dönd
 | `remove_key` | anahtar kimliği ya da ilk karakterleri | tam kimlik; son anahtar silinemez ve depo kilidi özel alınır | Hayır |
 | `create_ref` | ref adı, snapshot belirteci | snapshot kimliği; ref varsa `already_exists` ([BRANCH.tr.md](BRANCH.tr.md)) | Hayır |
 | `merge` | birleştirilecek snapshot belirteci, taşınacak ref (varsayılan `main`), mesaj, yazar, deneme çalışması | `MergeReport`: eylem (`up_to_date`, `fast_forward` ya da `merged`), ref'in şimdi ve önceden işaret ettiği snapshot, değişen yollar, kopyalarıyla çatışmalar | Hayır |
+| `search` | snapshot belirteci (yoksa `main`, ya da geçmişle her ref), geçmiş, ad deseni, metin, en az boyut, en çok boyut, sonra, önce, sınır (varsayılan 1000) | `SearchReport`: sonuçlar (yol, girdi, o sürümü tutan en yeni snapshot ve zamanı, metni içeren ilk satır), daha fazlasının olup olmadığı, aranan snapshot sayısı, metin için fazla büyük dosyalar ([SEARCH.tr.md](SEARCH.tr.md)); ölçüt yoksa `invalid_input` | Evet |
 | `remotes` | — | `Vec<Remote>`: ad ve URL, ada göre sıralı | Hayır |
 | `add_remote` | ad, URL: bir klasör yolu (mutlak ya da göreli) `sftp://[user@]host[:port]/path` ya da `s3://bucket/path?endpoint=…&region=…` | `Remote`, klasör mutlak yol olarak; SFTP ve S3 uzak depoları şifreli bir depo ister | Hayır |
 | `remove_remote` | ad | —; uzak kopyanın kendisine dokunulmaz | Hayır |

@@ -31,6 +31,7 @@ pub use apeiron_services::{
     Warning, WarningKind,
 };
 pub use apeiron_services::{MergeAction, MergeOutcome as MergeReport};
+pub use apeiron_services::{Query, SearchHit, SearchOutcome as SearchReport, TextLine};
 pub use error::{Error, ErrorKind, Result};
 pub use job::Job;
 pub use repo::Repository;
@@ -39,4 +40,4 @@ pub use types::{
     GitRequest, ListRequest, LogPage, LogRequest, RefInfo, RepoInfo, RestoreRequest,
     RestoreTestRequest, SnapshotInfo, SyncRequest, TransferRequest,
 };
-pub use types::{CreateRefRequest, MergeRequest};
+pub use types::{CreateRefRequest, MergeRequest, SearchRequest};

@@ -120,8 +120,11 @@ Ref adlarında yalnızca küçük harf, rakam, `.`, `_`, `-` ve `/` kullanılır
 | Bir klasörün geçmişi, en yeniden başlayarak | `apeiron log backup/documents` |
 | Bir yedeğin içindeki dosyalar | `apeiron ls backup/documents` ya da `apeiron ls backup/documents some/folder` |
 | Son iki yedek arasında ne değişti | `apeiron diff backup/documents~1 backup/documents` |
+| Bir yedekte dosyaları ada göre bul | `apeiron search '*.pdf' --in backup/documents` |
+| Daha önce silinmiş ya da değişmiş bir dosyayı bul | `apeiron search 'report*' --in backup/documents --history` |
+| Bazı sözcükleri içeren metin dosyalarını bul | `apeiron search --text 'invoice 2026' --in backup/documents` |
 
-Bir yedek ref'iyle (`backup/documents`) ya da kimliğinin ilk 8 veya daha fazla karakteriyle (`53373ba8`) anılabilir; `~N` N yedek geri gider (`backup/documents~3`). `diff` çıktısında `A` eklendi, `D` silindi, `M` değişti demektir.
+Bir yedek ref'iyle (`backup/documents`) ya da kimliğinin ilk 8 veya daha fazla karakteriyle (`53373ba8`) anılabilir; `~N` N yedek geri gider (`backup/documents~3`). `diff` çıktısında `A` eklendi, `D` silindi, `M` değişti demektir. Kabuk `*` işaretini açmasın diye bir arama deseni tırnak içinde yazılır; her ölçüt [SEARCH.tr.md](SEARCH.tr.md) içindedir.
 
 ## 6. Geri yükleme
 

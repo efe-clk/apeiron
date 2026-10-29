@@ -48,7 +48,7 @@ Her katman yalnızca hemen altındaki katmanı kullanır. Ayrıntılar: [docs/AR
 | --- | --- | --- | --- |
 | Çekirdek | `apeiron-core` | Nesne modeli, chunk bölme, paket/indeks dosyaları, ref ve reflog | Devam ediyor |
 | Depolama hedefleri | `apeiron-core`, `apeiron-remote` | Klasör (yerel ya da harici disk), SFTP ve S3 uzak depoları | Tamamlandı |
-| Hizmetler | `apeiron-services` | Bugün yedek, geri yükleme, listeleme, fark ve senkron; arşiv, arama ve politika sonra | Devam ediyor |
+| Hizmetler | `apeiron-services` | Bugün yedek, geri yükleme, listeleme, fark, senkron, birleştirme ve arama; arşiv ve politika sonra | Devam ediyor |
 | Herkese açık API | `apeiron` | Tüm işlemler için Rust API ([docs/API.tr.md](docs/API.tr.md) §8) | Devam ediyor |
 | Sistem çağrıları | `apeiron-sys` | `unsafe` gerektiren işletim sistemi çağrıları (Windows write-through) | Tamamlandı |
 | C ABI | — | Kararlı C arayüzü; `unsafe` kullanabilir | Planlandı |
@@ -116,6 +116,7 @@ Kod, commit ve format değişikliği kuralları: [CONTRIBUTING.tr.md](CONTRIBUTI
 | [Senkron](docs/SYNC.tr.md) | Klasörlerin cihazlar arası senkronu ve çatışma tespiti |
 | [Git](docs/GIT.tr.md) | Bir Git deposunu geçmişiyle içe almak ve geri dışa aktarmak |
 | [Dallar](docs/BRANCH.tr.md) | Dallanma ve birleştirme |
+| [Arama](docs/SEARCH.tr.md) | Dosyaları ada, üst veriye ve metne göre, geçmişte de bulmak |
 | [Kullanım rehberi](docs/GUIDE.tr.md) | Kurulum, günlük yedek, geri yükleme ve bir aylık deneme |
 | [Sözlük](docs/GLOSSARY.tr.md) | Terimler ve İngilizce–Türkçe karşılıkları |
 | [Katkı](CONTRIBUTING.tr.md) | Geliştirme ortamı ve kurallar |

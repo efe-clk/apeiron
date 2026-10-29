@@ -48,7 +48,7 @@ Each layer uses only the layer directly below it. Details: [docs/ARCHITECTURE.md
 | --- | --- | --- | --- |
 | Core | `apeiron-core` | Object model, chunking, pack/index files, refs and reflogs | In progress |
 | Storage targets | `apeiron-core`, `apeiron-remote` | Folder (local or external disk), SFTP and S3 remotes | Done |
-| Services | `apeiron-services` | Backup, restore, listing, diff and sync today; archive, search and policy later | In progress |
+| Services | `apeiron-services` | Backup, restore, listing, diff, sync, merge and search today; archive and policy later | In progress |
 | Public API | `apeiron` | Rust API for all operations ([docs/API.md](docs/API.md) §8) | In progress |
 | System calls | `apeiron-sys` | Operating system calls that need `unsafe` (Windows write-through) | Done |
 | C ABI | — | Stable C interface; may use `unsafe` | Planned |
@@ -116,6 +116,7 @@ Rules for code, commits and format changes: [CONTRIBUTING.md](CONTRIBUTING.md).
 | [Sync](docs/SYNC.md) | Folder sync between devices and conflict detection |
 | [Git](docs/GIT.md) | Importing a Git repository with its history and exporting it back |
 | [Branches](docs/BRANCH.md) | Branching and merging |
+| [Search](docs/SEARCH.md) | Finding files by name, metadata and text, also in the history |
 | [User guide](docs/GUIDE.md) | Installation, daily backup, restore and the one-month test |
 | [Glossary](docs/GLOSSARY.md) | Terms with English–Turkish equivalents |
 | [Contributing](CONTRIBUTING.md) | Development environment and rules |

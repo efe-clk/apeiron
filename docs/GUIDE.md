@@ -120,8 +120,11 @@ Ref names use only lowercase letters, digits, `.`, `_`, `-` and `/` (`backup/doc
 | History of one folder, newest first | `apeiron log backup/documents` |
 | Files inside a backup | `apeiron ls backup/documents` or `apeiron ls backup/documents some/folder` |
 | What changed between the last two backups | `apeiron diff backup/documents~1 backup/documents` |
+| Find files by name in a backup | `apeiron search '*.pdf' --in backup/documents` |
+| Find a file that was deleted or changed earlier | `apeiron search 'report*' --in backup/documents --history` |
+| Find text files holding some words | `apeiron search --text 'invoice 2026' --in backup/documents` |
 
-A backup can be named by its ref (`backup/documents`), by the first 8 or more characters of its id (`53373ba8`), and `~N` goes N backups back (`backup/documents~3`). In `diff`, `A` means added, `D` deleted, `M` modified.
+A backup can be named by its ref (`backup/documents`), by the first 8 or more characters of its id (`53373ba8`), and `~N` goes N backups back (`backup/documents~3`). In `diff`, `A` means added, `D` deleted, `M` modified. A search pattern needs quotes so the shell does not expand `*`; [SEARCH.md](SEARCH.md) lists every criterion.
 
 ## 6. Restoring
 

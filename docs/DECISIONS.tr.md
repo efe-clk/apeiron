@@ -30,6 +30,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [020](#adr-020-üç-yönlü-birleştirme-ve-çatışma-kopyalarıyla-bir-uzak-depo-üzerinden-senkron) | Senkron | Cihazlar bir uzak depoda buluşur; yol başına üç yönlü birleştirme; çatışan sürümler kopya olarak tutulur | Kabul edildi |
 | [021](#adr-021-kesin-nesne-kimlikleriyle-kendi-crateinde-git-içe-ve-dışa-aktarma) | Git | `gix` ile `apeiron-git`; dışa aktarılan commit'ler kimliklerini korusun diye ham başlıklar `meta` içinde | Kabul edildi |
 | [022](#adr-022-dallar-reftir-senkron-ve-dallar-için-tek-bir-üç-yönlü-birleştirme) | Dallar | Dallar ref'tir; senkron ve `merge` için çatışma kopyalı tek bir yol başına üç yönlü birleştirme | Kabul edildi |
+| [023](#adr-023-arama-saklanan-bir-dizin-olmadan-snapshotları-okur) | Arama | Snapshot'lar doğrudan okunur, her klasör ve içerik arama başına bir kez; saklanan dizin yok | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
@@ -478,3 +479,23 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Bir dalı izleyen çalışma klasörü (`checkout`) | Kullanıcı dosyalarını değiştirmenin ikinci bir yolu; şimdilik ihtiyacı `restore`, `backup` ve senkron karşılar |
 
 **Sonuçlar.** Bir metin dosyasının farklı satırlarındaki iki düzenleme, metin diff eklentisi olana kadar bir çatışmadır. Çatışma kopyaları birleştirilmiş snapshot'ta belirir ve sonraki değişiklikle temizlenir. Rebase ve cherry-pick yoktur.
+
+## ADR-023: Arama saklanan bir dizin olmadan snapshot'ları okur
+
+**Durum:** Kabul edildi (2026-10-29)
+
+**Bağlam.** Aşama 3, tek bir snapshot'ta ya da tüm geçmişte ada, üst veriye ve metne göre arama ekler ([SEARCH.tr.md](SEARCH.tr.md)). VISION.tr.md çevrimdışı çalışan ve gerektiğinde yeniden kurulan bir dizin ister. Depolar şifreli olabilir ve ref'ler yedeklerle, pull'larla, birleştirmelerle ve çöp toplamayla yer değiştirir.
+
+**Karar.** Bir arama snapshot'ların kendisini en yeniden eskiye okur. Daha yeni bir snapshot'ta aynı yolda görülmüş bir klasör yeniden dolaşılmaz ve bir dosyanın metni içerik başına bir kez okunur. Bir yolun her sürümü, onu tutan en yeni snapshot ile bir kez raporlanır. Metin, 16 MiB'a kadar olan UTF-8 dosyalarda aranır.
+
+**Gerekçe.** İçerik adresleme, bir dizinin vereceğini zaten verir: değişmemiş klasörler ve içerikler aynı kimliği paylaşır; böylece 3568 Git commit'lik bir geçmiş ada göre saniyenin bir kesrinde, metne göre birkaç saniyede aranır. Dizin olmayınca şifrelenecek ikinci bir ad ve metin kopyası, ref'lerle güncel tutulacak bir şey de yoktur.
+
+**Değerlendirilen seçenekler.**
+
+| Seçenek | Neden seçilmedi |
+| --- | --- |
+| Tam metin dizin dosyası gibi saklanan bir dizin | Şifrelenecek, her değişiklikten sonra güncellenecek ve onarılacak ikinci bir depo; bugünkü hızda gerekmiyor |
+| Yalnızca en yeni snapshot'ta aramak | Bir dosyanın geçmişte nerede olduğunu bulmak belirtilmiş bir hedeftir (VISION.tr.md) |
+| Her biçimi şimdiden metin için okumak | Eklenti sistemiyle gelen tür sürücülerini gerektirir |
+
+**Sonuçlar.** Metin arama, karşılaştığı her farklı metin dosyası içeriğini okur; bu yüzden geçmişteki metin miktarıyla büyür. Ölçümler gerektirirse aynı komutun arkasına saklanan bir dizin sonradan eklenebilir.

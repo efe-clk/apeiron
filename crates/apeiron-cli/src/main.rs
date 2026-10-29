@@ -26,6 +26,7 @@ use apeiron::{
     TransferReport, TransferRequest, Warning,
 };
 use apeiron::{CreateRefRequest, DeleteRefRequest, MergeAction, MergeRequest};
+use apeiron::{Query, SearchRequest, Time};
 use clap::{Parser, Subcommand};
 use serde::Serialize;
 
@@ -161,6 +162,35 @@ enum Command {
     Ref {
         #[command(subcommand)]
         command: RefCommand,
+    },
+    /// Find files by name, size, time and text in a snapshot or its history
+    Search {
+        /// A name with `*` and `?`; with `/`, a whole path
+        pattern: Option<String>,
+        /// Text a text file must hold
+        #[arg(long)]
+        text: Option<String>,
+        /// Files of at least this size, such as 10M
+        #[arg(long, value_parser = parse_size)]
+        larger: Option<u64>,
+        /// Files smaller than this size
+        #[arg(long, value_parser = parse_size)]
+        smaller: Option<u64>,
+        /// Modified on or after this day (YYYY-MM-DD)
+        #[arg(long, value_parser = parse_date)]
+        after: Option<Time>,
+        /// Modified before this day (YYYY-MM-DD)
+        #[arg(long, value_parser = parse_date)]
+        before: Option<Time>,
+        /// The snapshot searched (default main)
+        #[arg(long = "in")]
+        snapshot: Option<String>,
+        /// Also search every earlier snapshot; every ref without --in
+        #[arg(long)]
+        history: bool,
+        /// Show at most this many results
+        #[arg(long, default_value_t = 1000)]
+        limit: usize,
     },
     /// Merge a snapshot, usually a branch, into a ref
     Merge {
@@ -736,6 +766,65 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             }
             Ok(0)
         }
+        Command::Search {
+            pattern,
+            text,
+            larger,
+            smaller,
+            after,
+            before,
+            snapshot,
+            history,
+            limit,
+        } => {
+            let repo = open(cli.repo, password_file)?;
+            let report = watch(
+                out,
+                repo.search(SearchRequest {
+                    snapshot,
+                    history,
+                    query: Query {
+                        pattern,
+                        text,
+                        larger,
+                        smaller,
+                        after,
+                        before,
+                    },
+                    limit,
+                })?,
+            )?;
+            out.result(&report, |r| {
+                for hit in &r.hits {
+                    let mut line = hit.path.to_string();
+                    if let Some(text) = &hit.line {
+                        line.push_str(&format!(":{}: {}", text.number, text.text));
+                    }
+                    if history {
+                        say!(
+                            "{}  {}  {line}",
+                            format::short_id(&hit.snapshot),
+                            format::time(&hit.time)
+                        );
+                    } else {
+                        say!("{line}");
+                    }
+                }
+                if r.hits.is_empty() {
+                    say!("No matches in {}", format::count(r.snapshots, "snapshot"));
+                }
+                if r.truncated {
+                    say!("… more matches; show them with --limit");
+                }
+                if r.skipped > 0 {
+                    say!(
+                        "{} over 16 MiB not searched for text",
+                        format::count(r.skipped, "file")
+                    );
+                }
+            });
+            Ok(0)
+        }
         Command::Merge {
             from,
             into,
@@ -1056,6 +1145,33 @@ fn result_name(result: apeiron_daemon::RunResult) -> &'static str {
         RunResult::Failed => "FAILED",
         RunResult::Locked => "waiting for a lock",
     }
+}
+
+/// A size in bytes, or with `K`, `M` or `G` (powers of 1024).
+fn parse_size(s: &str) -> std::result::Result<u64, String> {
+    let (digits, shift) = match s.char_indices().last() {
+        Some((i, 'K' | 'k')) => (&s[..i], 10),
+        Some((i, 'M' | 'm')) => (&s[..i], 20),
+        Some((i, 'G' | 'g')) => (&s[..i], 30),
+        _ => (s, 0),
+    };
+    digits
+        .parse::<u64>()
+        .ok()
+        .and_then(|n| n.checked_mul(1 << shift))
+        .ok_or_else(|| format!("{s:?} is not a size such as 4096, 10K, 5M or 2G"))
+}
+
+/// The start of a day `YYYY-MM-DD` in local time.
+fn parse_date(s: &str) -> std::result::Result<Time, String> {
+    let start = s
+        .parse::<jiff::civil::Date>()
+        .and_then(|d| d.to_zoned(jiff::tz::TimeZone::system()))
+        .map_err(|_| format!("{s:?} is not a date such as 2026-10-29"))?;
+    Ok(Time {
+        seconds: start.timestamp().as_second(),
+        nanos: 0,
+    })
 }
 
 fn local_time(t: jiff::Timestamp) -> String {

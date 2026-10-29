@@ -15,11 +15,12 @@ use crate::types::{
     GitRequest, ListRequest, LogPage, LogRequest, RefInfo, RepoInfo, RestoreRequest,
     RestoreTestRequest, SnapshotInfo, SyncRequest, TransferRequest,
 };
-use crate::types::{CreateRefRequest, MergeRequest};
+use crate::types::{CreateRefRequest, MergeRequest, SearchRequest};
 use crate::{
     ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo, ExportReport, GcReport,
     GcRequest, GitExportReport, GitImportReport, KeyInfo, ObjectId, Phase, ReflogEntry, Remote,
-    RepairReport, RestoreReport, RestoreTestReport, SyncReport, TransferReport, VerifyReport,
+    RepairReport, RestoreReport, RestoreTestReport, SearchReport, SyncReport, TransferReport,
+    VerifyReport,
 };
 
 /// An open repository. Cloning is cheap; clones share the same state and can
@@ -373,6 +374,32 @@ impl Repository {
         let from = spec::resolve(&core, &request.from)?;
         let to = spec::resolve(&core, &request.to)?;
         Ok(services::diff(&core, &from, &to)?)
+    }
+
+    /// Finds files by name, metadata and text in a snapshot or in its
+    /// history (SEARCH.md).
+    pub fn search(&self, request: SearchRequest) -> Result<Job<SearchReport>> {
+        let starts = match &request.snapshot {
+            Some(spec) => vec![self.resolve(spec)?],
+            None if request.history => self
+                .view()?
+                .list_refs()?
+                .into_iter()
+                .map(|(_, id)| id)
+                .collect(),
+            None => vec![self.resolve("main")?],
+        };
+        let repo = self.clone();
+        Job::spawn("search", move |ctl| {
+            let core = repo.view()?;
+            let options = services::SearchOptions {
+                starts,
+                history: request.history,
+                query: request.query,
+                limit: request.limit,
+            };
+            Ok(services::search(&core, &options, ctl)?)
+        })
     }
 
     pub fn refs(&self) -> Result<Vec<RefInfo>> {

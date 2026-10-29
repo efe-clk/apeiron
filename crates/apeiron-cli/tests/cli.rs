@@ -508,3 +508,39 @@ fn branches_are_created_merged_and_deleted() {
     );
     assert!(!s.ok(&["refs"]).contains("feature"));
 }
+
+#[test]
+fn search_by_name_text_size_and_history() {
+    let s = Setup::new();
+    let src = s.path("src");
+    s.ok(&["backup", &src]);
+    fs::remove_file(s.root.join("src/a.txt")).unwrap();
+    s.ok(&["backup", &src]);
+
+    assert_eq!(s.ok(&["search", "*.txt"]), "sub/b.txt\n");
+    assert_eq!(
+        s.ok(&["search", "--text", "SECOND"]),
+        "sub/b.txt:1: second\n"
+    );
+    assert_eq!(s.ok(&["search", "--larger", "6"]), "sub/b.txt\n");
+    assert!(
+        s.ok(&["search", "--smaller", "1K", "--after", "2100-01-01"])
+            .starts_with("No matches")
+    );
+    let old = s.ok(&["search", "a.txt", "--history"]);
+    assert!(
+        old.ends_with("  a.txt\n") && old.lines().count() == 1,
+        "{old}"
+    );
+
+    let doc = s.json(&["search", "*", "--in", "main~1", "--limit", "1"]);
+    assert_eq!(doc["hits"].as_array().unwrap().len(), 1);
+    assert_eq!(doc["truncated"], true);
+
+    assert_eq!(code(&s.run(&["search"])), Some(1));
+    assert_eq!(code(&s.run(&["search", "--larger", "ten"])), Some(2));
+    assert_eq!(
+        code(&s.run(&["search", "x", "--before", "29.10.2026"])),
+        Some(2)
+    );
+}

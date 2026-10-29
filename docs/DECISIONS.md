@@ -30,6 +30,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [020](#adr-020-sync-through-a-remote-with-a-three-way-merge-and-conflict-copies) | Sync | Devices meet at a remote; a three-way merge per path; conflicting versions are kept as copies | Accepted |
 | [021](#adr-021-git-import-and-export-with-exact-object-ids-in-a-crate-of-its-own) | Git | `apeiron-git` with `gix`; raw headers in `meta` so exported commits keep their ids | Accepted |
 | [022](#adr-022-branches-are-refs-one-three-way-merge-for-sync-and-branches) | Branches | Branches are refs; one per-path three-way merge with conflict copies for sync and `merge` | Accepted |
+| [023](#adr-023-search-reads-the-snapshots-without-a-stored-index) | Search | Snapshots are read directly, each folder and content once per search; no stored index | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28.
 
@@ -478,3 +479,23 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | A working folder that follows a branch (`checkout`) | A second way of changing user files; `restore`, `backup` and sync cover the need for now |
 
 **Consequences.** Two edits to different lines of one text file are a conflict until the text diff plugin exists. Conflict copies appear in the merged snapshot and are cleaned up by the next change. Rebase and cherry-pick are not available.
+
+## ADR-023: Search reads the snapshots, without a stored index
+
+**Status:** Accepted (2026-10-29)
+
+**Context.** Stage 3 adds search by name, metadata and text, in one snapshot or in the whole history ([SEARCH.md](SEARCH.md)). VISION.md asks for an index that works offline and is rebuilt when needed. Repositories may be encrypted, and refs move through backups, pulls, merges and garbage collection.
+
+**Decision.** A search reads the snapshots themselves, newest first. A folder seen at the same path in a newer snapshot is not walked again, and a file's text is read once per content. Each version of a path is reported once, with the newest snapshot holding it. Text is searched in UTF-8 files up to 16 MiB.
+
+**Rationale.** Content addressing already gives what an index would: unchanged folders and contents share ids, so a history of 3568 Git commits is searched by name in a fraction of a second and by text in a few seconds. Without an index there is no second copy of names and text to encrypt, and nothing to keep in step with refs.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| A stored index, such as a full-text index file | A second store to encrypt, update after every change and repair; not needed at today's speed |
+| Searching only the newest snapshot | Finding where a file was in the past is a stated goal (VISION.md) |
+| Reading every format for text now | Needs type drivers, which come with the plugin system |
+
+**Consequences.** Text search reads every distinct text file content it meets, so it grows with the amount of text in the history. A stored index can be added later behind the same command if measurements call for it.

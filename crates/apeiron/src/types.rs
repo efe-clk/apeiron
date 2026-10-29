@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use apeiron_core::{ObjectId, Snapshot, Time, TransferReport};
-use apeiron_services::{ArchiveFormat, Name, SyncMode};
+use apeiron_services::{ArchiveFormat, Name, Query, SyncMode};
 use serde::{Deserialize, Serialize};
 
 /// Facts about an open repository.
@@ -285,6 +285,38 @@ impl GitRequest {
         GitRequest {
             path: path.into(),
             prefix: default_git_prefix(),
+        }
+    }
+}
+
+/// What to search for and where (SEARCH.md).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SearchRequest {
+    /// A snapshot spec (API.md §8.4); when absent, `main`, or with
+    /// `history` every ref.
+    #[serde(default)]
+    pub snapshot: Option<String>,
+    /// Also search every snapshot before it.
+    #[serde(default)]
+    pub history: bool,
+    #[serde(flatten)]
+    pub query: Query,
+    /// Most results returned.
+    #[serde(default = "default_search_limit")]
+    pub limit: usize,
+}
+
+fn default_search_limit() -> usize {
+    1000
+}
+
+impl SearchRequest {
+    pub fn new(query: Query) -> Self {
+        SearchRequest {
+            snapshot: None,
+            history: false,
+            query,
+            limit: default_search_limit(),
         }
     }
 }

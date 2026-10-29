@@ -80,7 +80,7 @@ Windows'ta yeniden adlandırmalar küçük `apeiron-sys` crate'i üzerinden `MOV
 | --- | --- | --- |
 | 1 | Git içe/dışa aktarma ([GIT.tr.md](GIT.tr.md); Git ağ protokolü hedef olarak kalıyor) | Tamamlandı |
 | 2 | Dal ve birleştirme ([BRANCH.tr.md](BRANCH.tr.md)) | Tamamlandı |
-| 3 | Arama | Planlandı |
+| 3 | Arama ([SEARCH.tr.md](SEARCH.tr.md)) | Tamamlandı |
 | 4 | C ABI ve Python SDK | Planlandı |
 | 5 | WebAssembly eklenti sistemi | Planlandı |
 | 6 | Metin diff eklentisi | Planlandı |
