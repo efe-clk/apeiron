@@ -1,0 +1,16 @@
+{
+  "name": "errors have the same kind in every language",
+  "steps": [
+    {"init": "repo"},
+    {"call": "nonsense", "error": "unsupported"},
+    {"start": "nonsense", "error": "unsupported"},
+    {"call": "resolve", "request": {"spec": "main"}, "error": "not_found"},
+    {"call": "log", "request": {"limit": 5}, "error": "invalid_input"},
+    {"start": "backup", "request": {"source": "$TMP/missing", "ref": "main"}, "error": "not_found"},
+    {"write": "src/a.txt", "text": "a"},
+    {"start": "backup", "request": {"source": "$TMP/src", "ref": "main"}, "expect": {"files": 1}},
+    {"start": "search", "request": {}, "error": "invalid_input"},
+    {"call": "create_ref", "request": {"name": "main", "snapshot": "main"}, "error": "already_exists"},
+    {"open": "missing", "error": "invalid_input"}
+  ]
+}

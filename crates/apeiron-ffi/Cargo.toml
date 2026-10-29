@@ -1,0 +1,23 @@
+[package]
+name = "apeiron-ffi"
+description = "C ABI of Apeiron: libapeiron and apeiron.h"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+# Built as libapeiron.so, libapeiron.dylib or apeiron.dll, and as a static library.
+name = "apeiron"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+api = { package = "apeiron", path = "../apeiron" }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+
+[dev-dependencies]
+cbindgen = "0.29"
+tempfile = "3.27.0"

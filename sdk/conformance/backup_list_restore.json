@@ -1,0 +1,24 @@
+{
+  "name": "back up a folder, look at it and restore it",
+  "steps": [
+    {"write": "src/a.txt", "text": "first"},
+    {"write": "src/sub/b.txt", "text": "second"},
+    {"init": "repo"},
+    {"call": "info", "expect": {"encrypted": false}},
+    {"start": "backup", "request": {"source": "$TMP/src", "ref": "main", "message": "one"},
+     "expect": {"files": 2, "dirs": 1, "bytes": 11, "parent": null, "warnings": []}},
+    {"call": "list", "request": {"snapshot": "main"},
+     "expect": [{"name": "a.txt", "kind": "file", "size": 5}, {"name": "sub", "kind": "dir"}]},
+    {"call": "log", "request": {"start": "main"},
+     "expect": {"snapshots": [{"message": "one", "parents": []}], "next": null}},
+    {"write": "src/a.txt", "text": "changed"},
+    {"start": "backup", "request": {"source": "$TMP/src", "ref": "main"}, "expect": {"files": 2}},
+    {"call": "diff", "request": {"from": "main~1", "to": "main"},
+     "expect": [{"path": "a.txt", "kind": "modified"}]},
+    {"start": "restore", "request": {"snapshot": "main~1", "target": "$TMP/out"},
+     "expect": {"files": 2, "warnings": []}},
+    {"read": "out/a.txt", "text": "first"},
+    {"read": "out/sub/b.txt", "text": "second"},
+    {"start": "verify", "expect": {}}
+  ]
+}

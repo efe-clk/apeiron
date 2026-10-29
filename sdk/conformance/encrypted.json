@@ -1,0 +1,14 @@
+{
+  "name": "an encrypted repository opens only with its password",
+  "steps": [
+    {"write": "src/a.txt", "text": "secret"},
+    {"init": "repo", "password": "correct horse"},
+    {"call": "info", "expect": {"encrypted": true}},
+    {"start": "backup", "request": {"source": "$TMP/src", "ref": "main"}, "expect": {"files": 1}},
+    {"call": "keys"},
+    {"open": "repo", "error": "key"},
+    {"open": "repo", "password": "wrong", "error": "key"},
+    {"open": "repo", "password": "correct horse"},
+    {"call": "list", "request": {"snapshot": "main"}, "expect": [{"name": "a.txt", "size": 6}]}
+  ]
+}

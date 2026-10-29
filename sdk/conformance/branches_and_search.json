@@ -1,0 +1,22 @@
+{
+  "name": "branch, merge and search the history",
+  "steps": [
+    {"write": "src/a.txt", "text": "first line\nsecond line\n"},
+    {"write": "src/old.txt", "text": "old"},
+    {"init": "repo"},
+    {"start": "backup", "request": {"source": "$TMP/src", "ref": "main"}},
+    {"call": "create_ref", "request": {"name": "feature", "snapshot": "main"}},
+    {"write": "src/new.txt", "text": "new"},
+    {"remove": "src/old.txt"},
+    {"start": "backup", "request": {"source": "$TMP/src", "ref": "feature"}},
+    {"call": "merge", "request": {"from": "feature"},
+     "expect": {"action": "fast_forward", "changes": [{"path": "new.txt", "kind": "added"}, {"path": "old.txt", "kind": "removed"}], "conflicts": []}},
+    {"call": "refs", "expect": [{"name": "feature"}, {"name": "main"}]},
+    {"start": "search", "request": {"pattern": "*.txt"},
+     "expect": {"hits": [{"path": "a.txt"}, {"path": "new.txt"}], "truncated": false, "snapshots": 1}},
+    {"start": "search", "request": {"pattern": "old*", "history": true},
+     "expect": {"hits": [{"path": "old.txt", "entry": {"kind": "file", "size": 3}}]}},
+    {"start": "search", "request": {"text": "SECOND"},
+     "expect": {"hits": [{"path": "a.txt", "line": {"number": 2, "text": "second line"}}]}}
+  ]
+}

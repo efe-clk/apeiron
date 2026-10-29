@@ -22,8 +22,8 @@ flowchart TB
 | Katman | Rol | Durum |
 | --- | --- | --- |
 | Rust API | Tek doğruluk kaynağı; her işlem burada tanımlanır | Devam ediyor (`apeiron` crate'i, bölüm 8) |
-| C ABI | Rust API üzerinde kararlı bir C arayüzü; `unsafe` kullanabilen iki crate'ten biri (`apeiron-sys` ile birlikte) | Planlandı (Aşama 3) |
-| SDK'lar | C ABI'yi saran, her dilin alışkanlıklarına uyan ince katmanlar | Planlandı (Aşama 3 ve sonrası) |
+| C ABI | Rust API üzerinde kararlı bir C arayüzü; `unsafe` kullanabilen iki crate'ten biri (`apeiron-sys` ile birlikte) | Tamamlandı (`apeiron-ffi`) |
+| SDK'lar | C ABI'yi saran, her dilin alışkanlıklarına uyan ince katmanlar | Devam ediyor (Python tamamlandı) |
 
 SDK'lar mantığı yeniden yazmaz, yalnızca C ABI'yi sarar. Aynı işlemin her dilde aynı sonucu vermesi böyle sağlanır.
 
@@ -65,8 +65,8 @@ Uzun işlemler (yedek, geri yükleme, senkron, doğrulama) **iş** (job) olarak 
 | Bozulma ayrı bir hatadır | Doğrulamadan geçemeyen veri ayrı bir bozulma hatası üretir ve hiçbir zaman döndürülmez | `apeiron-core` içinde tamamlandı |
 | Eşzamanlılık hataları açıktır | "Kilitli" ve "çakışma" (karşılaştır-ve-değiştir başarısız) ayrı hatalardır; çağıran yeniden deneyebilir ya da kullanıcıya sorabilir | `apeiron-core` içinde tamamlandı |
 | Genişletilebilir | Hata enum'ları `#[non_exhaustive]` işaretlidir; yeni hatalar çağıranları bozmadan eklenebilir | `apeiron-core` içinde tamamlandı |
-| Kararlı kodlar | Her hatanın C ABI ve SDK'lar için kararlı bir sayısal kodu vardır | Planlandı |
-| Sınırda panik yok | Panik hiçbir zaman C ABI'yi geçmez; bir hata koduna dönüşür | Planlandı |
+| Kararlı kodlar | Her hatanın C ABI ve SDK'lar için kararlı bir sayısal kodu vardır | Tamamlandı |
+| Sınırda panik yok | Panik hiçbir zaman C ABI'yi geçmez; bir hata koduna dönüşür | Tamamlandı |
 
 ## 6. Sürümleme politikası
 
@@ -82,16 +82,17 @@ Uzun işlemler (yedek, geri yükleme, senkron, doğrulama) **iş** (job) olarak 
 
 | İlke | Açıklama | Durum |
 | --- | --- | --- |
-| Opak tutamaçlar | Depolar, işler ve yineleyiciler, açık serbest bırakma işlevleri olan opak işaretçilerdir (opaque handle) | Planlandı |
-| Hata kodları ve mesajlar | Her işlev bir durum kodu döndürür; mesajı ayrı bir çağrı verir | Planlandı |
-| Sahiplik açıktır | Her işlev hangi belleği kimin serbest bırakacağını belgeler | Planlandı |
-| Sorgulanan ilerleme | İlerleme bir işlev çağrısıyla okunur, iş bir iptal çağrısıyla durdurulur; sınırı hiçbir geri çağrı (callback) geçmez (bölüm 8.5) | Planlandı |
-| Üretilen başlık dosyası | C başlık dosyası Rust kodundan üretilir ve CI'da denetlenir | Planlandı |
-| Ortak test paketi | Aynı senaryolar her SDK'da çalıştırılır ve sonuçlar karşılaştırılır | Planlandı |
+| Opak tutamaçlar | Depolar, işler ve yineleyiciler, açık serbest bırakma işlevleri olan opak işaretçilerdir (opaque handle) | Tamamlandı |
+| Hata kodları ve mesajlar | Her işlev bir durum kodu döndürür; mesajı ayrı bir çağrı verir | Tamamlandı |
+| Sahiplik açıktır | Her işlev hangi belleği kimin serbest bırakacağını belgeler | Tamamlandı |
+| Sorgulanan ilerleme | İlerleme bir işlev çağrısıyla okunur, iş bir iptal çağrısıyla durdurulur; sınırı hiçbir geri çağrı (callback) geçmez (bölüm 8.5) | Tamamlandı |
+| Üretilen başlık dosyası | C başlık dosyası Rust kodundan üretilir ve CI'da denetlenir | Tamamlandı |
+| Ortak test paketi | Aynı senaryolar her SDK'da çalıştırılır ve sonuçlar karşılaştırılır | Tamamlandı |
 
 | SDK dalgası | Diller | Durum |
 | --- | --- | --- |
-| İlk | Rust (yerel), C (ABI), Python, C++ | Planlandı |
+| İlk | Rust (yerel), C (ABI), Python | Tamamlandı |
+| İlk | C++ | Planlandı |
 | Sonraki | Go, C#, Java/Kotlin, Swift, JavaScript/TypeScript, Zig | Planlandı |
 
 ## 8. Rust API spesifikasyonu
@@ -118,7 +119,7 @@ flowchart TB
 | `apeiron` | Uygulamaların kullandığı tek crate: depo tutamacı, işlemler, işler, hatalar | Devam ediyor |
 | `apeiron-services` | Klasörleri tree ve snapshot'a, onları da geri klasöre çevirir; fark; tar, zip ve 7z dışa aktarma | Devam ediyor |
 | `apeiron-cli` | `apeiron` komutu ([CLI.tr.md](CLI.tr.md)) | Devam ediyor |
-| `apeiron-ffi` | `apeiron` üzerinde C ABI ([SDK.tr.md](SDK.tr.md)) | Planlandı (Aşama 3) |
+| `apeiron-ffi` | `apeiron` üzerinde C ABI ([SDK.tr.md](SDK.tr.md)) | Tamamlandı |
 
 ### 8.2 Depo tutamacı
 

@@ -35,6 +35,23 @@ jobs:
       - run: cargo test --all-targets
         env:
           APEIRON_SFTP_TEST: ${{ runner.os != 'Windows' && '1' || '' }}
+      # The C ABI through the Python SDK and a C program (docs/SDK.md).
+      - run: cargo build -p apeiron-ffi
+      - name: Python SDK and C example
+        shell: bash
+        run: |
+          case "$RUNNER_OS" in
+            Windows) lib=apeiron.dll; python=python ;;
+            macOS) lib=libapeiron.dylib; python=python3 ;;
+            *) lib=libapeiron.so; python=python3 ;;
+          esac
+          APEIRON_LIB="target/debug/$lib" $python -m unittest discover -s sdk/python/tests -v
+          if [ "$RUNNER_OS" != Windows ]; then
+            mkdir -p target/c/src && echo hello > target/c/src/a.txt && rm -rf target/c/repo
+            cc -std=c99 -Wall -Wextra -Werror -I crates/apeiron-ffi/include sdk/c/example.c \
+              -L target/debug -lapeiron -Wl,-rpath,"$PWD/target/debug" -o target/c/example
+            target/c/example "$PWD/target/c/repo" "$PWD/target/c/src"
+          fi
 
   # S3 remotes against LocalStack, an S3-compatible service with conditional writes.
   s3:

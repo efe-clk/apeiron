@@ -81,7 +81,7 @@ The exit criterion comes first; it was met on 2026-10-29 with item 1, and the st
 | 1 | Git import/export ([GIT.md](GIT.md); the Git network protocol remains a goal) | Done |
 | 2 | Branching and merging ([BRANCH.md](BRANCH.md)) | Done |
 | 3 | Search ([SEARCH.md](SEARCH.md)) | Done |
-| 4 | C ABI and Python SDK | Planned |
+| 4 | C ABI and Python SDK ([SDK.md](SDK.md)) | Done |
 | 5 | WebAssembly plugin system | Planned |
 | 6 | Text diff plugin | Planned |
 

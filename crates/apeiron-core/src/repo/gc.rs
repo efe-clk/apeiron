@@ -17,6 +17,7 @@ use crate::pack::{self, FileHash, PackEntry, PackWriter};
 const SECONDS_PER_DAY: u64 = 86_400;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct GcOptions {
     /// Reflog lines younger than this many days keep their snapshots alive;
     /// 0 keeps only what refs point to.

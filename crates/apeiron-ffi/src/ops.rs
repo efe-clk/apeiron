@@ -1,0 +1,138 @@
+//! Operations by name: JSON requests in, JSON results out (SDK.md §2.1).
+
+use std::time::Duration;
+
+use api::{Error, ErrorKind, Job, Progress, Repository};
+use serde::Deserialize;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
+use serde_json::Value;
+
+use crate::{Result, invalid};
+
+/// A job whose result is turned into JSON.
+pub(crate) trait AnyJob: Send {
+    fn progress(&self) -> Progress;
+    fn cancel(&self);
+    /// `None` while the job runs; `timeout` `None` waits without limit.
+    fn wait(&mut self, timeout: Option<Duration>) -> Option<Result<Value>>;
+}
+
+impl<T: Serialize + Send + 'static> AnyJob for Job<T> {
+    fn progress(&self) -> Progress {
+        Job::progress(self)
+    }
+
+    fn cancel(&self) {
+        Job::cancel(self);
+    }
+
+    fn wait(&mut self, timeout: Option<Duration>) -> Option<Result<Value>> {
+        let result = match timeout {
+            Some(t) => self.wait_timeout(t)?,
+            None => loop {
+                if let Some(r) = self.wait_timeout(Duration::from_secs(3600)) {
+                    break r;
+                }
+            },
+        };
+        Some(result.and_then(|v| json(&v)))
+    }
+}
+
+fn json(value: &impl Serialize) -> Result<Value> {
+    serde_json::to_value(value).map_err(|e| Error::new(ErrorKind::Internal, e.to_string()))
+}
+
+fn parse<T: DeserializeOwned>(request: Value) -> Result<T> {
+    serde_json::from_value(request).map_err(|e| invalid(format!("request_json: {e}")))
+}
+
+fn boxed<T: Serialize + Send + 'static>(job: Job<T>) -> Box<dyn AnyJob> {
+    Box::new(job)
+}
+
+#[derive(Deserialize)]
+struct Spec {
+    spec: String,
+}
+
+#[derive(Deserialize)]
+struct Named {
+    name: String,
+}
+
+#[derive(Deserialize)]
+struct Password {
+    password: String,
+}
+
+#[derive(Deserialize)]
+struct KeyId {
+    id: String,
+}
+
+#[derive(Deserialize)]
+struct NewRemote {
+    name: String,
+    url: String,
+}
+
+fn unknown(operation: &str) -> Error {
+    Error::new(
+        ErrorKind::Unsupported,
+        format!("unknown operation {operation:?}"),
+    )
+}
+
+/// Runs a short operation.
+pub(crate) fn call(repo: &Repository, operation: &str, request: Value) -> Result<Value> {
+    match operation {
+        "info" => json(&repo.info()),
+        "resolve" => json(&repo.resolve(&parse::<Spec>(request)?.spec)?),
+        "log" => json(&repo.log(&parse(request)?)?),
+        "list" => json(&repo.list(&parse(request)?)?),
+        "diff" => json(&repo.diff(&parse(request)?)?),
+        "refs" => json(&repo.refs()?),
+        "reflog" => json(&repo.reflog(&parse::<Named>(request)?.name)?),
+        "create_ref" => json(&repo.create_ref(&parse(request)?)?),
+        "delete_ref" => json(&repo.delete_ref(&parse(request)?)?),
+        "merge" => json(&repo.merge(&parse(request)?)?),
+        "repair" => json(&repo.repair()?),
+        "keys" => json(&repo.keys()?),
+        "add_password" => json(&repo.add_password(&parse::<Password>(request)?.password)?),
+        "add_recovery_key" => json(&repo.add_recovery_key()?),
+        "remove_key" => json(&repo.remove_key(&parse::<KeyId>(request)?.id)?),
+        "remotes" => json(&repo.remotes()?),
+        "add_remote" => {
+            let r: NewRemote = parse(request)?;
+            json(&repo.add_remote(&r.name, &r.url)?)
+        }
+        "remove_remote" => json(&repo.remove_remote(&parse::<Named>(request)?.name)?),
+        _ => Err(unknown(operation)),
+    }
+}
+
+/// Starts a long operation on a repository.
+pub(crate) fn start(repo: &Repository, operation: &str, request: Value) -> Result<Box<dyn AnyJob>> {
+    Ok(match operation {
+        "backup" => boxed(repo.backup(parse(request)?)?),
+        "restore" => boxed(repo.restore(parse(request)?)?),
+        "export" => boxed(repo.export(parse(request)?)?),
+        "verify" => boxed(repo.verify()?),
+        "gc" => boxed(repo.gc(parse(request)?)?),
+        "push" => boxed(repo.push(parse(request)?)?),
+        "pull" => boxed(repo.pull(parse(request)?)?),
+        "restore_test" => boxed(repo.restore_test(parse(request)?)?),
+        "search" => boxed(repo.search(parse(request)?)?),
+        "sync" => boxed(repo.sync(parse(request)?)?),
+        "git_import" => boxed(repo.git_import(parse(request)?)?),
+        "git_export" => boxed(repo.git_export(parse(request)?)?),
+        _ => return Err(unknown(operation)),
+    })
+}
+
+/// Starts `clone`, which makes a new repository from a remote.
+pub(crate) fn clone(request: Value) -> Result<Box<dyn AnyJob>> {
+    Ok(boxed(Repository::clone_from(parse(request)?)?))
+}

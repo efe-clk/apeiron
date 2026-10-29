@@ -22,8 +22,8 @@ flowchart TB
 | Layer | Role | Status |
 | --- | --- | --- |
 | Rust API | The single source of truth; every operation is defined here | In progress (the `apeiron` crate, section 8) |
-| C ABI | A stable C interface over the Rust API; one of the two crates allowed to use `unsafe` (with `apeiron-sys`) | Planned (Stage 3) |
-| SDKs | Thin wrappers over the C ABI that follow each language's habits | Planned (Stage 3 onward) |
+| C ABI | A stable C interface over the Rust API; one of the two crates allowed to use `unsafe` (with `apeiron-sys`) | Done (`apeiron-ffi`) |
+| SDKs | Thin wrappers over the C ABI that follow each language's habits | In progress (Python done) |
 
 SDKs never re-implement logic; they only wrap the C ABI. That is how the same operation gives the same result in every language.
 
@@ -65,8 +65,8 @@ Cancellation is safe by construction: objects become visible only after they are
 | Corruption is its own error | Data that fails verification produces a distinct corruption error and is never returned | Done in `apeiron-core` |
 | Concurrency errors are explicit | "Locked" and "conflict" (compare-and-swap failed) are separate errors so callers can retry or ask the user | Done in `apeiron-core` |
 | Non-exhaustive | Error enums are `#[non_exhaustive]` so new errors can be added without breaking callers | Done in `apeiron-core` |
-| Stable codes | Every error has a stable numeric code for the C ABI and SDKs | Planned |
-| No panics across boundaries | A panic never crosses the C ABI; it becomes an error code | Planned |
+| Stable codes | Every error has a stable numeric code for the C ABI and SDKs | Done |
+| No panics across boundaries | A panic never crosses the C ABI; it becomes an error code | Done |
 
 ## 6. Versioning policy
 
@@ -82,16 +82,17 @@ Cancellation is safe by construction: objects become visible only after they are
 
 | Principle | Description | Status |
 | --- | --- | --- |
-| Opaque handles | Repositories, jobs and iterators are opaque pointers with explicit free functions | Planned |
-| Error codes and messages | Every function returns a status code; a separate call returns the message | Planned |
-| Ownership is explicit | Every function documents who frees which memory | Planned |
-| Polled progress | Progress is read with a function call and a job is stopped with a cancel call; no callbacks cross the boundary (section 8.5) | Planned |
-| Generated header | The C header is generated from the Rust code and checked in CI | Planned |
-| Shared test suite | The same scenarios run against every SDK and their results are compared | Planned |
+| Opaque handles | Repositories, jobs and iterators are opaque pointers with explicit free functions | Done |
+| Error codes and messages | Every function returns a status code; a separate call returns the message | Done |
+| Ownership is explicit | Every function documents who frees which memory | Done |
+| Polled progress | Progress is read with a function call and a job is stopped with a cancel call; no callbacks cross the boundary (section 8.5) | Done |
+| Generated header | The C header is generated from the Rust code and checked in CI | Done |
+| Shared test suite | The same scenarios run against every SDK and their results are compared | Done |
 
 | SDK wave | Languages | Status |
 | --- | --- | --- |
-| First | Rust (native), C (ABI), Python, C++ | Planned |
+| First | Rust (native), C (ABI), Python | Done |
+| First | C++ | Planned |
 | Next | Go, C#, Java/Kotlin, Swift, JavaScript/TypeScript, Zig | Planned |
 
 ## 8. Rust API specification
@@ -118,7 +119,7 @@ flowchart TB
 | `apeiron` | The only crate applications use: repository handle, operations, jobs, errors | In progress |
 | `apeiron-services` | Turns folders into trees and snapshots and back; diff; tar, zip and 7z export | In progress |
 | `apeiron-cli` | The `apeiron` command ([CLI.md](CLI.md)) | In progress |
-| `apeiron-ffi` | C ABI over `apeiron` ([SDK.md](SDK.md)) | Planned (Stage 3) |
+| `apeiron-ffi` | C ABI over `apeiron` ([SDK.md](SDK.md)) | Done |
 
 ### 8.2 Repository handle
 

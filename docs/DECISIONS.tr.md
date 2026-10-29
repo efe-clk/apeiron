@@ -22,8 +22,8 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [012](#adr-012-yapısal-nesneler-için-kanonik-cbor) | Yapısal nesneler | Kanonik CBOR | Kabul edildi |
 | [013](#adr-013-küçük-harfli-ascii-ref-adları) | Ref adları | Yalnızca küçük harfli ASCII | Kabul edildi |
 | [014](#adr-014-güvensiz-sistem-çağrıları-için-küçük-bir-sistem-cratei) | `unsafe` kod | Yalnızca FFI crate'inde ve küçük `apeiron-sys` crate'inde | Kabul edildi |
-| [015](#adr-015-c-abi-sınırında-json-değerler) | C ABI | Küçük ve sabit bir işlev kümesi; istekler ve sonuçlar JSON | Önerildi |
-| [016](#adr-016-senkron-herkese-açık-api-ve-iş-parçacığında-çalışan-işler) | Uzun işlemler | Senkron API; sorgulanan ilerlemeyle iş parçacığında çalışan işler | Önerildi |
+| [015](#adr-015-c-abi-sınırında-json-değerler) | C ABI | Küçük ve sabit bir işlev kümesi; istekler ve sonuçlar JSON | Kabul edildi |
+| [016](#adr-016-senkron-herkese-açık-api-ve-iş-parçacığında-çalışan-işler) | Uzun işlemler | Senkron API; sorgulanan ilerlemeyle iş parçacığında çalışan işler | Kabul edildi |
 | [017](#adr-017-şifreleme-için-xchacha20-poly1305-ve-argon2id) | Şifreleme | Veri için XChaCha20-Poly1305, parolalar için Argon2id | Kabul edildi |
 | [018](#adr-018-uzak-depo-olarak-deponun-tam-kopyası-sftp-için-russh-s3-için-object_store) | Uzak hedefler | Uzak depolar deponun tam kopyasıdır; SFTP için `russh`, S3 için `object_store` | Kabul edildi |
 | [019](#adr-019-arka-plan-hizmeti-iş-dosyalı-bir-kullanıcı-sürecidir) | Arka plan hizmeti | İşletim sisteminin başlattığı, TOML iş dosyalı bir kullanıcı süreci; kaçırılan işler telafi edilir | Kabul edildi |
@@ -31,6 +31,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [021](#adr-021-kesin-nesne-kimlikleriyle-kendi-crateinde-git-içe-ve-dışa-aktarma) | Git | `gix` ile `apeiron-git`; dışa aktarılan commit'ler kimliklerini korusun diye ham başlıklar `meta` içinde | Kabul edildi |
 | [022](#adr-022-dallar-reftir-senkron-ve-dallar-için-tek-bir-üç-yönlü-birleştirme) | Dallar | Dallar ref'tir; senkron ve `merge` için çatışma kopyalı tek bir yol başına üç yönlü birleştirme | Kabul edildi |
 | [023](#adr-023-arama-saklanan-bir-dizin-olmadan-snapshotları-okur) | Arama | Snapshot'lar doğrudan okunur, her klasör ve içerik arama başına bir kez; saklanan dizin yok | Kabul edildi |
+| [024](#adr-024-python-sdksı-c-abiyi-ctypes-ile-çağırır) | Python SDK | C ABI üzerinde `ctypes` ile saf Python; her dil için tek bir uygunluk test paketi | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
@@ -315,7 +316,7 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 
 ## ADR-015: C ABI sınırında JSON değerler
 
-**Durum:** Önerildi (2026-10-28)
+**Durum:** Kabul edildi (2026-10-29)
 
 **Bağlam.** Her SDK C ABI üzerine kurulur ([SDK.tr.md](SDK.tr.md)). Her işlem için bir C işlevi ve her istek ile sonuç için C yapıları ABI'yi büyütür; her yeni alan onu bozar.
 
@@ -335,7 +336,7 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 
 ## ADR-016: Senkron herkese açık API ve iş parçacığında çalışan işler
 
-**Durum:** Önerildi (2026-10-28)
+**Durum:** Kabul edildi (2026-10-29)
 
 **Bağlam.** Yedekleme ve geri yükleme dakikalar ya da saatler sürer. Çağıranların ilerlemeye ve iptale ihtiyacı vardır; çekirdek ise senkrondur (ADR-006).
 
@@ -490,12 +491,32 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 
 **Gerekçe.** İçerik adresleme, bir dizinin vereceğini zaten verir: değişmemiş klasörler ve içerikler aynı kimliği paylaşır; böylece 3568 Git commit'lik bir geçmiş ada göre saniyenin bir kesrinde, metne göre birkaç saniyede aranır. Dizin olmayınca şifrelenecek ikinci bir ad ve metin kopyası, ref'lerle güncel tutulacak bir şey de yoktur.
 
-**Değerlendirilen seçenekler.**
+**Değerlendirilen alternatifler.**
 
-| Seçenek | Neden seçilmedi |
+| Alternatif | Neden seçilmedi |
 | --- | --- |
 | Tam metin dizin dosyası gibi saklanan bir dizin | Şifrelenecek, her değişiklikten sonra güncellenecek ve onarılacak ikinci bir depo; bugünkü hızda gerekmiyor |
 | Yalnızca en yeni snapshot'ta aramak | Bir dosyanın geçmişte nerede olduğunu bulmak belirtilmiş bir hedeftir (VISION.tr.md) |
 | Her biçimi şimdiden metin için okumak | Eklenti sistemiyle gelen tür sürücülerini gerektirir |
 
 **Sonuçlar.** Metin arama, karşılaştığı her farklı metin dosyası içeriğini okur; bu yüzden geçmişteki metin miktarıyla büyür. Ölçümler gerektirirse aynı komutun arkasına saklanan bir dizin sonradan eklenebilir.
+
+## ADR-024: Python SDK'sı C ABI'yi ctypes ile çağırır
+
+**Durum:** Kabul edildi (2026-10-29)
+
+**Bağlam.** Aşama 3, C ABI'yi ve ilk SDK'yı, Python için, ekler ([SDK.tr.md](SDK.tr.md)). Her SDK diğerleriyle aynı sonucu vermelidir (ADR-015) ve proje sahibi birkaç dildeki kodu elle sürdürmez.
+
+**Karar.** Python SDK'sı, `libapeiron`'u `ctypes` ile yükleyen ve C ABI işlevlerini çağıran tek bir saf Python modülüdür; yalnızca dönüşümleri, hata türü başına bir istisna sınıfını, context manager'ları ve bir ilerleme yineleyicisini ekler. `sdk/conformance` içindeki aynı JSON senaryoları, CI'da her işletim sisteminde Rust'tan C işlevleri üzerinden ve Python'dan SDK üzerinden çalışır. C başlık dosyasını `cbindgen` üretir; depodaki başlık farklıysa bir test başarısız olur.
+
+**Gerekçe.** `ctypes` Python'un parçasıdır; bu yüzden SDK derleyici gerektirmez ve aynı dosya her Python sürümü ve işletim sisteminde çalışır; tek ikili dosya yerel kütüphanedir. C ABI'nin etrafından değil içinden geçmek, diğer her dilin kullanacağı ABI'yi sınar. Ortak senaryolar "her dilde aynı sonuç"u bir sözden bir denetime çevirir.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| PyO3 ile derlenen bir eklenti | C ABI'nin yanında kendine ait yapıştırma kodu ve her Python sürümü için ayrı derleme |
+| `cffi` | `ctypes`'in bir düzine işlev için zaten yaptığı iş için ek bir bağımlılık |
+| Elle yazılmış tipli sınıflar | Rust türlerinden ayrışırdı; JSON şemalarından üretilerek gelecekler |
+
+**Sonuçlar.** Şemalar gelene kadar sonuçlar alan adıyla ya da anahtarla okunan kayıtlardır. Wheel'ler kütüphaneyi taşıyana kadar kütüphane `APEIRON_LIB` ile ya da modülün yanında bulunur.

@@ -51,7 +51,7 @@ Each layer uses only the layer directly below it. Details: [docs/ARCHITECTURE.md
 | Services | `apeiron-services` | Backup, restore, listing, diff, sync, merge and search today; archive and policy later | In progress |
 | Public API | `apeiron` | Rust API for all operations ([docs/API.md](docs/API.md) §8) | In progress |
 | System calls | `apeiron-sys` | Operating system calls that need `unsafe` (Windows write-through) | Done |
-| C ABI | — | Stable C interface; may use `unsafe` | Planned |
+| C ABI | `apeiron-ffi` | Stable C interface `libapeiron` with the header `apeiron.h`, and the Python SDK over it ([docs/SDK.md](docs/SDK.md)); may use `unsafe` | Done |
 | CLI | `apeiron-cli` | The `apeiron` command ([docs/CLI.md](docs/CLI.md)) | In progress |
 | Background service | `apeiron-daemon` | Scheduled jobs and the restore test ([docs/DAEMON.md](docs/DAEMON.md)) | Done |
 | Git | `apeiron-git` | Import and export of Git repositories with the same commit ids ([docs/GIT.md](docs/GIT.md)) | Done |
@@ -111,7 +111,7 @@ Rules for code, commits and format changes: [CONTRIBUTING.md](CONTRIBUTING.md).
 | [Roadmap](docs/ROADMAP.md) | Stages 0–5, scope, exit criteria, current status |
 | [API](docs/API.md) | Design principles of the planned public API (draft) |
 | [CLI](docs/CLI.md) | Design of the `apeiron` command (draft) |
-| [SDK](docs/SDK.md) | Design of the C ABI and language SDKs (draft) |
+| [SDK](docs/SDK.md) | The C ABI and the language SDKs |
 | [Background service](docs/DAEMON.md) | Scheduled jobs and the restore test |
 | [Sync](docs/SYNC.md) | Folder sync between devices and conflict detection |
 | [Git](docs/GIT.md) | Importing a Git repository with its history and exporting it back |
