@@ -19,6 +19,9 @@ jobs:
           components: rustfmt, clippy
       - run: cargo fmt --all --check
       - run: cargo clippy --all-targets -- -D warnings
+      # The text plugin is a workspace of its own (docs/TEXT.md).
+      - run: cargo fmt --manifest-path plugins/text/Cargo.toml --check
+      - run: cargo clippy --manifest-path plugins/text/Cargo.toml --all-targets -- -D warnings
 
   test:
     strategy:
@@ -38,6 +41,7 @@ jobs:
       - run: cargo test --all-targets
         env:
           APEIRON_SFTP_TEST: ${{ runner.os != 'Windows' && '1' || '' }}
+      - run: cargo test --manifest-path plugins/text/Cargo.toml
       # The C ABI through the Python SDK and a C program (docs/SDK.md).
       - run: cargo build -p apeiron-ffi
       - name: Python SDK and C example

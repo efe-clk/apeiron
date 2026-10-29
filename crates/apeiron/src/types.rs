@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use apeiron_core::{ObjectId, Snapshot, Time, TransferReport};
-use apeiron_services::{ArchiveFormat, Name, Query, SyncMode};
+use apeiron_services::{ArchiveFormat, ChangeKind, Name, Query, SyncMode};
 use serde::{Deserialize, Serialize};
 
 /// Facts about an open repository.
@@ -105,6 +105,19 @@ pub struct ListRequest {
 pub struct DiffRequest {
     pub from: String,
     pub to: String,
+}
+
+/// A changed path with the difference a plugin shows for it (TEXT.md §3).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TextDiff {
+    pub path: Name,
+    pub kind: ChangeKind,
+    /// The changed lines; absent when no plugin handles the file, it is not
+    /// text or it is a folder or a link.
+    pub text: Option<String>,
+    /// Why the plugin could not show the difference.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

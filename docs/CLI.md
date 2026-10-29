@@ -57,7 +57,7 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | `apeiron backup <folder> [--ref <name>] [--message <text>]` | Stores the folder as a new snapshot and moves the ref to it (default ref: `main`) | Done |
 | `apeiron log [<ref>]` | Lists the snapshots of a ref, newest first | Done |
 | `apeiron ls <snapshot> [<path>]` | Lists the files and folders inside a snapshot | Done |
-| `apeiron diff <snapshot> <snapshot>` | Lists files added, removed and changed between two snapshots | Done |
+| `apeiron diff <snapshot> <snapshot> [--text]` | Lists files added, removed and changed between two snapshots; `--text` also shows the changed lines of files a plugin handles ([TEXT.md](TEXT.md)) | Done |
 | `apeiron restore <snapshot> <target> [--path <path>]` | Writes a snapshot (or one path in it) into a new or empty folder | Done |
 | `apeiron export <snapshot> <file> [--format <format>] [--path <path>]` | Writes a snapshot (or one path in it) into a new `.tar`, `.zip` or `.7z` file; the extension chooses the format unless `--format` is given | Done |
 | `apeiron restore-test [<snapshot>] [--sample-mb <n>]` | Restores a random sample (default 100 MiB) of a snapshot into a temporary folder, checks every file and removes the folder; exit code 4 if a file is damaged | Done |

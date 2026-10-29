@@ -15,7 +15,7 @@ use crate::types::{
     GitRequest, ListRequest, LogPage, LogRequest, RefInfo, RepoInfo, RestoreRequest,
     RestoreTestRequest, SnapshotInfo, SyncRequest, TransferRequest,
 };
-use crate::types::{CreateRefRequest, MergeRequest, SearchRequest};
+use crate::types::{CreateRefRequest, MergeRequest, SearchRequest, TextDiff};
 use crate::{
     ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo, ExportReport, GcReport,
     GcRequest, GitExportReport, GitImportReport, KeyInfo, ObjectId, Phase, ReflogEntry, Remote,
@@ -419,6 +419,44 @@ impl Repository {
         let from = spec::resolve(&core, &request.from)?;
         let to = spec::resolve(&core, &request.to)?;
         Ok(services::diff(&core, &from, &to)?)
+    }
+
+    /// The changed paths between two snapshots with the difference the
+    /// plugin handling each file shows (TEXT.md §3).
+    pub fn diff_text(&self, request: &DiffRequest) -> Result<Vec<TextDiff>> {
+        let core = self.view()?;
+        let from = spec::resolve(&core, &request.from)?;
+        let to = spec::resolve(&core, &request.to)?;
+        let plugins = self.plugins()?;
+        let limit = services::PLUGIN_SIZE_LIMIT;
+        let mut out = Vec::new();
+        for change in services::diff(&core, &from, &to)? {
+            let path = change.path.as_bytes();
+            let name = path.rsplit(|&b| b == b'/').next().unwrap_or(path);
+            let mut diff = TextDiff {
+                path: change.path.clone(),
+                kind: change.kind,
+                text: None,
+                error: None,
+            };
+            if let Some(plugins) = plugins.as_deref().filter(|p| {
+                use services::ContentMerger;
+                p.handles(name)
+            }) {
+                let old = services::read_path(&core, &from, path, limit)?;
+                let new = services::read_path(&core, &to, path, limit)?;
+                // An added or removed file is compared with an empty one.
+                if old.is_some() || new.is_some() {
+                    let (old, new) = (old.unwrap_or_default(), new.unwrap_or_default());
+                    match plugins.diff_file(name, &old, &new) {
+                        Ok(text) => diff.text = text,
+                        Err(e) => diff.error = Some(e.to_string()),
+                    }
+                }
+            }
+            out.push(diff);
+        }
+        Ok(out)
     }
 
     /// Finds files by name, metadata and text in a snapshot or in its

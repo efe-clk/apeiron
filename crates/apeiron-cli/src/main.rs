@@ -109,7 +109,13 @@ enum Command {
         path: String,
     },
     /// List files added, removed and changed between two snapshots
-    Diff { from: String, to: String },
+    Diff {
+        from: String,
+        to: String,
+        /// Also show the changed lines of files a plugin handles, such as text
+        #[arg(long)]
+        text: bool,
+    },
     /// Write a snapshot, or one path in it, into a new or empty folder
     Restore {
         snapshot: String,
@@ -578,7 +584,29 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             });
             Ok(0)
         }
-        Command::Diff { from, to } => {
+        Command::Diff {
+            from,
+            to,
+            text: true,
+        } => {
+            let repo = open(cli.repo, password_file)?;
+            let diffs = repo.diff_text(&DiffRequest { from, to })?;
+            out.result(&diffs, |diffs| {
+                for d in diffs {
+                    say!("{} {}", format::change(d.kind), d.path);
+                    if let Some(text) = &d.text {
+                        for line in text.lines() {
+                            say!("{line}");
+                        }
+                    }
+                    if let Some(error) = &d.error {
+                        say!("(no difference shown: {error})");
+                    }
+                }
+            });
+            Ok(0)
+        }
+        Command::Diff { from, to, .. } => {
             let repo = open(cli.repo, password_file)?;
             let changes = repo.diff(&DiffRequest { from, to })?;
             out.result(&changes, |changes| {

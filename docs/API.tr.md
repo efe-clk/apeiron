@@ -148,6 +148,7 @@ Her işlem tek bir düz istek değeri alır ve tek bir düz sonuç değeri dönd
 | `log` | başlangıç snapshot'ı, en fazla sayı | `LogPage`: en yeniden başlayan snapshot'lar ve sonraki sayfanın başladığı yer | Hayır |
 | `list` | snapshot, yol | `Vec<EntryInfo>`: ad, tür, boyut, izinler, değişiklik zamanı | Hayır |
 | `diff` | iki snapshot | `Vec<Change>`: yol ve eklendi, silindi ya da değişti | Hayır |
+| `diff_text` | iki snapshot | `Vec<TextDiff>`: yol, tür ve bir eklentinin gösterdiği değişen satırlar ya da neden gösteremediği ([TEXT.tr.md](TEXT.tr.md)) | Hayır |
 | `refs` | — | `Vec<RefInfo>`: ad ve snapshot kimliği | Hayır |
 | `reflog` | ref adı | `Vec<ReflogEntry>` | Hayır |
 | `resolve` | snapshot belirteci (bölüm 8.4) | snapshot kimliği | Hayır |

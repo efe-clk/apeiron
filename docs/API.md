@@ -148,6 +148,7 @@ Every operation takes one plain request value and returns one plain result value
 | `log` | start snapshot, maximum count | `LogPage`: snapshots, newest first, and where the next page starts | No |
 | `list` | snapshot, path | `Vec<EntryInfo>`: name, kind, size, mode, mtime | No |
 | `diff` | two snapshots | `Vec<Change>`: path and added, removed or modified | No |
+| `diff_text` | two snapshots | `Vec<TextDiff>`: path, kind, and the changed lines a plugin shows or why it could not ([TEXT.md](TEXT.md)) | No |
 | `refs` | — | `Vec<RefInfo>`: name and snapshot id | No |
 | `reflog` | ref name | `Vec<ReflogEntry>` | No |
 | `resolve` | snapshot spec (section 8.4) | snapshot id | No |

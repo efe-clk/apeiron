@@ -56,7 +56,7 @@ ABI bilerek küçük tutulur: hiç değişmeyen birkaç işlev vardır; işlemle
 | `apeiron_repo_open(path, &repo)` | Bir depoyu açar |
 | `apeiron_repo_unlock(path, secret, &repo)` | Bir depoyu bir parola ya da kurtarma anahtarıyla açar |
 | `apeiron_repo_free(repo)` | Bir depo tutamacını kapatır |
-| `apeiron_call(repo, operation, request_json, &result_json)` | Kısa bir işlemi çalıştırır: `info`, `resolve`, `log`, `list`, `diff`, `refs`, `reflog`, `create_ref`, `delete_ref`, `merge`, `repair`, `keys`, `add_password`, `add_recovery_key`, `remove_key`, `remotes`, `add_remote`, `remove_remote`; NULL bir `repo` ile: `plugins`, `plugin_add`, `plugin_remove` |
+| `apeiron_call(repo, operation, request_json, &result_json)` | Kısa bir işlemi çalıştırır: `info`, `resolve`, `log`, `list`, `diff`, `diff_text`, `refs`, `reflog`, `create_ref`, `delete_ref`, `merge`, `repair`, `keys`, `add_password`, `add_recovery_key`, `remove_key`, `remotes`, `add_remote`, `remove_remote`; NULL bir `repo` ile: `plugins`, `plugin_add`, `plugin_remove` |
 | `apeiron_start(repo, operation, request_json, &job)` | Uzun bir işlemi başlatır: `backup`, `restore`, `export`, `verify`, `gc`, `push`, `pull`, `restore_test`, `search`, `sync`, `git_import`, `git_export` ve NULL bir `repo` ile `clone` |
 | `apeiron_job_progress(job, &progress_json)` | Anlık ilerlemeyi okur |
 | `apeiron_job_cancel(job)` | İşin durmasını ister |

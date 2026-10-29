@@ -62,7 +62,7 @@ Aynı eklentiler `apeiron merge`'de ve senkronda birleştirir. Eklentisi olmayan
 
 | Konu | Nerede |
 | --- | --- |
-| Satır satır metin birleştirme ve bir farkı göstermek | Metin diff eklentisi, 6. iş |
+| Satır satır metin birleştirme ve bir farkı göstermek | Metin eklentisi ([TEXT.tr.md](TEXT.tr.md)) |
 | Diğer eklenti türleri: depolama arka ucu, içe aktarıcı, hook, entegrasyon | Daha sonra, her biri ihtiyaç duyduğu izinlerle |
 | Bir depo ya da uzak kopya içinde gelen eklentiler | Daha sonra; şimdilik kullanıcı başına kurulur |
 | Eklenti bulup indirmek için bir mağaza | Daha sonra |

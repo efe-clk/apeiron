@@ -78,6 +78,33 @@ impl From<&TreeEntry> for EntryInfo {
     }
 }
 
+/// The content of the file at `path` in `snapshot`; `None` when there is
+/// none there, it is a folder or a link, or it is larger than `limit`.
+pub fn read_path(
+    repo: &Repository,
+    snapshot: &ObjectId,
+    path: &[u8],
+    limit: u64,
+) -> Result<Option<Vec<u8>>> {
+    let root = repo.read_snapshot(snapshot)?.tree;
+    let entry = match lookup(repo, &root, path) {
+        Ok(Node::Entry(entry)) => entry,
+        Ok(Node::Tree(_)) | Err(Error::NotFound(_)) => return Ok(None),
+        Err(e) => return Err(e),
+    };
+    let EntryKind::File { size, blob } = entry.kind else {
+        return Ok(None);
+    };
+    if size > limit {
+        return Ok(None);
+    }
+    let mut data = Vec::new();
+    if let Some(blob) = blob {
+        repo.read_file(&blob, &mut data)?;
+    }
+    Ok(Some(data))
+}
+
 /// Lists the folder at `path` in `snapshot`, or the single entry if `path` is a file.
 pub fn list(repo: &Repository, snapshot: &ObjectId, path: &[u8]) -> Result<Vec<EntryInfo>> {
     let root = repo.read_snapshot(snapshot)?.tree;

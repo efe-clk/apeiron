@@ -4,7 +4,7 @@
 
 The expensive decisions (format, object model, API and plugin boundary) are made in Stage 0; everything else is built on top of that foundation. Every stage leaves a product that is usable on its own. The stages and exit criteria come from [VISION.md](VISION.md).
 
-**Current stage: Stage 3 — Developer and ecosystem (In progress).** Stage 0 and Stage 1 were completed on 2026-10-28 and Stage 2 on 2026-10-29; the one-month tests of Stage 1 and Stage 2 were skipped by the owner's decision.
+**Current stage: Stage 4 — Interfaces and multi-user (Planned).** Stage 0 and Stage 1 were completed on 2026-10-28, Stage 2 and Stage 3 on 2026-10-29; the one-month tests of Stage 1 and Stage 2 were skipped by the owner's decision.
 
 ## 1. Overview
 
@@ -13,7 +13,7 @@ flowchart LR
     S0["Stage 0<br/>Format and core<br/>Done"]
     S1["Stage 1<br/>Local MVP<br/>Done"]
     S2["Stage 2<br/>Remote and sync<br/>Done"]
-    S3["Stage 3<br/>Developer and ecosystem<br/>In progress"]
+    S3["Stage 3<br/>Developer and ecosystem<br/>Done"]
     S4["Stage 4<br/>Interfaces and multi-user<br/>Planned"]
     S5["Stage 5<br/>Enterprise<br/>Planned"]
     S0 --> S1 --> S2 --> S3 --> S4 --> S5
@@ -24,7 +24,7 @@ flowchart LR
 | 0. Format and core | Object model and format specification, storage engine, integrity verification, Rust API draft | Specification written; no data loss in power-failure tests | Done |
 | 1. Local MVP | CLI; taking snapshots, history, file-level diff, restore, verification; local and external disk backup targets; tar, zip and 7z export | Backing up and restoring your own data with nothing but Apeiron for one month | Done (one-month test skipped) |
 | 2. Remote and sync | Background service, scheduled backup, encryption, SFTP and S3 targets, one-/two-way sync, conflict detection, restore test | One month of trouble-free sync between two devices and a remote server | Done (one-month test skipped) |
-| 3. Developer and ecosystem | Branching and merging, Git import/export (goal: Git network protocol), C ABI and Python SDK, WebAssembly plugin system, text diff plugin, search | A real Git repository can be moved into Apeiron and back | In progress |
+| 3. Developer and ecosystem | Branching and merging, Git import/export (goal: Git network protocol), C ABI and Python SDK, WebAssembly plugin system, text diff plugin, search | A real Git repository can be moved into Apeiron and back | Done |
 | 4. Interfaces and multi-user | Desktop and web interface, users and permissions, audit log, sharing | A non-technical user can back up and restore without the CLI | Planned |
 | 5. Enterprise | Central identity, multi-tenant use, replication, high availability, immutable archive, compliance reports | First enterprise pilot installation | Planned |
 
@@ -74,7 +74,7 @@ The work items are done in this order, because each builds on the one before: re
 
 **Exit criterion:** A real Git repository can be moved into Apeiron and back.
 
-The exit criterion comes first; it was met on 2026-10-29 with item 1, and the stage goes on with the other items. The plugin system comes before the text diff plugin, which is its first user.
+The exit criterion came first; it was met on 2026-10-29 with item 1, and the stage was completed the same day with the other items. The plugin system comes before the text diff plugin, which is its first user.
 
 | # | Work item | Status |
 | --- | --- | --- |
@@ -83,7 +83,7 @@ The exit criterion comes first; it was met on 2026-10-29 with item 1, and the st
 | 3 | Search ([SEARCH.md](SEARCH.md)) | Done |
 | 4 | C ABI and Python SDK ([SDK.md](SDK.md)) | Done |
 | 5 | WebAssembly plugin system ([PLUGIN.md](PLUGIN.md)) | Done |
-| 6 | Text diff plugin | Planned |
+| 6 | Text diff plugin ([TEXT.md](TEXT.md)) | Done |
 
 ## 6. Stage 4 — Interfaces and multi-user
 

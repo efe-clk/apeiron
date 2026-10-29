@@ -437,6 +437,10 @@ class Repository:
     def diff(self, from_: str, to: str) -> list:
         return self.call("diff", **{"from": from_, "to": to})
 
+    def diff_text(self, from_: str, to: str) -> list:
+        """Changed paths with the changed lines a plugin shows (docs/TEXT.md)."""
+        return self.call("diff_text", **{"from": from_, "to": to})
+
     def refs(self) -> list:
         return self.call("refs")
 

@@ -57,7 +57,7 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | `apeiron backup <folder> [--ref <name>] [--message <text>]` | Klasörü yeni bir snapshot olarak saklar ve ref'i ona taşır (varsayılan ref: `main`) | Tamamlandı |
 | `apeiron log [<ref>]` | Bir ref'in snapshot'larını en yeniden başlayarak listeler | Tamamlandı |
 | `apeiron ls <snapshot> [<path>]` | Bir snapshot'taki dosya ve klasörleri listeler | Tamamlandı |
-| `apeiron diff <snapshot> <snapshot>` | İki snapshot arasında eklenen, silinen ve değişen dosyaları listeler | Tamamlandı |
+| `apeiron diff <snapshot> <snapshot> [--text]` | İki snapshot arasında eklenen, silinen ve değişen dosyaları listeler; `--text` bir eklentinin işlediği dosyaların değişen satırlarını da gösterir ([TEXT.tr.md](TEXT.tr.md)) | Tamamlandı |
 | `apeiron restore <snapshot> <target> [--path <path>]` | Bir snapshot'ı (ya da içindeki bir yolu) yeni ya da boş bir klasöre yazar | Tamamlandı |
 | `apeiron export <snapshot> <file> [--format <format>] [--path <path>]` | Bir snapshot'ı (ya da içindeki bir yolu) yeni bir `.tar`, `.zip` ya da `.7z` dosyasına yazar; `--format` verilmezse biçimi dosya uzantısı belirler | Tamamlandı |
 | `apeiron restore-test [<snapshot>] [--sample-mb <n>]` | Bir snapshot'tan rastgele bir örneği (varsayılan 100 MiB) geçici bir klasöre geri yükler, her dosyayı denetler ve klasörü siler; bir dosya bozuksa çıkış kodu 4'tür | Tamamlandı |

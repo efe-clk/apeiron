@@ -622,3 +622,65 @@ fn a_plugin_merges_what_would_be_a_conflict() {
     assert!(ok(&["plugin", "remove", "test-driver"]).starts_with("Removed test-driver"));
     assert_eq!(code(&run(&["plugin", "remove", "test-driver"])), Some(1));
 }
+
+#[test]
+fn the_text_plugin_merges_lines_and_shows_differences() {
+    let plugin = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../plugins/text");
+    let target = plugin.join("../../target/plugin-text");
+    let status = Command::new(env!("CARGO"))
+        .args([
+            "build",
+            "--release",
+            "--target",
+            "wasm32-wasip2",
+            "--manifest-path",
+        ])
+        .arg(plugin.join("Cargo.toml"))
+        .arg("--target-dir")
+        .arg(&target)
+        .status()
+        .unwrap();
+    assert!(status.success(), "rustup target add wasm32-wasip2");
+    let wasm = target.join("wasm32-wasip2/release/apeiron_text.wasm");
+
+    let s = Setup::new();
+    let plugins = s.root.join("plugins");
+    let ok = |args: &[&str]| {
+        let out = Command::new(env!("CARGO_BIN_EXE_apeiron"))
+            .args(args)
+            .env("APEIRON_REPO", s.repo())
+            .env("APEIRON_PLUGINS", &plugins)
+            .output()
+            .unwrap();
+        assert_eq!(
+            code(&out),
+            Some(0),
+            "{args:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8(out.stdout).unwrap()
+    };
+    assert!(ok(&["plugin", "add", wasm.to_str().unwrap()]).starts_with("Installed text 0.1.0"));
+
+    let src = s.path("src");
+    let notes = s.root.join("src/notes.md");
+    fs::write(&notes, "# Notes\n\none\ntwo\nthree\nfour\nfive\n").unwrap();
+    ok(&["backup", &src]);
+    ok(&["ref", "create", "feature"]);
+    fs::write(&notes, "# Notes\n\none\ntwo\nthree\nfour\nFIVE\n").unwrap();
+    ok(&["backup", &src, "--ref", "feature"]);
+    fs::write(&notes, "# Notes\n\nONE\ntwo\nthree\nfour\nfive\n").unwrap();
+    ok(&["backup", &src]);
+
+    let diff = ok(&["diff", "main~1", "main", "--text"]);
+    assert!(diff.starts_with("M notes.md\n@@ "), "{diff}");
+    assert!(diff.contains("\n-one\n+ONE\n"), "{diff}");
+
+    let out = ok(&["merge", "feature"]);
+    assert!(out.contains("merged by plugin text: notes.md"), "{out}");
+    ok(&["restore", "main", &s.path("out")]);
+    assert_eq!(
+        fs::read_to_string(s.root.join("out/notes.md")).unwrap(),
+        "# Notes\n\nONE\ntwo\nthree\nfour\nFIVE\n"
+    );
+}

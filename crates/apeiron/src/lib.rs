@@ -44,4 +44,4 @@ pub use types::{
     GitRequest, ListRequest, LogPage, LogRequest, RefInfo, RepoInfo, RestoreRequest,
     RestoreTestRequest, SnapshotInfo, SyncRequest, TransferRequest,
 };
-pub use types::{CreateRefRequest, MergeRequest, SearchRequest};
+pub use types::{CreateRefRequest, MergeRequest, SearchRequest, TextDiff};

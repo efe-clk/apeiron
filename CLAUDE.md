@@ -56,11 +56,13 @@ Apeiron; sürüm kontrolü, arşivleme, yedekleme, senkronizasyon ve bütünlük
 
 **Aşama 2 — Uzak ve senkron.** Tamamlandı (2026-10-29): şifreleme, uzak hedefler, arka plan hizmeti, senkron. Bir aylık senkron denemesi, proje sahibi kararı Claude'a bıraktığı için atlandı.
 
-**Aşama 3 — Geliştirici ve ekosistem.** Devam ediyor. İşler `docs/ROADMAP.md` §5'te, sırasıyla:
+**Aşama 3 — Geliştirici ve ekosistem.** Tamamlandı (2026-10-29). İşler `docs/ROADMAP.md` §5'te:
 
 1. ~~Git içe/dışa aktarma (`docs/GIT.md`).~~ Tamamlandı (2026-10-29); aşamanın çıkış kriteri karşılandı.
 2. ~~Dal ve birleştirme (`docs/BRANCH.md`).~~ Tamamlandı (2026-10-29).
 3. ~~Arama (`docs/SEARCH.md`).~~ Tamamlandı (2026-10-29).
 4. ~~C ABI ve Python SDK (`docs/SDK.md`).~~ Tamamlandı (2026-10-29).
 5. ~~WebAssembly eklenti sistemi (`docs/PLUGIN.md`).~~ Tamamlandı (2026-10-29).
-6. Metin diff eklentisi.
+6. ~~Metin diff eklentisi (`docs/TEXT.md`).~~ Tamamlandı (2026-10-29).
+
+**Aşama 4 — Arayüzler ve çok kullanıcı.** Planlandı; işlerin sırası `docs/ROADMAP.md` §6'da belirlenecek.

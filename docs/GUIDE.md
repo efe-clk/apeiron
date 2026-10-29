@@ -228,6 +228,19 @@ apeiron merge trial                           # join it into main
 
 When both `main` and the branch changed the same file, `main` keeps its version and the branch's version is added as `name (conflict trial).ext`.
 
+### 6.8 Merging text files line by line
+
+Without a plugin, two changes to the same text file always leave a conflict copy. The text plugin joins changes to different lines ([TEXT.md](TEXT.md)). It is built once and installed for your user:
+
+```bash
+rustup target add wasm32-wasip2
+cargo build --release --target wasm32-wasip2 --manifest-path plugins/text/Cargo.toml
+apeiron plugin add plugins/text/target/wasm32-wasip2/release/apeiron_text.wasm
+apeiron diff main~1 main --text               # see which lines changed
+```
+
+Install it on every computer that syncs the folder; a computer without it makes conflict copies instead, which loses nothing.
+
 ## 7. Routine
 
 | How often | Command | Why |

@@ -62,7 +62,7 @@ The same plugins merge in `apeiron merge` and in sync. A device without the plug
 
 | Item | Where |
 | --- | --- |
-| Line-by-line text merge and showing a difference | The text diff plugin, work item 6 |
+| Line-by-line text merge and showing a difference | The text plugin ([TEXT.md](TEXT.md)) |
 | Other plugin types: storage backend, importer, hook, integration | Later, each with the permissions it needs |
 | Plugins shipped inside a repository or a remote | Later; installed per user for now |
 | A store to find and download plugins | Later |

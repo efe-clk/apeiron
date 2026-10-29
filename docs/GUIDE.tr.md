@@ -228,6 +228,19 @@ apeiron merge trial                           # onu main'e birleştirin
 
 Hem `main` hem dal aynı dosyayı değiştirdiyse `main` kendi sürümünü tutar ve dalın sürümü `name (conflict trial).ext` olarak eklenir.
 
+### 6.8 Metin dosyalarını satır satır birleştirmek
+
+Eklenti olmadan, aynı metin dosyasındaki iki değişiklik her zaman bir çatışma kopyası bırakır. Metin eklentisi farklı satırlardaki değişiklikleri birleştirir ([TEXT.tr.md](TEXT.tr.md)). Bir kez derlenir ve kullanıcınız için kurulur:
+
+```bash
+rustup target add wasm32-wasip2
+cargo build --release --target wasm32-wasip2 --manifest-path plugins/text/Cargo.toml
+apeiron plugin add plugins/text/target/wasm32-wasip2/release/apeiron_text.wasm
+apeiron diff main~1 main --text               # hangi satırların değiştiğini görün
+```
+
+Klasörü senkronlayan her bilgisayara kurun; kurulu olmayan bir bilgisayar bunun yerine çatışma kopyası oluşturur, bu da hiçbir şey kaybettirmez.
+
 ## 7. Düzen
 
 | Ne sıklıkla | Komut | Neden |
