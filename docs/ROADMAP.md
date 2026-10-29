@@ -68,7 +68,7 @@ The work items are done in this order, because each builds on the one before: re
 | 1 | Client-side encryption ([FORMAT.md](FORMAT.md) §14) | Done |
 | 2 | Remote targets (folder, SFTP, S3) with push and pull ([FORMAT.md](FORMAT.md) §15) | Done |
 | 3 | Background service (daemon), scheduled backup, restore test ([DAEMON.md](DAEMON.md)) | Done |
-| 4 | One-way and two-way sync, conflict detection ([SYNC.md](SYNC.md); clone done) | In progress |
+| 4 | One-way and two-way sync, conflict detection ([SYNC.md](SYNC.md)) | Done |
 
 ## 5. Stage 3 — Developer and ecosystem
 

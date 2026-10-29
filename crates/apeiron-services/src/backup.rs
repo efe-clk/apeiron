@@ -12,6 +12,7 @@ use crate::control::{Control, Phase, Warning, WarningKind};
 use crate::error::{Error, IoContext, Result};
 use crate::name::Name;
 use crate::os;
+use crate::sync;
 
 /// What to back up and how to describe the snapshot.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -68,38 +69,10 @@ pub fn backup(
     ctl: &Control,
 ) -> Result<BackupOutcome> {
     apeiron_core::validate_ref_name(&options.ref_name)?;
-    let source = &options.source;
-    if !fs::metadata(source).at(source)?.is_dir() {
-        return Err(Error::InvalidInput(format!(
-            "{} is not a folder",
-            source.display()
-        )));
-    }
-    // Fail early when the root itself cannot be listed.
-    fs::read_dir(source).at(source)?;
     let parent = repo.read_ref(&options.ref_name)?;
-
-    ctl.set_phase(Phase::Scanning);
-    let mut totals = (0, 0);
-    scan(source, ctl, &mut totals)?;
-    ctl.update(|p| {
-        p.phase = Phase::Storing;
-        p.items_total = Some(totals.0);
-        p.bytes_total = Some(totals.1);
-    });
-
-    let mut walk = Walk {
-        ctl,
-        warnings: Vec::new(),
-        files: 0,
-        dirs: 0,
-        symlinks: 0,
-        bytes: 0,
-    };
     let mut writer = repo.writer();
-    let tree = walk
-        .store_dir(&mut writer, source, &Name::default())?
-        .ok_or_else(|| Error::InvalidInput(format!("{} cannot be read", source.display())))?;
+    let stored = store_folder(&mut writer, &options.source, false, ctl)?;
+    let tree = stored.tree;
     let mut meta = options.meta.clone();
     meta.sort();
     let snapshot = Snapshot {
@@ -122,11 +95,70 @@ pub fn backup(
     Ok(BackupOutcome {
         snapshot: id,
         parent,
+        files: stored.files,
+        dirs: stored.dirs,
+        symlinks: stored.symlinks,
+        bytes: stored.bytes,
+        new_bytes,
+        warnings: stored.warnings,
+    })
+}
+
+/// A folder stored as a tree.
+pub(crate) struct Stored {
+    pub(crate) tree: ObjectId,
+    pub(crate) files: u64,
+    pub(crate) dirs: u64,
+    pub(crate) symlinks: u64,
+    pub(crate) bytes: u64,
+    pub(crate) warnings: Vec<Warning>,
+}
+
+/// Stores the folder `source` through `writer`. With `for_sync`, the
+/// temporary files of a sync (`sync::TMP_PREFIX`) are left out, and those
+/// left behind by an interrupted one are removed.
+pub(crate) fn store_folder(
+    writer: &mut ObjectWriter<'_>,
+    source: &Path,
+    for_sync: bool,
+    ctl: &Control,
+) -> Result<Stored> {
+    if !fs::metadata(source).at(source)?.is_dir() {
+        return Err(Error::InvalidInput(format!(
+            "{} is not a folder",
+            source.display()
+        )));
+    }
+    // Fail early when the root itself cannot be listed.
+    fs::read_dir(source).at(source)?;
+
+    ctl.set_phase(Phase::Scanning);
+    let mut totals = (0, 0);
+    scan(source, ctl, &mut totals)?;
+    ctl.update(|p| {
+        p.phase = Phase::Storing;
+        p.items_total = Some(totals.0);
+        p.bytes_total = Some(totals.1);
+    });
+
+    let mut walk = Walk {
+        ctl,
+        for_sync,
+        warnings: Vec::new(),
+        files: 0,
+        dirs: 0,
+        symlinks: 0,
+        bytes: 0,
+    };
+    let tree = walk
+        .store_dir(writer, source, &Name::default())?
+        .ok_or_else(|| Error::InvalidInput(format!("{} cannot be read", source.display())))?;
+    Ok(Stored {
+        tree,
         files: walk.files,
         dirs: walk.dirs,
         symlinks: walk.symlinks,
         bytes: walk.bytes,
-        new_bytes,
         warnings: walk.warnings,
     })
 }
@@ -154,6 +186,7 @@ fn scan(dir: &Path, ctl: &Control, totals: &mut (u64, u64)) -> Result<()> {
 
 struct Walk<'c> {
     ctl: &'c Control,
+    for_sync: bool,
     warnings: Vec<Warning>,
     files: u64,
     dirs: u64,
@@ -187,6 +220,7 @@ impl Walk<'_> {
         let mut children = Vec::new();
         for entry in listing {
             match entry {
+                Ok(entry) if self.for_sync && sync::is_tmp(&entry) => {}
                 Ok(entry) => match os::name_bytes(&entry.file_name()) {
                     Some(name) => children.push((name, entry.path())),
                     None => self.warn(

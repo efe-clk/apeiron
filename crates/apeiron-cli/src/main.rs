@@ -20,9 +20,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use apeiron::{
-    ArchiveFormat, BackupRequest, CloneRequest, DiffRequest, Error, ErrorKind, ExportRequest,
-    GcRequest, Job, KeyKind, ListRequest, LogRequest, Name, Repository, RestoreRequest,
-    RestoreTestRequest, TransferReport, TransferRequest, Warning,
+    ArchiveFormat, BackupRequest, ChangeKind, CloneRequest, ConflictKind, DiffRequest, Error,
+    ErrorKind, ExportRequest, GcRequest, Job, KeyKind, ListRequest, LogRequest, Name, Repository,
+    RestoreRequest, RestoreTestRequest, SyncAction, SyncMode, SyncReport, SyncRequest,
+    TransferReport, TransferRequest, Warning,
 };
 use clap::{Parser, Subcommand};
 use serde::Serialize;
@@ -178,6 +179,19 @@ enum Command {
         /// The new repository; must not exist or be empty
         path: PathBuf,
     },
+    /// Keep a folder equal on several devices through a remote
+    Sync {
+        folder: PathBuf,
+        remote: String,
+        /// Ref on both sides; default sync/<folder name>
+        #[arg(long = "ref", value_name = "NAME")]
+        ref_name: Option<String>,
+        #[arg(long, value_enum, default_value = "two-way")]
+        mode: ModeArg,
+        /// Only show what would change
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// Copy the snapshots of a ref to a remote and move the ref there
     Push {
         remote: String,
@@ -230,6 +244,23 @@ enum KeyCommand {
         /// Key id from `apeiron key list`; its first characters are enough
         id: String,
     },
+}
+
+#[derive(Clone, Copy, clap::ValueEnum)]
+enum ModeArg {
+    TwoWay,
+    Send,
+    Receive,
+}
+
+impl From<ModeArg> for SyncMode {
+    fn from(m: ModeArg) -> Self {
+        match m {
+            ModeArg::TwoWay => SyncMode::TwoWay,
+            ModeArg::Send => SyncMode::Send,
+            ModeArg::Receive => SyncMode::Receive,
+        }
+    }
 }
 
 #[derive(Clone, Copy, clap::ValueEnum)]
@@ -680,6 +711,26 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             });
             Ok(0)
         }
+        Command::Sync {
+            folder,
+            remote,
+            ref_name,
+            mode,
+            dry_run,
+        } => {
+            let repo = open(cli.repo, password_file)?;
+            let mut request = SyncRequest::new(folder, remote.clone());
+            request.ref_name = ref_name;
+            request.mode = mode.into();
+            request.dry_run = dry_run;
+            let report = watch(out, repo.sync(request)?)?;
+            out.result(&report, |r| print_sync(r, &remote, dry_run));
+            let attention = !report.conflicts.is_empty() || !report.skipped.is_empty();
+            Ok(match warnings_exit(out, &report.warnings) {
+                0 if attention => EXIT_WARNINGS,
+                code => code,
+            })
+        }
         Command::Push { remote, ref_name } => {
             let repo = open(cli.repo, password_file)?;
             let request = TransferRequest::new(remote.clone(), ref_name.clone());
@@ -836,6 +887,52 @@ fn local_time(t: jiff::Timestamp) -> String {
 }
 
 /// One line about a push or pull.
+fn print_sync(r: &SyncReport, remote: &str, dry_run: bool) {
+    for change in &r.changes {
+        let mark = match change.kind {
+            ChangeKind::Added => '+',
+            ChangeKind::Removed => '-',
+            ChangeKind::Modified => '~',
+        };
+        say!("{mark} {}", change.path);
+    }
+    for c in &r.conflicts {
+        let what = match c.kind {
+            ConflictKind::BothChanged => "changed on both devices",
+            ConflictKind::DeletedHere => "deleted here, changed on the other device; kept",
+            ConflictKind::DeletedThere => "changed here, deleted on the other device; kept",
+            ConflictKind::ChangedDuringSync => "changed here during sync",
+        };
+        match &c.copy {
+            Some(copy) => say!("conflict: {} ({what}); the other version is {copy}", c.path),
+            None => say!("conflict: {} ({what})", c.path),
+        }
+    }
+    for path in &r.skipped {
+        say!("left alone, changed during sync: {path}");
+    }
+    let would = if dry_run { "would be " } else { "" };
+    let short = r.snapshot.map_or("-".to_owned(), |s| format::short_id(&s));
+    match r.action {
+        SyncAction::UpToDate => say!("{} is up to date with {remote} ({short})", r.ref_name),
+        SyncAction::Sent => say!(
+            "{}: changes here {would}sent to {remote} ({short})",
+            r.ref_name
+        ),
+        SyncAction::Received => say!(
+            "{}: changes from {remote} {would}applied ({})",
+            r.ref_name,
+            format::count(r.changes.len() as u64, "change")
+        ),
+        SyncAction::Merged => say!(
+            "{}: changes from both sides {would}merged ({}, {})",
+            r.ref_name,
+            format::count(r.changes.len() as u64, "change"),
+            format::count(r.conflicts.len() as u64, "conflict")
+        ),
+    }
+}
+
 fn transferred(r: &TransferReport, ref_name: &str, remote: &str) -> String {
     if r.previous == Some(r.snapshot) || r.objects == 0 && r.previous.is_some() {
         return format!(

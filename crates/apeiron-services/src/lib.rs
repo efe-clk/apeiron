@@ -14,6 +14,7 @@ mod name;
 mod os;
 mod restore;
 mod restore_test;
+mod sync;
 
 pub use backup::{BackupOptions, BackupOutcome, backup};
 pub use control::{Control, Phase, Progress, Warning, WarningKind};
@@ -24,3 +25,6 @@ pub use list::{EntryInfo, Kind, list};
 pub use name::Name;
 pub use restore::{RestoreOutcome, restore};
 pub use restore_test::{RestoreProblem, RestoreTestOutcome, restore_test};
+pub use sync::{
+    Conflict, ConflictKind, SyncAction, SyncMode, SyncOptions, SyncOutcome, folder_ref, sync,
+};

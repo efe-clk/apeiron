@@ -40,7 +40,7 @@ Temel tasarım fikirleri:
 | --- | --- | --- | --- |
 | Arayüzler | CLI, arka plan hizmeti, masaüstü, web, mobil | `apeiron-cli`, `apeiron-daemon` | Devam ediyor (CLI ve arka plan hizmeti tamamlandı) |
 | Herkese açık API | Kararlı Rust API; diğer diller için C ABI; üstünde SDK'lar | `apeiron` | Devam ediyor (Rust API) |
-| Hizmetler | Sürümleme, arşiv, yedek, senkron, arama, politika | `apeiron-services` | Devam ediyor (yedek, geri yükleme, fark) |
+| Hizmetler | Sürümleme, arşiv, yedek, senkron, arama, politika | `apeiron-services` | Devam ediyor (yedek, geri yükleme, fark, senkron) |
 | Çekirdek | Nesne modeli, depolama motoru, bütünlük, şifreleme, işlem günlüğü | `apeiron-core` | Devam ediyor |
 | Depolama hedefleri | Yerel disk, harici disk, ağ depolaması, uzak hedefler | `apeiron-core` (`Store`, klasörler), `apeiron-remote` (SFTP, S3) | Tamamlandı |
 | Eklentiler | Type driver'lar, storage backend'ler, içe/dışa aktarıcılar, hook'lar | — | Planlandı |
@@ -162,7 +162,7 @@ Doğrulamadan geçemeyen bir chunk hedefe hiçbir zaman yazılmaz; hata raporlan
 
 ### 5.3 Senkronlama
 
-Durum: Planlandı (Aşama 2). Aktarım protokolü henüz tasarlanmadı; aşağıdaki akış [VISION.tr.md](VISION.tr.md) belgesindeki hedeflenen ilkeyi gösterir.
+Durum: Tamamlandı. Cihazlar bir uzak depoda buluşur; turun tamamı, birleştirme ve klasörün nasıl değiştirildiği [SYNC.tr.md](SYNC.tr.md), nesnelerin aktarımı [FORMAT.tr.md](FORMAT.tr.md) §15 içindedir. Aşağıdaki akış bir push'tur.
 
 ```mermaid
 sequenceDiagram

@@ -7,7 +7,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime};
 
 use apeiron::{
-    BackupRequest, ErrorKind, GcRequest, Repository, RestoreTestRequest, TransferRequest,
+    BackupRequest, ErrorKind, GcRequest, Repository, RestoreTestRequest, SyncAction, SyncRequest,
+    TransferRequest,
 };
 use jiff::tz::TimeZone;
 use jiff::{SignedDuration, Timestamp};
@@ -328,6 +329,47 @@ fn try_run(job: &Job, stop: &AtomicBool) -> apeiron::Result<(RunResult, String)>
                 ),
             }
         }
+        Action::Sync {
+            folder,
+            remote,
+            ref_name,
+            mode,
+        } => {
+            let mut request = SyncRequest::new(folder.clone(), remote.clone());
+            request.ref_name = ref_name.clone();
+            request.mode = *mode;
+            let report = wait(repo.sync(request)?, stop)?;
+            let action = match report.action {
+                SyncAction::UpToDate => "up to date",
+                SyncAction::Sent => "sent",
+                SyncAction::Received => "received",
+                SyncAction::Merged => "merged",
+            };
+            let mut text = format!(
+                "{} {action}: {} changes",
+                report.ref_name,
+                report.changes.len()
+            );
+            let attention = report.conflicts.len() + report.skipped.len() + report.warnings.len();
+            if !report.conflicts.is_empty() {
+                text.push_str(&format!("; {} conflicts", report.conflicts.len()));
+            }
+            if !report.skipped.is_empty() {
+                text.push_str(&format!(
+                    "; {} left for the next round",
+                    report.skipped.len()
+                ));
+            }
+            if !report.warnings.is_empty() {
+                text.push_str(&format!("; {} files skipped", report.warnings.len()));
+            }
+            let result = if attention > 0 {
+                RunResult::Warnings
+            } else {
+                RunResult::Ok
+            };
+            (result, text)
+        }
         Action::Gc => {
             let report = wait(repo.gc(GcRequest::default())?, stop)?;
             (
@@ -481,6 +523,57 @@ mod tests {
         let status = status(&s.paths).unwrap();
         let last_end = status[0].last.as_ref().unwrap().last_end;
         assert_eq!(status[0].next_run.duration_since(last_end).as_secs(), 3600);
+    }
+
+    #[test]
+    fn sync_jobs_keep_two_folders_equal() {
+        let s = setup(
+            r#"
+            [job.a]
+            repo = "ROOT/repo"
+            do = "sync"
+            folder = "ROOT/src"
+            remote = "hub"
+            every = "15m"
+
+            [job.b]
+            repo = "ROOT/copy"
+            do = "sync"
+            folder = "ROOT/other"
+            ref = "sync/src"
+            remote = "origin"
+            mode = "receive"
+            every = "15m"
+            "#,
+        );
+        let root = s.dir.path();
+        let repo = Repository::open(root.join("repo")).unwrap();
+        repo.add_remote("hub", root.join("hub").to_str().unwrap())
+            .unwrap();
+        // The hub must exist before the second device can clone it.
+        repo.sync(apeiron::SyncRequest::new(root.join("src"), "hub"))
+            .unwrap()
+            .wait()
+            .unwrap();
+        let request = apeiron::CloneRequest {
+            url: root.join("hub").to_str().unwrap().to_owned(),
+            path: root.join("copy"),
+            secret: None,
+        };
+        Repository::clone_from(request).unwrap().wait().unwrap();
+        fs::create_dir(root.join("other")).unwrap();
+
+        let daemon = Daemon::start(s.paths.clone()).unwrap();
+        let jobs = load_jobs(&s.paths.jobs).unwrap();
+        let runs = daemon.run_due(&jobs, &AtomicBool::new(false)).unwrap();
+        let results: Vec<_> = runs.iter().map(|r| r.run.result).collect();
+        assert_eq!(results, [RunResult::Ok, RunResult::Ok], "{runs:?}");
+        assert!(runs[0].run.message.contains("sync/src up to date"));
+        assert!(runs[1].run.message.contains("received: 1 changes"));
+        assert_eq!(fs::read(root.join("other/a.txt")).unwrap(), b"hello");
+        let status = status(&s.paths).unwrap();
+        let last = status[0].last.as_ref().unwrap().last_start;
+        assert_eq!(status[0].next_run.duration_since(last).as_secs(), 900);
     }
 
     #[test]

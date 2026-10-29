@@ -21,8 +21,9 @@ pub use apeiron_core::{
 };
 pub use apeiron_services::{
     ArchiveFormat, BackupOptions as BackupRequest, BackupOutcome as BackupReport, Change,
-    ChangeKind, EntryInfo, ExportOutcome as ExportReport, Kind, Name, Phase, Progress,
-    RestoreOutcome as RestoreReport, RestoreProblem, RestoreTestOutcome as RestoreTestReport,
+    ChangeKind, Conflict, ConflictKind, EntryInfo, ExportOutcome as ExportReport, Kind, Name,
+    Phase, Progress, RestoreOutcome as RestoreReport, RestoreProblem,
+    RestoreTestOutcome as RestoreTestReport, SyncAction, SyncMode, SyncOutcome as SyncReport,
     Warning, WarningKind,
 };
 pub use error::{Error, ErrorKind, Result};
@@ -31,5 +32,5 @@ pub use repo::Repository;
 pub use types::{
     AddedKey, CloneReport, CloneRequest, ClonedRef, DeleteRefRequest, DiffRequest, ExportRequest,
     ListRequest, LogPage, LogRequest, RefInfo, RepoInfo, RestoreRequest, RestoreTestRequest,
-    SnapshotInfo, TransferRequest,
+    SnapshotInfo, SyncRequest, TransferRequest,
 };

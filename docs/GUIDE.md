@@ -183,6 +183,23 @@ apeiron clone /run/media/$USER/DISK/apeiron ~/apeiron   # or an sftp:// or s3://
 
 It asks for the password of the copy and creates a repository at `~/apeiron` with every backup in it; the copy is then known as `origin`, so `apeiron --repo ~/apeiron pull origin backup/documents` brings later backups. If `clone` is stopped before it finishes, delete the new folder and run it again.
 
+### 6.5 The same folder on two computers
+
+Sync keeps a folder, such as `~/Documents`, equal on two or more computers through any of these copies ([SYNC.md](SYNC.md)). On the first computer:
+
+```bash
+apeiron sync ~/Documents disk              # backs up the folder and sends it
+```
+
+On the second, after `clone` (section 6.4):
+
+```bash
+apeiron --repo ~/apeiron sync --dry-run ~/Documents origin   # shows what would change
+apeiron --repo ~/apeiron sync ~/Documents origin
+```
+
+From then on, run `apeiron sync` on either computer, or let the background service do it (section 8, `do = "sync"`, `every = "15m"`). Each run backs up the folder first, so every state stays in the history and can be restored. When both computers changed the same file differently, both versions are kept: the other one appears beside it as `name (conflict COMPUTER DATE TIME).ext`. Look at both, keep what you want and delete the copy; the next sync spreads that too.
+
 ## 7. Routine
 
 | How often | Command | Why |

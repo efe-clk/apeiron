@@ -48,7 +48,7 @@ Each layer uses only the layer directly below it. Details: [docs/ARCHITECTURE.md
 | --- | --- | --- | --- |
 | Core | `apeiron-core` | Object model, chunking, pack/index files, refs and reflogs | In progress |
 | Storage targets | `apeiron-core`, `apeiron-remote` | Folder (local or external disk), SFTP and S3 remotes | Done |
-| Services | `apeiron-services` | Backup, restore, listing and diff today; archive, sync, search and policy later | In progress |
+| Services | `apeiron-services` | Backup, restore, listing, diff and sync today; archive, search and policy later | In progress |
 | Public API | `apeiron` | Rust API for all operations ([docs/API.md](docs/API.md) §8) | In progress |
 | System calls | `apeiron-sys` | Operating system calls that need `unsafe` (Windows write-through) | Done |
 | C ABI | — | Stable C interface; may use `unsafe` | Planned |
@@ -112,7 +112,7 @@ Rules for code, commits and format changes: [CONTRIBUTING.md](CONTRIBUTING.md).
 | [CLI](docs/CLI.md) | Design of the `apeiron` command (draft) |
 | [SDK](docs/SDK.md) | Design of the C ABI and language SDKs (draft) |
 | [Background service](docs/DAEMON.md) | Scheduled jobs and the restore test |
-| [Sync](docs/SYNC.md) | Design of folder sync between devices and conflict detection (in progress) |
+| [Sync](docs/SYNC.md) | Folder sync between devices and conflict detection |
 | [User guide](docs/GUIDE.md) | Installation, daily backup, restore and the one-month test |
 | [Glossary](docs/GLOSSARY.md) | Terms with English–Turkish equivalents |
 | [Contributing](CONTRIBUTING.md) | Development environment and rules |

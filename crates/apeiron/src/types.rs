@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use apeiron_core::{ObjectId, Snapshot, Time, TransferReport};
-use apeiron_services::{ArchiveFormat, Name};
+use apeiron_services::{ArchiveFormat, Name, SyncMode};
 use serde::{Deserialize, Serialize};
 
 /// Facts about an open repository.
@@ -196,4 +196,33 @@ pub struct ClonedRef {
     pub name: String,
     #[serde(flatten)]
     pub report: TransferReport,
+}
+
+/// Which folder to sync with which remote.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SyncRequest {
+    pub folder: PathBuf,
+    /// The name of a remote.
+    pub remote: String,
+    /// The ref on both sides; `sync/<folder name>` when absent.
+    #[serde(rename = "ref", default, skip_serializing_if = "Option::is_none")]
+    pub ref_name: Option<String>,
+    #[serde(default)]
+    pub mode: SyncMode,
+    /// Shows what would change without changing the folder, a ref or the
+    /// remote.
+    #[serde(default)]
+    pub dry_run: bool,
+}
+
+impl SyncRequest {
+    pub fn new(folder: impl Into<PathBuf>, remote: impl Into<String>) -> Self {
+        SyncRequest {
+            folder: folder.into(),
+            remote: remote.into(),
+            ref_name: None,
+            mode: SyncMode::TwoWay,
+            dry_run: false,
+        }
+    }
 }

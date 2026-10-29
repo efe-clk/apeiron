@@ -5,7 +5,8 @@ use std::path::PathBuf;
 
 use apeiron::{
     BackupRequest, ChangeKind, CloneRequest, DeleteRefRequest, DiffRequest, ErrorKind, KeyKind,
-    ListRequest, LogRequest, Phase, Repository, RestoreRequest, TransferRequest,
+    ListRequest, LogRequest, Phase, Repository, RestoreRequest, SyncAction, SyncMode, SyncRequest,
+    TransferRequest,
 };
 
 struct Setup {
@@ -449,6 +450,40 @@ fn clone_makes_a_second_copy_that_knows_its_origin() {
 
     let err = Repository::clone_from(request).unwrap().wait().unwrap_err();
     assert_eq!(err.kind, ErrorKind::InvalidInput);
+}
+
+#[test]
+fn sync_names_its_ref_after_the_folder() {
+    let s = setup();
+    let folder = s.root.join("My Docs");
+    fs::create_dir(&folder).unwrap();
+    fs::write(folder.join("a.txt"), b"a").unwrap();
+    s.repo
+        .add_remote("hub", s.root.join("hub").to_str().unwrap())
+        .unwrap();
+    let report = s
+        .repo
+        .sync(SyncRequest::new(&folder, "hub"))
+        .unwrap()
+        .wait()
+        .unwrap();
+    assert_eq!(report.ref_name, "sync/my-docs");
+    assert_eq!(report.action, SyncAction::Sent);
+    assert!(report.pushed.is_some());
+    assert_eq!(
+        s.repo.resolve("sync/my-docs").unwrap(),
+        report.snapshot.unwrap()
+    );
+
+    let mut request = SyncRequest::new(&folder, "hub");
+    request.mode = SyncMode::Receive;
+    let report = s.repo.sync(request).unwrap().wait().unwrap();
+    assert_eq!(report.action, SyncAction::UpToDate);
+    let err = s
+        .repo
+        .sync(SyncRequest::new(&folder, "nowhere"))
+        .unwrap_err();
+    assert_eq!(err.kind, ErrorKind::NotFound);
 }
 
 fn copy_dir(src: &std::path::Path, dest: &std::path::Path) {

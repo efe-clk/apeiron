@@ -59,4 +59,4 @@ Apeiron; sürüm kontrolü, arşivleme, yedekleme, senkronizasyon ve bütünlük
 1. ~~İstemci tarafı şifreleme (`init --encrypt`, parola ve kurtarma anahtarı).~~ Tamamlandı (2026-10-28).
 2. ~~Uzak hedefler (klasör, SFTP, S3), push ve pull.~~ Tamamlandı (2026-10-29).
 3. ~~Arka plan hizmeti, zamanlanmış yedek, geri yükleme testi.~~ Tamamlandı (2026-10-29).
-4. Senkron ve çatışma tespiti.
+4. ~~Senkron ve çatışma tespiti.~~ Tamamlandı (2026-10-29). Aşamanın çıkış ölçütü olan bir aylık senkron denemesi bekliyor.

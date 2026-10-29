@@ -34,6 +34,10 @@ pub fn next_run(job: &Job, last: Option<&JobState>, now: Timestamp, tz: &TimeZon
             .last_start
             .checked_add(SignedDuration::from_hours(i64::from(days) * 24))
             .ok(),
+        (Every::Minutes(minutes), _) => last
+            .last_start
+            .checked_add(SignedDuration::from_mins(i64::from(minutes)))
+            .ok(),
         (Every::Hours(hours), _) => last
             .last_start
             .checked_add(SignedDuration::from_hours(i64::from(hours)))

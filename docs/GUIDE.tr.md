@@ -183,6 +183,23 @@ apeiron clone /run/media/$USER/DISK/apeiron ~/apeiron   # ya da bir sftp:// veya
 
 Kopyanın parolasını sorar ve `~/apeiron` içinde her yedeği barındıran bir depo oluşturur; kopya artık `origin` olarak bilinir, yani `apeiron --repo ~/apeiron pull origin backup/documents` sonraki yedekleri getirir. `clone` bitmeden durdurulursa yeni klasörü silin ve yeniden çalıştırın.
 
+### 6.5 İki bilgisayarda aynı klasör
+
+Senkron, `~/Documents` gibi bir klasörü bu kopyalardan herhangi biri üzerinden iki ya da daha fazla bilgisayarda eşit tutar ([SYNC.tr.md](SYNC.tr.md)). İlk bilgisayarda:
+
+```bash
+apeiron sync ~/Documents disk              # klasörü yedekler ve gönderir
+```
+
+İkincisinde, `clone`'dan sonra (bölüm 6.4):
+
+```bash
+apeiron --repo ~/apeiron sync --dry-run ~/Documents origin   # neyin değişeceğini gösterir
+apeiron --repo ~/apeiron sync ~/Documents origin
+```
+
+Bundan sonra `apeiron sync` komutunu iki bilgisayardan birinde çalıştırın ya da bunu arka plan hizmetine bırakın (bölüm 8, `do = "sync"`, `every = "15m"`). Her çalışma önce klasörü yedekler; böylece her hâl geçmişte kalır ve geri yüklenebilir. İki bilgisayar aynı dosyayı farklı değiştirdiyse iki sürüm de tutulur: öteki, yanında `ad (conflict BİLGİSAYAR TARİH SAAT).uzantı` olarak görünür. İkisine bakın, istediğinizi tutun ve kopyayı silin; sonraki senkron bunu da yayar.
+
 ## 7. Düzen
 
 | Ne sıklıkla | Komut | Neden |

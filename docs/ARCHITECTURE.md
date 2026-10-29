@@ -40,7 +40,7 @@ Key design ideas:
 | --- | --- | --- | --- |
 | Interfaces | CLI, background service, desktop, web, mobile | `apeiron-cli`, `apeiron-daemon` | In progress (CLI and background service done) |
 | Public API | Stable Rust API; C ABI for other languages; SDKs on top | `apeiron` | In progress (Rust API) |
-| Services | Versioning, archive, backup, sync, search, policy | `apeiron-services` | In progress (backup, restore, diff) |
+| Services | Versioning, archive, backup, sync, search, policy | `apeiron-services` | In progress (backup, restore, diff, sync) |
 | Core | Object model, storage engine, integrity, encryption, operation log | `apeiron-core` | In progress |
 | Storage targets | Local disk, external disk, network storage, remote targets | `apeiron-core` (`Store`, folders), `apeiron-remote` (SFTP, S3) | Done |
 | Plugins | Type drivers, storage backends, importers/exporters, hooks | — | Planned |
@@ -162,7 +162,7 @@ A chunk that fails verification is never written to the target; the error is rep
 
 ### 5.3 Synchronising
 
-Status: Planned (Stage 2). The transfer protocol is not designed yet; the flow below shows the intended principle from [VISION.md](VISION.md).
+Status: Done. Devices meet at a remote; the full round, the merge and how the folder is changed are in [SYNC.md](SYNC.md), the transfer of objects in [FORMAT.md](FORMAT.md) §15. The flow below is one push.
 
 ```mermaid
 sequenceDiagram

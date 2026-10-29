@@ -162,6 +162,7 @@ Her işlem tek bir düz istek değeri alır ve tek bir düz sonuç değeri dönd
 | `remove_remote` | ad | —; uzak kopyanın kendisine dokunulmaz | Hayır |
 | `push` | uzak depo adı, ref adı (varsayılan `main`) | `TransferReport`: uzaktaki ref'in şimdi ve önceden gösterdiği snapshot'lar, kopyalanan nesneler ve saklanan baytlar; uzak depoda bu kopyada olmayan snapshot'lar varsa `conflict` | Evet |
 | `pull` | uzak depo adı, ref adı (varsayılan `main`) | yerel ref için aynısı, `TransferReport`; yerel ref'te uzak depoda olmayan snapshot'lar varsa `conflict` | Evet |
+| `sync` | klasör, uzak depo adı, ref adı (varsayılan `sync/<klasör adı>`), kip (`two-way`, `send` ya da `receive`), deneme çalışması | `SyncReport`: ref, eylem (`up_to_date`, `sent`, `received` ya da `merged`), snapshot, alınan yedek, ne çekildiği ve push edildiği, klasördeki değişiklikler, kopyalarıyla çatışmalar, sonraki tura bırakılan yollar, uyarılar, çalışan tur sayısı ([SYNC.tr.md](SYNC.tr.md)); `send` kipinde uzak depoda bu kopyada olmayan snapshot'lar varsa `conflict` | Evet |
 
 ### 8.4 Bir snapshot'ı adlandırma
 

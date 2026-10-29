@@ -12,12 +12,12 @@ use crate::spec;
 use crate::types::{
     AddedKey, CloneReport, CloneRequest, ClonedRef, DeleteRefRequest, DiffRequest, ExportRequest,
     ListRequest, LogPage, LogRequest, RefInfo, RepoInfo, RestoreRequest, RestoreTestRequest,
-    SnapshotInfo, TransferRequest,
+    SnapshotInfo, SyncRequest, TransferRequest,
 };
 use crate::{
     ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo, ExportReport, GcReport,
     GcRequest, KeyInfo, ObjectId, Phase, ReflogEntry, Remote, RepairReport, RestoreReport,
-    RestoreTestReport, TransferReport, VerifyReport,
+    RestoreTestReport, SyncReport, TransferReport, VerifyReport,
 };
 
 /// An open repository. Cloning is cheap; clones share the same state and can
@@ -186,6 +186,36 @@ impl Repository {
             let report = services::backup(&mut core, &request, ctl)?;
             *repo.write() = core;
             Ok(report)
+        })
+    }
+
+    /// Runs one sync round of a folder with a remote (SYNC.md §3): backs up
+    /// the folder, pulls, merges if both sides changed, changes the folder
+    /// and pushes. Fails with [`ErrorKind::Conflict`] in `send` mode when
+    /// the remote has snapshots this copy does not have.
+    pub fn sync(&self, request: SyncRequest) -> Result<Job<SyncReport>> {
+        let remote = self.read().remote(&request.remote)?;
+        let ref_name = match request.ref_name {
+            Some(name) => name,
+            None => default_sync_ref(&request.folder)?,
+        };
+        let options = services::SyncOptions {
+            folder: request.folder,
+            ref_name,
+            mode: request.mode,
+            dry_run: request.dry_run,
+            host: gethostname::gethostname().into_string().ok(),
+        };
+        let repo = self.clone();
+        Job::spawn("sync", move |ctl| {
+            let store = open_store(&remote, repo.info().encrypted)?;
+            let _writer = repo.lock_writer();
+            let _lock = core::RepoLock::shared(repo.path())?;
+            let mut core = repo.read().reopen()?;
+            let report = services::sync(&mut core, &*store, &options, ctl);
+            // Refs may have moved even when a later step failed.
+            *repo.write() = core;
+            Ok(report?)
         })
     }
 
@@ -454,6 +484,30 @@ impl Repository {
         core.refresh_index()?;
         Ok(core.repair()?)
     }
+}
+
+/// `sync/<folder name>`, with the characters a ref name cannot hold
+/// replaced by `-`.
+fn default_sync_ref(folder: &Path) -> Result<String> {
+    let absolute = std::path::absolute(folder).map_err(|e| {
+        Error::new(
+            ErrorKind::InvalidInput,
+            format!("{}: {e}", folder.display()),
+        )
+    })?;
+    let name: String = absolute
+        .file_name()
+        .map(|n| n.to_string_lossy().to_lowercase())
+        .unwrap_or_default()
+        .chars()
+        .map(|c| match c {
+            'a'..='z' | '0'..='9' | '.' | '_' | '-' => c,
+            _ => '-',
+        })
+        .collect();
+    let name = name.trim_start_matches('.').trim_end_matches(".lock");
+    let name = if name.is_empty() { "folder" } else { name };
+    Ok(format!("sync/{name}"))
 }
 
 /// The name `clone` gives the remote it copied.

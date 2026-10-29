@@ -97,6 +97,35 @@ impl Repository {
         Ok((repo, reports))
     }
 
+    /// Whether the snapshot `ancestor` is `id` or reachable from it through
+    /// parents.
+    pub fn is_ancestor(&self, ancestor: ObjectId, id: ObjectId) -> Result<bool> {
+        is_ancestor(ancestor, id, |s| self.read_snapshot(s))
+    }
+
+    /// The nearest snapshot from `b` that is also an ancestor of `a`; `None`
+    /// if their histories never meet.
+    pub fn merge_base(&self, a: ObjectId, b: ObjectId) -> Result<Option<ObjectId>> {
+        let mut of_a = HashSet::new();
+        let mut stack = vec![a];
+        while let Some(id) = stack.pop() {
+            if of_a.insert(id) {
+                stack.extend(self.read_snapshot(&id)?.parents);
+            }
+        }
+        let mut seen = HashSet::new();
+        let mut queue = std::collections::VecDeque::from([b]);
+        while let Some(id) = queue.pop_front() {
+            if of_a.contains(&id) {
+                return Ok(Some(id));
+            }
+            if seen.insert(id) {
+                queue.extend(self.read_snapshot(&id)?.parents);
+            }
+        }
+        Ok(None)
+    }
+
     /// The remotes of this copy, sorted by name.
     pub fn remotes(&self) -> Result<Vec<Remote>> {
         remote::read_remotes(&self.dir(REMOTES))
@@ -210,16 +239,7 @@ impl Repository {
         on_copy: OnCopy<'_>,
     ) -> Result<TransferReport> {
         validate_ref_name(name)?;
-        match store.read(CONFIG)? {
-            Some(bytes) => self.check_remote_config(store, &bytes)?,
-            None => {
-                return Err(Error::InvalidRepository {
-                    path: store.location(""),
-                    reason: "no config file".to_owned(),
-                });
-            }
-        }
-        let have = remote_index(store, &self.keys)?;
+        let have = self.open_remote(store)?;
         let remote = store
             .read_ref(name)?
             .ok_or_else(|| Error::RefNotFound(name.to_owned()))?;
@@ -230,15 +250,6 @@ impl Repository {
             objects: 0,
             bytes: 0,
         };
-
-        let read_remote = |id: &ObjectId, ty: ObjectType| -> Result<Vec<u8>> {
-            let location = have.get(id).ok_or(Error::ObjectNotFound(*id))?;
-            check_type(*id, ty, location)?;
-            let path = pack_file(&location.pack);
-            let entry = &location.entry;
-            let stored = store.read_range(&path, entry.offset, u64::from(entry.stored_len))?;
-            pack::decode_stored(&store.location(&path), entry, &self.keys, &stored)
-        };
         if previous == Some(remote) {
             return Ok(report);
         }
@@ -247,7 +258,13 @@ impl Repository {
                 if self.contains(id) {
                     self.read_snapshot(id)
                 } else {
-                    Snapshot::decode(&read_remote(id, ObjectType::Snapshot)?)
+                    Snapshot::decode(&read_remote(
+                        store,
+                        &have,
+                        &self.keys,
+                        id,
+                        ObjectType::Snapshot,
+                    )?)
                 }
             };
             if !is_ancestor(local, remote, read_snapshot)? {
@@ -259,7 +276,63 @@ impl Repository {
                 return Err(Error::LocalAhead(name.to_owned()));
             }
         }
-        let missing = missing_objects(remote, |id| self.contains(id), read_remote)?;
+        self.copy_objects(store, &have, &mut report, on_copy)?;
+        self.update_ref(name, previous, Some(remote))?;
+        Ok(report)
+    }
+
+    /// Copies the objects the ref `name` reaches on `store` into this
+    /// repository without moving any local ref; `None` if the remote has no
+    /// such ref. The objects stay unreachable until a ref points to them.
+    pub fn fetch(
+        &mut self,
+        store: &dyn Store,
+        name: &str,
+        on_copy: OnCopy<'_>,
+    ) -> Result<Option<TransferReport>> {
+        validate_ref_name(name)?;
+        let have = self.open_remote(store)?;
+        let Some(remote) = store.read_ref(name)? else {
+            return Ok(None);
+        };
+        let mut report = TransferReport {
+            snapshot: remote,
+            previous: None,
+            objects: 0,
+            bytes: 0,
+        };
+        self.copy_objects(store, &have, &mut report, on_copy)?;
+        Ok(Some(report))
+    }
+
+    /// Checks that `store` holds a copy of this repository and reads its
+    /// index files.
+    fn open_remote(&self, store: &dyn Store) -> Result<HashMap<ObjectId, Location>> {
+        match store.read(CONFIG)? {
+            Some(bytes) => self.check_remote_config(store, &bytes)?,
+            None => {
+                return Err(Error::InvalidRepository {
+                    path: store.location(""),
+                    reason: "no config file".to_owned(),
+                });
+            }
+        }
+        remote_index(store, &self.keys)
+    }
+
+    /// Copies what `report.snapshot` reaches and this repository lacks.
+    fn copy_objects(
+        &mut self,
+        store: &dyn Store,
+        have: &HashMap<ObjectId, Location>,
+        report: &mut TransferReport,
+        on_copy: OnCopy<'_>,
+    ) -> Result<()> {
+        let missing = missing_objects(
+            report.snapshot,
+            |id| self.contains(id),
+            |id, ty| read_remote(store, have, &self.keys, id, ty),
+        )?;
 
         // Read in pack order so that adjacent objects come in one read.
         let mut wanted: Vec<Location> = Vec::with_capacity(missing.len());
@@ -294,13 +367,11 @@ impl Repository {
                 writer.put_stored(&location.entry, stored, &from)?;
                 report.objects += 1;
                 report.bytes += stored.len() as u64;
-                on_copy(&report)?;
+                on_copy(report)?;
             }
             start = end;
         }
-        writer.finish()?;
-        self.update_ref(name, previous, Some(remote))?;
-        Ok(report)
+        writer.finish()
     }
 
     /// Checks the remote `config`, or makes `store` a new copy of this
@@ -421,6 +492,22 @@ fn remote_index(store: &dyn Store, keys: &Keys) -> Result<HashMap<ObjectId, Loca
         }
     }
     Ok(have)
+}
+
+/// Reads a snapshot, tree or blob from a remote.
+fn read_remote(
+    store: &dyn Store,
+    have: &HashMap<ObjectId, Location>,
+    keys: &Keys,
+    id: &ObjectId,
+    ty: ObjectType,
+) -> Result<Vec<u8>> {
+    let location = have.get(id).ok_or(Error::ObjectNotFound(*id))?;
+    check_type(*id, ty, location)?;
+    let path = pack_file(&location.pack);
+    let entry = &location.entry;
+    let stored = store.read_range(&path, entry.offset, u64::from(entry.stored_len))?;
+    pack::decode_stored(&store.location(&path), entry, keys, &stored)
 }
 
 fn pack_file(name: &FileHash) -> String {
@@ -757,6 +844,19 @@ mod tests {
         assert!(matches!(push(&b, &remote), Err(Error::RemoteAhead(_))));
         assert!(matches!(pull(&mut b, &remote), Err(Error::LocalAhead(_))));
         assert_eq!(b.read_ref("main").unwrap(), Some(on_b));
+        // Fetch copies what the remote has and moves no ref.
+        let store = FolderStore::open(&remote).unwrap();
+        let fetched = b.fetch(&store, "main", &mut |_| Ok(())).unwrap().unwrap();
+        assert_eq!(fetched.snapshot, on_a);
+        assert!(fetched.objects > 0);
+        assert_eq!(content(&b, &on_a), b"a");
+        assert_eq!(b.read_ref("main").unwrap(), Some(on_b));
+        assert!(b.fetch(&store, "other", &mut |_| Ok(())).unwrap().is_none());
+        assert_eq!(b.merge_base(on_b, on_a).unwrap(), Some(first));
+        assert_eq!(b.merge_base(on_a, first).unwrap(), Some(first));
+        assert!(b.is_ancestor(first, on_a).unwrap());
+        assert!(!b.is_ancestor(on_a, on_b).unwrap());
+        drop(store);
         let store = FolderStore::open(&remote).unwrap();
         assert_eq!(store.read_ref("main").unwrap(), Some(on_a));
 

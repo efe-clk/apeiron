@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use apeiron::SyncMode;
 use serde::Deserialize;
 
 use crate::{Error, IoContext, Result};
@@ -39,6 +40,13 @@ pub enum Action {
         sample_bytes: u64,
     },
     Gc,
+    Sync {
+        folder: PathBuf,
+        remote: String,
+        /// `None` for `sync/<folder name>`.
+        ref_name: Option<String>,
+        mode: SyncMode,
+    },
 }
 
 impl Action {
@@ -49,12 +57,14 @@ impl Action {
             Action::Verify => "verify",
             Action::RestoreTest { .. } => "restore-test",
             Action::Gc => "gc",
+            Action::Sync { .. } => "sync",
         }
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Every {
+    Minutes(u32),
     Hours(u32),
     Days(u32),
 }
@@ -81,6 +91,8 @@ struct RawJob {
     every: String,
     at: Option<String>,
     sample_mb: Option<u64>,
+    remote: Option<String>,
+    mode: Option<String>,
 }
 
 /// Reads the jobs file; jobs come sorted by name, the order they run in.
@@ -116,6 +128,10 @@ fn to_job(name: &str, raw: RawJob) -> std::result::Result<Job, String> {
         return Err("names use only a-z, 0-9, `.`, `_` and `-`".to_owned());
     }
     let ref_name = raw.ref_name.clone().unwrap_or_else(|| "main".to_owned());
+    if raw.action != "sync" {
+        not_here_for(&raw.action, "remote", raw.remote.is_some())?;
+        not_here_for(&raw.action, "mode", raw.mode.is_some())?;
+    }
     let not_here = |key: &str, present: bool| {
         if present {
             Err(format!("`{key}` does not apply to `do = {:?}`", raw.action))
@@ -169,15 +185,34 @@ fn to_job(name: &str, raw: RawJob) -> std::result::Result<Job, String> {
                 sample_bytes: raw.sample_mb.unwrap_or(100).saturating_mul(1024 * 1024),
             }
         }
+        "sync" => {
+            not_here("message", raw.message.is_some())?;
+            not_here("push", raw.push.is_some())?;
+            not_here("sample_mb", raw.sample_mb.is_some())?;
+            let mode = match raw.mode.as_deref() {
+                None | Some("two-way") => SyncMode::TwoWay,
+                Some("send") => SyncMode::Send,
+                Some("receive") => SyncMode::Receive,
+                Some(other) => {
+                    return Err(format!("`mode = {other:?}`: use two-way, send or receive"));
+                }
+            };
+            Action::Sync {
+                folder: expand(raw.folder.as_deref().ok_or("`folder` is missing")?),
+                remote: raw.remote.clone().ok_or("`remote` is missing")?,
+                ref_name: raw.ref_name.clone(),
+                mode,
+            }
+        }
         other => {
             return Err(format!(
-                "unknown `do = {other:?}`; use backup, push, verify, restore-test or gc"
+                "unknown `do = {other:?}`; use backup, push, verify, restore-test, gc or sync"
             ));
         }
     };
     let every = parse_every(&raw.every)?;
     let at = raw.at.as_deref().map(parse_at).transpose()?;
-    if at.is_some() && matches!(every, Every::Hours(_)) {
+    if at.is_some() && matches!(every, Every::Hours(_) | Every::Minutes(_)) {
         return Err("`at` needs `every` in days or weeks".to_owned());
     }
     Ok(Job {
@@ -191,7 +226,7 @@ fn to_job(name: &str, raw: RawJob) -> std::result::Result<Job, String> {
 }
 
 fn parse_every(text: &str) -> std::result::Result<Every, String> {
-    let bad = || format!("`every = {text:?}`: use hour, day, week, or a number with h or d");
+    let bad = || format!("`every = {text:?}`: use hour, day, week, or a number with m, h or d");
     let every = match text {
         "hour" => Every::Hours(1),
         "day" => Every::Days(1),
@@ -203,6 +238,7 @@ fn parse_every(text: &str) -> std::result::Result<Every, String> {
                 return Err(bad());
             }
             match unit {
+                "m" => Every::Minutes(n),
                 "h" => Every::Hours(n),
                 "d" => Every::Days(n),
                 _ => return Err(bad()),
@@ -224,6 +260,14 @@ fn parse_at(text: &str) -> std::result::Result<(i8, i8), String> {
         return Err(bad());
     }
     Ok((hour, minute))
+}
+
+fn not_here_for(action: &str, key: &str, present: bool) -> std::result::Result<(), String> {
+    if present {
+        Err(format!("`{key}` does not apply to `do = {action:?}`"))
+    } else {
+        Ok(())
+    }
 }
 
 /// Replaces a leading `~` with the home folder.
@@ -321,6 +365,18 @@ mod tests {
                 "`ref` does not apply",
             ),
             ("do = \"push\"\nevery = \"day\"", "at least one remote"),
+            (
+                "do = \"sync\"\nfolder = \"/f\"\nevery = \"15m\"",
+                "`remote` is missing",
+            ),
+            (
+                "do = \"sync\"\nfolder = \"/f\"\nremote = \"r\"\nmode = \"both\"\nevery = \"1h\"",
+                "use two-way, send or receive",
+            ),
+            (
+                "do = \"verify\"\nremote = \"r\"\nevery = \"day\"",
+                "`remote` does not apply",
+            ),
             ("do = \"copy\"\nevery = \"day\"", "unknown `do"),
             ("do = \"gc\"\nevery = \"day\"\ncolour = 1", "unknown field"),
         ];
