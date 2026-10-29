@@ -192,6 +192,11 @@ enum Command {
         #[arg(long, default_value_t = 1000)]
         limit: usize,
     },
+    /// Install, list or remove plugins
+    Plugin {
+        #[command(subcommand)]
+        command: PluginCommand,
+    },
     /// Merge a snapshot, usually a branch, into a ref
     Merge {
         from: String,
@@ -279,6 +284,16 @@ enum RefCommand {
     },
     /// Delete a ref; its reflog keeps the history until garbage collection
     Delete { name: String },
+}
+
+#[derive(Subcommand)]
+enum PluginCommand {
+    /// Check a plugin (a WebAssembly component) and install it
+    Add { file: PathBuf },
+    /// List the installed plugins
+    List,
+    /// Remove an installed plugin
+    Remove { name: String },
 }
 
 #[derive(Subcommand)]
@@ -845,6 +860,9 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     };
                     say!("{mark} {}", change.path);
                 }
+                for m in &r.plugin_merges {
+                    say!("merged by plugin {}: {}", m.plugin, m.path);
+                }
                 for c in &r.conflicts {
                     match &c.copy {
                         Some(copy) => {
@@ -870,11 +888,47 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     ),
                 }
             });
+            let warned = warnings_exit(out, &report.warnings);
             Ok(if report.conflicts.is_empty() {
-                0
+                warned
             } else {
                 EXIT_WARNINGS
             })
+        }
+        Command::Plugin { command } => {
+            match command {
+                PluginCommand::Add { file } => {
+                    let added = apeiron::add_plugin(&file, None)?;
+                    out.result(&added, |a| {
+                        let i = &a.info;
+                        let verb = if a.replaced { "Replaced" } else { "Installed" };
+                        say!("{verb} {} {}: {}", i.name, i.version, i.description);
+                        say!("It merges files named {}", i.patterns.join(", "));
+                    });
+                }
+                PluginCommand::List => {
+                    let list = apeiron::plugins(None)?;
+                    out.result(&list, |list| {
+                        for i in list {
+                            say!(
+                                "{} {}  {}  {}",
+                                i.name,
+                                i.version,
+                                i.patterns.join(" "),
+                                i.description
+                            );
+                        }
+                        if list.is_empty() {
+                            say!("No plugins; see docs/PLUGIN.md");
+                        }
+                    });
+                }
+                PluginCommand::Remove { name } => {
+                    let removed = apeiron::remove_plugin(&name, None)?;
+                    out.result(&removed, |i| say!("Removed {} {}", i.name, i.version));
+                }
+            }
+            Ok(0)
         }
         Command::Git { command } => {
             let repo = open(cli.repo, password_file)?;
@@ -1189,6 +1243,9 @@ fn print_sync(r: &SyncReport, remote: &str, dry_run: bool) {
             ChangeKind::Modified => '~',
         };
         say!("{mark} {}", change.path);
+    }
+    for m in &r.plugin_merges {
+        say!("merged by plugin {}: {}", m.plugin, m.path);
     }
     for c in &r.conflicts {
         let what = match c.kind {

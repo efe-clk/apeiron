@@ -223,10 +223,10 @@ impl Run<'_> {
             (gix::object::Kind::Commit, bytes)
         };
         let git_id = self.write(kind, &bytes)?;
-        if let Some(expected) = meta(snapshot, keys::ID) {
-            if git_id.to_string() != expected {
-                self.report.inexact.push(expected.to_owned());
-            }
+        if let Some(expected) = meta(snapshot, keys::ID)
+            && git_id.to_string() != expected
+        {
+            self.report.inexact.push(expected.to_owned());
         }
         Ok(git_id)
     }
@@ -242,10 +242,8 @@ impl Run<'_> {
         let inside =
             |p: &[u8]| path.is_empty() || p.starts_with(path) && p.get(path.len()) == Some(&b'/');
         let plain = !gitlinks.keys().any(|p| inside(p));
-        if plain {
-            if let Some(id) = self.trees.get(&tree) {
-                return Ok(*id);
-            }
+        if plain && let Some(id) = self.trees.get(&tree) {
+            return Ok(*id);
         }
         let mut entries = Vec::new();
         for entry in self.repo.read_tree(&tree)?.entries {

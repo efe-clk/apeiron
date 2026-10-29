@@ -38,6 +38,17 @@ struct Inner {
     core: RwLock<core::Repository>,
     /// Lets one writer at a time into the repository within this process.
     writer: Mutex<()>,
+    /// The type drivers merges use (PLUGIN.md §4).
+    plugins: Mutex<PluginSlot>,
+}
+
+#[derive(Debug)]
+enum PluginSlot {
+    /// Read from [`apeiron_plugin::default_dir`] when first needed.
+    Default,
+    /// Read from this folder when first needed.
+    Dir(PathBuf),
+    Loaded(Option<Arc<apeiron_plugin::Plugins>>),
 }
 
 impl Repository {
@@ -117,8 +128,38 @@ impl Repository {
                 path: path.to_path_buf(),
                 core: RwLock::new(core),
                 writer: Mutex::new(()),
+                plugins: Mutex::new(PluginSlot::Default),
             }),
         }
+    }
+
+    /// Uses the plugins installed in `dir` instead of the user's plugin
+    /// folder (PLUGIN.md §1).
+    pub fn use_plugin_dir(&self, dir: impl Into<PathBuf>) {
+        *self.plugin_slot() = PluginSlot::Dir(dir.into());
+    }
+
+    fn plugin_slot(&self) -> MutexGuard<'_, PluginSlot> {
+        self.inner
+            .plugins
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+    }
+
+    /// The installed plugins, read once; `None` without a plugin folder.
+    fn plugins(&self) -> Result<Option<Arc<apeiron_plugin::Plugins>>> {
+        let mut slot = self.plugin_slot();
+        let dir = match &*slot {
+            PluginSlot::Loaded(p) => return Ok(p.clone()),
+            PluginSlot::Dir(dir) => Some(dir.clone()),
+            PluginSlot::Default => apeiron_plugin::default_dir().ok(),
+        };
+        let plugins = match dir {
+            Some(dir) => Some(Arc::new(apeiron_plugin::Plugins::open(dir)?)),
+            None => None,
+        };
+        *slot = PluginSlot::Loaded(plugins.clone());
+        Ok(plugins)
     }
 
     fn read(&self) -> RwLockReadGuard<'_, core::Repository> {
@@ -214,8 +255,12 @@ impl Repository {
             let store = open_store(&remote, repo.info().encrypted)?;
             let _writer = repo.lock_writer();
             let _lock = core::RepoLock::shared(repo.path())?;
+            let plugins = repo.plugins()?;
             let mut core = repo.read().reopen()?;
-            let report = services::sync(&mut core, &*store, &options, ctl);
+            let merger = plugins
+                .as_deref()
+                .map(|p| p as &dyn services::ContentMerger);
+            let report = services::sync(&mut core, &*store, &options, merger, ctl);
             // Refs may have moved even when a later step failed.
             *repo.write() = core;
             Ok(report?)
@@ -455,7 +500,11 @@ impl Repository {
             host: gethostname::gethostname().into_string().ok(),
             dry_run: request.dry_run,
         };
-        let report = services::merge(&mut core, &options);
+        let plugins = self.plugins()?;
+        let merger = plugins
+            .as_deref()
+            .map(|p| p as &dyn services::ContentMerger);
+        let report = services::merge(&mut core, &options, merger);
         *self.write() = core;
         Ok(report?)
     }

@@ -62,5 +62,5 @@ Apeiron; sürüm kontrolü, arşivleme, yedekleme, senkronizasyon ve bütünlük
 2. ~~Dal ve birleştirme (`docs/BRANCH.md`).~~ Tamamlandı (2026-10-29).
 3. ~~Arama (`docs/SEARCH.md`).~~ Tamamlandı (2026-10-29).
 4. ~~C ABI ve Python SDK (`docs/SDK.md`).~~ Tamamlandı (2026-10-29).
-5. WebAssembly eklenti sistemi.
+5. ~~WebAssembly eklenti sistemi (`docs/PLUGIN.md`).~~ Tamamlandı (2026-10-29).
 6. Metin diff eklentisi.

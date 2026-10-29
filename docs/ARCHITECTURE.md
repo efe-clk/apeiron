@@ -43,7 +43,7 @@ Key design ideas:
 | Services | Versioning, archive, backup, sync, search, policy | `apeiron-services`, `apeiron-git` | In progress (backup, restore, diff, sync, Git import and export) |
 | Core | Object model, storage engine, integrity, encryption, operation log | `apeiron-core` | In progress |
 | Storage targets | Local disk, external disk, network storage, remote targets | `apeiron-core` (`Store`, folders), `apeiron-remote` (SFTP, S3) | Done |
-| Plugins | Type drivers, storage backends, importers/exporters, hooks | — | Planned |
+| Plugins | Type drivers, storage backends, importers/exporters, hooks | `apeiron-plugin` | In progress (host and type drivers done) |
 
 Rules that apply to every crate:
 
@@ -181,7 +181,7 @@ Sync is not backup: every device keeps its own history and reflogs, so a deletio
 
 ## 6. Plugin boundary
 
-Status: Planned (Stage 3).
+Status: In progress. The host and the first plugin type, type drivers, are done ([PLUGIN.md](PLUGIN.md)); version 0.1 of the plugin API grants no permissions.
 
 ```mermaid
 flowchart LR
@@ -220,7 +220,7 @@ flowchart LR
 | Encryption | Client-side encryption; the remote target never sees plaintext; keys stay with the user | Done |
 | Identity and permissions | Separate read, write, delete, share and admin permissions | Planned (Stage 4) |
 | Audit log | Sensitive operations are logged; sensitive data never is | Planned (Stage 4) |
-| Plugins | WASM sandbox with declared, user-approved permissions | Planned (Stage 3) |
+| Plugins | WASM sandbox with declared, user-approved permissions | In place; no permissions granted yet |
 | Memory safety | `unsafe` only in the FFI crate and `apeiron-sys` | In effect |
 | Remote access | Off by default; configured explicitly | Planned (Stage 2) |
 | Telemetry | Off by default; data is never sent to a third party as a requirement | In effect (there is no telemetry) |

@@ -82,7 +82,7 @@ Windows'ta yeniden adlandırmalar küçük `apeiron-sys` crate'i üzerinden `MOV
 | 2 | Dal ve birleştirme ([BRANCH.tr.md](BRANCH.tr.md)) | Tamamlandı |
 | 3 | Arama ([SEARCH.tr.md](SEARCH.tr.md)) | Tamamlandı |
 | 4 | C ABI ve Python SDK ([SDK.tr.md](SDK.tr.md)) | Tamamlandı |
-| 5 | WebAssembly eklenti sistemi | Planlandı |
+| 5 | WebAssembly eklenti sistemi ([PLUGIN.tr.md](PLUGIN.tr.md)) | Tamamlandı |
 | 6 | Metin diff eklentisi | Planlandı |
 
 ## 6. Aşama 4 — Arayüzler ve çok kullanıcı

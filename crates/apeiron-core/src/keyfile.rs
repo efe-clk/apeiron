@@ -348,7 +348,7 @@ fn parse_recovery(text: &str) -> Option<[u8; 32]> {
 }
 
 fn parse_hex_vec(text: &str) -> Option<Vec<u8>> {
-    if text.len() % 2 != 0 {
+    if !text.len().is_multiple_of(2) {
         return None;
     }
     (0..text.len())

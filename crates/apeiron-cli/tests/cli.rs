@@ -544,3 +544,81 @@ fn search_by_name_text_size_and_history() {
         Some(2)
     );
 }
+
+/// The fixture plugin of apeiron-plugin's tests, built for wasm32-wasip2.
+fn fixture_plugin() -> PathBuf {
+    let plugin = Path::new(env!("CARGO_MANIFEST_DIR")).join("../apeiron-plugin");
+    let target = plugin.join("../../target/plugin-fixture");
+    let status = Command::new(env!("CARGO"))
+        .args([
+            "build",
+            "--release",
+            "--target",
+            "wasm32-wasip2",
+            "--manifest-path",
+        ])
+        .arg(plugin.join("tests/fixture/Cargo.toml"))
+        .arg("--target-dir")
+        .arg(&target)
+        .status()
+        .unwrap();
+    assert!(status.success(), "rustup target add wasm32-wasip2");
+    target.join("wasm32-wasip2/release/test_driver.wasm")
+}
+
+#[test]
+fn a_plugin_merges_what_would_be_a_conflict() {
+    let s = Setup::new();
+    let plugins = s.root.join("plugins");
+    let run = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_apeiron"))
+            .args(args)
+            .env("APEIRON_REPO", s.repo())
+            .env("APEIRON_PLUGINS", &plugins)
+            .output()
+            .unwrap()
+    };
+    let ok = |args: &[&str]| {
+        let out = run(args);
+        assert_eq!(
+            code(&out),
+            Some(0),
+            "{args:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8(out.stdout).unwrap()
+    };
+
+    assert!(ok(&["plugin", "list"]).starts_with("No plugins"));
+    let wasm = fixture_plugin();
+    let out = ok(&["plugin", "add", wasm.to_str().unwrap()]);
+    assert!(out.starts_with("Installed test-driver 1.0"), "{out}");
+    assert!(ok(&["plugin", "list"]).starts_with("test-driver 1.0  *.merge"));
+
+    let src = s.path("src");
+    fs::write(s.root.join("src/a.merge"), b"base").unwrap();
+    ok(&["backup", &src]);
+    ok(&["ref", "create", "feature"]);
+    fs::write(s.root.join("src/a.merge"), b"theirs").unwrap();
+    ok(&["backup", &src, "--ref", "feature"]);
+    fs::write(s.root.join("src/a.merge"), b"ours").unwrap();
+    ok(&["backup", &src]);
+
+    let out = ok(&["merge", "feature"]);
+    assert!(
+        out.contains("merged by plugin test-driver: a.merge"),
+        "{out}"
+    );
+    assert!(!ok(&["ls", "main"]).contains("conflict"));
+    ok(&["restore", "main", &s.path("out"), "--path", "a.merge"]);
+    let restored = fs::read_dir(s.root.join("out"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    assert_eq!(fs::read(restored).unwrap(), b"base|ours|theirs");
+
+    assert!(ok(&["plugin", "remove", "test-driver"]).starts_with("Removed test-driver"));
+    assert_eq!(code(&run(&["plugin", "remove", "test-driver"])), Some(1));
+}

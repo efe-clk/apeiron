@@ -55,7 +55,7 @@ Her katman yalnızca hemen altındaki katmanı kullanır. Ayrıntılar: [docs/AR
 | CLI | `apeiron-cli` | `apeiron` komutu ([docs/CLI.tr.md](docs/CLI.tr.md)) | Devam ediyor |
 | Arka plan hizmeti | `apeiron-daemon` | Zamanlanmış işler ve geri yükleme testi ([docs/DAEMON.tr.md](docs/DAEMON.tr.md)) | Tamamlandı |
 | Git | `apeiron-git` | Git depolarını aynı commit kimlikleriyle içe ve dışa aktarma ([docs/GIT.tr.md](docs/GIT.tr.md)) | Tamamlandı |
-| Eklentiler | — | WebAssembly eklenti ortamı | Planlandı |
+| Eklentiler | `apeiron-plugin` | WebAssembly eklenti ortamı; tür sürücüleri dosyaları birleştirir ([docs/PLUGIN.tr.md](docs/PLUGIN.tr.md)) | Tamamlandı |
 
 Planlanan katmanların crate adları, o katmana başlanırken belirlenir.
 
@@ -63,7 +63,7 @@ Planlanan katmanların crate adları, o katmana başlanırken belirlenir.
 
 | Alan | Seçim | Durum |
 | --- | --- | --- |
-| Dil | Rust (2024 sürümü, en az 1.85); C yalnızca ABI için | Kullanımda |
+| Dil | Rust (2024 sürümü, en az 1.97); C yalnızca ABI için | Kullanımda |
 | Özet | BLAKE3, nesne kimliklerinde anahtarlı mod (`blake3`) | Kullanımda |
 | Chunk bölme | FastCDC 2020, ortalama 1 MiB (`fastcdc`) | Kullanımda |
 | Sıkıştırma | zstd (`zstd`) | Kullanımda |
@@ -71,7 +71,7 @@ Planlanan katmanların crate adları, o katmana başlanırken belirlenir.
 | Hatalar | Tipli hatalar (`thiserror`) | Kullanımda |
 | Yapısal nesneler | Kanonik CBOR (`minicbor`) | Kullanımda |
 | Git uyumu | gitoxide (`gix`) | Planlandı |
-| Eklentiler | WebAssembly bileşen modeli, Wasmtime | Planlandı |
+| Eklentiler | WebAssembly bileşen modeli, Wasmtime | Kullanımda |
 | Asenkron çalışma zamanı | Tokio (yalnızca ağ, senkron ve arka plan hizmeti katmanları) | Planlandı |
 | CI | GitHub Actions: Linux x86_64/aarch64, macOS ve Windows'ta fmt, clippy, testler | Kullanımda |
 
@@ -117,6 +117,7 @@ Kod, commit ve format değişikliği kuralları: [CONTRIBUTING.tr.md](CONTRIBUTI
 | [Git](docs/GIT.tr.md) | Bir Git deposunu geçmişiyle içe almak ve geri dışa aktarmak |
 | [Dallar](docs/BRANCH.tr.md) | Dallanma ve birleştirme |
 | [Arama](docs/SEARCH.tr.md) | Dosyaları ada, üst veriye ve metne göre, geçmişte de bulmak |
+| [Eklentiler](docs/PLUGIN.tr.md) | WebAssembly eklentileri ve tür sürücüleri |
 | [Kullanım rehberi](docs/GUIDE.tr.md) | Kurulum, günlük yedek, geri yükleme ve bir aylık deneme |
 | [Sözlük](docs/GLOSSARY.tr.md) | Terimler ve İngilizce–Türkçe karşılıkları |
 | [Katkı](CONTRIBUTING.tr.md) | Geliştirme ortamı ve kurallar |

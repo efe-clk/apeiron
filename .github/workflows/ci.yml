@@ -28,7 +28,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
+      # wasm32-wasip2 builds the fixture plugin of the plugin host's tests.
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
       # The SFTP tests start an OpenSSH server as the runner user.
       - if: runner.os == 'Linux'
         run: sudo apt-get install -y openssh-server && sudo mkdir -p /run/sshd

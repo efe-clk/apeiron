@@ -39,10 +39,8 @@ pub(crate) fn resolve(repo: &Repository, spec: &str) -> Result<ObjectId> {
 
 fn resolve_base(repo: &Repository, base: &str) -> Result<ObjectId> {
     let is_ref_name = apeiron_core::validate_ref_name(base).is_ok();
-    if is_ref_name {
-        if let Some(id) = repo.read_ref(base)? {
-            return Ok(id);
-        }
+    if is_ref_name && let Some(id) = repo.read_ref(base)? {
+        return Ok(id);
     }
     let is_hex = base.len() >= MIN_PREFIX
         && base

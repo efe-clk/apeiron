@@ -82,7 +82,7 @@ The exit criterion comes first; it was met on 2026-10-29 with item 1, and the st
 | 2 | Branching and merging ([BRANCH.md](BRANCH.md)) | Done |
 | 3 | Search ([SEARCH.md](SEARCH.md)) | Done |
 | 4 | C ABI and Python SDK ([SDK.md](SDK.md)) | Done |
-| 5 | WebAssembly plugin system | Planned |
+| 5 | WebAssembly plugin system ([PLUGIN.md](PLUGIN.md)) | Done |
 | 6 | Text diff plugin | Planned |
 
 ## 6. Stage 4 — Interfaces and multi-user

@@ -8,6 +8,7 @@
 
 mod error;
 mod job;
+mod plugins;
 mod repo;
 mod spec;
 mod types;
@@ -23,6 +24,8 @@ pub use apeiron_git::{
     ExportReport as GitExportReport, ImportReport as GitImportReport, RefUpdate as GitRefUpdate,
     Skipped as GitSkipped,
 };
+pub use apeiron_plugin::{Added as PluginAdded, PluginInfo};
+pub use apeiron_services::PluginMerge;
 pub use apeiron_services::{
     ArchiveFormat, BackupOptions as BackupRequest, BackupOutcome as BackupReport, Change,
     ChangeKind, Conflict, ConflictKind, EntryInfo, ExportOutcome as ExportReport, Kind, Name,
@@ -34,6 +37,7 @@ pub use apeiron_services::{MergeAction, MergeOutcome as MergeReport};
 pub use apeiron_services::{Query, SearchHit, SearchOutcome as SearchReport, TextLine};
 pub use error::{Error, ErrorKind, Result};
 pub use job::Job;
+pub use plugins::{add_plugin, plugin_dir, plugins, remove_plugin};
 pub use repo::Repository;
 pub use types::{
     AddedKey, CloneReport, CloneRequest, ClonedRef, DeleteRefRequest, DiffRequest, ExportRequest,

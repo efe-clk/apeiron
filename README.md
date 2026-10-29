@@ -55,7 +55,7 @@ Each layer uses only the layer directly below it. Details: [docs/ARCHITECTURE.md
 | CLI | `apeiron-cli` | The `apeiron` command ([docs/CLI.md](docs/CLI.md)) | In progress |
 | Background service | `apeiron-daemon` | Scheduled jobs and the restore test ([docs/DAEMON.md](docs/DAEMON.md)) | Done |
 | Git | `apeiron-git` | Import and export of Git repositories with the same commit ids ([docs/GIT.md](docs/GIT.md)) | Done |
-| Plugins | — | WebAssembly plugin host | Planned |
+| Plugins | `apeiron-plugin` | WebAssembly plugin host; type drivers merge files ([docs/PLUGIN.md](docs/PLUGIN.md)) | Done |
 
 Crate names for planned layers are chosen when the layer is started.
 
@@ -63,7 +63,7 @@ Crate names for planned layers are chosen when the layer is started.
 
 | Area | Choice | Status |
 | --- | --- | --- |
-| Language | Rust (edition 2024, minimum 1.85); C only for the ABI | In use |
+| Language | Rust (edition 2024, minimum 1.97); C only for the ABI | In use |
 | Hashing | BLAKE3, keyed mode for object ids (`blake3`) | In use |
 | Chunking | FastCDC 2020, average 1 MiB (`fastcdc`) | In use |
 | Compression | zstd (`zstd`) | In use |
@@ -71,7 +71,7 @@ Crate names for planned layers are chosen when the layer is started.
 | Errors | Typed errors (`thiserror`) | In use |
 | Structured objects | Canonical CBOR (`minicbor`) | In use |
 | Git compatibility | gitoxide (`gix`) | Planned |
-| Plugins | WebAssembly component model, Wasmtime | Planned |
+| Plugins | WebAssembly component model, Wasmtime | In use |
 | Async runtime | Tokio (network, sync and daemon layers only) | Planned |
 | CI | GitHub Actions: fmt, clippy, tests on Linux x86_64/aarch64, macOS, Windows | In use |
 
@@ -117,6 +117,7 @@ Rules for code, commits and format changes: [CONTRIBUTING.md](CONTRIBUTING.md).
 | [Git](docs/GIT.md) | Importing a Git repository with its history and exporting it back |
 | [Branches](docs/BRANCH.md) | Branching and merging |
 | [Search](docs/SEARCH.md) | Finding files by name, metadata and text, also in the history |
+| [Plugins](docs/PLUGIN.md) | WebAssembly plugins and type drivers |
 | [User guide](docs/GUIDE.md) | Installation, daily backup, restore and the one-month test |
 | [Glossary](docs/GLOSSARY.md) | Terms with English–Turkish equivalents |
 | [Contributing](CONTRIBUTING.md) | Development environment and rules |

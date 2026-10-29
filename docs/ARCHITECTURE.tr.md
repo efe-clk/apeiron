@@ -43,7 +43,7 @@ Temel tasarım fikirleri:
 | Hizmetler | Sürümleme, arşiv, yedek, senkron, arama, politika | `apeiron-services`, `apeiron-git` | Devam ediyor (yedek, geri yükleme, fark, senkron, Git içe ve dışa aktarma) |
 | Çekirdek | Nesne modeli, depolama motoru, bütünlük, şifreleme, işlem günlüğü | `apeiron-core` | Devam ediyor |
 | Depolama hedefleri | Yerel disk, harici disk, ağ depolaması, uzak hedefler | `apeiron-core` (`Store`, klasörler), `apeiron-remote` (SFTP, S3) | Tamamlandı |
-| Eklentiler | Type driver'lar, storage backend'ler, içe/dışa aktarıcılar, hook'lar | — | Planlandı |
+| Eklentiler | Type driver'lar, storage backend'ler, içe/dışa aktarıcılar, hook'lar | `apeiron-plugin` | Devam ediyor (ortam ve tür sürücüleri tamamlandı) |
 
 Her crate için geçerli kurallar:
 
@@ -181,7 +181,7 @@ Senkron yedek değildir: her cihaz kendi geçmişini ve reflog'larını tutar, b
 
 ## 6. Eklenti sınırı
 
-Durum: Planlandı (Aşama 3).
+Durum: Devam ediyor. Ortam ve ilk eklenti türü olan tür sürücüleri tamamlandı ([PLUGIN.tr.md](PLUGIN.tr.md)); eklenti API'sinin 0.1 sürümü hiç izin vermez.
 
 ```mermaid
 flowchart LR
@@ -220,7 +220,7 @@ flowchart LR
 | Şifreleme | İstemci tarafı şifreleme; uzak hedef düz metni hiç görmez; anahtarlar kullanıcıda kalır | Tamamlandı |
 | Kimlik ve izinler | Okuma, yazma, silme, paylaşma ve yönetme izinleri ayrıdır | Planlandı (Aşama 4) |
 | Denetim kaydı | Hassas işlemler kaydedilir; hassas veri hiçbir zaman kaydedilmez | Planlandı (Aşama 4) |
-| Eklentiler | Bildirilmiş ve kullanıcının onayladığı izinlerle WASM sandbox | Planlandı (Aşama 3) |
+| Eklentiler | Bildirilmiş ve kullanıcının onayladığı izinlerle WASM sandbox | Yerinde; henüz izin verilmiyor |
 | Bellek güvenliği | `unsafe` yalnızca FFI crate'inde ve `apeiron-sys` içinde | Uygulanıyor |
 | Uzak erişim | Varsayılan olarak kapalı; açıkça yapılandırılır | Planlandı (Aşama 2) |
 | Telemetri | Varsayılan olarak kapalı; veri hiçbir zaman zorunlu olarak üçüncü tarafa gönderilmez | Uygulanıyor (telemetri yok) |

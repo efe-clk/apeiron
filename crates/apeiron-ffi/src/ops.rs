@@ -1,5 +1,6 @@
 //! Operations by name: JSON requests in, JSON results out (SDK.md §2.1).
 
+use std::path::PathBuf;
 use std::time::Duration;
 
 use api::{Error, ErrorKind, Job, Progress, Repository};
@@ -73,6 +74,26 @@ struct KeyId {
 }
 
 #[derive(Deserialize)]
+struct PluginDir {
+    #[serde(default)]
+    dir: Option<PathBuf>,
+}
+
+#[derive(Deserialize)]
+struct PluginFile {
+    file: PathBuf,
+    #[serde(default)]
+    dir: Option<PathBuf>,
+}
+
+#[derive(Deserialize)]
+struct PluginName {
+    name: String,
+    #[serde(default)]
+    dir: Option<PathBuf>,
+}
+
+#[derive(Deserialize)]
 struct NewRemote {
     name: String,
     url: String,
@@ -110,6 +131,25 @@ pub(crate) fn call(repo: &Repository, operation: &str, request: Value) -> Result
         }
         "remove_remote" => json(&repo.remove_remote(&parse::<Named>(request)?.name)?),
         _ => Err(unknown(operation)),
+    }
+}
+
+/// Runs an operation that needs no repository: the plugins of the user
+/// (PLUGIN.md §1).
+pub(crate) fn call_global(operation: &str, request: Value) -> Result<Value> {
+    match operation {
+        "plugins" => json(&api::plugins(parse::<PluginDir>(request)?.dir.as_deref())?),
+        "plugin_add" => {
+            let r: PluginFile = parse(request)?;
+            json(&api::add_plugin(&r.file, r.dir.as_deref())?)
+        }
+        "plugin_remove" => {
+            let r: PluginName = parse(request)?;
+            json(&api::remove_plugin(&r.name, r.dir.as_deref())?)
+        }
+        _ => Err(invalid(format!(
+            "operation {operation:?} needs a repository; repo is NULL"
+        ))),
     }
 }
 

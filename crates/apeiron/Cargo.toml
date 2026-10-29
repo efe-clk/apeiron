@@ -11,6 +11,7 @@ publish = false
 [dependencies]
 apeiron-core = { path = "../apeiron-core" }
 apeiron-git = { path = "../apeiron-git" }
+apeiron-plugin = { path = "../apeiron-plugin" }
 apeiron-remote = { path = "../apeiron-remote" }
 apeiron-services = { path = "../apeiron-services" }
 gethostname = "1.1.0"

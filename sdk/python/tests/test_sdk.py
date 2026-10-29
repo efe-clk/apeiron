@@ -70,6 +70,14 @@ class Sdk(unittest.TestCase):
         with apeiron.Repository.open(self.root / "repo", key) as repo:
             self.assertTrue(repo.info().encrypted)
 
+    def test_plugins_without_a_repository(self):
+        folder = self.root / "plugins"
+        self.assertEqual(apeiron.plugins(folder), [])
+        with self.assertRaises(apeiron.NotFoundError):
+            apeiron.remove_plugin("missing", folder)
+        with self.assertRaises(apeiron.InvalidInputError):
+            apeiron.add_plugin(self.root / "src" / "a.txt", folder)
+
     def test_clone(self):
         with apeiron.Repository.init(self.root / "repo") as repo:
             repo.backup(self.root / "src").wait()

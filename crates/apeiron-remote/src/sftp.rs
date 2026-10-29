@@ -209,10 +209,10 @@ impl SftpStore {
         if known(&self.dirs.lock().unwrap_or_else(PoisonError::into_inner)) {
             return Ok(());
         }
-        if let Err(e) = self.conn()?.sftp.create_dir(self.path(rel)).await {
-            if !self.exists(rel).await? {
-                return Err(self.sftp_error(rel, e));
-            }
+        if let Err(e) = self.conn()?.sftp.create_dir(self.path(rel)).await
+            && !self.exists(rel).await?
+        {
+            return Err(self.sftp_error(rel, e));
         }
         self.dirs
             .lock()
@@ -557,19 +557,19 @@ async fn authenticate(
     options: &SshOptions,
 ) -> std::result::Result<(), String> {
     let rsa_hash = ssh.best_supported_rsa_hash().await.ok().flatten().flatten();
-    if options.use_agent {
-        if let Some(mut agent) = agent().await {
-            let identities = agent.request_identities().await.unwrap_or_default();
-            for identity in identities {
-                let AgentIdentity::PublicKey { key, .. } = identity else {
-                    continue;
-                };
-                let result = ssh
-                    .authenticate_publickey_with(user, key, rsa_hash, &mut agent)
-                    .await;
-                if result.is_ok_and(|r| r.success()) {
-                    return Ok(());
-                }
+    if options.use_agent
+        && let Some(mut agent) = agent().await
+    {
+        let identities = agent.request_identities().await.unwrap_or_default();
+        for identity in identities {
+            let AgentIdentity::PublicKey { key, .. } = identity else {
+                continue;
+            };
+            let result = ssh
+                .authenticate_publickey_with(user, key, rsa_hash, &mut agent)
+                .await;
+            if result.is_ok_and(|r| r.success()) {
+                return Ok(());
             }
         }
     }

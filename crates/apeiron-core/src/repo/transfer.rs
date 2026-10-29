@@ -187,10 +187,10 @@ impl Repository {
         if previous == Some(local) {
             return Ok(report);
         }
-        if let Some(remote) = previous {
-            if !is_ancestor(remote, local, |id| self.read_snapshot(id))? {
-                return Err(Error::RemoteAhead(name.to_owned()));
-            }
+        if let Some(remote) = previous
+            && !is_ancestor(remote, local, |id| self.read_snapshot(id))?
+        {
+            return Err(Error::RemoteAhead(name.to_owned()));
         }
 
         let missing = missing_objects(
@@ -213,10 +213,10 @@ impl Repository {
             report.objects += 1;
             report.bytes += stored.len() as u64;
             on_copy(&report)?;
-            if w.len() >= pack::TARGET_SIZE {
-                if let Some(w) = writer.take() {
-                    packs.push(write_pack(store, w)?);
-                }
+            if w.len() >= pack::TARGET_SIZE
+                && let Some(w) = writer.take()
+            {
+                packs.push(write_pack(store, w)?);
             }
         }
         if let Some(w) = writer.take() {

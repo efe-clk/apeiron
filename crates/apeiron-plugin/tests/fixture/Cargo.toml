@@ -1,0 +1,16 @@
+# A plugin that misbehaves on purpose, for the tests of the plugin host.
+# Built for wasm32-wasip2 by tests/host.rs.
+[package]
+name = "test-driver"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = "0.57.1"
+
+# Not part of the Apeiron workspace.
+[workspace]

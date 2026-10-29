@@ -74,7 +74,7 @@ fn round(device: &mut Device, remote: &Path) -> SyncOutcome {
 }
 
 fn round_with(device: &mut Device, store: &dyn Store, options: SyncOptions) -> SyncOutcome {
-    let out = sync(&mut device.repo, store, &options, &Control::new()).unwrap();
+    let out = sync(&mut device.repo, store, &options, None, &Control::new()).unwrap();
     assert!(out.warnings.is_empty(), "{:?}", out.warnings);
     out
 }
@@ -279,7 +279,7 @@ fn send_and_receive_go_one_way() {
     write(&s.b.folder, "beta.txt", "beta, changed");
     let mut send_b = options(&s.b);
     send_b.mode = SyncMode::Send;
-    let err = sync(&mut s.b.repo, &store, &send_b, &Control::new()).unwrap_err();
+    let err = sync(&mut s.b.repo, &store, &send_b, None, &Control::new()).unwrap_err();
     assert!(matches!(
         err,
         apeiron_services::Error::Core(apeiron_core::Error::RemoteAhead(_))

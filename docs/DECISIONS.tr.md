@@ -32,6 +32,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [022](#adr-022-dallar-reftir-senkron-ve-dallar-için-tek-bir-üç-yönlü-birleştirme) | Dallar | Dallar ref'tir; senkron ve `merge` için çatışma kopyalı tek bir yol başına üç yönlü birleştirme | Kabul edildi |
 | [023](#adr-023-arama-saklanan-bir-dizin-olmadan-snapshotları-okur) | Arama | Snapshot'lar doğrudan okunur, her klasör ve içerik arama başına bir kez; saklanan dizin yok | Kabul edildi |
 | [024](#adr-024-python-sdksı-c-abiyi-ctypes-ile-çağırır) | Python SDK | C ABI üzerinde `ctypes` ile saf Python; her dil için tek bir uygunluk test paketi | Kabul edildi |
+| [025](#adr-025-eklentiler-hiçbir-şey-verilmeden-çalışır-önce-tür-sürücüleri-gelir) | Eklentiler | İzinsiz, süre ve bellek sınırlı, kullanıcı başına bileşenler; tür sürücüleri çatışma kopyasından önce birleştirir; Rust 1.97 | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
@@ -520,3 +521,24 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Elle yazılmış tipli sınıflar | Rust türlerinden ayrışırdı; JSON şemalarından üretilerek gelecekler |
 
 **Sonuçlar.** Şemalar gelene kadar sonuçlar alan adıyla ya da anahtarla okunan kayıtlardır. Wheel'ler kütüphaneyi taşıyana kadar kütüphane `APEIRON_LIB` ile ya da modülün yanında bulunur.
+
+## ADR-025: Eklentiler hiçbir şey verilmeden çalışır; önce tür sürücüleri gelir
+
+**Durum:** Kabul edildi (2026-10-29)
+
+**Bağlam.** Aşama 3, Wasmtime ve bileşen modeli üzerinde eklenti sistemini ekler ([PLUGIN.tr.md](PLUGIN.tr.md), ADR-005). İlk kullanıcısı, metni birleştiren ve gösteren metin diff eklentisidir. Eklentiler başkalarının yazdığı kodu çalıştırır ve bir birleştirme asla veri kaybetmemelidir. Rust 1.85 ile derlenen en yeni Wasmtime 2025 ortasında yayımlandı.
+
+**Karar.** İlk eklenti arayüzü `apeiron:plugin/type-driver@0.1.0`'dır ve `describe`, `merge` ve `diff` içerir. Bir birleştirme, çatışma kopyası oluşturmadan önce deseni dosya adına uyan ilk kurulu eklentiye sorar; birleştirilmiş içerikten başka her şey çatışma kopyasını bırakır. Eklentiler kullanıcı başına kurulur. Her çağrı, WASI ile ama hiçbir şey verilmeden yeni bir örnekte çalışır: dosya, ağ, ortam ya da argüman yok, en çok 30 saniye ve 512 MiB; izin isteyen bir eklenti reddedilir. Güncel Wasmtime'ı kullanmak için en düşük Rust sürümü 1.85'ten 1.97'ye çıkar.
+
+**Gerekçe.** Bir tür sürücüsü hemen işe yarar ve izin gerektirmez; böylece sandbox kapalı başlayabilir ve yalnızca ihtiyaç duyan eklenti türleri için, kullanıcının onayıyla açılır. Çatışma kopyasına geri dönmek, her başarısızlığı eklenti olmaması kadar güvenli tutar. Standart kütüphaneyle yazılmış eklentiler WASI'yi içe aktarır; bu yüzden boş bir WASI bağlamı onlara hiçbir şey vermeden çalışmalarını sağlar. Başkalarının kodu için bir sandbox güncel güvenlik düzeltmelerini taşımalıdır; bu, eski bir Rust ile derlenmekten ağır basar.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Depoda saklanan ve onunla kopyalanan eklentiler | Her cihaz bir uzak kopyadan aldığı kodu çalıştırırdı; kurmak her kullanıcının kararı olarak kalır |
+| Şimdiden bir izin sorusu | Bu işin hiçbir eklenti türü izin gerektirmiyor |
+| Süre sınırı yerine yakıt (fuel) | Yakıt zamanı değil komutları sayar; kullanıcı zamanı bekler |
+| Rust 1.85 için en yenisi olan Wasmtime 34 | Sandbox'a bir yıldan fazla düzeltmeyi kaçırır |
+
+**Sonuçlar.** Eklentisi olmayan bir cihaz, başka bir cihazın birleştirdiği yerde çatışma kopyası oluşturur; iki sonuç da güvenlidir. Apeiron'u derlemek Rust 1.97 ya da daha yenisini, eklenti ortamını sınamak `wasm32-wasip2` hedefini gerektirir. Fark işlevi, gösterilmek için metin diff eklentisini bekler.

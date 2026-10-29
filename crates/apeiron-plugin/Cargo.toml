@@ -1,0 +1,21 @@
+[package]
+name = "apeiron-plugin"
+description = "Plugin host of Apeiron: WebAssembly components on Wasmtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+apeiron-services = { path = "../apeiron-services" }
+dirs = "6.0.0"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+thiserror = "2.0.21"
+wasmtime = { version = "50.0.1", default-features = false, features = ["component-model", "cranelift", "runtime", "std"] }
+wasmtime-wasi = { version = "50.0.1", default-features = false, features = ["p2"] }
+
+[dev-dependencies]
+tempfile = "3.27.0"

@@ -246,11 +246,13 @@ pub unsafe extern "C" fn apeiron_repo_free(repo: *mut apeiron_repo) {
     }
 }
 
-/// Runs a short operation (SDK.md §2.1). A NULL request is `{}`.
+/// Runs a short operation (SDK.md §2.1). `repo` is NULL for `plugins`,
+/// `plugin_add` and `plugin_remove`, which need no repository. A NULL
+/// request is `{}`.
 ///
 /// # Safety
-/// `repo` is a live handle; `operation` and `request_json` (or NULL) are
-/// NUL-terminated strings; `out_result_json` is valid for writes.
+/// `repo` is null or a live handle; `operation` and `request_json` (or
+/// NULL) are NUL-terminated strings; `out_result_json` is valid for writes.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn apeiron_call(
     repo: *const apeiron_repo,
@@ -263,7 +265,12 @@ pub unsafe extern "C" fn apeiron_call(
         unsafe {
             clear(out_result_json, "out_result_json")?;
             let request = request(request_json)?;
-            let result = ops::call(repo_ref(repo)?, text(operation, "operation")?, request)?;
+            let operation = text(operation, "operation")?;
+            let result = if repo.is_null() {
+                ops::call_global(operation, request)?
+            } else {
+                ops::call(repo_ref(repo)?, operation, request)?
+            };
             give(out_result_json, result.to_string())?;
         }
         Ok(0)

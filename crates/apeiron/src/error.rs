@@ -141,6 +141,18 @@ impl From<apeiron_services::Error> for Error {
     }
 }
 
+impl From<apeiron_plugin::Error> for Error {
+    fn from(e: apeiron_plugin::Error) -> Self {
+        use apeiron_plugin::Error as E;
+        let message = e.to_string();
+        match e {
+            E::Io { path, source } => Error::io(path, &source),
+            E::NotFound(_) | E::NoFolder => Error::new(ErrorKind::NotFound, message),
+            E::Invalid(_) | E::Failed { .. } => Error::new(ErrorKind::InvalidInput, message),
+        }
+    }
+}
+
 impl From<apeiron_git::Error> for Error {
     fn from(e: apeiron_git::Error) -> Self {
         use apeiron_git::Error as E;

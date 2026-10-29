@@ -77,6 +77,9 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | `apeiron ref delete <name>` | Deletes a ref; `apeiron reflog <name>` still shows where it pointed | Done |
 | `apeiron merge <from> [--into <ref>] [--message <text>] [--dry-run]` | Merges a snapshot, usually a branch, into a ref (default `main`); exit code 3 when there are conflicts | Done |
 | `apeiron search [<pattern>] [--text <text>] [--larger <size>] [--smaller <size>] [--after <date>] [--before <date>] [--in <snapshot>] [--history] [--limit <n>]` | Finds files, folders and links by name, size, modification day and text in a snapshot (default `main`) or, with `--history`, in every earlier snapshot too; prints `path:line: text` for text matches and the snapshot and its time before each result with `--history` ([SEARCH.md](SEARCH.md)) | Done |
+| `apeiron plugin add <file.wasm>` | Checks a plugin and installs it for the user; a merge or sync then lets it merge the files it handles instead of making conflict copies ([PLUGIN.md](PLUGIN.md)) | Done |
+| `apeiron plugin list` | Lists the installed plugins | Done |
+| `apeiron plugin remove <name>` | Removes a plugin | Done |
 | `apeiron git import <git-repo> [--prefix <name>]` | Stores every branch, tag and remote-tracking branch of a Git repository, with its history, under `git/` ([GIT.md](GIT.md)) | Done |
 | `apeiron git export <git-repo> [--prefix <name>]` | Writes them back into a Git repository with the same commit ids; exit code 3 if one could not be reproduced | Done |
 | `apeiron push <remote> [<ref>]` | Copies the snapshots of a ref (default `main`) to a remote and moves the ref there | Done |

@@ -291,7 +291,7 @@ pub(crate) fn read_table(path: &Path, keys: &Keys) -> Result<Vec<PackEntry>> {
 
     let mut entries = Vec::with_capacity(count as usize);
     let mut expected_offset = HEADER_LEN;
-    for raw in table.chunks_exact(ENTRY_LEN) {
+    for raw in table.as_chunks::<ENTRY_LEN>().0 {
         let (id, tail) = raw.split_at(ID_LEN);
         let id = ObjectId::from_bytes(id.try_into().map_err(|_| bad_entry(path))?);
         let entry = PackEntry::decode_tail(id, tail.try_into().map_err(|_| bad_entry(path))?)

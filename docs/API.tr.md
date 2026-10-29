@@ -76,7 +76,7 @@ Uzun işlemler (yedek, geri yükleme, senkron, doğrulama) **iş** (job) olarak 
 | 1.0 öncesi | Küçük sürümler arasında uyumu bozan değişikliklere izin verilir ve sürüm notlarında listelenir | Planlandı |
 | 1.0'dan sonra | Uyumu bozan değişiklik yalnızca yeni ana sürümde, yazılı bir uyumluluk politikasıyla | Planlandı |
 | Ayrı sürümler | Depolama formatının ([FORMAT.tr.md](FORMAT.tr.md)), C ABI'nin ve eklenti API'sinin kendi sürüm numaraları vardır | Format: Tamamlandı (sürüm 1); diğerleri Planlandı |
-| En düşük Rust sürümü | Workspace desteklenen en düşük Rust sürümünü belirtir (şu an 1.85) | Tamamlandı |
+| En düşük Rust sürümü | Workspace desteklenen en düşük Rust sürümünü belirtir (şu an 1.97) | Tamamlandı |
 
 ## 7. C ABI ve SDK katmanı
 
@@ -159,8 +159,10 @@ Her işlem tek bir düz istek değeri alır ve tek bir düz sonuç değeri dönd
 | `add_recovery_key` | — | `AddedKey`: kimlik ve kullanıcıya bir kez gösterilen yeni kurtarma anahtarı | Hayır |
 | `remove_key` | anahtar kimliği ya da ilk karakterleri | tam kimlik; son anahtar silinemez ve depo kilidi özel alınır | Hayır |
 | `create_ref` | ref adı, snapshot belirteci | snapshot kimliği; ref varsa `already_exists` ([BRANCH.tr.md](BRANCH.tr.md)) | Hayır |
-| `merge` | birleştirilecek snapshot belirteci, taşınacak ref (varsayılan `main`), mesaj, yazar, deneme çalışması | `MergeReport`: eylem (`up_to_date`, `fast_forward` ya da `merged`), ref'in şimdi ve önceden işaret ettiği snapshot, değişen yollar, kopyalarıyla çatışmalar | Hayır |
+| `merge` | birleştirilecek snapshot belirteci, taşınacak ref (varsayılan `main`), mesaj, yazar, deneme çalışması | `MergeReport`: eylem (`up_to_date`, `fast_forward` ya da `merged`), ref'in şimdi ve önceden işaret ettiği snapshot, değişen yollar, kopyalarıyla çatışmalar, eklentilerin birleştirdiği dosyalar, eklenti uyarıları | Hayır |
 | `search` | snapshot belirteci (yoksa `main`, ya da geçmişle her ref), geçmiş, ad deseni, metin, en az boyut, en çok boyut, sonra, önce, sınır (varsayılan 1000) | `SearchReport`: sonuçlar (yol, girdi, o sürümü tutan en yeni snapshot ve zamanı, metni içeren ilk satır), daha fazlasının olup olmadığı, aranan snapshot sayısı, metin için fazla büyük dosyalar ([SEARCH.tr.md](SEARCH.tr.md)); ölçüt yoksa `invalid_input` | Evet |
+| `plugins`, `add_plugin`, `remove_plugin` (serbest işlevler) | eklenti klasörü (varsayılan: kullanıcınınki), dosya ya da ad | `Vec<PluginInfo>`, `PluginAdded` (bilgi, birinin yerini alıp almadığı), `PluginInfo` ([PLUGIN.tr.md](PLUGIN.tr.md)) | Hayır |
+| `use_plugin_dir` | klasör | —; bu tutamacın birleştirmeleri ve senkronu oradaki eklentileri kullanır | Hayır |
 | `remotes` | — | `Vec<Remote>`: ad ve URL, ada göre sıralı | Hayır |
 | `add_remote` | ad, URL: bir klasör yolu (mutlak ya da göreli) `sftp://[user@]host[:port]/path` ya da `s3://bucket/path?endpoint=…&region=…` | `Remote`, klasör mutlak yol olarak; SFTP ve S3 uzak depoları şifreli bir depo ister | Hayır |
 | `remove_remote` | ad | —; uzak kopyanın kendisine dokunulmaz | Hayır |
@@ -168,7 +170,7 @@ Her işlem tek bir düz istek değeri alır ve tek bir düz sonuç değeri dönd
 | `pull` | uzak depo adı, ref adı (varsayılan `main`) | yerel ref için aynısı, `TransferReport`; yerel ref'te uzak depoda olmayan snapshot'lar varsa `conflict` | Evet |
 | `git_import` | Git deposu yolu, ref öneki (varsayılan `git`) | `GitImportReport`: saklanan commit ve etiketler, taşınan ref'ler (Git adı, ref, Git kimliği, snapshot, önceki), nedeniyle atlanan ref'ler, eskimiş ref'ler ([GIT.tr.md](GIT.tr.md)) | Evet |
 | `git_export` | Git deposu yolu (yoksa çıplak olarak oluşturulur), ref öneki | `GitExportReport`: yazılan commit ve etiketler, güncellenen ref'ler, atlanan ref'ler, yeniden üretilemeyen Git kimlikleri | Evet |
-| `sync` | klasör, uzak depo adı, ref adı (varsayılan `sync/<klasör adı>`), kip (`two-way`, `send` ya da `receive`), deneme çalışması | `SyncReport`: ref, eylem (`up_to_date`, `sent`, `received` ya da `merged`), snapshot, alınan yedek, ne çekildiği ve push edildiği, klasördeki değişiklikler, kopyalarıyla çatışmalar, sonraki tura bırakılan yollar, uyarılar, çalışan tur sayısı ([SYNC.tr.md](SYNC.tr.md)); `send` kipinde uzak depoda bu kopyada olmayan snapshot'lar varsa `conflict` | Evet |
+| `sync` | klasör, uzak depo adı, ref adı (varsayılan `sync/<klasör adı>`), kip (`two-way`, `send` ya da `receive`), deneme çalışması | `SyncReport`: ref, eylem (`up_to_date`, `sent`, `received` ya da `merged`), snapshot, alınan yedek, ne çekildiği ve push edildiği, klasördeki değişiklikler, kopyalarıyla çatışmalar, eklentilerin birleştirdiği dosyalar, sonraki tura bırakılan yollar, uyarılar, çalışan tur sayısı ([SYNC.tr.md](SYNC.tr.md)); `send` kipinde uzak depoda bu kopyada olmayan snapshot'lar varsa `conflict` | Evet |
 
 ### 8.4 Bir snapshot'ı adlandırma
 

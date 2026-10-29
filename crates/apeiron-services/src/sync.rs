@@ -16,8 +16,8 @@ use crate::control::{Control, Phase, Warning, WarningKind};
 use crate::diff::{Change, ChangeKind};
 use crate::error::{Error, IoContext, Result};
 use crate::merge::{
-    Conflict, ConflictKind, Merge, by_name, free_name, is_dir, is_file, same, same_content,
-    tree_of, write_items,
+    Conflict, ConflictKind, ContentMerger, Merge, PluginMerge, by_name, describe, free_name,
+    is_dir, is_file, same, same_content, tree_of, write_items,
 };
 use crate::name::Name;
 use crate::os::{self, Attrs};
@@ -91,6 +91,9 @@ pub struct SyncOutcome {
     /// Changes made to the folder (that would be made, in a dry run).
     pub changes: Vec<Change>,
     pub conflicts: Vec<Conflict>,
+    /// Files plugins merged instead of making conflict copies.
+    #[serde(default)]
+    pub plugin_merges: Vec<PluginMerge>,
     /// Paths changed here while the round ran; left alone for the next
     /// round.
     pub skipped: Vec<Name>,
@@ -100,18 +103,20 @@ pub struct SyncOutcome {
 }
 
 /// Runs one sync round of `options.folder` with the ref `options.ref_name`
-/// on `store`, starting again when another device pushed meanwhile. The
-/// caller holds the repository lock shared.
+/// on `store`, starting again when another device pushed meanwhile. Files
+/// changed on both devices go to the type drivers of `merger` first
+/// (PLUGIN.md §4). The caller holds the repository lock shared.
 pub fn sync(
     repo: &mut Repository,
     store: &dyn Store,
     options: &SyncOptions,
+    merger: Option<&dyn ContentMerger>,
     ctl: &Control,
 ) -> Result<SyncOutcome> {
     apeiron_core::validate_ref_name(&folder_ref(&options.ref_name))?;
     let mut attempt = 1;
     loop {
-        match round(repo, store, options, ctl) {
+        match round(repo, store, options, merger, ctl) {
             Ok(mut outcome) => {
                 outcome.attempts = attempt;
                 ctl.set_phase(Phase::Done);
@@ -139,6 +144,7 @@ fn round(
     repo: &mut Repository,
     store: &dyn Store,
     options: &SyncOptions,
+    merger: Option<&dyn ContentMerger>,
     ctl: &Control,
 ) -> Result<SyncOutcome> {
     let name = options.ref_name.as_str();
@@ -152,6 +158,7 @@ fn round(
         pushed: None,
         changes: Vec::new(),
         conflicts: Vec::new(),
+        plugin_merges: Vec::new(),
         skipped: Vec::new(),
         warnings: Vec::new(),
         attempts: 0,
@@ -270,14 +277,16 @@ fn round(
                 .transpose()?;
             let remote_snapshot = repo.read_snapshot(&r)?;
             let suffix = conflict_suffix(&remote_snapshot);
-            let (items, conflicts) = Merge {
-                repo,
-                suffix: &suffix,
-                conflicts: Vec::new(),
-            }
-            .run(base_tree, local_tree, remote_snapshot.tree)?;
+            let result = Merge::new(repo, &suffix, merger).run(
+                base_tree,
+                local_tree,
+                remote_snapshot.tree,
+            )?;
+            let conflicts = result.conflicts;
+            outcome.plugin_merges = result.plugin_merges;
+            outcome.warnings.extend(result.warnings);
             let mut writer = repo.writer();
-            let merged = write_items(&mut writer, items)?;
+            let merged = write_items(&mut writer, result.items)?;
             writer.finish()?;
             if same_content(repo, merged, remote_snapshot.tree)? {
                 outcome.conflicts = conflicts;
@@ -285,9 +294,7 @@ fn round(
                     .map(|()| outcome);
             }
             let mut message = "sync: merge".to_owned();
-            for c in &conflicts {
-                message.push_str(&format!("\nconflict: {} ({:?})", c.path, c.kind));
-            }
+            describe(&mut message, &conflicts, &outcome.plugin_merges);
             let parents = local.into_iter().chain([r]).collect();
             let mut writer = repo.writer();
             let m = writer.put_snapshot(&snapshot(merged, parents, options, message))?;
@@ -688,10 +695,8 @@ fn set_attrs(path: &Path, entry: &TreeEntry, is_dir: bool) {
         uid: None,
         gid: None,
     };
-    if is_dir {
-        if let Some(time) = attrs.mtime.and_then(os::from_time) {
-            let _ = os::set_dir_mtime(path, time);
-        }
+    if is_dir && let Some(time) = attrs.mtime.and_then(os::from_time) {
+        let _ = os::set_dir_mtime(path, time);
     }
     let _ = os::apply_attrs(path, &attrs);
 }
@@ -778,6 +783,7 @@ mod tests {
             pushed: None,
             changes: Vec::new(),
             conflicts: Vec::new(),
+            plugin_merges: Vec::new(),
             skipped: Vec::new(),
             warnings: Vec::new(),
             attempts: 1,

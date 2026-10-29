@@ -295,10 +295,10 @@ impl TreeEntry {
         {
             return Err(invalid("invalid entry name"));
         }
-        if let EntryKind::File { size, blob } = self.kind {
-            if (size == 0) != blob.is_none() {
-                return Err(invalid("a file has a blob exactly when it is not empty"));
-            }
+        if let EntryKind::File { size, blob } = self.kind
+            && (size == 0) != blob.is_none()
+        {
+            return Err(invalid("a file has a blob exactly when it is not empty"));
         }
         if self.mode.is_some_and(|m| m & !MODE_MASK != 0) {
             return Err(invalid("mode has bits above the lowest 12"));

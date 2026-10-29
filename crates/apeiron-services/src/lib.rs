@@ -24,9 +24,12 @@ pub use diff::{Change, ChangeKind, diff};
 pub use error::{Error, Result};
 pub use export::{ArchiveFormat, ExportOutcome, export};
 pub use list::{EntryInfo, Kind, list};
-pub use merge::{Conflict, ConflictKind, MergeAction, MergeOptions, MergeOutcome, merge};
+pub use merge::{
+    Conflict, ConflictKind, ContentMerger, MergeAction, MergeOptions, MergeOutcome, Merged,
+    PLUGIN_SIZE_LIMIT, PluginMerge, merge,
+};
 pub use name::Name;
 pub use restore::{RestoreOutcome, restore};
 pub use restore_test::{RestoreProblem, RestoreTestOutcome, restore_test};
-pub use search::{Query, SearchHit, SearchOptions, SearchOutcome, TextLine, search};
+pub use search::{Query, SearchHit, SearchOptions, SearchOutcome, TextLine, name_matches, search};
 pub use sync::{SyncAction, SyncMode, SyncOptions, SyncOutcome, folder_ref, sync};

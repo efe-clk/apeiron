@@ -5,7 +5,8 @@ use std::path::PathBuf;
 
 use apeiron_core::{EntryKind, ObjectId, Repository};
 use apeiron_services::{
-    BackupOptions, ConflictKind, Control, Error, MergeAction, MergeOptions, backup, merge,
+    BackupOptions, ConflictKind, ContentMerger, Control, Error, MergeAction, MergeOptions, Merged,
+    WarningKind, backup, merge,
 };
 
 struct Setup {
@@ -41,6 +42,16 @@ impl Setup {
     }
 
     fn merge(&mut self, from: &str, into: &str, dry_run: bool) -> apeiron_services::MergeOutcome {
+        self.merge_with(from, into, dry_run, None)
+    }
+
+    fn merge_with(
+        &mut self,
+        from: &str,
+        into: &str,
+        dry_run: bool,
+        merger: Option<&dyn ContentMerger>,
+    ) -> apeiron_services::MergeOutcome {
         let options = MergeOptions {
             from: self.repo.read_ref(from).unwrap().unwrap(),
             from_name: from.to_owned(),
@@ -50,7 +61,7 @@ impl Setup {
             host: None,
             dry_run,
         };
-        merge(&mut self.repo, &options).unwrap()
+        merge(&mut self.repo, &options, merger).unwrap()
     }
 
     /// Every file of the snapshot `name` points to, with its content.
@@ -224,7 +235,107 @@ fn unrelated_histories_merge_without_losing_anything() {
         dry_run: false,
     };
     assert!(matches!(
-        merge(&mut s.repo, &options),
+        merge(&mut s.repo, &options, None),
         Err(Error::NotFound(_))
     ));
+}
+
+/// Joins the lines of both sides after the base for `*.log` files; refuses
+/// `*.bad` files and fails on `*.err` files.
+struct Lines;
+
+impl ContentMerger for Lines {
+    fn handles(&self, name: &[u8]) -> bool {
+        [&b".log"[..], b".bad", b".err"]
+            .iter()
+            .any(|ext| name.ends_with(ext))
+    }
+
+    fn merge(
+        &self,
+        name: &[u8],
+        base: Option<&[u8]>,
+        ours: &[u8],
+        theirs: &[u8],
+    ) -> Result<Option<Merged>, String> {
+        if name.ends_with(b".err") {
+            return Err("the plugin crashed".to_owned());
+        }
+        if name.ends_with(b".bad") {
+            return Ok(None);
+        }
+        let base = base.unwrap_or_default();
+        let mut data = ours.to_vec();
+        data.extend_from_slice(&theirs[base.len()..]);
+        Ok(Some(Merged {
+            data,
+            plugin: "lines".to_owned(),
+        }))
+    }
+}
+
+#[test]
+fn a_type_driver_merges_files_both_sides_changed() {
+    let mut s = setup();
+    let first = s.commit(
+        "main",
+        &[
+            ("a.log", "1\n"),
+            ("b.bad", "x"),
+            ("c.err", "x"),
+            ("d.txt", "x"),
+        ],
+    );
+    s.repo.update_ref("feature", None, Some(first)).unwrap();
+    s.commit(
+        "feature",
+        &[
+            ("a.log", "1\ntheirs\n"),
+            ("b.bad", "t"),
+            ("c.err", "t"),
+            ("d.txt", "t"),
+        ],
+    );
+    s.commit(
+        "main",
+        &[
+            ("a.log", "1\nours\n"),
+            ("b.bad", "o"),
+            ("c.err", "o"),
+            ("d.txt", "o"),
+        ],
+    );
+
+    let out = s.merge_with("feature", "main", false, Some(&Lines));
+    assert_eq!(out.plugin_merges.len(), 1);
+    assert_eq!(
+        (
+            out.plugin_merges[0].path.to_string(),
+            out.plugin_merges[0].plugin.as_str()
+        ),
+        ("a.log".to_owned(), "lines")
+    );
+    let conflicts: Vec<String> = out.conflicts.iter().map(|c| c.path.to_string()).collect();
+    assert_eq!(conflicts, ["b.bad", "c.err", "d.txt"]);
+    assert_eq!(out.warnings.len(), 1);
+    assert_eq!(
+        (out.warnings[0].path.to_string(), out.warnings[0].kind),
+        ("c.err".to_owned(), WarningKind::Plugin)
+    );
+    let files = s.files("main");
+    assert!(
+        files.contains(&("a.log".to_owned(), "1\nours\ntheirs\n".to_owned())),
+        "{files:?}"
+    );
+    assert!(!files.iter().any(|(n, _)| n.starts_with("a (conflict")));
+    let message = s
+        .repo
+        .read_snapshot(&out.snapshot)
+        .unwrap()
+        .message
+        .unwrap();
+    assert!(
+        message.contains("merged by plugin lines: a.log"),
+        "{message}"
+    );
 }

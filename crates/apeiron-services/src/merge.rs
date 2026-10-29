@@ -7,6 +7,7 @@ use std::time::SystemTime;
 use apeiron_core::{EntryKind, ObjectId, ObjectWriter, Repository, Snapshot, Tree, TreeEntry};
 use serde::{Deserialize, Serialize};
 
+use crate::control::{Warning, WarningKind};
 use crate::diff::{Change, ChangeKind};
 use crate::error::{Error, Result};
 use crate::name::Name;
@@ -34,6 +35,40 @@ pub struct Conflict {
     pub kind: ConflictKind,
     /// Where the other version was put.
     pub copy: Option<Name>,
+}
+
+/// Files larger than this are not given to a plugin (PLUGIN.md §3).
+pub const PLUGIN_SIZE_LIMIT: u64 = 64 << 20;
+
+/// Content merged by a type driver.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Merged {
+    pub data: Vec<u8>,
+    /// Name of the plugin that merged it.
+    pub plugin: String,
+}
+
+/// Merges the content of a file both sides changed (PLUGIN.md §4).
+pub trait ContentMerger {
+    /// Whether a plugin handles files named `name`.
+    fn handles(&self, name: &[u8]) -> bool;
+
+    /// The merged content; `Ok(None)` when no plugin handles `name` or the
+    /// changes conflict; a message when the plugin failed.
+    fn merge(
+        &self,
+        name: &[u8],
+        base: Option<&[u8]>,
+        ours: &[u8],
+        theirs: &[u8],
+    ) -> std::result::Result<Option<Merged>, String>;
+}
+
+/// A file a plugin merged instead of making a conflict copy.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PluginMerge {
+    pub path: Name,
+    pub plugin: String,
 }
 
 /// Two entries are the same when their kind, content and permission bits
@@ -132,21 +167,53 @@ pub(crate) enum Item {
         entry: TreeEntry,
         items: Vec<Item>,
     },
+    /// A file whose content a plugin merged; `entry` gives its name and
+    /// attributes.
+    File {
+        entry: TreeEntry,
+        data: Vec<u8>,
+    },
+}
+
+/// What a three-way merge of trees found.
+pub(crate) struct Merged3 {
+    pub(crate) items: Vec<Item>,
+    pub(crate) conflicts: Vec<Conflict>,
+    pub(crate) plugin_merges: Vec<PluginMerge>,
+    pub(crate) warnings: Vec<Warning>,
 }
 
 pub(crate) struct Merge<'a> {
     pub(crate) repo: &'a Repository,
     pub(crate) suffix: &'a str,
+    pub(crate) merger: Option<&'a dyn ContentMerger>,
     pub(crate) conflicts: Vec<Conflict>,
+    pub(crate) plugin_merges: Vec<PluginMerge>,
+    pub(crate) warnings: Vec<Warning>,
 }
 
-impl Merge<'_> {
+impl<'a> Merge<'a> {
+    pub(crate) fn new(
+        repo: &'a Repository,
+        suffix: &'a str,
+        merger: Option<&'a dyn ContentMerger>,
+    ) -> Self {
+        Merge {
+            repo,
+            suffix,
+            merger,
+            conflicts: Vec::new(),
+            plugin_merges: Vec::new(),
+            warnings: Vec::new(),
+        }
+    }
+
     pub(crate) fn run(
         mut self,
         base: Option<ObjectId>,
         local: ObjectId,
         remote: ObjectId,
-    ) -> Result<(Vec<Item>, Vec<Conflict>)> {
+    ) -> Result<Merged3> {
         let base = match base {
             Some(id) => self.repo.read_tree(&id)?,
             None => Tree {
@@ -156,7 +223,74 @@ impl Merge<'_> {
         let local = self.repo.read_tree(&local)?;
         let remote = self.repo.read_tree(&remote)?;
         let items = self.trees(&base, &local, &remote, &Name::default())?;
-        Ok((items, self.conflicts))
+        Ok(Merged3 {
+            items,
+            conflicts: self.conflicts,
+            plugin_merges: self.plugin_merges,
+            warnings: self.warnings,
+        })
+    }
+
+    /// Asks a type driver to merge two changed versions of a file; `None`
+    /// when there is none, it finds a conflict or it fails (PLUGIN.md §4).
+    fn by_plugin(
+        &mut self,
+        path: &Name,
+        b: Option<&TreeEntry>,
+        l: &TreeEntry,
+        r: &TreeEntry,
+    ) -> Result<Option<Item>> {
+        let Some(merger) = self.merger else {
+            return Ok(None);
+        };
+        let content = |e: Option<&TreeEntry>| -> Result<Option<Option<Vec<u8>>>> {
+            let Some(TreeEntry {
+                kind: EntryKind::File { size, blob },
+                ..
+            }) = e
+            else {
+                return Ok(Some(None));
+            };
+            if *size > PLUGIN_SIZE_LIMIT {
+                return Ok(None);
+            }
+            let mut data = Vec::new();
+            if let Some(blob) = blob {
+                self.repo.read_file(blob, &mut data)?;
+            }
+            Ok(Some(Some(data)))
+        };
+        if !is_file(l) || !is_file(r) || !merger.handles(&l.name) {
+            return Ok(None);
+        }
+        let (Some(base), Some(Some(ours)), Some(Some(theirs))) =
+            (content(b)?, content(Some(l))?, content(Some(r))?)
+        else {
+            return Ok(None);
+        };
+        match merger.merge(&l.name, base.as_deref(), &ours, &theirs) {
+            Ok(Some(merged)) => {
+                self.plugin_merges.push(PluginMerge {
+                    path: path.clone(),
+                    plugin: merged.plugin,
+                });
+                let mut entry = l.clone();
+                entry.mtime = Some(crate::os::to_time(SystemTime::now()));
+                Ok(Some(Item::File {
+                    entry,
+                    data: merged.data,
+                }))
+            }
+            Ok(None) => Ok(None),
+            Err(message) => {
+                self.warnings.push(Warning {
+                    path: path.clone(),
+                    kind: WarningKind::Plugin,
+                    message,
+                });
+                Ok(None)
+            }
+        }
     }
 
     fn trees(&mut self, base: &Tree, local: &Tree, remote: &Tree, rel: &Name) -> Result<Vec<Item>> {
@@ -200,6 +334,13 @@ impl Merge<'_> {
                 match (l, r) {
                     (None, Some(_)) => (r, Some((ConflictKind::DeletedHere, None))),
                     (Some(_), None) => (l, Some((ConflictKind::DeletedThere, None))),
+                    (Some(le), Some(re)) => match self.by_plugin(&path, b, le, re)? {
+                        Some(item) => {
+                            items.push(item);
+                            continue;
+                        }
+                        None => (l, Some((ConflictKind::BothChanged, r))),
+                    },
                     _ => (l, Some((ConflictKind::BothChanged, r))),
                 }
             };
@@ -232,7 +373,7 @@ impl Merge<'_> {
 
 pub(crate) fn item_name(item: &Item) -> &[u8] {
     match item {
-        Item::Entry(e) | Item::Dir { entry: e, .. } => &e.name,
+        Item::Entry(e) | Item::Dir { entry: e, .. } | Item::File { entry: e, .. } => &e.name,
     }
 }
 
@@ -246,6 +387,11 @@ pub(crate) fn write_items(writer: &mut ObjectWriter<'_>, items: Vec<Item>) -> Re
                 entry.kind = EntryKind::Directory {
                     tree: write_items(writer, items)?,
                 };
+                entry
+            }
+            Item::File { mut entry, data } => {
+                let (size, blob) = writer.put_file(data.as_slice())?;
+                entry.kind = EntryKind::File { size, blob };
                 entry
             }
         });
@@ -320,11 +466,22 @@ pub struct MergeOutcome {
     /// Paths that differ between the two.
     pub changes: Vec<Change>,
     pub conflicts: Vec<Conflict>,
+    /// Files plugins merged instead of making conflict copies.
+    #[serde(default)]
+    pub plugin_merges: Vec<PluginMerge>,
+    /// Plugins that failed; their files became conflict copies.
+    #[serde(default)]
+    pub warnings: Vec<Warning>,
 }
 
-/// Merges `options.from` into the ref `options.into` (BRANCH.md §2). The
-/// caller holds the repository lock shared.
-pub fn merge(repo: &mut Repository, options: &MergeOptions) -> Result<MergeOutcome> {
+/// Merges `options.from` into the ref `options.into` (BRANCH.md §2), with
+/// the type drivers of `merger` (PLUGIN.md §4). The caller holds the
+/// repository lock shared.
+pub fn merge(
+    repo: &mut Repository,
+    options: &MergeOptions,
+    merger: Option<&dyn ContentMerger>,
+) -> Result<MergeOutcome> {
     let into = options.into.as_str();
     let ours = repo
         .read_ref(into)?
@@ -336,6 +493,8 @@ pub fn merge(repo: &mut Repository, options: &MergeOptions) -> Result<MergeOutco
         previous: ours,
         changes: Vec::new(),
         conflicts: Vec::new(),
+        plugin_merges: Vec::new(),
+        warnings: Vec::new(),
     };
     if ours == theirs || repo.is_ancestor(theirs, ours)? {
         return Ok(outcome);
@@ -366,14 +525,9 @@ pub fn merge(repo: &mut Repository, options: &MergeOptions) -> Result<MergeOutco
         " (conflict {})",
         options.from_name.replace(['/', '\\'], "-")
     );
-    let (items, conflicts) = Merge {
-        repo,
-        suffix: &suffix,
-        conflicts: Vec::new(),
-    }
-    .run(base, our_tree, their_tree)?;
+    let result = Merge::new(repo, &suffix, merger).run(base, our_tree, their_tree)?;
     let mut writer = repo.writer();
-    let merged = write_items(&mut writer, items)?;
+    let merged = write_items(&mut writer, result.items)?;
     writer.finish()?;
     changes(
         repo,
@@ -387,9 +541,7 @@ pub fn merge(repo: &mut Repository, options: &MergeOptions) -> Result<MergeOutco
         .message
         .clone()
         .unwrap_or_else(|| format!("merge {} into {into}", options.from_name));
-    for c in &conflicts {
-        message.push_str(&format!("\nconflict: {} ({:?})", c.path, c.kind));
-    }
+    describe(&mut message, &result.conflicts, &result.plugin_merges);
     let snapshot = Snapshot {
         tree: merged,
         parents: vec![ours, theirs],
@@ -400,7 +552,9 @@ pub fn merge(repo: &mut Repository, options: &MergeOptions) -> Result<MergeOutco
         meta: Vec::new(),
     };
     outcome.action = MergeAction::Merged;
-    outcome.conflicts = conflicts;
+    outcome.conflicts = result.conflicts;
+    outcome.plugin_merges = result.plugin_merges;
+    outcome.warnings = result.warnings;
     if options.dry_run {
         return Ok(outcome);
     }
@@ -410,6 +564,16 @@ pub fn merge(repo: &mut Repository, options: &MergeOptions) -> Result<MergeOutco
     repo.update_ref(into, Some(ours), Some(id))?;
     outcome.snapshot = id;
     Ok(outcome)
+}
+
+/// Adds a line per conflict and per file a plugin merged to a message.
+pub(crate) fn describe(message: &mut String, conflicts: &[Conflict], merges: &[PluginMerge]) {
+    for c in conflicts {
+        message.push_str(&format!("\nconflict: {} ({:?})", c.path, c.kind));
+    }
+    for m in merges {
+        message.push_str(&format!("\nmerged by plugin {}: {}", m.plugin, m.path));
+    }
 }
 
 /// The paths that differ from `a` to `b` by [`same`]; a folder added or

@@ -316,6 +316,17 @@ fn find_line(data: &[u8], needle: &str) -> Option<TextLine> {
     })
 }
 
+/// Whether a file name matches a pattern such as `*.txt`, ignoring case
+/// (SEARCH.md §1).
+pub fn name_matches(pattern: &str, name: &[u8]) -> bool {
+    let pattern: Vec<char> = pattern.to_lowercase().chars().collect();
+    let name: Vec<char> = String::from_utf8_lossy(name)
+        .to_lowercase()
+        .chars()
+        .collect();
+    wildcard(&pattern, &name)
+}
+
 /// Whether `subject` matches `pattern`, where `*` stands for any characters
 /// and `?` for one.
 fn wildcard(pattern: &[char], subject: &[char]) -> bool {

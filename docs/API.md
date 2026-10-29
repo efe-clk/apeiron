@@ -76,7 +76,7 @@ Cancellation is safe by construction: objects become visible only after they are
 | Before 1.0 | Breaking changes are allowed between minor versions and are listed in release notes | Planned |
 | From 1.0 | Breaking changes only in a new major version, with a written compatibility policy | Planned |
 | Separate versions | The storage format ([FORMAT.md](FORMAT.md)), the C ABI and the plugin API have their own version numbers | Format: Done (version 1); others Planned |
-| Minimum Rust version | The workspace declares its minimum supported Rust version (currently 1.85) | Done |
+| Minimum Rust version | The workspace declares its minimum supported Rust version (currently 1.97) | Done |
 
 ## 7. C ABI and SDK layer
 
@@ -159,8 +159,10 @@ Every operation takes one plain request value and returns one plain result value
 | `add_recovery_key` | — | `AddedKey`: id and the new recovery key, shown to the user once | No |
 | `remove_key` | key id or its first characters | the whole id; the last key cannot be removed, and the repository lock is taken exclusive | No |
 | `create_ref` | ref name, snapshot spec | the snapshot id; `already_exists` if the ref exists ([BRANCH.md](BRANCH.md)) | No |
-| `merge` | snapshot spec to merge, ref to move (default `main`), message, author, dry run | `MergeReport`: action (`up_to_date`, `fast_forward` or `merged`), the snapshot the ref points to now and before, changed paths, conflicts with their copies | No |
+| `merge` | snapshot spec to merge, ref to move (default `main`), message, author, dry run | `MergeReport`: action (`up_to_date`, `fast_forward` or `merged`), the snapshot the ref points to now and before, changed paths, conflicts with their copies, files merged by plugins, plugin warnings | No |
 | `search` | snapshot spec (absent: `main`, or every ref with history), history, name pattern, text, larger, smaller, after, before, limit (default 1000) | `SearchReport`: hits (path, entry, the newest snapshot holding that version and its time, the first line with the text), whether there were more, snapshots searched, files too large for text ([SEARCH.md](SEARCH.md)); `invalid_input` without a criterion | Yes |
+| `plugins`, `add_plugin`, `remove_plugin` (free functions) | plugin folder (default: the user's), file or name | `Vec<PluginInfo>`, `PluginAdded` (info, whether one was replaced), `PluginInfo` ([PLUGIN.md](PLUGIN.md)) | No |
+| `use_plugin_dir` | folder | —; merges and sync of this handle use the plugins there | No |
 | `remotes` | — | `Vec<Remote>`: name and URL, sorted by name | No |
 | `add_remote` | name, URL: a folder path (absolute or relative) `sftp://[user@]host[:port]/path` or `s3://bucket/path?endpoint=…&region=…` | `Remote`, a folder as an absolute path; SFTP and S3 remotes need an encrypted repository | No |
 | `remove_remote` | name | —; the remote copy itself is not touched | No |
@@ -168,7 +170,7 @@ Every operation takes one plain request value and returns one plain result value
 | `pull` | remote name, ref name (default `main`) | `TransferReport`, the same for the local ref; `conflict` if the local ref has snapshots the remote does not | Yes |
 | `git_import` | Git repository path, ref prefix (default `git`) | `GitImportReport`: commits and tags stored, refs moved (Git name, ref, Git id, snapshot, previous), skipped refs with the reason, stale refs ([GIT.md](GIT.md)) | Yes |
 | `git_export` | Git repository path (created bare if missing), ref prefix | `GitExportReport`: commits and tags written, refs updated, skipped refs, Git ids not reproduced | Yes |
-| `sync` | folder, remote name, ref name (default `sync/<folder name>`), mode (`two-way`, `send` or `receive`), dry run | `SyncReport`: ref, action (`up_to_date`, `sent`, `received` or `merged`), snapshot, the backup made, what was fetched and pushed, folder changes, conflicts with their copies, paths left for the next round, warnings, rounds run ([SYNC.md](SYNC.md)); `conflict` in `send` mode when the remote has snapshots this copy does not | Yes |
+| `sync` | folder, remote name, ref name (default `sync/<folder name>`), mode (`two-way`, `send` or `receive`), dry run | `SyncReport`: ref, action (`up_to_date`, `sent`, `received` or `merged`), snapshot, the backup made, what was fetched and pushed, folder changes, conflicts with their copies, files merged by plugins, paths left for the next round, warnings, rounds run ([SYNC.md](SYNC.md)); `conflict` in `send` mode when the remote has snapshots this copy does not | Yes |
 
 ### 8.4 Naming a snapshot
 

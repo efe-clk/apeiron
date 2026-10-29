@@ -18,6 +18,9 @@ from typing import Any, Iterator, Optional, Tuple
 
 __all__ = [
     "Repository",
+    "plugins",
+    "add_plugin",
+    "remove_plugin",
     "Job",
     "Record",
     "ApeironError",
@@ -306,6 +309,30 @@ def _start(handle: Optional[ctypes.c_void_p], operation: str, request: dict) -> 
         _library().apeiron_start(handle, operation.encode(), _request(request), ctypes.byref(out))
     )
     return Job(out)
+
+
+def _call_global(operation: str, request: dict) -> Any:
+    out = ctypes.c_void_p()
+    _check(
+        _library().apeiron_call(None, operation.encode(), _request(request), ctypes.byref(out))
+    )
+    return _take(out)
+
+
+def plugins(dir: Any = None) -> list:
+    """The installed plugins (docs/PLUGIN.md); ``dir`` is the plugin folder,
+    the user's by default."""
+    return _call_global("plugins", _drop_none({"dir": dir}))
+
+
+def add_plugin(file: Any, dir: Any = None) -> Record:
+    """Checks a plugin (a WebAssembly component) and installs it."""
+    return _call_global("plugin_add", _drop_none({"file": file, "dir": dir}))
+
+
+def remove_plugin(name: str, dir: Any = None) -> Record:
+    """Removes an installed plugin."""
+    return _call_global("plugin_remove", _drop_none({"name": name, "dir": dir}))
 
 
 class Repository:

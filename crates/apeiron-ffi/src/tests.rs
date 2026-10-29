@@ -238,6 +238,32 @@ fn null_pointers_and_bad_strings_are_errors() {
         unsafe { apeiron_call(ptr::null(), c("info").as_ptr(), ptr::null(), &mut out) },
         4
     );
+    let dir = tempfile::tempdir().unwrap();
+    let request = c(&serde_json::json!({"dir": dir.path().join("plugins")}).to_string());
+    assert_eq!(
+        unsafe {
+            apeiron_call(
+                ptr::null(),
+                c("plugins").as_ptr(),
+                request.as_ptr(),
+                &mut out,
+            )
+        },
+        0
+    );
+    assert_eq!(take(out), "[]");
+    let request = c(&serde_json::json!({"name": "x", "dir": dir.path()}).to_string());
+    assert_eq!(
+        unsafe {
+            apeiron_call(
+                ptr::null(),
+                c("plugin_remove").as_ptr(),
+                request.as_ptr(),
+                &mut out,
+            )
+        },
+        2
+    );
     assert_eq!(unsafe { apeiron_job_cancel(ptr::null_mut()) }, 4);
     // Freeing NULL is allowed.
     unsafe {

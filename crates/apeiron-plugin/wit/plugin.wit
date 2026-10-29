@@ -1,0 +1,29 @@
+// The plugin interface of Apeiron, version 0.1 (docs/PLUGIN.md §2).
+package apeiron:plugin@0.1.0;
+
+// A type driver knows the content of some kinds of files.
+interface type-driver {
+  record info {
+    // Lowercase letters, digits and `-`.
+    name: string,
+    version: string,
+    description: string,
+    // File name patterns such as `*.txt`; `*` and `?` as wildcards.
+    patterns: list<string>,
+    // Permissions the plugin asks for; version 0.1 grants none.
+    permissions: list<string>,
+  }
+
+  describe: func() -> info;
+
+  // Joins the changes of `ours` and `theirs` since `base`, absent when the
+  // file did not exist there. `none` when the changes conflict.
+  merge: func(base: option<list<u8>>, ours: list<u8>, theirs: list<u8>) -> result<option<list<u8>>, string>;
+
+  // A difference for people to read, or `none`.
+  diff: func(old: list<u8>, new: list<u8>) -> result<option<string>, string>;
+}
+
+world type-driver-plugin {
+  export type-driver;
+}

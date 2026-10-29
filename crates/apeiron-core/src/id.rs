@@ -149,8 +149,8 @@ pub(crate) fn parse_hex<const N: usize>(s: &str) -> Option<[u8; N]> {
         return None;
     }
     let mut out = [0u8; N];
-    for (i, pair) in s.chunks_exact(2).enumerate() {
-        out[i] = (digit(pair[0])? << 4) | digit(pair[1])?;
+    for (i, [high, low]) in s.as_chunks::<2>().0.iter().enumerate() {
+        out[i] = (digit(*high)? << 4) | digit(*low)?;
     }
     Some(out)
 }

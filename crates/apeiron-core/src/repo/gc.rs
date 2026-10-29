@@ -116,10 +116,10 @@ impl Repository {
                 None => writer.insert(PackWriter::new(&self.dir(TMP), &self.keys)?),
             };
             w.add_stored(entry, &stored)?;
-            if w.len() >= pack::TARGET_SIZE {
-                if let Some(w) = writer.take() {
-                    written.push(w.finish(&self.dir(PACKS))?);
-                }
+            if w.len() >= pack::TARGET_SIZE
+                && let Some(w) = writer.take()
+            {
+                written.push(w.finish(&self.dir(PACKS))?);
             }
         }
         if let Some(w) = writer.take() {

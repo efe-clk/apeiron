@@ -32,6 +32,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [022](#adr-022-branches-are-refs-one-three-way-merge-for-sync-and-branches) | Branches | Branches are refs; one per-path three-way merge with conflict copies for sync and `merge` | Accepted |
 | [023](#adr-023-search-reads-the-snapshots-without-a-stored-index) | Search | Snapshots are read directly, each folder and content once per search; no stored index | Accepted |
 | [024](#adr-024-the-python-sdk-calls-the-c-abi-through-ctypes) | Python SDK | Pure Python over the C ABI with `ctypes`; one conformance suite for every language | Accepted |
+| [025](#adr-025-plugins-run-with-nothing-granted-type-drivers-come-first) | Plugins | Per-user components with no permissions, time and memory limits; type drivers merge before a conflict copy; Rust 1.97 | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28.
 
@@ -520,3 +521,24 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Typed classes written by hand | Would drift from the Rust types; they come generated from the JSON schemas |
 
 **Consequences.** Results are records read by attribute or key until the schemas exist. The library is found through `APEIRON_LIB` or next to the module until wheels carry it.
+
+## ADR-025: Plugins run with nothing granted; type drivers come first
+
+**Status:** Accepted (2026-10-29)
+
+**Context.** Stage 3 adds the plugin system ([PLUGIN.md](PLUGIN.md)) on Wasmtime and the component model (ADR-005). Its first user is the text diff plugin, which merges and shows text. Plugins run code written by others, and a merge must never lose data. The newest Wasmtime that builds with Rust 1.85 was released in mid-2025.
+
+**Decision.** The first plugin interface, `apeiron:plugin/type-driver@0.1.0`, has `describe`, `merge` and `diff`. A merge asks the first installed plugin whose pattern matches the file name before it makes a conflict copy; anything but merged content leaves the conflict copy. Plugins are installed per user. Each call runs in a new instance with WASI but nothing granted: no files, network, environment or arguments, at most 30 seconds and 512 MiB; a plugin that asks for permissions is refused. The minimum Rust version rises from 1.85 to 1.97 to use the current Wasmtime.
+
+**Rationale.** A type driver is useful at once and needs no permission, so the sandbox can start closed and open only for plugin types that need it, with the user's approval. Falling back to the conflict copy keeps every failure as safe as having no plugin. Plugins written with a standard library import WASI, so an empty WASI context lets them run without giving them anything. A sandbox for others' code should carry current security fixes, which outweighs building with an older Rust.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| Plugins stored in the repository and copied with it | Every device would run code it received from a remote; installing stays a decision of each user |
+| A permission prompt now | No plugin type of this work item needs a permission |
+| Fuel instead of a time limit | Fuel counts instructions, not time; the user waits for time |
+| Wasmtime 34, the newest for Rust 1.85 | Misses more than a year of fixes to the sandbox |
+
+**Consequences.** A device without the plugin makes a conflict copy where another device merged; both results are safe. Building Apeiron needs Rust 1.97 or newer, and testing the plugin host needs the `wasm32-wasip2` target. The diff function waits for the text diff plugin to be shown.

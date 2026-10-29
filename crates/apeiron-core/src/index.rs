@@ -131,10 +131,7 @@ pub(crate) fn decode_index(path: &Path, bytes: &[u8], keys: &Keys) -> Result<Vec
     if bytes.len() < count_end {
         return Err(corrupt("index is too short"));
     }
-    let packs: Vec<FileHash> = bytes[..packs_end]
-        .chunks_exact(32)
-        .map(|c| c.try_into().map_err(|_| corrupt("bad pack name")))
-        .collect::<Result<_>>()?;
+    let packs: Vec<FileHash> = bytes[..packs_end].as_chunks::<32>().0.to_vec();
     let entry_count = u64::from_le_bytes(
         bytes[packs_end..count_end]
             .try_into()
@@ -146,7 +143,7 @@ pub(crate) fn decode_index(path: &Path, bytes: &[u8], keys: &Keys) -> Result<Vec
 
     let mut locations = Vec::with_capacity(entry_count as usize);
     let mut previous: Option<ObjectId> = None;
-    for raw in bytes[count_end..].chunks_exact(ENTRY_LEN) {
+    for raw in bytes[count_end..].as_chunks::<ENTRY_LEN>().0 {
         let id = ObjectId::from_bytes(raw[..ID_LEN].try_into().map_err(|_| corrupt("bad id"))?);
         if previous.is_some_and(|p| p >= id) {
             return Err(corrupt("index entries are not sorted"));

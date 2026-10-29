@@ -106,4 +106,6 @@ pub enum WarningKind {
     Unsupported,
     /// The entry or one of its attributes could not be restored.
     NotRestored,
+    /// A plugin failed; the file was kept as a conflict copy.
+    Plugin,
 }
