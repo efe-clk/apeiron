@@ -162,6 +162,8 @@ Every operation takes one plain request value and returns one plain result value
 | `remove_remote` | name | —; the remote copy itself is not touched | No |
 | `push` | remote name, ref name (default `main`) | `TransferReport`: snapshot the remote ref points to now, the one before, objects and stored bytes copied; `conflict` if the remote has snapshots this copy does not | Yes |
 | `pull` | remote name, ref name (default `main`) | `TransferReport`, the same for the local ref; `conflict` if the local ref has snapshots the remote does not | Yes |
+| `git_import` | Git repository path, ref prefix (default `git`) | `GitImportReport`: commits and tags stored, refs moved (Git name, ref, Git id, snapshot, previous), skipped refs with the reason, stale refs ([GIT.md](GIT.md)) | Yes |
+| `git_export` | Git repository path (created bare if missing), ref prefix | `GitExportReport`: commits and tags written, refs updated, skipped refs, Git ids not reproduced | Yes |
 | `sync` | folder, remote name, ref name (default `sync/<folder name>`), mode (`two-way`, `send` or `receive`), dry run | `SyncReport`: ref, action (`up_to_date`, `sent`, `received` or `merged`), snapshot, the backup made, what was fetched and pushed, folder changes, conflicts with their copies, paths left for the next round, warnings, rounds run ([SYNC.md](SYNC.md)); `conflict` in `send` mode when the remote has snapshots this copy does not | Yes |
 
 ### 8.4 Naming a snapshot

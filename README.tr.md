@@ -54,6 +54,7 @@ Her katman yalnızca hemen altındaki katmanı kullanır. Ayrıntılar: [docs/AR
 | C ABI | — | Kararlı C arayüzü; `unsafe` kullanabilir | Planlandı |
 | CLI | `apeiron-cli` | `apeiron` komutu ([docs/CLI.tr.md](docs/CLI.tr.md)) | Devam ediyor |
 | Arka plan hizmeti | `apeiron-daemon` | Zamanlanmış işler ve geri yükleme testi ([docs/DAEMON.tr.md](docs/DAEMON.tr.md)) | Tamamlandı |
+| Git | `apeiron-git` | Git depolarını aynı commit kimlikleriyle içe ve dışa aktarma ([docs/GIT.tr.md](docs/GIT.tr.md)) | Tamamlandı |
 | Eklentiler | — | WebAssembly eklenti ortamı | Planlandı |
 
 Planlanan katmanların crate adları, o katmana başlanırken belirlenir.

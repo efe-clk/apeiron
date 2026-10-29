@@ -200,6 +200,17 @@ apeiron --repo ~/apeiron sync ~/Documents origin
 
 From then on, run `apeiron sync` on either computer, or let the background service do it (section 8, `do = "sync"`, `every = "15m"`). Each run backs up the folder first, so every state stays in the history and can be restored. When both computers changed the same file differently, both versions are kept: the other one appears beside it as `name (conflict COMPUTER DATE TIME).ext`. Look at both, keep what you want and delete the copy; the next sync spreads that too.
 
+### 6.6 A Git repository
+
+A Git project can be kept in Apeiron with its whole history ([GIT.md](GIT.md)):
+
+```bash
+apeiron git import ~/code/project           # branches and tags become git/heads/…, git/tags/…
+apeiron git export ~/restored/project.git   # the same history, with the same commit ids
+```
+
+Run `git import` again to store new commits; after `git export`, `git clone ~/restored/project.git` gives a working copy.
+
 ## 7. Routine
 
 | How often | Command | Why |

@@ -200,6 +200,17 @@ apeiron --repo ~/apeiron sync ~/Documents origin
 
 Bundan sonra `apeiron sync` komutunu iki bilgisayardan birinde çalıştırın ya da bunu arka plan hizmetine bırakın (bölüm 8, `do = "sync"`, `every = "15m"`). Her çalışma önce klasörü yedekler; böylece her hâl geçmişte kalır ve geri yüklenebilir. İki bilgisayar aynı dosyayı farklı değiştirdiyse iki sürüm de tutulur: öteki, yanında `ad (conflict BİLGİSAYAR TARİH SAAT).uzantı` olarak görünür. İkisine bakın, istediğinizi tutun ve kopyayı silin; sonraki senkron bunu da yayar.
 
+### 6.6 Bir Git deposu
+
+Bir Git projesi tüm geçmişiyle Apeiron'da tutulabilir ([GIT.tr.md](GIT.tr.md)):
+
+```bash
+apeiron git import ~/code/project           # dallar ve etiketler git/heads/…, git/tags/… olur
+apeiron git export ~/restored/project.git   # aynı geçmiş, aynı commit kimlikleriyle
+```
+
+Yeni commit'leri saklamak için `git import`'u yeniden çalıştırın; `git export`'tan sonra `git clone ~/restored/project.git` bir çalışma kopyası verir.
+
 ## 7. Düzen
 
 | Ne sıklıkla | Komut | Neden |

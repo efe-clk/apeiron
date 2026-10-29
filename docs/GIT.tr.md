@@ -2,7 +2,7 @@
 
 # Apeiron ve Git
 
-> **Durum: Devam ediyor.** Aşama 3'ün 1. işinin tasarımıdır ([ROADMAP.tr.md](ROADMAP.tr.md) §5): bir Git deposunu geçmişiyle birlikte içe almak ve geri dışa aktarmak. Arkasındaki karar ADR-021'dir ([DECISIONS.tr.md](DECISIONS.tr.md)).
+> **Durum: Tamamlandı.** Aşama 3'ün 1. işinin tasarımıdır ([ROADMAP.tr.md](ROADMAP.tr.md) §5): bir Git deposunu geçmişiyle birlikte içe almak ve geri dışa aktarmak. Arkasındaki karar ADR-021'dir ([DECISIONS.tr.md](DECISIONS.tr.md)).
 
 Aşama 3, gerçek bir Git deposu Apeiron'a alınıp geri verilebildiğinde biter. "Geri" katı ölçülür: yeniden dışa aktarılan her commit ve açıklamalı etiket, sahip olduğu Git nesne kimliğinin aynısını alır; böylece Git'teki geçmiş değişmez, imzalar geçerli kalır ve `git fsck` hiçbir şey bulmaz.
 
@@ -10,8 +10,8 @@ Aşama 3, gerçek bir Git deposu Apeiron'a alınıp geri verilebildiğinde biter
 
 | Komut | Ne yapar | Durum |
 | --- | --- | --- |
-| `apeiron git import <git-repo> [--prefix <name>]` | Bir Git deposunun her dalını ve etiketini tüm geçmişiyle snapshot olarak saklar; ref'ler `<prefix>/heads/…` ve `<prefix>/tags/…` olur (varsayılan önek `git`). Yeniden çalıştırılınca yalnızca yeni commit'leri saklar | Planlandı |
-| `apeiron git export <git-repo> [--prefix <name>]` | Bu ref'lerin snapshot'larını Git nesneleri olarak bir Git deposuna yazar (yoksa çıplak bir depo oluşturur) ve dallarını ve etiketlerini onlara yöneltir | Planlandı |
+| `apeiron git import <git-repo> [--prefix <name>]` | Bir Git deposunun her dalını, etiketini ve uzak takip dalını tüm geçmişiyle snapshot olarak saklar; ref'ler `<prefix>/heads/…`, `<prefix>/tags/…` ve `<prefix>/remotes/…` olur (varsayılan önek `git`). Yeniden çalıştırılınca yalnızca yeni commit'leri saklar | Tamamlandı |
+| `apeiron git export <git-repo> [--prefix <name>]` | Bu ref'lerin snapshot'larını Git nesneleri olarak bir Git deposuna yazar (yoksa çıplak bir depo oluşturur) ve dallarını, etiketlerini ve uzak takip dallarını onlara yöneltir; bir commit başka bir kimlik aldıysa çıkış kodu 3'tür | Tamamlandı |
 
 Git'ten yapılan snapshot'lar sıradan snapshot'lardır: `apeiron log git/heads/main`, `apeiron diff`, `apeiron restore git/heads/main ~/checkout` ve bir uzak depoya push onlarla çalışır. Apeiron'da yapılan bir snapshot, örneğin bir yedek, ref'i önekin altındaysa yeni bir commit olur.
 
@@ -57,11 +57,11 @@ Dışa aktarma bir dosya kipini `100` ve ardından sekizlik `mode` olarak geri y
 
 Git, `feature/ABC-123` içindeki büyük harfler gibi, Apeiron ref adlarının izin vermediği adlara izin verir (FORMAT.tr.md §9.3). Bir Git adının her parçası kaçışlanır: `a-z`, `0-9`, `.` ve `-` kalır; bir parçanın başındaki `.` ve diğer her bayt `_` ve iki küçük onaltılık basamak olur. `feature/ABC-123`, `git/heads/feature/_41_42_43-123` olur; dışa aktarma bunu geri çevirir. Kaçıştan sonra 200 bayttan uzun bir ad bir uyarıyla atlanır.
 
-Yalnızca `refs/heads/` ve `refs/tags/` içe alınır. `HEAD`, uzak takip ref'leri, notlar ve stash'ler dışarıda kalır ve listelenir. Git'te silinen bir dal Apeiron ref'ini korur; içe alma onu eskimiş olarak raporlar.
+Yalnızca `refs/heads/`, `refs/tags/` ve `refs/remotes/` içe alınır; bir klonda dalların çoğu uzak takip dallarıdır. `HEAD`, `origin/HEAD` gibi sembolik ref'ler, notlar ve stash'ler dışarıda kalır ve listelenir. Git'te silinen bir dal Apeiron ref'ini korur; içe alma onu eskimiş olarak raporlar.
 
 ## 4. Çalıştırmalar: içe alma
 
-1. Her dalı ve etiketi oku. Bir tree'ye ya da blob'a işaret eden bir etiket ya da etiket zinciri bir uyarıyla atlanır.
+1. Her dalı, etiketi ve uzak takip dalını oku. Bir tree'ye ya da blob'a işaret eden bir etiket ya da etiket zinciri bir uyarıyla atlanır.
 2. Zaten saklananı bul: önekin altındaki mevcut ref'lerin snapshot'larını dolaş ve `git.id` değerlerini oku.
 3. Eksik commit'leri, ebeveynler çocuklardan önce olmak üzere sakla. Bir çalıştırma içinde daha önce görülen blob'lar ve tree'ler yeniden okunmaz.
 4. Her ref'i karşılaştır ve değiştir ile snapshot'ına taşı. Git'te geriye giden (zorla push edilen) bir dal ref'i de taşır; reflog eski snapshot'ı tutar.
@@ -100,8 +100,10 @@ Git alanları olmayan bir snapshot; snapshot'ın yazarıyla (ya da `Apeiron <ape
 
 | Crate | Görev | Durum |
 | --- | --- | --- |
-| `apeiron-git` | İçe ve dışa aktarma; `gix`'i yalnızca o kullanır | Planlandı |
-| `apeiron` | `git_import` ve `git_export` işleri (API.tr.md §8.3) | Planlandı |
-| `apeiron-cli` | `apeiron git import` ve `apeiron git export` | Planlandı |
+| `apeiron-git` | İçe ve dışa aktarma; `gix`'i yalnızca o kullanır | Tamamlandı |
+| `apeiron` | `git_import` ve `git_export` işleri (API.tr.md §8.3) | Tamamlandı |
+| `apeiron-cli` | `apeiron git import` ve `apeiron git export` | Tamamlandı |
 
 Nesneleri ve ref'leri `gix` (gitoxide) 0.85 okur ve yazar (VISION.tr.md); Rust 1.85 ile derlenen en yeni sürüm odur. Nesneler ham bayt olarak çözülür ve yazılır; böylece gix'in normalleştirdiği hiçbir şey bir kimliği değiştiremez.
+
+Testler `git` ile; bir birleştirme, büyük harfli bir dal, çalıştırılabilir bir dosya, bir sembolik bağ, bir alt modül girdisi, iki tür etiket, bir imza başlığı ve Latin-1 bir mesaj içeren bir depo kurar ve her kimliğin geri geldiğini denetler. Gerçek depolar da aynı şekilde geri geldi: 3.568 commit'lik bir depo; 4.265 commit ve 13 etiketli bir depo; ve 22 saniyede içe alınıp 19 saniyede dışa aktarılan 27.156 commit ve 70 etiketli bir depo.

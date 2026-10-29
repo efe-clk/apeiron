@@ -19,6 +19,10 @@ pub use apeiron_core::{
     GcOptions as GcRequest, GcReport, KeyInfo, KeyKind, ObjectId, RefOp, ReflogEntry, Remote,
     RepairReport, Time, TransferReport, VerifyReport,
 };
+pub use apeiron_git::{
+    ExportReport as GitExportReport, ImportReport as GitImportReport, RefUpdate as GitRefUpdate,
+    Skipped as GitSkipped,
+};
 pub use apeiron_services::{
     ArchiveFormat, BackupOptions as BackupRequest, BackupOutcome as BackupReport, Change,
     ChangeKind, Conflict, ConflictKind, EntryInfo, ExportOutcome as ExportReport, Kind, Name,
@@ -31,6 +35,6 @@ pub use job::Job;
 pub use repo::Repository;
 pub use types::{
     AddedKey, CloneReport, CloneRequest, ClonedRef, DeleteRefRequest, DiffRequest, ExportRequest,
-    ListRequest, LogPage, LogRequest, RefInfo, RepoInfo, RestoreRequest, RestoreTestRequest,
-    SnapshotInfo, SyncRequest, TransferRequest,
+    GitRequest, ListRequest, LogPage, LogRequest, RefInfo, RepoInfo, RestoreRequest,
+    RestoreTestRequest, SnapshotInfo, SyncRequest, TransferRequest,
 };

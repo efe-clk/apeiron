@@ -11,13 +11,13 @@ use crate::job::Job;
 use crate::spec;
 use crate::types::{
     AddedKey, CloneReport, CloneRequest, ClonedRef, DeleteRefRequest, DiffRequest, ExportRequest,
-    ListRequest, LogPage, LogRequest, RefInfo, RepoInfo, RestoreRequest, RestoreTestRequest,
-    SnapshotInfo, SyncRequest, TransferRequest,
+    GitRequest, ListRequest, LogPage, LogRequest, RefInfo, RepoInfo, RestoreRequest,
+    RestoreTestRequest, SnapshotInfo, SyncRequest, TransferRequest,
 };
 use crate::{
     ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo, ExportReport, GcReport,
-    GcRequest, KeyInfo, ObjectId, Phase, ReflogEntry, Remote, RepairReport, RestoreReport,
-    RestoreTestReport, SyncReport, TransferReport, VerifyReport,
+    GcRequest, GitExportReport, GitImportReport, KeyInfo, ObjectId, Phase, ReflogEntry, Remote,
+    RepairReport, RestoreReport, RestoreTestReport, SyncReport, TransferReport, VerifyReport,
 };
 
 /// An open repository. Cloning is cheap; clones share the same state and can
@@ -216,6 +216,39 @@ impl Repository {
             // Refs may have moved even when a later step failed.
             *repo.write() = core;
             Ok(report?)
+        })
+    }
+
+    /// Stores every branch, tag and remote-tracking branch of a Git
+    /// repository, with its history, under `<prefix>/` (GIT.md §4).
+    pub fn git_import(&self, request: GitRequest) -> Result<Job<GitImportReport>> {
+        let repo = self.clone();
+        Job::spawn("git-import", move |ctl| {
+            ctl.update(|p| p.phase = Phase::Storing);
+            let _writer = repo.lock_writer();
+            let _lock = core::RepoLock::shared(repo.path())?;
+            let mut core = repo.read().reopen()?;
+            let report = apeiron_git::import(&mut core, &request.path, &request.prefix, &mut |n| {
+                git_progress(ctl, n)
+            });
+            *repo.write() = core;
+            ctl.update(|p| p.phase = Phase::Done);
+            Ok(report?)
+        })
+    }
+
+    /// Writes the snapshots of the refs under `<prefix>/` into a Git
+    /// repository, created bare if it does not exist (GIT.md §5).
+    pub fn git_export(&self, request: GitRequest) -> Result<Job<GitExportReport>> {
+        let repo = self.clone();
+        Job::spawn("git-export", move |ctl| {
+            ctl.update(|p| p.phase = Phase::Exporting);
+            let core = repo.view()?;
+            let report = apeiron_git::export(&core, &request.path, &request.prefix, &mut |n| {
+                git_progress(ctl, n)
+            })?;
+            ctl.update(|p| p.phase = Phase::Done);
+            Ok(report)
         })
     }
 
@@ -508,6 +541,15 @@ fn default_sync_ref(folder: &Path) -> Result<String> {
     let name = name.trim_start_matches('.').trim_end_matches(".lock");
     let name = if name.is_empty() { "folder" } else { name };
     Ok(format!("sync/{name}"))
+}
+
+/// Reports the commits and tags done and stops once cancelled.
+fn git_progress(ctl: &services::Control, done: u64) -> apeiron_git::Result<()> {
+    ctl.update(|p| p.items_done = done);
+    if ctl.is_cancelled() {
+        return Err(apeiron_git::Error::Cancelled);
+    }
+    Ok(())
 }
 
 /// The name `clone` gives the remote it copied.

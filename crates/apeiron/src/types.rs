@@ -226,3 +226,25 @@ impl SyncRequest {
         }
     }
 }
+
+/// Which Git repository to import from or export to.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GitRequest {
+    pub path: PathBuf,
+    /// The folder of refs for the repository; `git` by default.
+    #[serde(default = "default_git_prefix")]
+    pub prefix: String,
+}
+
+fn default_git_prefix() -> String {
+    "git".to_owned()
+}
+
+impl GitRequest {
+    pub fn new(path: impl Into<PathBuf>) -> Self {
+        GitRequest {
+            path: path.into(),
+            prefix: default_git_prefix(),
+        }
+    }
+}

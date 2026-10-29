@@ -54,6 +54,7 @@ Each layer uses only the layer directly below it. Details: [docs/ARCHITECTURE.md
 | C ABI | — | Stable C interface; may use `unsafe` | Planned |
 | CLI | `apeiron-cli` | The `apeiron` command ([docs/CLI.md](docs/CLI.md)) | In progress |
 | Background service | `apeiron-daemon` | Scheduled jobs and the restore test ([docs/DAEMON.md](docs/DAEMON.md)) | Done |
+| Git | `apeiron-git` | Import and export of Git repositories with the same commit ids ([docs/GIT.md](docs/GIT.md)) | Done |
 | Plugins | — | WebAssembly plugin host | Planned |
 
 Crate names for planned layers are chosen when the layer is started.

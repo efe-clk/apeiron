@@ -58,7 +58,7 @@ Apeiron; sürüm kontrolü, arşivleme, yedekleme, senkronizasyon ve bütünlük
 
 **Aşama 3 — Geliştirici ve ekosistem.** Devam ediyor. İşler `docs/ROADMAP.md` §5'te, sırasıyla:
 
-1. Git içe/dışa aktarma (`docs/GIT.md`; dışa aktarılan commit'ler aynı kimliği almalı).
+1. ~~Git içe/dışa aktarma (`docs/GIT.md`).~~ Tamamlandı (2026-10-29); aşamanın çıkış kriteri karşılandı.
 2. Dal ve birleştirme.
 3. Arama.
 4. C ABI ve Python SDK.

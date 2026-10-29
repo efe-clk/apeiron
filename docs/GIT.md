@@ -2,7 +2,7 @@
 
 # Apeiron and Git
 
-> **Status: In progress.** This is the design of Stage 3 work item 1 ([ROADMAP.md](ROADMAP.md) §5): importing a Git repository with its history and exporting it back. The decision behind it is ADR-021 ([DECISIONS.md](DECISIONS.md)).
+> **Status: Done.** This is the design of Stage 3 work item 1 ([ROADMAP.md](ROADMAP.md) §5): importing a Git repository with its history and exporting it back. The decision behind it is ADR-021 ([DECISIONS.md](DECISIONS.md)).
 
 Stage 3 ends when a real Git repository can be moved into Apeiron and back. "Back" is measured strictly: every commit and annotated tag exported again gets the same Git object id it had, so the history in Git is unchanged, signatures stay valid and `git fsck` finds nothing.
 
@@ -10,8 +10,8 @@ Stage 3 ends when a real Git repository can be moved into Apeiron and back. "Bac
 
 | Command | What it does | Status |
 | --- | --- | --- |
-| `apeiron git import <git-repo> [--prefix <name>]` | Stores every branch and tag of a Git repository, with its whole history, as snapshots; refs become `<prefix>/heads/…` and `<prefix>/tags/…` (default prefix `git`). Run again, it stores only new commits | Planned |
-| `apeiron git export <git-repo> [--prefix <name>]` | Writes the snapshots of those refs as Git objects into a Git repository, created bare if it does not exist, and points its branches and tags at them | Planned |
+| `apeiron git import <git-repo> [--prefix <name>]` | Stores every branch, tag and remote-tracking branch of a Git repository, with its whole history, as snapshots; refs become `<prefix>/heads/…`, `<prefix>/tags/…` and `<prefix>/remotes/…` (default prefix `git`). Run again, it stores only new commits | Done |
+| `apeiron git export <git-repo> [--prefix <name>]` | Writes the snapshots of those refs as Git objects into a Git repository, created bare if it does not exist, and points its branches, tags and remote-tracking branches at them; exit code 3 if a commit got another id | Done |
 
 Snapshots made from Git are ordinary snapshots: `apeiron log git/heads/main`, `apeiron diff`, `apeiron restore git/heads/main ~/checkout` and push to a remote all work on them. A snapshot made in Apeiron, such as a backup, becomes a new commit when its ref is under the prefix.
 
@@ -57,11 +57,11 @@ Export writes a file mode back as `100` followed by `mode` in octal, so the old 
 
 Git allows names that Apeiron ref names do not (FORMAT.md §9.3), such as capitals in `feature/ABC-123`. Each part of a Git name is escaped: `a-z`, `0-9`, `.` and `-` stay, a `.` at the start of a part and every other byte become `_` and two lowercase hex digits. `feature/ABC-123` becomes `git/heads/feature/_41_42_43-123`; export reverses it. A name longer than 200 bytes after escaping is skipped with a warning.
 
-Only `refs/heads/` and `refs/tags/` are imported. `HEAD`, remote-tracking refs, notes and stashes are left out and listed. A branch deleted in Git keeps its Apeiron ref; the import reports it as stale.
+Only `refs/heads/`, `refs/tags/` and `refs/remotes/` are imported; in a clone most branches are remote-tracking ones. `HEAD`, symbolic refs such as `origin/HEAD`, notes and stashes are left out and listed. A branch deleted in Git keeps its Apeiron ref; the import reports it as stale.
 
 ## 4. Import
 
-1. Read every branch and tag. A tag that points to a tree or a blob, or a chain of tags, is skipped with a warning.
+1. Read every branch, tag and remote-tracking branch. A tag that points to a tree or a blob, or a chain of tags, is skipped with a warning.
 2. Find what is already stored: walk the snapshots of the existing refs under the prefix and read their `git.id`.
 3. Store the commits that are missing, parents before children. Blobs and trees met before are not read again within one run.
 4. Move each ref to its snapshot with compare-and-swap. A Git branch that moved backwards (force-pushed) moves the ref too; the reflog keeps the old snapshot.
@@ -100,8 +100,10 @@ A snapshot without Git fields becomes a commit with the snapshot's author (or `A
 
 | Crate | Role | Status |
 | --- | --- | --- |
-| `apeiron-git` | Import and export; only it uses `gix` | Planned |
-| `apeiron` | `git_import` and `git_export` jobs (API.md §8.3) | Planned |
-| `apeiron-cli` | `apeiron git import` and `apeiron git export` | Planned |
+| `apeiron-git` | Import and export; only it uses `gix` | Done |
+| `apeiron` | `git_import` and `git_export` jobs (API.md §8.3) | Done |
+| `apeiron-cli` | `apeiron git import` and `apeiron git export` | Done |
 
 `gix` (gitoxide) 0.85 reads and writes the objects and refs (VISION.md); it is the newest release that builds with Rust 1.85. Objects are parsed and written as raw bytes, so nothing gix normalizes can change an id.
+
+The tests build a repository with `git` that has a merge, a branch with capitals, an executable, a symbolic link, a submodule entry, both kinds of tag, a signature header and a Latin-1 message, and check that every id comes back. Real repositories came back the same way: one of 3,568 commits; one of 4,265 commits and 13 tags; and one of 27,156 commits and 70 tags, imported in 22 seconds and exported in 19.

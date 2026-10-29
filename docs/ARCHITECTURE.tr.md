@@ -40,7 +40,7 @@ Temel tasarım fikirleri:
 | --- | --- | --- | --- |
 | Arayüzler | CLI, arka plan hizmeti, masaüstü, web, mobil | `apeiron-cli`, `apeiron-daemon` | Devam ediyor (CLI ve arka plan hizmeti tamamlandı) |
 | Herkese açık API | Kararlı Rust API; diğer diller için C ABI; üstünde SDK'lar | `apeiron` | Devam ediyor (Rust API) |
-| Hizmetler | Sürümleme, arşiv, yedek, senkron, arama, politika | `apeiron-services` | Devam ediyor (yedek, geri yükleme, fark, senkron) |
+| Hizmetler | Sürümleme, arşiv, yedek, senkron, arama, politika | `apeiron-services`, `apeiron-git` | Devam ediyor (yedek, geri yükleme, fark, senkron, Git içe ve dışa aktarma) |
 | Çekirdek | Nesne modeli, depolama motoru, bütünlük, şifreleme, işlem günlüğü | `apeiron-core` | Devam ediyor |
 | Depolama hedefleri | Yerel disk, harici disk, ağ depolaması, uzak hedefler | `apeiron-core` (`Store`, klasörler), `apeiron-remote` (SFTP, S3) | Tamamlandı |
 | Eklentiler | Type driver'lar, storage backend'ler, içe/dışa aktarıcılar, hook'lar | — | Planlandı |

@@ -74,11 +74,11 @@ The work items are done in this order, because each builds on the one before: re
 
 **Exit criterion:** A real Git repository can be moved into Apeiron and back.
 
-The exit criterion comes first. The plugin system comes before the text diff plugin, which is its first user.
+The exit criterion comes first; it was met on 2026-10-29 with item 1, and the stage goes on with the other items. The plugin system comes before the text diff plugin, which is its first user.
 
 | # | Work item | Status |
 | --- | --- | --- |
-| 1 | Git import/export ([GIT.md](GIT.md); goal: Git network protocol) | In progress |
+| 1 | Git import/export ([GIT.md](GIT.md); the Git network protocol remains a goal) | Done |
 | 2 | Branching and merging | Planned |
 | 3 | Search | Planned |
 | 4 | C ABI and Python SDK | Planned |

@@ -424,3 +424,48 @@ fn daemon_run_stops_cleanly_on_sigterm() {
     assert!(child.wait().unwrap().success());
     assert!(fs::read_to_string(&log).unwrap().contains("stopped"));
 }
+
+#[test]
+fn git_import_and_export_keep_commit_ids() {
+    if Command::new("git").arg("--version").output().is_err() {
+        return;
+    }
+    let s = Setup::new();
+    fs::write(s.root.join("gitconfig"), "").unwrap();
+    let git = |dir: &str, args: &[&str]| {
+        let out = Command::new("git")
+            .args(args)
+            .current_dir(s.root.join(dir))
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", s.root.join("gitconfig"))
+            .env("GIT_AUTHOR_NAME", "A")
+            .env("GIT_AUTHOR_EMAIL", "a@example.org")
+            .env("GIT_COMMITTER_NAME", "A")
+            .env("GIT_COMMITTER_EMAIL", "a@example.org")
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8(out.stdout).unwrap()
+    };
+    git("src", &["init", "-q"]);
+    git("src", &["add", "."]);
+    git("src", &["commit", "-q", "-m", "first"]);
+    git("src", &["tag", "-a", "v1", "-m", "one"]);
+
+    let doc = s.json(&["git", "import", &s.path("src")]);
+    assert_eq!(
+        (doc["commits"].as_u64(), doc["tags"].as_u64()),
+        (Some(1), Some(1))
+    );
+    assert!(s.ok(&["ls", "git/tags/v1"]).contains("a.txt"));
+    let out = s.ok(&["git", "export", &s.path("out.git")]);
+    assert!(out.contains("Wrote 1 commit and 1 tag"), "{out}");
+    let refs = |dir: &str| git(dir, &["for-each-ref", "refs/heads", "refs/tags"]);
+    assert_eq!(refs("out.git"), refs("src"));
+    let missing = s.run(&["--json", "git", "import", &s.path("nothing")]);
+    assert_eq!(code(&missing), Some(1));
+}

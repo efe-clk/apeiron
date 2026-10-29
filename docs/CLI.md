@@ -73,6 +73,8 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | `apeiron remote remove <name>` | Forgets a remote; the copy itself is not touched | Done |
 | `apeiron clone <url> <path>` | Makes a new repository from a remote copy, with the same password, pulls every ref and names the remote `origin`; the way to set up a second device | Done |
 | `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run]` | Keeps a folder equal on several devices through a remote: backs it up, pulls, merges, changes the folder and pushes ([SYNC.md](SYNC.md)); prints `+`, `-` and `~` for added, removed and changed files and one line per conflict | Done |
+| `apeiron git import <git-repo> [--prefix <name>]` | Stores every branch, tag and remote-tracking branch of a Git repository, with its history, under `git/` ([GIT.md](GIT.md)) | Done |
+| `apeiron git export <git-repo> [--prefix <name>]` | Writes them back into a Git repository with the same commit ids; exit code 3 if one could not be reproduced | Done |
 | `apeiron push <remote> [<ref>]` | Copies the snapshots of a ref (default `main`) to a remote and moves the ref there | Done |
 | `apeiron pull <remote> [<ref>]` | Copies the snapshots of a ref from a remote and moves the local ref forward | Done |
 | `apeiron key remove <id>` | Removes a password or recovery key; the last one cannot be removed | Done |

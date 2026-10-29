@@ -21,8 +21,8 @@ use std::time::{Duration, Instant};
 
 use apeiron::{
     ArchiveFormat, BackupRequest, ChangeKind, CloneRequest, ConflictKind, DiffRequest, Error,
-    ErrorKind, ExportRequest, GcRequest, Job, KeyKind, ListRequest, LogRequest, Name, Repository,
-    RestoreRequest, RestoreTestRequest, SyncAction, SyncMode, SyncReport, SyncRequest,
+    ErrorKind, ExportRequest, GcRequest, GitRequest, Job, KeyKind, ListRequest, LogRequest, Name,
+    Repository, RestoreRequest, RestoreTestRequest, SyncAction, SyncMode, SyncReport, SyncRequest,
     TransferReport, TransferRequest, Warning,
 };
 use clap::{Parser, Subcommand};
@@ -156,6 +156,11 @@ enum Command {
         #[command(subcommand)]
         command: KeyCommand,
     },
+    /// Import a Git repository with its history, or export it back
+    Git {
+        #[command(subcommand)]
+        command: GitCommand,
+    },
     /// Manage the remote copies of the repository
     Remote {
         #[command(subcommand)]
@@ -214,6 +219,24 @@ enum DaemonCommand {
     Once,
     /// Show each job's last run, its result and the next run
     Status,
+}
+
+#[derive(Subcommand)]
+enum GitCommand {
+    /// Store every branch and tag of a Git repository as snapshots
+    Import {
+        path: PathBuf,
+        /// Folder of refs for the repository
+        #[arg(long, default_value = "git")]
+        prefix: String,
+    },
+    /// Write the snapshots under the prefix into a Git repository
+    Export {
+        path: PathBuf,
+        /// Folder of refs for the repository
+        #[arg(long, default_value = "git")]
+        prefix: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -653,6 +676,54 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     out.result(&serde_json::json!({ "removed": removed }), |_| {
                         say!("Removed key {}", format::short_key(&removed));
                     });
+                }
+            }
+            Ok(0)
+        }
+        Command::Git { command } => {
+            let repo = open(cli.repo, password_file)?;
+            match command {
+                GitCommand::Import { path, prefix } => {
+                    let request = GitRequest { path, prefix };
+                    let report = watch(out, repo.git_import(request)?)?;
+                    out.result(&report, |r| {
+                        for skipped in &r.skipped {
+                            say!("skipped {}: {}", skipped.name, skipped.reason);
+                        }
+                        for name in &r.stale {
+                            say!("kept {name}: gone from the Git repository");
+                        }
+                        for update in &r.refs {
+                            say!("{} → {}", update.git, update.ref_name);
+                        }
+                        say!(
+                            "Imported {} and {}; {} moved",
+                            format::count(r.commits, "commit"),
+                            format::count(r.tags, "tag"),
+                            format::count(r.refs.len() as u64, "ref")
+                        );
+                    });
+                }
+                GitCommand::Export { path, prefix } => {
+                    let request = GitRequest { path, prefix };
+                    let report = watch(out, repo.git_export(request)?)?;
+                    out.result(&report, |r| {
+                        for skipped in &r.skipped {
+                            say!("skipped {}: {}", skipped.name, skipped.reason);
+                        }
+                        for id in &r.inexact {
+                            say!("warning: commit {id} was written with another id");
+                        }
+                        say!(
+                            "Wrote {} and {}; {} updated",
+                            format::count(r.commits, "commit"),
+                            format::count(r.tags, "tag"),
+                            format::count(r.refs.len() as u64, "ref")
+                        );
+                    });
+                    if !report.inexact.is_empty() {
+                        return Ok(EXIT_WARNINGS);
+                    }
                 }
             }
             Ok(0)

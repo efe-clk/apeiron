@@ -140,3 +140,18 @@ impl From<apeiron_services::Error> for Error {
         }
     }
 }
+
+impl From<apeiron_git::Error> for Error {
+    fn from(e: apeiron_git::Error) -> Self {
+        use apeiron_git::Error as E;
+        let message = e.to_string();
+        match e {
+            E::Core(e) => e.into(),
+            E::Git { path, .. } => Error::new(ErrorKind::Io, message).with_path(path),
+            E::Unsupported(_) => Error::new(ErrorKind::Unsupported, message),
+            E::InvalidObject { .. } => Error::new(ErrorKind::Corrupt, message),
+            E::Cancelled => Error::new(ErrorKind::Cancelled, message),
+            _ => Error::new(ErrorKind::Internal, message),
+        }
+    }
+}

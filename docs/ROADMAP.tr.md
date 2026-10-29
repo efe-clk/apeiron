@@ -74,11 +74,11 @@ Windows'ta yeniden adlandırmalar küçük `apeiron-sys` crate'i üzerinden `MOV
 
 **Çıkış kriteri:** Gerçek bir Git deposu Apeiron'a taşınıp geri alınabiliyor.
 
-Önce çıkış kriteri gelir. Eklenti sistemi, ilk kullanıcısı olan metin diff eklentisinden önce gelir.
+Önce çıkış kriteri gelir; 2026-10-29'da 1. işle karşılandı ve aşama diğer işlerle sürüyor. Eklenti sistemi, ilk kullanıcısı olan metin diff eklentisinden önce gelir.
 
 | # | İş | Durum |
 | --- | --- | --- |
-| 1 | Git içe/dışa aktarma ([GIT.tr.md](GIT.tr.md); hedef: Git ağ protokolü) | Devam ediyor |
+| 1 | Git içe/dışa aktarma ([GIT.tr.md](GIT.tr.md); Git ağ protokolü hedef olarak kalıyor) | Tamamlandı |
 | 2 | Dal ve birleştirme | Planlandı |
 | 3 | Arama | Planlandı |
 | 4 | C ABI ve Python SDK | Planlandı |
