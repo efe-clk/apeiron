@@ -399,6 +399,21 @@ impl Repository {
         Ok(chunk)
     }
 
+    /// Splits `reader` into chunks as a backup would and returns each
+    /// chunk's id and length, without storing anything.
+    pub fn chunk_ids<R: Read>(&self, reader: R) -> Result<Vec<(ObjectId, u32)>> {
+        let mut ids = Vec::new();
+        for chunk in self.config.chunker.chunks(reader) {
+            let chunk = chunk?;
+            // Chunks are at most `max_size` (16 MiB), so the length fits in a u32.
+            ids.push((
+                self.keys.id.object_id(ObjectType::Chunk, &chunk),
+                chunk.len() as u32,
+            ));
+        }
+        Ok(ids)
+    }
+
     /// Stored snapshots whose hex id starts with `prefix`, sorted.
     pub fn snapshots_with_prefix(&self, prefix: &str) -> Vec<ObjectId> {
         let mut ids: Vec<_> = self

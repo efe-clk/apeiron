@@ -60,6 +60,8 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | `apeiron diff <snapshot> <snapshot>` | İki snapshot arasında eklenen, silinen ve değişen dosyaları listeler | Tamamlandı |
 | `apeiron restore <snapshot> <target> [--path <path>]` | Bir snapshot'ı (ya da içindeki bir yolu) yeni ya da boş bir klasöre yazar | Tamamlandı |
 | `apeiron export <snapshot> <file> [--format <format>] [--path <path>]` | Bir snapshot'ı (ya da içindeki bir yolu) yeni bir `.tar`, `.zip` ya da `.7z` dosyasına yazar; `--format` verilmezse biçimi dosya uzantısı belirler | Tamamlandı |
+| `apeiron restore-test [<snapshot>] [--sample-mb <n>]` | Bir snapshot'tan rastgele bir örneği (varsayılan 100 MiB) geçici bir klasöre geri yükler, her dosyayı denetler ve klasörü siler; bir dosya bozuksa çıkış kodu 4'tür | Tamamlandı |
+| `apeiron daemon run\|once\|status` | Zamanlanmış işleri çalıştırır ([DAEMON.tr.md](DAEMON.tr.md)) | Tamamlandı |
 | `apeiron refs` | Tüm ref'leri ve gösterdikleri snapshot'ları listeler | Tamamlandı |
 | `apeiron verify` | Her paketi, indeksi ve nesneyi okuyup denetler | Tamamlandı |
 | `apeiron repair` | Bayat ref kilitlerini kaldırır, kaybolan reflog satırlarını ekler ve bozuk indeks dosyalarını yeniler | Tamamlandı |

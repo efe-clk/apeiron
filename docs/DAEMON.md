@@ -2,7 +2,7 @@
 
 # Apeiron Background Service
 
-> **Status: Planned (draft, awaiting approval).** This is the design of Stage 2 work item 3 ([ROADMAP.md](ROADMAP.md) §4): the background service, scheduled jobs and the restore test. The decision behind it is ADR-019 ([DECISIONS.md](DECISIONS.md)).
+> **Status: Done.** This is the design of Stage 2 work item 3 ([ROADMAP.md](ROADMAP.md) §4): the background service, scheduled jobs and the restore test. The decision behind it is ADR-019 ([DECISIONS.md](DECISIONS.md)).
 
 The background service (daemon) runs backups and checks on a schedule, without the user. Like the CLI it uses only the public API ([API.md](API.md)).
 
@@ -10,21 +10,23 @@ The background service (daemon) runs backups and checks on a schedule, without t
 
 | Need | How | Status |
 | --- | --- | --- |
-| Back up without thinking about it | Jobs run on a schedule from a jobs file (section 3) | Planned |
-| A laptop that was off or asleep | A missed job runs once at the next chance (section 4) | Planned |
-| Copies elsewhere | A backup job can push to remotes after it succeeds | Planned |
-| Knowing that backups work | Scheduled `verify` and a restore test (section 5) | Planned |
-| Knowing when something failed | `apeiron daemon status` and a log (section 6) | Planned |
+| Back up without thinking about it | Jobs run on a schedule from a jobs file (section 3) | Done |
+| A laptop that was off or asleep | A missed job runs once at the next chance (section 4) | Done |
+| Copies elsewhere | A backup job can push to remotes after it succeeds | Done |
+| Knowing that backups work | Scheduled `verify` and a restore test (section 5) | Done |
+| Knowing when something failed | `apeiron daemon status` and a log (section 6) | Done |
 
 ## 2. Commands
 
 | Command | What it does | Status |
 | --- | --- | --- |
-| `apeiron daemon run` | Runs until stopped, starting each job when it is due | Planned |
-| `apeiron daemon once` | Runs every job that is due now, then exits | Planned |
-| `apeiron daemon status` | Shows each job's last run, its result and the next run; exit code 4 if a job's last run failed | Planned |
+| `apeiron daemon run` | Runs until stopped, starting each job when it is due | Done |
+| `apeiron daemon once` | Runs every job that is due now, then exits; exit code 4 if one of them failed | Done |
+| `apeiron daemon status` | Shows each job's last run, its result and the next run; exit code 4 if a job's last run failed | Done |
 
-The operating system starts `apeiron daemon run` at login: a systemd user unit on Linux, a launchd agent on macOS and a Task Scheduler task on Windows. The user guide gives the file for each; no administrator rights are needed. Only one daemon runs per user; a second one stops with a "locked" error.
+All three take `--jobs <file>` and `--state-dir <folder>` to use other files than the usual ones (sections 3 and 6). `apeiron restore-test [<snapshot>] [--sample-mb <n>]` runs the restore test of section 5 by hand.
+
+The operating system starts `apeiron daemon run` at login: a systemd user unit on Linux, a launchd agent on macOS and a Task Scheduler task on Windows. The user guide gives the file for each ([GUIDE.md](GUIDE.md) §8); no administrator rights are needed. Only one daemon runs per user; a second one stops with a "locked" error.
 
 ## 3. The jobs file
 
@@ -81,7 +83,7 @@ flowchart LR
 
 - A job is due when `every` has passed since its last start. With `at`, it waits until that time of day on the day it becomes due.
 - A run that was missed because the computer was off or asleep is made once at the next chance, not once for every missed period.
-- Jobs run one at a time, in the order of the file. A job that is still running when another becomes due is not interrupted.
+- Jobs run one at a time, in the order of their names. A job that is still running when another becomes due is not interrupted.
 - A job that fails is tried again after one hour, until it succeeds or its next regular run comes. A job that meets a "locked" repository (for example during garbage collection run by hand) is tried again after 10 minutes.
 - Stopping the daemon cancels the running job; the repository stays in its previous state (CLI.md §1).
 
@@ -99,7 +101,7 @@ A backup is proven only by restoring it (VISION.md). The restore test does this 
 
 | File | Folder | Content |
 | --- | --- | --- |
-| `state.json` | `~/.local/state/apeiron` on Linux, the configuration folder on macOS, `%LOCALAPPDATA%\apeiron` on Windows | Per job: last start and end, result (`ok`, `warnings` or `failed`), message, next run. Replaced atomically after every run |
+| `state.json` | `~/.local/state/apeiron` on Linux, the configuration folder on macOS, `%LOCALAPPDATA%\apeiron` on Windows | Per job: last start and end, result (`ok`, `warnings`, `failed` or `locked`) and message; `status` works out the next run from it. Replaced atomically after every run |
 | `daemon.log` | The same folder | One line per job run and per error; at 1 MiB it is renamed to `daemon.log.1` and a new one starts |
 
 ## 7. Not part of this work item
@@ -115,8 +117,8 @@ A backup is proven only by restoring it (VISION.md). The restore test does this 
 
 | Crate | Role | Status |
 | --- | --- | --- |
-| `apeiron-daemon` | Jobs file, schedule, state, restore test and the run loop; uses only the public `apeiron` crate | Planned |
-| `apeiron-cli` | The `apeiron daemon` commands | Planned |
+| `apeiron-daemon` | Jobs file, schedule, state, restore test and the run loop; uses only the public `apeiron` crate | Done |
+| `apeiron-cli` | The `apeiron daemon` commands | Done |
 
 | Need | Proposed library | Reason |
 | --- | --- | --- |

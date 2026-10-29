@@ -275,6 +275,18 @@ fn encrypted_repository_with_password_file() {
 }
 
 #[test]
+fn restore_test_checks_a_sample() {
+    let s = Setup::new();
+    s.ok(&["backup", &s.path("src")]);
+    assert!(
+        s.ok(&["restore-test"])
+            .starts_with("OK: restored and checked 2 files")
+    );
+    let doc = s.json(&["restore-test", "main", "--sample-mb", "0"]);
+    assert_eq!(doc["files"], 1);
+}
+
+#[test]
 fn push_and_pull_with_a_folder_remote() {
     let s = Setup::new();
     let src = s.path("src");
@@ -305,4 +317,97 @@ fn push_and_pull_with_a_folder_remote() {
     assert_eq!(doc["error"]["kind"], "not_found");
     s.ok(&["remote", "remove", "disk"]);
     assert_eq!(s.ok(&["remote", "list"]), "");
+}
+
+#[test]
+fn daemon_runs_due_jobs_and_shows_their_status() {
+    let s = Setup::new();
+    let jobs = s.root.join("jobs.toml");
+    let state = s.path("state");
+    let toml_path = |p: String| p.replace('\\', "/");
+    fs::write(
+        &jobs,
+        format!(
+            "[job.docs]\nrepo = \"{}\"\ndo = \"backup\"\nfolder = \"{}\"\nevery = \"day\"\n\n\
+             [job.test]\nrepo = \"{}\"\ndo = \"restore-test\"\nevery = \"week\"\n",
+            toml_path(s.path("repo")),
+            toml_path(s.path("src")),
+            toml_path(s.path("repo")),
+        ),
+    )
+    .unwrap();
+    let daemon = |command: &str| {
+        let args = [
+            "daemon",
+            command,
+            "--jobs",
+            jobs.to_str().unwrap(),
+            "--state-dir",
+            &state,
+        ];
+        s.ok(&args)
+    };
+    let first = daemon("once");
+    assert!(first.contains("docs: ok: snapshot"), "{first}");
+    assert!(
+        first.contains("test: ok: restored and checked 2 files"),
+        "{first}"
+    );
+    assert_eq!(daemon("once"), "No job is due\n");
+    let status = daemon("status");
+    assert!(status.starts_with("docs  backup  ok "), "{status}");
+    assert!(status.contains("next "));
+
+    let doc = s.json(&[
+        "daemon",
+        "status",
+        "--jobs",
+        jobs.to_str().unwrap(),
+        "--state-dir",
+        &state,
+    ]);
+    assert_eq!(doc[1]["do"], "restore-test");
+    assert_eq!(doc[1]["last"]["result"], "ok");
+
+    fs::write(
+        &jobs,
+        "[job.bad]\nrepo = \"/r\"\ndo = \"nothing\"\nevery = \"day\"\n",
+    )
+    .unwrap();
+    let out = s.run(&[
+        "daemon",
+        "once",
+        "--jobs",
+        jobs.to_str().unwrap(),
+        "--state-dir",
+        &state,
+    ]);
+    assert_eq!(code(&out), Some(1));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("unknown `do"));
+}
+
+#[cfg(unix)]
+#[test]
+fn daemon_run_stops_cleanly_on_sigterm() {
+    let s = Setup::new();
+    let state = s.root.join("state");
+    let mut child = Command::new(env!("CARGO_BIN_EXE_apeiron"))
+        .args(["daemon", "run", "--jobs"])
+        .arg(s.root.join("none.toml"))
+        .arg("--state-dir")
+        .arg(&state)
+        .spawn()
+        .unwrap();
+    let log = state.join("daemon.log");
+    let start = std::time::Instant::now();
+    while !fs::read_to_string(&log).is_ok_and(|l| l.contains("started")) {
+        assert!(start.elapsed().as_secs() < 10, "the daemon did not start");
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    Command::new("kill")
+        .arg(child.id().to_string())
+        .status()
+        .unwrap();
+    assert!(child.wait().unwrap().success());
+    assert!(fs::read_to_string(&log).unwrap().contains("stopped"));
 }

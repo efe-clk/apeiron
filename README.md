@@ -47,12 +47,13 @@ Each layer uses only the layer directly below it. Details: [docs/ARCHITECTURE.md
 | Layer | Crate | Role | Status |
 | --- | --- | --- | --- |
 | Core | `apeiron-core` | Object model, chunking, pack/index files, refs and reflogs | In progress |
-| Storage targets | — | Local, external, SFTP, S3 targets | Planned |
+| Storage targets | `apeiron-core`, `apeiron-remote` | Folder (local or external disk), SFTP and S3 remotes | Done |
 | Services | `apeiron-services` | Backup, restore, listing and diff today; archive, sync, search and policy later | In progress |
 | Public API | `apeiron` | Rust API for all operations ([docs/API.md](docs/API.md) §8) | In progress |
 | System calls | `apeiron-sys` | Operating system calls that need `unsafe` (Windows write-through) | Done |
 | C ABI | — | Stable C interface; may use `unsafe` | Planned |
 | CLI | `apeiron-cli` | The `apeiron` command ([docs/CLI.md](docs/CLI.md)) | In progress |
+| Background service | `apeiron-daemon` | Scheduled jobs and the restore test ([docs/DAEMON.md](docs/DAEMON.md)) | Done |
 | Plugins | — | WebAssembly plugin host | Planned |
 
 Crate names for planned layers are chosen when the layer is started.
@@ -110,7 +111,7 @@ Rules for code, commits and format changes: [CONTRIBUTING.md](CONTRIBUTING.md).
 | [API](docs/API.md) | Design principles of the planned public API (draft) |
 | [CLI](docs/CLI.md) | Design of the `apeiron` command (draft) |
 | [SDK](docs/SDK.md) | Design of the C ABI and language SDKs (draft) |
-| [Background service](docs/DAEMON.md) | Design of scheduled jobs and the restore test (draft) |
+| [Background service](docs/DAEMON.md) | Scheduled jobs and the restore test |
 | [User guide](docs/GUIDE.md) | Installation, daily backup, restore and the one-month test |
 | [Glossary](docs/GLOSSARY.md) | Terms with English–Turkish equivalents |
 | [Contributing](CONTRIBUTING.md) | Development environment and rules |

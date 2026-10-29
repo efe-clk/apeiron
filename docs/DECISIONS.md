@@ -26,7 +26,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [016](#adr-016-synchronous-public-api-with-jobs-on-threads) | Long operations | Synchronous API; jobs on threads with polled progress | Proposed |
 | [017](#adr-017-xchacha20-poly1305-and-argon2id-for-encryption) | Encryption | XChaCha20-Poly1305 for data, Argon2id for passwords | Accepted |
 | [018](#adr-018-whole-repository-copies-as-remotes-russh-for-sftp-object_store-for-s3) | Remote targets | Remotes are whole repository copies; `russh` for SFTP, `object_store` for S3 | Accepted |
-| [019](#adr-019-the-background-service-is-a-user-process-with-a-jobs-file) | Background service | A user process with a TOML jobs file, started by the operating system; missed jobs catch up | Proposed |
+| [019](#adr-019-the-background-service-is-a-user-process-with-a-jobs-file) | Background service | A user process with a TOML jobs file, started by the operating system; missed jobs catch up | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28.
 
@@ -394,7 +394,7 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 
 ## ADR-019: The background service is a user process with a jobs file
 
-**Status:** Proposed (2026-10-29)
+**Status:** Accepted (2026-10-29)
 
 **Context.** Stage 2 needs scheduled backups and a regular restore test ([DAEMON.md](DAEMON.md)). The first users back up a personal computer, often a laptop that sleeps or is switched off, on Linux, macOS and Windows. Encrypted repositories need their password without a person present.
 

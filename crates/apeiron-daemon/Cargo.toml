@@ -1,0 +1,22 @@
+[package]
+name = "apeiron-daemon"
+description = "Background service of Apeiron: scheduled jobs and the restore test"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+apeiron = { path = "../apeiron" }
+dirs = "6.0.0"
+fs4 = "1.1.0"
+jiff = { version = "0.2.38", features = ["serde"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1"
+thiserror = "2.0.21"
+toml = "1.1.8"
+
+[dev-dependencies]
+tempfile = "3.27.0"

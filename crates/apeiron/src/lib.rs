@@ -22,12 +22,13 @@ pub use apeiron_core::{
 pub use apeiron_services::{
     ArchiveFormat, BackupOptions as BackupRequest, BackupOutcome as BackupReport, Change,
     ChangeKind, EntryInfo, ExportOutcome as ExportReport, Kind, Name, Phase, Progress,
-    RestoreOutcome as RestoreReport, Warning, WarningKind,
+    RestoreOutcome as RestoreReport, RestoreProblem, RestoreTestOutcome as RestoreTestReport,
+    Warning, WarningKind,
 };
 pub use error::{Error, ErrorKind, Result};
 pub use job::Job;
 pub use repo::Repository;
 pub use types::{
     AddedKey, DeleteRefRequest, DiffRequest, ExportRequest, ListRequest, LogPage, LogRequest,
-    RefInfo, RepoInfo, RestoreRequest, SnapshotInfo, TransferRequest,
+    RefInfo, RepoInfo, RestoreRequest, RestoreTestRequest, SnapshotInfo, TransferRequest,
 };

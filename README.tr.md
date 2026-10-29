@@ -47,12 +47,13 @@ Her katman yalnızca hemen altındaki katmanı kullanır. Ayrıntılar: [docs/AR
 | Katman | Crate | Rol | Durum |
 | --- | --- | --- | --- |
 | Çekirdek | `apeiron-core` | Nesne modeli, chunk bölme, paket/indeks dosyaları, ref ve reflog | Devam ediyor |
-| Depolama hedefleri | — | Yerel, harici, SFTP, S3 hedefleri | Planlandı |
+| Depolama hedefleri | `apeiron-core`, `apeiron-remote` | Klasör (yerel ya da harici disk), SFTP ve S3 uzak depoları | Tamamlandı |
 | Hizmetler | `apeiron-services` | Bugün yedek, geri yükleme, listeleme ve fark; arşiv, senkron, arama ve politika sonra | Devam ediyor |
 | Herkese açık API | `apeiron` | Tüm işlemler için Rust API ([docs/API.tr.md](docs/API.tr.md) §8) | Devam ediyor |
 | Sistem çağrıları | `apeiron-sys` | `unsafe` gerektiren işletim sistemi çağrıları (Windows write-through) | Tamamlandı |
 | C ABI | — | Kararlı C arayüzü; `unsafe` kullanabilir | Planlandı |
 | CLI | `apeiron-cli` | `apeiron` komutu ([docs/CLI.tr.md](docs/CLI.tr.md)) | Devam ediyor |
+| Arka plan hizmeti | `apeiron-daemon` | Zamanlanmış işler ve geri yükleme testi ([docs/DAEMON.tr.md](docs/DAEMON.tr.md)) | Tamamlandı |
 | Eklentiler | — | WebAssembly eklenti ortamı | Planlandı |
 
 Planlanan katmanların crate adları, o katmana başlanırken belirlenir.
@@ -110,7 +111,7 @@ Kod, commit ve format değişikliği kuralları: [CONTRIBUTING.tr.md](CONTRIBUTI
 | [API](docs/API.tr.md) | Planlanan herkese açık API'nin tasarım ilkeleri (taslak) |
 | [CLI](docs/CLI.tr.md) | `apeiron` komutunun tasarımı (taslak) |
 | [SDK](docs/SDK.tr.md) | C ABI ve dil SDK'larının tasarımı (taslak) |
-| [Arka plan hizmeti](docs/DAEMON.tr.md) | Zamanlanmış işlerin ve geri yükleme testinin tasarımı (taslak) |
+| [Arka plan hizmeti](docs/DAEMON.tr.md) | Zamanlanmış işler ve geri yükleme testi |
 | [Kullanım rehberi](docs/GUIDE.tr.md) | Kurulum, günlük yedek, geri yükleme ve bir aylık deneme |
 | [Sözlük](docs/GLOSSARY.tr.md) | Terimler ve İngilizce–Türkçe karşılıkları |
 | [Katkı](CONTRIBUTING.tr.md) | Geliştirme ortamı ve kurallar |

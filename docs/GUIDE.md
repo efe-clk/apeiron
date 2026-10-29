@@ -184,48 +184,69 @@ The service must support conditional writes; Apeiron refuses to move a ref other
 | Monthly | Restore a few files to a new folder and open them | A backup is only proven by restoring it |
 | When a warning says so | `apeiron repair` | Removes stale locks, completes reflogs and rebuilds damaged index files |
 
-## 8. Automatic daily backup (Linux)
+## 8. Automatic backups (background service)
 
-A systemd user timer runs the backup every day, and also after the computer was off at the scheduled time. Create `~/.config/systemd/user/apeiron-backup.service`:
+The background service runs backups, pushes and checks on a schedule ([DAEMON.md](DAEMON.md)). A run missed while the computer was off or asleep is made once at the next chance.
 
-```ini
-[Unit]
-Description=Apeiron backup of Documents
+1. Write the jobs into `~/.config/apeiron/jobs.toml` (macOS: `~/Library/Application Support/apeiron/jobs.toml`, Windows: `%APPDATA%\apeiron\jobs.toml`):
 
-[Service]
-Type=oneshot
-Environment=APEIRON_REPO=/run/media/<user>/<disk>/apeiron
-# Only for an encrypted repository (section 3.1):
-Environment=APEIRON_PASSWORD_FILE=%h/.config/apeiron/password
-ExecStart=%h/.cargo/bin/apeiron backup %h/Documents --ref backup/documents
-# Exit code 3 means "done with warnings".
-SuccessExitStatus=3
-```
+   ```toml
+   [job.documents]
+   repo = "/run/media/me/disk/apeiron"
+   password_file = "~/.config/apeiron/password"   # only for an encrypted repository
+   do = "backup"
+   folder = "~/Documents"
+   ref = "backup/documents"
+   every = "day"
+   at = "12:30"
+   push = ["nas"]                                 # optional: remotes (section 6)
 
-and `~/.config/systemd/user/apeiron-backup.timer`:
+   [job.check]
+   repo = "/run/media/me/disk/apeiron"
+   password_file = "~/.config/apeiron/password"
+   do = "restore-test"
+   ref = "backup/documents"
+   every = "week"
+   ```
 
-```ini
-[Unit]
-Description=Daily Apeiron backup
+2. Try it once: `apeiron daemon once` runs every job that is due and prints the results.
+3. Let the system start `apeiron daemon run` when you log in:
 
-[Timer]
-OnCalendar=daily
-Persistent=true
+   | System | How |
+   | --- | --- |
+   | Linux | Create `~/.config/systemd/user/apeiron.service` (below), then `systemctl --user enable --now apeiron` |
+   | macOS | Create `~/Library/LaunchAgents/org.apeiron.daemon.plist` (below), then `launchctl load -w ~/Library/LaunchAgents/org.apeiron.daemon.plist` |
+   | Windows | `schtasks /Create /SC ONLOGON /TN Apeiron /TR "%USERPROFILE%\.cargo\bin\apeiron.exe daemon run"` |
 
-[Install]
-WantedBy=timers.target
-```
+   ```ini
+   [Unit]
+   Description=Apeiron background service
 
-Then enable it and check the results:
+   [Service]
+   ExecStart=%h/.cargo/bin/apeiron daemon run
+   Restart=on-failure
 
-```bash
-systemctl --user daemon-reload
-systemctl --user enable --now apeiron-backup.timer
-systemctl --user list-timers apeiron-backup.timer
-journalctl --user -u apeiron-backup.service
-```
+   [Install]
+   WantedBy=default.target
+   ```
 
-If the external disk is not plugged in, that day's run fails with "no config file" and the next run tries again. A built-in scheduler comes with the background service in Stage 2.
+   ```xml
+   <?xml version="1.0" encoding="UTF-8"?>
+   <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+   <plist version="1.0">
+   <dict>
+     <key>Label</key><string>org.apeiron.daemon</string>
+     <key>ProgramArguments</key>
+     <array><string>/Users/me/.cargo/bin/apeiron</string><string>daemon</string><string>run</string></array>
+     <key>RunAtLoad</key><true/>
+     <key>KeepAlive</key><true/>
+   </dict>
+   </plist>
+   ```
+
+4. Look at the results now and then: `apeiron daemon status` lists each job's last run and the next one; exit code 4 means a job failed. The details are in `daemon.log` next to the state (Linux: `~/.local/state/apeiron`).
+
+On a home server where nobody logs in, `loginctl enable-linger <user>` keeps the Linux service running without a login. If the external disk is not plugged in, the job fails with "no config file" and is tried again an hour later.
 
 ## 9. The one-month test
 
@@ -233,7 +254,7 @@ The exit criterion of Stage 1 is to back up and restore your own data with nothi
 
 | Week | Do | Note down |
 | --- | --- | --- |
-| 1 | Install, create the repository, first backups, set up the timer | Anything unclear in this guide; how long the first backup took |
+| 1 | Install, create the repository, first backups, set up the background service | Anything unclear in this guide; how long the first backup took |
 | 2 | Daily backups; `apeiron verify`; restore one folder and compare it | Warnings you saw; whether the restored files open |
 | 3 | Restore one deleted file from an older backup (`~N`); `apeiron gc --dry-run` | How easy it was to find the right backup |
 | 4 | Restore everything to a new folder and compare with the original; `apeiron gc` | Missing or wrong files, error messages, repository size |

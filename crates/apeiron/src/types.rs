@@ -129,6 +129,28 @@ pub struct AddedKey {
     pub recovery_key: Option<String>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RestoreTestRequest {
+    /// A snapshot spec (API.md §8.4).
+    pub snapshot: String,
+    /// How much to restore; at least one file is always restored.
+    #[serde(default = "default_sample_bytes")]
+    pub sample_bytes: u64,
+}
+
+fn default_sample_bytes() -> u64 {
+    100 * 1024 * 1024
+}
+
+impl RestoreTestRequest {
+    pub fn new(snapshot: impl Into<String>) -> Self {
+        RestoreTestRequest {
+            snapshot: snapshot.into(),
+            sample_bytes: default_sample_bytes(),
+        }
+    }
+}
+
 /// Which ref to push to or pull from which remote.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TransferRequest {

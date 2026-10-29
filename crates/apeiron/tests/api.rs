@@ -123,6 +123,14 @@ fn backup_log_list_diff_restore_verify() {
 
     let job = s.repo.verify().unwrap();
     assert!(job.wait().unwrap().is_ok());
+    let test = s
+        .repo
+        .restore_test(apeiron::RestoreTestRequest::new("main"))
+        .unwrap()
+        .wait()
+        .unwrap();
+    assert!(test.is_ok());
+    assert_eq!(test.files, 2);
 
     let reopened = Repository::open(s.repo.path()).unwrap();
     assert_eq!(reopened.refs().unwrap()[0].snapshot, second.snapshot);

@@ -2,7 +2,7 @@
 
 # Apeiron Arka Plan Hizmeti
 
-> **Durum: Planlandı (taslak, onay bekliyor).** Aşama 2'nin 3. işinin tasarımıdır ([ROADMAP.tr.md](ROADMAP.tr.md) §4): arka plan hizmeti, zamanlanmış işler ve geri yükleme testi. Arkasındaki karar ADR-019'dur ([DECISIONS.tr.md](DECISIONS.tr.md)).
+> **Durum: Tamamlandı.** Aşama 2'nin 3. işinin tasarımıdır ([ROADMAP.tr.md](ROADMAP.tr.md) §4): arka plan hizmeti, zamanlanmış işler ve geri yükleme testi. Arkasındaki karar ADR-019'dur ([DECISIONS.tr.md](DECISIONS.tr.md)).
 
 Arka plan hizmeti (daemon), yedekleri ve denetimleri kullanıcı olmadan, bir zamanlamaya göre çalıştırır. CLI gibi yalnızca herkese açık API'yi kullanır ([API.tr.md](API.tr.md)).
 
@@ -10,21 +10,23 @@ Arka plan hizmeti (daemon), yedekleri ve denetimleri kullanıcı olmadan, bir za
 
 | İhtiyaç | Nasıl | Durum |
 | --- | --- | --- |
-| Düşünmeden yedeklemek | İşler bir iş dosyasından, bir zamanlamaya göre çalışır (bölüm 3) | Planlandı |
-| Kapalı ya da uykudaki bir dizüstü | Kaçırılan bir iş, ilk fırsatta bir kez çalışır (bölüm 4) | Planlandı |
-| Başka yerlerde kopyalar | Bir yedek işi, başarılı olduktan sonra uzak depolara push edebilir | Planlandı |
-| Yedeklerin çalıştığını bilmek | Zamanlanmış `verify` ve geri yükleme testi (bölüm 5) | Planlandı |
-| Bir şeyin başarısız olduğunu bilmek | `apeiron daemon status` ve bir kayıt dosyası (bölüm 6) | Planlandı |
+| Düşünmeden yedeklemek | İşler bir iş dosyasından, bir zamanlamaya göre çalışır (bölüm 3) | Tamamlandı |
+| Kapalı ya da uykudaki bir dizüstü | Kaçırılan bir iş, ilk fırsatta bir kez çalışır (bölüm 4) | Tamamlandı |
+| Başka yerlerde kopyalar | Bir yedek işi, başarılı olduktan sonra uzak depolara push edebilir | Tamamlandı |
+| Yedeklerin çalıştığını bilmek | Zamanlanmış `verify` ve geri yükleme testi (bölüm 5) | Tamamlandı |
+| Bir şeyin başarısız olduğunu bilmek | `apeiron daemon status` ve bir kayıt dosyası (bölüm 6) | Tamamlandı |
 
 ## 2. Komutlar
 
 | Komut | Ne yapar | Durum |
 | --- | --- | --- |
-| `apeiron daemon run` | Durdurulana kadar çalışır; her işi zamanı geldiğinde başlatır | Planlandı |
-| `apeiron daemon once` | Zamanı gelmiş her işi çalıştırır, sonra çıkar | Planlandı |
-| `apeiron daemon status` | Her işin son çalışmasını, sonucunu ve bir sonraki çalışmasını gösterir; bir işin son çalışması başarısızsa çıkış kodu 4'tür | Planlandı |
+| `apeiron daemon run` | Durdurulana kadar çalışır; her işi zamanı geldiğinde başlatır | Tamamlandı |
+| `apeiron daemon once` | Zamanı gelmiş her işi çalıştırır, sonra çıkar; biri başarısız olduysa çıkış kodu 4'tür | Tamamlandı |
+| `apeiron daemon status` | Her işin son çalışmasını, sonucunu ve bir sonraki çalışmasını gösterir; bir işin son çalışması başarısızsa çıkış kodu 4'tür | Tamamlandı |
 
-`apeiron daemon run` komutunu oturum açılınca işletim sistemi başlatır: Linux'ta bir systemd kullanıcı birimi, macOS'ta bir launchd ajanı, Windows'ta bir Görev Zamanlayıcı görevi. Kullanım rehberi her biri için dosyayı verir; yönetici yetkisi gerekmez. Her kullanıcı için yalnızca bir daemon çalışır; ikincisi "kilitli" hatasıyla durur.
+Üçü de, olağan dosyalar yerine başkalarını kullanmak için `--jobs <file>` ve `--state-dir <folder>` alır (bölüm 3 ve 6). `apeiron restore-test [<snapshot>] [--sample-mb <n>]`, bölüm 5'teki geri yükleme testini elle çalıştırır.
+
+`apeiron daemon run` komutunu oturum açılınca işletim sistemi başlatır: Linux'ta bir systemd kullanıcı birimi, macOS'ta bir launchd ajanı, Windows'ta bir Görev Zamanlayıcı görevi. Kullanım rehberi her biri için dosyayı verir ([GUIDE.tr.md](GUIDE.tr.md) §8); yönetici yetkisi gerekmez. Her kullanıcı için yalnızca bir daemon çalışır; ikincisi "kilitli" hatasıyla durur.
 
 ## 3. İş dosyası
 
@@ -81,7 +83,7 @@ flowchart LR
 
 - Bir işin zamanı, son başlangıcından bu yana `every` kadar süre geçince gelir. `at` varsa, zamanının geldiği gün o saate kadar bekler.
 - Bilgisayar kapalı ya da uykudayken kaçırılan bir çalışma, kaçırılan her dönem için değil, ilk fırsatta bir kez yapılır.
-- İşler dosyadaki sırayla, birer birer çalışır. Başka bir işin zamanı geldiğinde hâlâ çalışan bir iş yarıda kesilmez.
+- İşler adlarının sırasıyla, birer birer çalışır. Başka bir işin zamanı geldiğinde hâlâ çalışan bir iş yarıda kesilmez.
 - Başarısız olan bir iş, başarılı olana ya da sıradaki düzenli çalışması gelene kadar bir saat sonra yeniden denenir. "Kilitli" bir depoya rastlayan bir iş (örneğin elle çalıştırılan çöp toplama sırasında) 10 dakika sonra yeniden denenir.
 - Daemon'u durdurmak, çalışan işi iptal eder; depo önceki durumunda kalır (CLI.tr.md §1).
 
@@ -99,7 +101,7 @@ Bir yedek ancak geri yüklenerek kanıtlanır (VISION.tr.md). Geri yükleme test
 
 | Dosya | Klasör | İçerik |
 | --- | --- | --- |
-| `state.json` | Linux'ta `~/.local/state/apeiron`, macOS'ta yapılandırma klasörü, Windows'ta `%LOCALAPPDATA%\apeiron` | Her iş için: son başlangıç ve bitiş, sonuç (`ok`, `warnings` ya da `failed`), mesaj, sonraki çalışma. Her çalışmadan sonra atomik olarak değiştirilir |
+| `state.json` | Linux'ta `~/.local/state/apeiron`, macOS'ta yapılandırma klasörü, Windows'ta `%LOCALAPPDATA%\apeiron` | Her iş için: son başlangıç ve bitiş, sonuç (`ok`, `warnings`, `failed` ya da `locked`) ve mesaj; `status` sonraki çalışmayı bundan hesaplar. Her çalışmadan sonra atomik olarak değiştirilir |
 | `daemon.log` | Aynı klasör | Her iş çalışması ve her hata için bir satır; 1 MiB'a ulaşınca `daemon.log.1` olarak yeniden adlandırılır ve yenisi başlar |
 
 ## 7. Bu işin parçası olmayanlar
@@ -115,8 +117,8 @@ Bir yedek ancak geri yüklenerek kanıtlanır (VISION.tr.md). Geri yükleme test
 
 | Crate | Görev | Durum |
 | --- | --- | --- |
-| `apeiron-daemon` | İş dosyası, zamanlama, durum, geri yükleme testi ve çalışma döngüsü; yalnızca herkese açık `apeiron` crate'ini kullanır | Planlandı |
-| `apeiron-cli` | `apeiron daemon` komutları | Planlandı |
+| `apeiron-daemon` | İş dosyası, zamanlama, durum, geri yükleme testi ve çalışma döngüsü; yalnızca herkese açık `apeiron` crate'ini kullanır | Tamamlandı |
+| `apeiron-cli` | `apeiron daemon` komutları | Tamamlandı |
 
 | İhtiyaç | Önerilen kütüphane | Gerekçe |
 | --- | --- | --- |

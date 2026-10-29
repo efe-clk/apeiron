@@ -55,7 +55,7 @@ The ABI is deliberately small: a handful of functions that never change, while t
 | `apeiron_repo_unlock(path, secret, &repo)` | Opens a repository with a password or the recovery key |
 | `apeiron_repo_free(repo)` | Closes a repository handle |
 | `apeiron_call(repo, operation, request_json, &result_json)` | Runs a short operation (`log`, `list`, `diff`, `refs`, `reflog`, `resolve`, `delete_ref`, `repair`, `info`, `keys`, `add_password`, `add_recovery_key`, `remove_key`, `remotes`, `add_remote`, `remove_remote`) |
-| `apeiron_start(repo, operation, request_json, &job)` | Starts a long operation (`backup`, `restore`, `export`, `verify`, `gc`, `push`, `pull`) |
+| `apeiron_start(repo, operation, request_json, &job)` | Starts a long operation (`backup`, `restore`, `export`, `verify`, `gc`, `push`, `pull`, `restore_test`) |
 | `apeiron_job_progress(job, &progress_json)` | Reads the current progress |
 | `apeiron_job_cancel(job)` | Asks the job to stop |
 | `apeiron_job_wait(job, timeout_ms, &result_json)` | Waits for the result; returns `APEIRON_PENDING` if the timeout passes first (`-1` waits forever) |

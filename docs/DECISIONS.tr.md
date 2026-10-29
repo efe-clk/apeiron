@@ -26,7 +26,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [016](#adr-016-senkron-herkese-açık-api-ve-iş-parçacığında-çalışan-işler) | Uzun işlemler | Senkron API; sorgulanan ilerlemeyle iş parçacığında çalışan işler | Önerildi |
 | [017](#adr-017-şifreleme-için-xchacha20-poly1305-ve-argon2id) | Şifreleme | Veri için XChaCha20-Poly1305, parolalar için Argon2id | Kabul edildi |
 | [018](#adr-018-uzak-depo-olarak-deponun-tam-kopyası-sftp-için-russh-s3-için-object_store) | Uzak hedefler | Uzak depolar deponun tam kopyasıdır; SFTP için `russh`, S3 için `object_store` | Kabul edildi |
-| [019](#adr-019-arka-plan-hizmeti-iş-dosyalı-bir-kullanıcı-sürecidir) | Arka plan hizmeti | İşletim sisteminin başlattığı, TOML iş dosyalı bir kullanıcı süreci; kaçırılan işler telafi edilir | Önerildi |
+| [019](#adr-019-arka-plan-hizmeti-iş-dosyalı-bir-kullanıcı-sürecidir) | Arka plan hizmeti | İşletim sisteminin başlattığı, TOML iş dosyalı bir kullanıcı süreci; kaçırılan işler telafi edilir | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
@@ -394,7 +394,7 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 
 ## ADR-019: Arka plan hizmeti iş dosyalı bir kullanıcı sürecidir
 
-**Durum:** Önerildi (2026-10-29)
+**Durum:** Kabul edildi (2026-10-29)
 
 **Bağlam.** Aşama 2, zamanlanmış yedeklere ve düzenli bir geri yükleme testine ihtiyaç duyar ([DAEMON.tr.md](DAEMON.tr.md)). İlk kullanıcılar, Linux, macOS ve Windows'ta, çoğu zaman uyuyan ya da kapatılan bir dizüstü olan kişisel bir bilgisayarı yedekler. Şifreli depolar, başında biri olmadan parolalarına ihtiyaç duyar.
 

@@ -21,8 +21,8 @@ use std::time::{Duration, Instant};
 
 use apeiron::{
     ArchiveFormat, BackupRequest, DiffRequest, Error, ErrorKind, ExportRequest, GcRequest, Job,
-    KeyKind, ListRequest, LogRequest, Name, Repository, RestoreRequest, TransferReport,
-    TransferRequest, Warning,
+    KeyKind, ListRequest, LogRequest, Name, Repository, RestoreRequest, RestoreTestRequest,
+    TransferReport, TransferRequest, Warning,
 };
 use clap::{Parser, Subcommand};
 use serde::Serialize;
@@ -127,6 +127,14 @@ enum Command {
         #[arg(long, default_value = "")]
         path: String,
     },
+    /// Restore a random sample of a snapshot into a temporary folder and check it
+    RestoreTest {
+        #[arg(default_value = "main")]
+        snapshot: String,
+        /// How many MiB to restore; at least one file is always restored
+        #[arg(long, default_value_t = 100)]
+        sample_mb: u64,
+    },
     /// List all refs and the snapshots they point to
     Refs,
     /// Read and check every pack, index and object
@@ -152,6 +160,17 @@ enum Command {
         #[command(subcommand)]
         command: RemoteCommand,
     },
+    /// Run scheduled jobs: backups, pushes, checks and restore tests
+    Daemon {
+        #[command(subcommand)]
+        command: DaemonCommand,
+        /// Jobs file instead of the usual one
+        #[arg(long, global = true, value_name = "PATH")]
+        jobs: Option<PathBuf>,
+        /// Folder for the state and the log instead of the usual one
+        #[arg(long, global = true, value_name = "PATH")]
+        state_dir: Option<PathBuf>,
+    },
     /// Copy the snapshots of a ref to a remote and move the ref there
     Push {
         remote: String,
@@ -164,6 +183,16 @@ enum Command {
         #[arg(default_value = "main")]
         ref_name: String,
     },
+}
+
+#[derive(Subcommand)]
+enum DaemonCommand {
+    /// Run until stopped, starting each job when it is due
+    Run,
+    /// Run every job that is due now, then exit
+    Once,
+    /// Show each job's last run, its result and the next run
+    Status,
 }
 
 #[derive(Subcommand)]
@@ -475,6 +504,28 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             });
             Ok(warnings_exit(out, &report.warnings))
         }
+        Command::RestoreTest {
+            snapshot,
+            sample_mb,
+        } => {
+            let repo = open(cli.repo, password_file)?;
+            let mut request = RestoreTestRequest::new(snapshot);
+            request.sample_bytes = sample_mb.saturating_mul(1024 * 1024);
+            let report = watch(out, repo.restore_test(request)?)?;
+            out.result(&report, |r| {
+                for p in &r.problems {
+                    say!("damaged: {}: {}", p.path, p.message);
+                }
+                if r.is_ok() {
+                    say!(
+                        "OK: restored and checked {}, {}",
+                        format::count(r.files, "file"),
+                        format::bytes(r.bytes)
+                    );
+                }
+            });
+            Ok(if report.is_ok() { 0 } else { EXIT_DAMAGED })
+        }
         Command::Refs => {
             let repo = open(cli.repo, password_file)?;
             let refs = repo.refs()?;
@@ -592,6 +643,11 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             }
             Ok(0)
         }
+        Command::Daemon {
+            command,
+            jobs,
+            state_dir,
+        } => run_daemon(out, command, jobs, state_dir),
         Command::Push { remote, ref_name } => {
             let repo = open(cli.repo, password_file)?;
             let request = TransferRequest::new(remote.clone(), ref_name.clone());
@@ -636,6 +692,115 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             Ok(0)
         }
     }
+}
+
+fn run_daemon(
+    out: &Output,
+    command: DaemonCommand,
+    jobs: Option<PathBuf>,
+    state_dir: Option<PathBuf>,
+) -> Result<u8, Failure> {
+    use apeiron_daemon::{Daemon, Paths, RunResult};
+    let daemon_error = |e: apeiron_daemon::Error| {
+        let kind = match e {
+            apeiron_daemon::Error::Locked(_) => ErrorKind::Locked,
+            apeiron_daemon::Error::Jobs { .. } => ErrorKind::InvalidInput,
+            _ => ErrorKind::Io,
+        };
+        Failure::Api(Error::new(kind, e.to_string()))
+    };
+    let mut paths = Paths::system().map_err(daemon_error)?;
+    if let Some(jobs) = jobs {
+        paths.jobs = jobs;
+    }
+    if let Some(state_dir) = state_dir {
+        paths.state_dir = state_dir;
+    }
+    let failed = |result: RunResult| result == RunResult::Failed;
+    match command {
+        DaemonCommand::Run => {
+            let daemon = Daemon::start(paths).map_err(daemon_error)?;
+            let stop = Arc::new(AtomicBool::new(false));
+            let flag = stop.clone();
+            let _ = ctrlc::set_handler(move || flag.store(true, Ordering::Relaxed));
+            daemon.run(&stop).map_err(daemon_error)?;
+            Ok(0)
+        }
+        DaemonCommand::Once => {
+            let jobs = apeiron_daemon::load_jobs(&paths.jobs).map_err(daemon_error)?;
+            let daemon = Daemon::start(paths).map_err(daemon_error)?;
+            let runs = daemon
+                .run_due(&jobs, &AtomicBool::new(false))
+                .map_err(daemon_error)?;
+            out.result(&runs, |runs| {
+                for r in runs {
+                    say!(
+                        "{}: {}: {}",
+                        r.job,
+                        result_name(r.run.result),
+                        r.run.message
+                    );
+                }
+                if runs.is_empty() {
+                    say!("No job is due");
+                }
+            });
+            Ok(if runs.iter().any(|r| failed(r.run.result)) {
+                EXIT_DAMAGED
+            } else {
+                0
+            })
+        }
+        DaemonCommand::Status => {
+            let jobs = apeiron_daemon::status(&paths).map_err(daemon_error)?;
+            out.result(&jobs, |jobs| {
+                let now = jiff::Timestamp::now();
+                for j in jobs {
+                    let next = if j.next_run <= now {
+                        "due now".to_owned()
+                    } else {
+                        format!("next {}", local_time(j.next_run))
+                    };
+                    match &j.last {
+                        Some(last) => {
+                            say!(
+                                "{}  {}  {} {}  {next}",
+                                j.name,
+                                j.action,
+                                result_name(last.result),
+                                local_time(last.last_start)
+                            );
+                            say!("    {}", last.message);
+                        }
+                        None => say!("{}  {}  never run  {next}", j.name, j.action),
+                    }
+                }
+                if jobs.is_empty() {
+                    say!("No jobs; see docs/DAEMON.md for the jobs file");
+                }
+            });
+            let any_failed = jobs
+                .iter()
+                .any(|j| j.last.as_ref().is_some_and(|l| failed(l.result)));
+            Ok(if any_failed { EXIT_DAMAGED } else { 0 })
+        }
+    }
+}
+
+fn result_name(result: apeiron_daemon::RunResult) -> &'static str {
+    use apeiron_daemon::RunResult;
+    match result {
+        RunResult::Ok => "ok",
+        RunResult::Warnings => "ok with warnings",
+        RunResult::Failed => "FAILED",
+        RunResult::Locked => "waiting for a lock",
+    }
+}
+
+fn local_time(t: jiff::Timestamp) -> String {
+    t.to_zoned(jiff::tz::TimeZone::system())
+        .strftime("%Y-%m-%d %H:%M")
+        .to_string()
 }
 
 /// One line about a push or pull.

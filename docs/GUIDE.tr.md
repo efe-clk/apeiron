@@ -184,48 +184,69 @@ Hizmet koşullu yazmayı desteklemelidir; aksi hâlde Apeiron bir ref'i taşıma
 | Aylık | Birkaç dosyayı yeni bir klasöre geri yükleyip açın | Bir yedek ancak geri yüklenerek kanıtlanır |
 | Bir uyarı söylediğinde | `apeiron repair` | Bayat kilitleri kaldırır, reflog'ları tamamlar ve bozuk indeks dosyalarını yeniden kurar |
 
-## 8. Otomatik günlük yedek (Linux)
+## 8. Otomatik yedekler (arka plan hizmeti)
 
-Bir systemd kullanıcı zamanlayıcısı yedeği her gün çalıştırır; bilgisayar planlanan saatte kapalıysa açıldıktan sonra da çalıştırır. `~/.config/systemd/user/apeiron-backup.service` dosyasını oluşturun:
+Arka plan hizmeti; yedekleri, push'ları ve denetimleri bir zamanlamaya göre çalıştırır ([DAEMON.tr.md](DAEMON.tr.md)). Bilgisayar kapalı ya da uykudayken kaçırılan bir çalışma, ilk fırsatta bir kez yapılır.
 
-```ini
-[Unit]
-Description=Apeiron backup of Documents
+1. İşleri `~/.config/apeiron/jobs.toml` dosyasına yazın (macOS: `~/Library/Application Support/apeiron/jobs.toml`, Windows: `%APPDATA%\apeiron\jobs.toml`):
 
-[Service]
-Type=oneshot
-Environment=APEIRON_REPO=/run/media/<user>/<disk>/apeiron
-# Only for an encrypted repository (section 3.1):
-Environment=APEIRON_PASSWORD_FILE=%h/.config/apeiron/password
-ExecStart=%h/.cargo/bin/apeiron backup %h/Documents --ref backup/documents
-# Exit code 3 means "done with warnings".
-SuccessExitStatus=3
-```
+   ```toml
+   [job.documents]
+   repo = "/run/media/me/disk/apeiron"
+   password_file = "~/.config/apeiron/password"   # yalnızca şifreli bir depo için
+   do = "backup"
+   folder = "~/Documents"
+   ref = "backup/documents"
+   every = "day"
+   at = "12:30"
+   push = ["nas"]                                 # isteğe bağlı: uzak depolar (bölüm 6)
 
-ve `~/.config/systemd/user/apeiron-backup.timer` dosyasını:
+   [job.check]
+   repo = "/run/media/me/disk/apeiron"
+   password_file = "~/.config/apeiron/password"
+   do = "restore-test"
+   ref = "backup/documents"
+   every = "week"
+   ```
 
-```ini
-[Unit]
-Description=Daily Apeiron backup
+2. Bir kez deneyin: `apeiron daemon once`, zamanı gelmiş her işi çalıştırır ve sonuçları yazdırır.
+3. Oturum açtığınızda `apeiron daemon run` komutunu sistemin başlatmasını sağlayın:
 
-[Timer]
-OnCalendar=daily
-Persistent=true
+   | Sistem | Nasıl |
+   | --- | --- |
+   | Linux | `~/.config/systemd/user/apeiron.service` dosyasını oluşturun (aşağıda), sonra `systemctl --user enable --now apeiron` |
+   | macOS | `~/Library/LaunchAgents/org.apeiron.daemon.plist` dosyasını oluşturun (aşağıda), sonra `launchctl load -w ~/Library/LaunchAgents/org.apeiron.daemon.plist` |
+   | Windows | `schtasks /Create /SC ONLOGON /TN Apeiron /TR "%USERPROFILE%\.cargo\bin\apeiron.exe daemon run"` |
 
-[Install]
-WantedBy=timers.target
-```
+   ```ini
+   [Unit]
+   Description=Apeiron background service
 
-Ardından etkinleştirin ve sonuçlara bakın:
+   [Service]
+   ExecStart=%h/.cargo/bin/apeiron daemon run
+   Restart=on-failure
 
-```bash
-systemctl --user daemon-reload
-systemctl --user enable --now apeiron-backup.timer
-systemctl --user list-timers apeiron-backup.timer
-journalctl --user -u apeiron-backup.service
-```
+   [Install]
+   WantedBy=default.target
+   ```
 
-Harici disk takılı değilse o günün çalışması "no config file" hatasıyla başarısız olur ve sonraki çalışma yeniden dener. Yerleşik bir zamanlayıcı Aşama 2'de arka plan hizmetiyle gelecek.
+   ```xml
+   <?xml version="1.0" encoding="UTF-8"?>
+   <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+   <plist version="1.0">
+   <dict>
+     <key>Label</key><string>org.apeiron.daemon</string>
+     <key>ProgramArguments</key>
+     <array><string>/Users/me/.cargo/bin/apeiron</string><string>daemon</string><string>run</string></array>
+     <key>RunAtLoad</key><true/>
+     <key>KeepAlive</key><true/>
+   </dict>
+   </plist>
+   ```
+
+4. Ara sıra sonuçlara bakın: `apeiron daemon status` her işin son ve sıradaki çalışmasını listeler; çıkış kodu 4 bir işin başarısız olduğu anlamına gelir. Ayrıntılar, durum dosyasının yanındaki `daemon.log` içindedir (Linux: `~/.local/state/apeiron`).
+
+Kimsenin oturum açmadığı bir ev sunucusunda `loginctl enable-linger <user>`, Linux hizmetinin oturum açılmadan çalışmasını sağlar. Harici disk takılı değilse iş "no config file" hatasıyla başarısız olur ve bir saat sonra yeniden denenir.
 
 ## 9. Bir aylık deneme
 
@@ -233,7 +254,7 @@ Aşama 1'in çıkış kriteri, kendi verinizi bir ay boyunca yalnızca Apeiron i
 
 | Hafta | Yapın | Not edin |
 | --- | --- | --- |
-| 1 | Kurulum, depoyu oluşturma, ilk yedekler, zamanlayıcıyı kurma | Bu rehberde anlaşılmayan her şey; ilk yedeğin ne kadar sürdüğü |
+| 1 | Kurulum, depoyu oluşturma, ilk yedekler, arka plan hizmetini kurma | Bu rehberde anlaşılmayan her şey; ilk yedeğin ne kadar sürdüğü |
 | 2 | Günlük yedekler; `apeiron verify`; bir klasörü geri yükleyip karşılaştırma | Gördüğünüz uyarılar; geri yüklenen dosyaların açılıp açılmadığı |
 | 3 | Silinmiş bir dosyayı daha eski bir yedekten (`~N`) geri yükleme; `apeiron gc --dry-run` | Doğru yedeği bulmanın ne kadar kolay olduğu |
 | 4 | Her şeyi yeni bir klasöre geri yükleyip özgün hâliyle karşılaştırma; `apeiron gc` | Eksik ya da hatalı dosyalar, hata mesajları, deponun boyutu |

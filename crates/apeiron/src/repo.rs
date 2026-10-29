@@ -11,12 +11,12 @@ use crate::job::Job;
 use crate::spec;
 use crate::types::{
     AddedKey, DeleteRefRequest, DiffRequest, ExportRequest, ListRequest, LogPage, LogRequest,
-    RefInfo, RepoInfo, RestoreRequest, SnapshotInfo, TransferRequest,
+    RefInfo, RepoInfo, RestoreRequest, RestoreTestRequest, SnapshotInfo, TransferRequest,
 };
 use crate::{
     ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo, ExportReport, GcReport,
     GcRequest, KeyInfo, ObjectId, Phase, ReflogEntry, Remote, RepairReport, RestoreReport,
-    TransferReport, VerifyReport,
+    RestoreTestReport, TransferReport, VerifyReport,
 };
 
 /// An open repository. Cloning is cheap; clones share the same state and can
@@ -183,6 +183,24 @@ impl Repository {
                 &snapshot,
                 request.path.as_bytes(),
                 &request.target,
+                ctl,
+            )?)
+        })
+    }
+
+    /// Restores a random sample of a snapshot into a temporary folder,
+    /// checks every file against the snapshot and removes the folder. Damage
+    /// is reported in the result, not as an error.
+    pub fn restore_test(&self, request: RestoreTestRequest) -> Result<Job<RestoreTestReport>> {
+        let snapshot = self.resolve(&request.snapshot)?;
+        let repo = self.clone();
+        Job::spawn("restore-test", move |ctl| {
+            let core = repo.view()?;
+            Ok(services::restore_test(
+                &core,
+                &snapshot,
+                request.sample_bytes,
+                &std::env::temp_dir(),
                 ctl,
             )?)
         })
