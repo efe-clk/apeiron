@@ -66,7 +66,7 @@ The work items are done in this order, because each builds on the one before: re
 | # | Work item | Status |
 | --- | --- | --- |
 | 1 | Client-side encryption ([FORMAT.md](FORMAT.md) §14) | Done |
-| 2 | Remote targets (folder, SFTP, S3) with push and pull ([FORMAT.md](FORMAT.md) §15); folders are done | In progress |
+| 2 | Remote targets (folder, SFTP, S3) with push and pull ([FORMAT.md](FORMAT.md) §15); folders and SFTP are done | In progress |
 | 3 | Background service (daemon), scheduled backup, restore test | Planned |
 | 4 | One-way and two-way sync, conflict detection | Planned |
 

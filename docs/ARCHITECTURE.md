@@ -42,7 +42,7 @@ Key design ideas:
 | Public API | Stable Rust API; C ABI for other languages; SDKs on top | `apeiron` | In progress (Rust API) |
 | Services | Versioning, archive, backup, sync, search, policy | `apeiron-services` | In progress (backup, restore, diff) |
 | Core | Object model, storage engine, integrity, encryption, operation log | `apeiron-core` | In progress |
-| Storage targets | Local disk, external disk, network storage, remote targets | `apeiron-core` (`Store`, folders) | In progress (folders) |
+| Storage targets | Local disk, external disk, network storage, remote targets | `apeiron-core` (`Store`, folders), `apeiron-remote` (SFTP) | In progress (folders and SFTP done) |
 | Plugins | Type drivers, storage backends, importers/exporters, hooks | — | Planned |
 
 Rules that apply to every crate:

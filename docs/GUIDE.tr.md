@@ -149,6 +149,14 @@ apeiron push disk backup/documents                      # her yedekten sonra
 
 İlk push her şeyi kopyalar; sonrakiler yalnızca yeni olanı. Diskteki klasör aynı parolaya sahip eksiksiz bir depodur: bilgisayar kaybolursa doğrudan ondan geri yükleyin: `apeiron --repo /run/media/$USER/DISK/apeiron restore backup/documents ~/restored`. Yarıda kalan bir push yeniden çalıştırılır.
 
+### 6.2 Ev sunucusunda bir kopya (SFTP)
+
+Evde ya da başka bir yerde `ssh` ile ulaştığınız bir sunucu da bir kopya tutabilir. Depo şifreli olmalıdır (bölüm 3.1): bilgisayardan yalnızca şifreli veri çıkar.
+
+1. `ssh user@nas.local` komutunun parola yazmadan çalıştığından emin olun; SSH ajanında bir anahtar ya da parolasız `~/.ssh/id_ed25519` yeterlidir. İlk `ssh` sizden sunucunun anahtarını denetlemenizi ister; Apeiron yalnızca bu şekilde denetlediğiniz sunuculara güvenir.
+2. `apeiron remote add nas sftp://user@nas.local/srv/apeiron` (başka bir port için sunucu adından sonra `:2222` ekleyin).
+3. Diskteki gibi `apeiron push nas backup/documents`.
+
 ## 7. Düzen
 
 | Ne sıklıkla | Komut | Neden |

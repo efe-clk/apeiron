@@ -29,8 +29,8 @@ pub use id::{ID_LEN, ObjectId, ObjectType};
 pub use keyfile::{KeyInfo, KeyKind};
 pub use lock::RepoLock;
 pub use object::{Blob, EntryKind, Snapshot, Time, Tree, TreeEntry};
-pub use refs::{RefOp, ReflogEntry, RepairReport, validate_ref_name};
-pub use remote::{FolderStore, Remote, Store};
+pub use refs::{RefOp, ReflogEntry, RepairReport, decode_ref, encode_ref, validate_ref_name};
+pub use remote::{FolderStore, Remote, RemoteUrl, SftpUrl, Store};
 pub use repo::{
     GcOptions, GcReport, ObjectWriter, OnCopy, Repository, TransferReport, VerifyReport,
 };

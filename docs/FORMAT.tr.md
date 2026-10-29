@@ -19,8 +19,8 @@ Uygulama durumu (`apeiron-core`):
 | 12 | Depo kilidi | Tamamlandı |
 | 13 | Çöp toplama | Tamamlandı |
 | 14 | Şifreleme | Tamamlandı |
-| 15 | Uzak depolar, push ve pull: klasörler | Tamamlandı |
-| 15 | Uzak depolar, push ve pull: SFTP ve S3 | Planlandı |
+| 15 | Uzak depolar, push ve pull: klasörler ve SFTP | Tamamlandı |
+| 15 | Uzak depolar, push ve pull: S3 | Planlandı |
 
 ## Sade anlatım
 
@@ -535,7 +535,7 @@ Her uzak depo türü, bölüm 2'deki düzenin yolları üzerinde aynı küçük 
 | Bir dosyayı silme | Silme | `DELETE` |
 | Yeni bir kopyanın klasörlerini oluşturma | Bölüm 2'deki klasörleri oluşturma | Hiçbir şey; S3'te klasör yoktur |
 
-Bir dosya ya tamamen vardır ya hiç yoktur. Koşullu `PUT` yapamayan bir uzak depo reddedilir; çünkü o olmadan iki yazıcı birbirinin ref'inin üzerine yazabilir. Zaten bir depo tutan bir klasör, kullanıldığı sürece paylaşımlı olarak da kilitlenir (bölüm 12); böylece doğrudan onun üzerinde çalıştırılan çöp toplama bekler.
+Bir dosya ya tamamen vardır ya hiç yoktur. Koşullu `PUT` yapamayan bir uzak depo reddedilir; çünkü o olmadan iki yazıcı birbirinin ref'inin üzerine yazabilir. Zaten bir depo tutan bir klasör, kullanıldığı sürece paylaşımlı olarak da kilitlenir (bölüm 12); böylece doğrudan onun üzerinde çalıştırılan çöp toplama bekler. SFTP, bir ref'i değiştirmek için OpenSSH'nin `posix-rename@openssh.com` eklentisini ister ve sunucu sunuyorsa dosyaları `fsync@openssh.com` ile diske yazdırır; 10 dakikadan eski bir ref kilidi (bölüm 9.3) bir sonraki push tarafından kaldırılır.
 
 ### 15.3 Push
 

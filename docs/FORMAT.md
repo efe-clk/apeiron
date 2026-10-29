@@ -19,8 +19,8 @@ Implementation status (`apeiron-core`):
 | 12 | Repository lock | Done |
 | 13 | Garbage collection | Done |
 | 14 | Encryption | Done |
-| 15 | Remote repositories, push and pull: folders | Done |
-| 15 | Remote repositories, push and pull: SFTP and S3 | Planned |
+| 15 | Remote repositories, push and pull: folders and SFTP | Done |
+| 15 | Remote repositories, push and pull: S3 | Planned |
 
 ## Plain summary
 
@@ -535,7 +535,7 @@ Every remote kind offers the same small set of operations on paths of the layout
 | Delete a file | Delete | `DELETE` |
 | Create the folders of a new copy | Create the folders of section 2 | Nothing; S3 has no folders |
 
-A file is either completely there or not there at all. A remote that cannot do a conditional `PUT` is refused, because without it two writers could overwrite each other's ref. A folder that already holds a repository is also locked shared while it is used (section 12), so that garbage collection run on it directly waits.
+A file is either completely there or not there at all. A remote that cannot do a conditional `PUT` is refused, because without it two writers could overwrite each other's ref. A folder that already holds a repository is also locked shared while it is used (section 12), so that garbage collection run on it directly waits. SFTP needs the OpenSSH extension `posix-rename@openssh.com` to replace a ref and syncs files with `fsync@openssh.com` when the server offers it; a ref lock older than 10 minutes (section 9.3) is removed by the next push.
 
 ### 15.3 Push
 

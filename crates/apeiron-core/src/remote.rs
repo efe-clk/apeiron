@@ -44,18 +44,76 @@ pub(crate) fn validate_remote_name(name: &str) -> Result<()> {
     Ok(())
 }
 
-/// Checks a remote URL. Only folders are supported so far; a folder must be
-/// given as an absolute path.
+/// Where a remote is (FORMAT.md §15.1).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RemoteUrl {
+    /// A folder, given as an absolute path.
+    Folder(PathBuf),
+    Sftp(SftpUrl),
+}
+
+/// `sftp://[user@]host[:port]/path`
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SftpUrl {
+    pub user: Option<String>,
+    pub host: String,
+    pub port: u16,
+    /// The repository folder on the server, starting with `/`.
+    pub path: String,
+}
+
+impl RemoteUrl {
+    pub fn parse(url: &str) -> Result<Self> {
+        let invalid = |reason: &str| Error::InvalidRemote(format!("{url:?}: {reason}"));
+        if let Some(rest) = url.strip_prefix("sftp://") {
+            let (authority, path) = match rest.find('/') {
+                Some(i) => rest.split_at(i),
+                None => return Err(invalid("the URL has no folder path")),
+            };
+            let (user, host_port) = match authority.rsplit_once('@') {
+                Some((user, host_port)) if !user.is_empty() => (Some(user.to_owned()), host_port),
+                Some(_) => return Err(invalid("the user name is empty")),
+                None => (None, authority),
+            };
+            // An IPv6 address is written in brackets: [::1]:22
+            let (host, port) = match host_port.strip_prefix('[') {
+                Some(v6) => {
+                    let (host, after) = v6.split_once(']').ok_or_else(|| invalid("missing `]`"))?;
+                    (host, after.strip_prefix(':'))
+                }
+                None => match host_port.split_once(':') {
+                    Some((host, port)) => (host, Some(port)),
+                    None => (host_port, None),
+                },
+            };
+            if host.is_empty() {
+                return Err(invalid("the host name is empty"));
+            }
+            let port = match port {
+                Some(port) => port.parse().map_err(|_| invalid("bad port number"))?,
+                None => 22,
+            };
+            return Ok(RemoteUrl::Sftp(SftpUrl {
+                user,
+                host: host.to_owned(),
+                port,
+                path: path.to_owned(),
+            }));
+        }
+        if url.contains("://") {
+            return Err(Error::UnsupportedRemote(url.to_owned()));
+        }
+        if !Path::new(url).is_absolute() {
+            return Err(Error::InvalidRemote(format!(
+                "the folder {url:?} is not an absolute path"
+            )));
+        }
+        Ok(RemoteUrl::Folder(PathBuf::from(url)))
+    }
+}
+
 pub(crate) fn validate_url(url: &str) -> Result<()> {
-    if url.contains("://") {
-        return Err(Error::UnsupportedRemote(url.to_owned()));
-    }
-    if !Path::new(url).is_absolute() {
-        return Err(Error::InvalidRemote(format!(
-            "the folder {url:?} is not an absolute path"
-        )));
-    }
-    Ok(())
+    RemoteUrl::parse(url).map(drop)
 }
 
 /// Reads the `remotes` file; a missing file has no remotes.
@@ -249,9 +307,42 @@ mod tests {
             assert!(validate_remote_name(bad).is_err(), "{bad:?}");
         }
         assert!(matches!(
-            validate_url("sftp://nas/srv"),
+            validate_url("s3://bucket/apeiron"),
             Err(Error::UnsupportedRemote(_))
         ));
+        let sftp = |user: Option<&str>, host: &str, port, path: &str| {
+            RemoteUrl::Sftp(SftpUrl {
+                user: user.map(str::to_owned),
+                host: host.to_owned(),
+                port,
+                path: path.to_owned(),
+            })
+        };
+        let cases = [
+            (
+                "sftp://nas/srv/apeiron",
+                sftp(None, "nas", 22, "/srv/apeiron"),
+            ),
+            (
+                "sftp://me@nas.local:2222/x",
+                sftp(Some("me"), "nas.local", 2222, "/x"),
+            ),
+            ("sftp://[::1]:23/", sftp(None, "::1", 23, "/")),
+        ];
+        for (url, expected) in cases {
+            assert_eq!(RemoteUrl::parse(url).unwrap(), expected, "{url}");
+        }
+        for bad in [
+            "sftp://nas",
+            "sftp://@nas/x",
+            "sftp://:22/x",
+            "sftp://nas:x/y",
+        ] {
+            assert!(
+                matches!(RemoteUrl::parse(bad), Err(Error::InvalidRemote(_))),
+                "{bad}"
+            );
+        }
         assert!(matches!(
             validate_url("relative/dir"),
             Err(Error::InvalidRemote(_))

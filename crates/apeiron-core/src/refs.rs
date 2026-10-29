@@ -134,13 +134,15 @@ fn short_check(body: &str) -> String {
     to_hex(&blake3::hash(body.as_bytes()).as_bytes()[..8])
 }
 
-fn encode_ref(target: ObjectId) -> String {
+/// The content of a ref file pointing to `target` (FORMAT.md §9.3).
+pub fn encode_ref(target: ObjectId) -> String {
     let head = format!("apeiron-ref 1\ntarget {target}\n");
     let check = blake3::hash(head.as_bytes());
     format!("{head}check {}\n", to_hex(check.as_bytes()))
 }
 
-fn decode_ref(path: &Path, text: &str) -> Result<ObjectId> {
+/// Parses and checks the content of the ref file at `path`.
+pub fn decode_ref(path: &Path, text: &str) -> Result<ObjectId> {
     let corrupt = || Error::corrupt(path, "invalid ref file");
     let mut lines = text.split_inclusive('\n');
     let (Some(magic), Some(target), Some(check), None) =

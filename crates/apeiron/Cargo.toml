@@ -10,6 +10,7 @@ publish = false
 
 [dependencies]
 apeiron-core = { path = "../apeiron-core" }
+apeiron-remote = { path = "../apeiron-remote" }
 apeiron-services = { path = "../apeiron-services" }
 serde = { version = "1.0.229", features = ["derive"] }
 thiserror = "2.0.21"

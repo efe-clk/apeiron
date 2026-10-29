@@ -73,7 +73,7 @@ pub enum Error {
     RemoteExists(String),
     #[error("no remote named {0:?}")]
     RemoteNotFound(String),
-    #[error("{0}: only folder remotes are supported so far")]
+    #[error("{0}: this kind of remote is not supported yet")]
     UnsupportedRemote(String),
     #[error("{} holds another repository", .0.display())]
     OtherRepository(PathBuf),

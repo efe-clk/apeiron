@@ -57,6 +57,6 @@ Apeiron; sürüm kontrolü, arşivleme, yedekleme, senkronizasyon ve bütünlük
 **Aşama 2 — Uzak ve senkron.** Devam ediyor. İşler `docs/ROADMAP.md` §4'te, sırasıyla:
 
 1. ~~İstemci tarafı şifreleme (`init --encrypt`, parola ve kurtarma anahtarı).~~ Tamamlandı (2026-10-28).
-2. Uzak hedefler (klasör, SFTP, S3), push ve pull. Devam ediyor: klasör hedefi tamamlandı (2026-10-29); sırada SFTP, sonra S3.
+2. Uzak hedefler (klasör, SFTP, S3), push ve pull. Devam ediyor: klasör ve SFTP hedefleri tamamlandı (2026-10-29); sırada S3.
 3. Arka plan hizmeti, zamanlanmış yedek, geri yükleme testi.
 4. Senkron ve çatışma tespiti.

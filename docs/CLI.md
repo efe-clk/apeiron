@@ -43,7 +43,9 @@ To change a password, add the new one with `apeiron key add`, find the old one i
 
 ### 2.2 Remotes
 
-A remote is a complete copy of the repository in another place ([FORMAT.md](FORMAT.md) §15). `apeiron remote add disk /run/media/user/disk/apeiron` names a folder; `apeiron push disk` copies only what the folder does not have yet, and the folder can then be opened like any repository, with the same password. `apeiron pull disk` brings snapshots back. A ref only moves forward: if both copies have snapshots the other lacks, the command stops with a conflict and changes nothing. SFTP and S3 remotes are planned.
+A remote is a complete copy of the repository in another place ([FORMAT.md](FORMAT.md) §15). `apeiron remote add disk /run/media/user/disk/apeiron` names a folder; `apeiron push disk` copies only what the folder does not have yet, and the folder can then be opened like any repository, with the same password. `apeiron pull disk` brings snapshots back. A ref only moves forward: if both copies have snapshots the other lacks, the command stops with a conflict and changes nothing.
+
+A home server is reached with SFTP: `apeiron remote add nas sftp://user@nas.local/srv/apeiron`. Apeiron logs in like `ssh` does, with the keys of the SSH agent or `~/.ssh/id_ed25519`, `id_ecdsa` or `id_rsa` without a passphrase, and checks the server against `~/.ssh/known_hosts`; a server that is not there is refused, so connect once with `ssh` first. Only an encrypted repository can use an SFTP remote. S3 remotes are planned.
 
 ## 3. Commands
 
@@ -62,7 +64,7 @@ A remote is a complete copy of the repository in another place ([FORMAT.md](FORM
 | `apeiron gc [--keep-days <days>] [--dry-run]` | Deletes data no ref and no reflog line of the last 90 days (or `--keep-days`) can reach; `--dry-run` only reports | Done |
 | `apeiron key list` | Lists the passwords and recovery keys of an encrypted repository | Done |
 | `apeiron key add [--recovery] [--new-password-file <file>]` | Adds a password (asked twice, or read from the file), or with `--recovery` a new recovery key, printed once | Done |
-| `apeiron remote add <name> <folder>` | Adds a remote: a folder, such as one on an external disk (section 2.2) | Done |
+| `apeiron remote add <name> <url>` | Adds a remote: a folder, such as one on an external disk, or `sftp://[user@]host[:port]/path` (section 2.2) | Done |
 | `apeiron remote list` | Lists the remotes | Done |
 | `apeiron remote remove <name>` | Forgets a remote; the copy itself is not touched | Done |
 | `apeiron push <remote> [<ref>]` | Copies the snapshots of a ref (default `main`) to a remote and moves the ref there | Done |
@@ -115,6 +117,7 @@ apeiron verify
 | `apeiron` | Public Rust API ([API.md](API.md) §8) | In progress |
 | `apeiron-services` | Folder ↔ snapshot, diff and export logic used by the API | In progress |
 | `apeiron-cli` | The `apeiron` program | In progress |
+| `apeiron-remote` | SFTP remotes, and later S3 ones (ADR-018) | In progress |
 
 | Need | Proposed library | Reason |
 | --- | --- | --- |
@@ -122,6 +125,7 @@ apeiron verify
 | JSON output | `serde_json` | Standard JSON library for `serde`, already used for configuration |
 | Ctrl+C | `ctrlc` | Small, widely used; the same code on Linux, macOS and Windows |
 | Hidden password prompt | `rpassword` | Small, widely used; reads from the terminal without echo on Linux, macOS and Windows |
+| SFTP | `russh`, `russh-sftp` | Pure Rust SSH and SFTP, also on Windows (ADR-018) |
 | tar, zip and 7z export | `tar`, `zip`, `sevenz-rust2` | Pure Rust; the archives open with the standard `tar`, `unzip` and `7z` tools, keeping permissions and symbolic links |
 
 ## 8. Open questions

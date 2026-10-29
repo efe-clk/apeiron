@@ -149,6 +149,14 @@ apeiron push disk backup/documents                      # after each backup
 
 The first push copies everything; later ones copy only what is new. The folder on the disk is a complete repository with the same password: if the computer is lost, restore straight from it with `apeiron --repo /run/media/$USER/DISK/apeiron restore backup/documents ~/restored`. An interrupted push is simply run again.
 
+### 6.2 A copy on a home server (SFTP)
+
+A server at home or elsewhere that you reach with `ssh` can hold a copy too. The repository must be encrypted (section 3.1): only encrypted data leaves the computer.
+
+1. Make sure `ssh user@nas.local` works without typing a password, with a key in the SSH agent or `~/.ssh/id_ed25519` without a passphrase. The first `ssh` asks you to check the server's key; Apeiron trusts only servers you have checked that way.
+2. `apeiron remote add nas sftp://user@nas.local/srv/apeiron` (add `:2222` after the host for another port).
+3. `apeiron push nas backup/documents`, as with a disk.
+
 ## 7. Routine
 
 | How often | Command | Why |

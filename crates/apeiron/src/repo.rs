@@ -380,10 +380,10 @@ impl Repository {
         let repo = self.clone();
         Job::spawn("push", move |ctl| {
             ctl.update(|p| p.phase = Phase::Copying);
-            let store = core::FolderStore::open(Path::new(&remote.url))?;
+            let store = open_store(&remote, repo.info().encrypted)?;
             let report = repo
                 .view()?
-                .push(&store, &request.ref_name, &mut |r| copied(ctl, r))?;
+                .push(&*store, &request.ref_name, &mut |r| copied(ctl, r))?;
             ctl.update(|p| p.phase = Phase::Done);
             Ok(report)
         })
@@ -397,11 +397,11 @@ impl Repository {
         let repo = self.clone();
         Job::spawn("pull", move |ctl| {
             ctl.update(|p| p.phase = Phase::Copying);
-            let store = core::FolderStore::open(Path::new(&remote.url))?;
+            let store = open_store(&remote, repo.info().encrypted)?;
             let _writer = repo.lock_writer();
             let _lock = core::RepoLock::shared(repo.path())?;
             let mut core = repo.read().reopen()?;
-            let report = core.pull(&store, &request.ref_name, &mut |r| copied(ctl, r))?;
+            let report = core.pull(&*store, &request.ref_name, &mut |r| copied(ctl, r))?;
             *repo.write() = core;
             ctl.update(|p| p.phase = Phase::Done);
             Ok(report)
@@ -416,6 +416,27 @@ impl Repository {
         let mut core = self.write();
         core.refresh_index()?;
         Ok(core.repair()?)
+    }
+}
+
+/// Connects to a remote. Only an encrypted repository is sent over the
+/// network (FORMAT.md §15.1).
+fn open_store(remote: &Remote, encrypted: bool) -> Result<Box<dyn core::Store>> {
+    match core::RemoteUrl::parse(&remote.url)? {
+        core::RemoteUrl::Folder(path) => Ok(Box::new(core::FolderStore::open(&path)?)),
+        core::RemoteUrl::Sftp(url) => {
+            if !encrypted {
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    "only an encrypted repository can use an SFTP remote; \
+                     create one with `init --encrypt`",
+                ));
+            }
+            let options = apeiron_remote::SshOptions::from_home()?;
+            Ok(Box::new(apeiron_remote::SftpStore::connect(
+                &url, &options,
+            )?))
+        }
     }
 }
 

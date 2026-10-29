@@ -170,7 +170,7 @@ enum Command {
 enum RemoteCommand {
     /// List the remotes
     List,
-    /// Add a remote; for now a folder, such as one on an external disk
+    /// Add a remote: a folder, such as one on an external disk, or sftp://[user@]host[:port]/path
     Add { name: String, url: String },
     /// Forget a remote; the copy itself is not touched
     Remove { name: String },

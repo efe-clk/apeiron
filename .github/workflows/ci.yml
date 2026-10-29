@@ -29,4 +29,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
+      # The SFTP tests start an OpenSSH server as the runner user.
+      - if: runner.os == 'Linux'
+        run: sudo apt-get install -y openssh-server && sudo mkdir -p /run/sshd
       - run: cargo test --all-targets
+        env:
+          APEIRON_SFTP_TEST: ${{ runner.os != 'Windows' && '1' || '' }}
