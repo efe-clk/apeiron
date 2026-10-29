@@ -110,6 +110,7 @@ Rules for code, commits and format changes: [CONTRIBUTING.md](CONTRIBUTING.md).
 | [API](docs/API.md) | Design principles of the planned public API (draft) |
 | [CLI](docs/CLI.md) | Design of the `apeiron` command (draft) |
 | [SDK](docs/SDK.md) | Design of the C ABI and language SDKs (draft) |
+| [Background service](docs/DAEMON.md) | Design of scheduled jobs and the restore test (draft) |
 | [User guide](docs/GUIDE.md) | Installation, daily backup, restore and the one-month test |
 | [Glossary](docs/GLOSSARY.md) | Terms with English–Turkish equivalents |
 | [Contributing](CONTRIBUTING.md) | Development environment and rules |

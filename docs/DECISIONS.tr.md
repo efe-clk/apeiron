@@ -26,6 +26,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [016](#adr-016-senkron-herkese-açık-api-ve-iş-parçacığında-çalışan-işler) | Uzun işlemler | Senkron API; sorgulanan ilerlemeyle iş parçacığında çalışan işler | Önerildi |
 | [017](#adr-017-şifreleme-için-xchacha20-poly1305-ve-argon2id) | Şifreleme | Veri için XChaCha20-Poly1305, parolalar için Argon2id | Kabul edildi |
 | [018](#adr-018-uzak-depo-olarak-deponun-tam-kopyası-sftp-için-russh-s3-için-object_store) | Uzak hedefler | Uzak depolar deponun tam kopyasıdır; SFTP için `russh`, S3 için `object_store` | Kabul edildi |
+| [019](#adr-019-arka-plan-hizmeti-iş-dosyalı-bir-kullanıcı-sürecidir) | Arka plan hizmeti | İşletim sisteminin başlattığı, TOML iş dosyalı bir kullanıcı süreci; kaçırılan işler telafi edilir | Önerildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
@@ -390,3 +391,24 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Koşullu yazma yerine S3'te kilit dosyaları | S3'te koşullu yazma olmadan atomik "yoksa oluştur" yoktur |
 
 **Sonuçlar.** `russh`, Rust 1.85'i destekleyen en yeni sürüm olan 0.63'e, saf Rust `ring` şifreleme altyapısıyla sabitlenir; `object_store`, HTTPS için `aws-lc-rs` getirir. Koşullu yazma desteği olmayan S3 uyumlu hizmetler reddedilir. SFTP, sunucunun `~/.ssh/known_hosts` içinde olmasını ister. SFTP ve S3 kopyalarının reflog'u yoktur. Bir uzak kopyanın çöp toplaması sonraki bir iştir; bir klasör kopyası, bir depo olarak açılarak bugün de toplanabilir.
+
+## ADR-019: Arka plan hizmeti iş dosyalı bir kullanıcı sürecidir
+
+**Durum:** Önerildi (2026-10-29)
+
+**Bağlam.** Aşama 2, zamanlanmış yedeklere ve düzenli bir geri yükleme testine ihtiyaç duyar ([DAEMON.tr.md](DAEMON.tr.md)). İlk kullanıcılar, Linux, macOS ve Windows'ta, çoğu zaman uyuyan ya da kapatılan bir dizüstü olan kişisel bir bilgisayarı yedekler. Şifreli depolar, başında biri olmadan parolalarına ihtiyaç duyar.
+
+**Karar.** `apeiron daemon run`, oturum açmış kullanıcının sıradan bir sürecidir ve oturum açılınca işletim sisteminin kendi yoluyla başlatılır (systemd kullanıcı birimi, launchd ajanı, Görev Zamanlayıcı). İşler, kullanıcının yapılandırma klasöründeki bir TOML dosyasında listelenir; kaçırılan bir iş ilk fırsatta bir kez çalışır. Her işin durumu bir JSON dosyasında tutulur ve daemon, yalnızca herkese açık API'yi kullanan ayrı bir crate'tir: `apeiron-daemon`. Parolalar, CLI'daki gibi parola dosyalarından gelir.
+
+**Gerekçe.** Bir kullanıcı süreci, kullanıcının dosyalarını ve anahtarlarını yönetici yetkisi olmadan okuyabilir ve aynı kod üç sistemde de çalışır; yalnızca başlatma dosyası değişir. Kaçırılan çalışmaları telafi etmek, bir zamanlamayı dizüstünde çalışır kılan şeydir. Düz metin bir iş dosyası kullanıcı tarafından okunabilir, düzenlenebilir ve yedeklenebilir.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Yönetici olarak çalışan sistem çapında bir hizmet | Yönetici yetkisi ve her kullanıcının dosyalarına erişim ister; kişisel bir yedeğin ihtiyacından fazladır |
+| Tek tek CLI komutları çalıştıran `cron`, launchd ya da Görev Zamanlayıcı kayıtları | Her sistemde farklıdır; `cron`, bilgisayar kapalıyken kaçırılan çalışmaları telafi etmez; `status` için ortak bir durum yoktur |
+| İşleri deponun içinde tutmak | Bir iş birden fazla depoya ve uzak depoya yayılabilir; depo tek bir bilgisayarın klasörlerine bağlı olmamalıdır |
+| cron biçiminde bir zamanlama (`30 2 * * *`) | İlk kullanıcılar için okunması zordur; kişisel yedekler için `every` ve `at` yeterlidir |
+
+**Sonuçlar.** İşler yalnızca kullanıcı oturum açmışken çalışır. Bir bilgisayarın iki kullanıcısı kendi daemon'larını çalıştırır. Oturum açmış kullanıcısı olmayan bir sunucu, `apeiron daemon run` komutunu elle bir sistem hizmeti olarak çalıştırır; rehber bunun nasıl yapılacağını gösterir.

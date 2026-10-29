@@ -26,6 +26,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [016](#adr-016-synchronous-public-api-with-jobs-on-threads) | Long operations | Synchronous API; jobs on threads with polled progress | Proposed |
 | [017](#adr-017-xchacha20-poly1305-and-argon2id-for-encryption) | Encryption | XChaCha20-Poly1305 for data, Argon2id for passwords | Accepted |
 | [018](#adr-018-whole-repository-copies-as-remotes-russh-for-sftp-object_store-for-s3) | Remote targets | Remotes are whole repository copies; `russh` for SFTP, `object_store` for S3 | Accepted |
+| [019](#adr-019-the-background-service-is-a-user-process-with-a-jobs-file) | Background service | A user process with a TOML jobs file, started by the operating system; missed jobs catch up | Proposed |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28.
 
@@ -390,3 +391,24 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Lock files on S3 instead of conditional writes | S3 has no atomic create-if-absent without conditional writes |
 
 **Consequences.** `russh` is pinned to 0.63, the newest release that supports Rust 1.85, with the pure Rust `ring` cryptography backend; `object_store` brings `aws-lc-rs` for HTTPS. S3-compatible services without conditional writes are refused. SFTP needs the server in `~/.ssh/known_hosts`. SFTP and S3 copies have no reflog. Garbage collection of a remote copy is a later work item; a folder copy can already be collected by opening it as a repository.
+
+## ADR-019: The background service is a user process with a jobs file
+
+**Status:** Proposed (2026-10-29)
+
+**Context.** Stage 2 needs scheduled backups and a regular restore test ([DAEMON.md](DAEMON.md)). The first users back up a personal computer, often a laptop that sleeps or is switched off, on Linux, macOS and Windows. Encrypted repositories need their password without a person present.
+
+**Decision.** `apeiron daemon run` is an ordinary process of the logged-in user, started at login by the operating system's own mechanism (systemd user unit, launchd agent, Task Scheduler). Jobs are listed in a TOML file in the user's configuration folder; a job that was missed runs once at the next chance. The state of every job is kept in a JSON file and the daemon is a separate crate, `apeiron-daemon`, that uses only the public API. Passwords come from password files, as in the CLI.
+
+**Rationale.** A user process can read the user's files and keys without administrator rights, and the same code runs on all three systems; only the start-up file differs. Catching up missed runs is what makes a schedule work on a laptop. A plain text jobs file can be read, edited and backed up by the user.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| A system-wide service running as administrator | Needs administrator rights and access to every user's files; more than a personal backup needs |
+| `cron`, launchd or Task Scheduler entries that run single CLI commands | Different on each system; `cron` does not catch up on runs missed while the computer was off; no shared state for `status` |
+| Keeping the jobs inside the repository | A job can span repositories and remotes; the repository should not depend on one computer's folders |
+| A cron-style schedule (`30 2 * * *`) | Hard to read for the first users; `every` and `at` cover personal backups |
+
+**Consequences.** Jobs run only while the user is logged in. Two users of one computer each run their own daemon. A server without a logged-in user runs `apeiron daemon run` as a system service by hand; the guide shows how.
