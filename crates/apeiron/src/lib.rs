@@ -29,6 +29,7 @@ pub use error::{Error, ErrorKind, Result};
 pub use job::Job;
 pub use repo::Repository;
 pub use types::{
-    AddedKey, DeleteRefRequest, DiffRequest, ExportRequest, ListRequest, LogPage, LogRequest,
-    RefInfo, RepoInfo, RestoreRequest, RestoreTestRequest, SnapshotInfo, TransferRequest,
+    AddedKey, CloneReport, CloneRequest, ClonedRef, DeleteRefRequest, DiffRequest, ExportRequest,
+    ListRequest, LogPage, LogRequest, RefInfo, RepoInfo, RestoreRequest, RestoreTestRequest,
+    SnapshotInfo, TransferRequest,
 };

@@ -128,6 +128,7 @@ flowchart TB
 | `Repository::init_encrypted(path, password)` | Boş, şifreli bir depo oluşturur ([FORMAT.tr.md](FORMAT.tr.md) §14), açar ve kurtarma anahtarını döndürür; bu anahtar hiçbir yerde saklanmaz ve kullanıcıya bir kez gösterilir |
 | `Repository::open(path)` | Var olan bir depoyu açar; şifreli bir depoda `Key` hatası verir |
 | `Repository::unlock(path, secret)` | Bir depoyu bir parola ya da kurtarma anahtarıyla açar |
+| `Repository::clone_from(request)` | Uzun: yeni ya da boş bir klasörde, bir uzak kopyadan yeni bir depo oluşturur (URL `add_remote`'taki gibi), her ref'i pull eder ve uzak depoyu `origin` olarak ekler ([FORMAT.tr.md](FORMAT.tr.md) §15.6); şifreli bir kopyanın parolası istekle verilir. `CloneReport` döndürür: her ref için bir `TransferReport` |
 | `repo.info()` | Yolu, format sürümünü, chunk bölme ayarlarını, deponun şifreli olup olmadığını ve açılırken bozuk bulunan dosyaları döndürür |
 
 Bir `Repository` iş parçacıkları arasında paylaşılabilir (`Send + Sync`). Yalnızca okuyan işlemler paralel çalışır; yazan işlemler süreç içinde birbirini bekler. Her işlem çalışırken depo kilidini paylaşımlı, çöp toplama ise özel tutar ([FORMAT.tr.md](FORMAT.tr.md) §12); böylece çöp toplama hiçbir zaman başka bir programla aynı anda çalışmaz. Diğer yazıcılar aynı anda çalışabilir, çünkü ref'ler karşılaştır ve değiştir ile güncellenir.

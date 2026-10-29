@@ -311,6 +311,19 @@ fn push_and_pull_with_a_folder_remote() {
     assert!(String::from_utf8_lossy(&disk.stdout).contains("a.txt"));
     assert!(s.ok(&["pull", "disk"]).contains("up to date"));
 
+    // A second device starts from the disk.
+    let doc = s.json(&["clone", &s.path("disk"), &s.path("copy")]);
+    assert_eq!(doc["refs"][0]["name"], "main");
+    let copy = Command::new(env!("CARGO_BIN_EXE_apeiron"))
+        .args(["--repo", &s.path("copy"), "pull", "origin"])
+        .output()
+        .unwrap();
+    assert!(String::from_utf8_lossy(&copy.stdout).contains("up to date with origin"));
+    assert_eq!(
+        code(&s.run(&["clone", &s.path("disk"), &s.path("copy")])),
+        Some(1)
+    );
+
     let out = s.run(&["--json", "push", "nowhere"]);
     assert_eq!(code(&out), Some(1));
     let doc: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();

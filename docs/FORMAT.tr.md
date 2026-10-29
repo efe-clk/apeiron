@@ -20,7 +20,7 @@ Uygulama durumu (`apeiron-core`):
 | 13 | Çöp toplama | Tamamlandı |
 | 14 | Şifreleme | Tamamlandı |
 | 15 | Uzak depolar, push ve pull: klasörler, SFTP ve S3 | Tamamlandı |
-| 15.6 | Klon (taslak, onay bekliyor) | Planlandı |
+| 15.6 | Klon | Tamamlandı |
 
 ## Sade anlatım
 
@@ -532,6 +532,7 @@ Her uzak depo türü, bölüm 2'deki düzenin yolları üzerinde aynı küçük 
 | Bir klasörü listeleme | Klasörü okuma | Önekle `LIST` |
 | Yeni bir dosyayı atomik yazma | `tmp/` içine yazma, diske yazma, yeniden adlandırma (bölüm 9.1) | `If-None-Match: *` ile `PUT` |
 | Bir ref'i değiştirme (karşılaştır ve değiştir) | Bölüm 9.3'teki gibi kilit dosyası | `If-Match: <önce okunan etag>` ile `PUT` |
+| Ref'leri listeleme | `refs/` klasörlerini okuma | `refs/` önekiyle `LIST` |
 | Bir dosyayı silme | Silme | `DELETE` |
 | Yeni bir kopyanın klasörlerini oluşturma | Bölüm 2'deki klasörleri oluşturma | Hiçbir şey; S3'te klasör yoktur |
 
@@ -571,9 +572,9 @@ Klon, ikinci bir cihaz için bir uzak depodan yeni bir yerel depo oluşturur ([S
 1. Uzaktaki `config`'i oku; olmalıdır. Yerel klasör var olmamalı ya da boş olmalıdır.
 2. Bölüm 2'deki klasörleri oluştur, uzaktaki `keys/` içindeki her anahtar dosyasını kopyala ve verilen parolanın ya da kurtarma anahtarının bunlardan birini açtığını denetle (bölüm 14.2); yanlış bir parola burada durdurur ve yeni klasörü siler.
 3. Kopyalanan `config`'i en son yaz (bölüm 9.2): o andan itibaren klasör bir depodur.
-4. Uzak deponun her ref'ini pull et (bölüm 15.4).
+4. Uzak deponun her ref'ini pull et (bölüm 15.4) ve uzak depoyu `remotes` dosyasına `origin` adıyla ekle (bölüm 15.1).
 
-Şifresiz bir uzak deponun klonu anahtar kopyalamaz. Klon, uzak depodan anahtar kopyalayan tek işlemdir; pull asla kopyalamaz. Yarıda kalan bir klon, `config`'i olmayan bir klasör bırakır; bu klasör silinir ve yeniden klonlanır.
+Şifresiz bir uzak deponun klonu anahtar kopyalamaz. Klon, uzak depodan anahtar kopyalayan tek işlemdir; pull asla kopyalamaz. Yarıda kalan bir klon, `config`'i olmayan bir klasör bırakır; bu klasör silinir ve yeniden klonlanır. Pull sırasında yarıda kalan bir klon ise ref'leri yeniden pull edilen bir depodur.
 
 ## 16. Sonraki sürümlere bırakılanlar
 

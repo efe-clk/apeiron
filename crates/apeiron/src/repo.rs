@@ -10,8 +10,9 @@ use crate::error::{Error, ErrorKind, Result};
 use crate::job::Job;
 use crate::spec;
 use crate::types::{
-    AddedKey, DeleteRefRequest, DiffRequest, ExportRequest, ListRequest, LogPage, LogRequest,
-    RefInfo, RepoInfo, RestoreRequest, RestoreTestRequest, SnapshotInfo, TransferRequest,
+    AddedKey, CloneReport, CloneRequest, ClonedRef, DeleteRefRequest, DiffRequest, ExportRequest,
+    ListRequest, LogPage, LogRequest, RefInfo, RepoInfo, RestoreRequest, RestoreTestRequest,
+    SnapshotInfo, TransferRequest,
 };
 use crate::{
     ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo, ExportReport, GcReport,
@@ -74,6 +75,37 @@ impl Repository {
             path,
             core::Repository::unlock(path, secret)?,
         ))
+    }
+
+    /// Makes a new repository in a new or empty folder from a remote copy
+    /// and pulls every ref of it; the remote is then known as `origin`
+    /// ([FORMAT.md](FORMAT.md) §15.6). Open the result with `unlock`.
+    pub fn clone_from(request: CloneRequest) -> Result<Job<CloneReport>> {
+        let url = absolute_url(&request.url)?;
+        let remote = Remote {
+            name: ORIGIN.to_owned(),
+            url,
+        };
+        Job::spawn("clone", move |ctl| {
+            ctl.update(|p| p.phase = Phase::Copying);
+            // The copy is already where the user stored it; whether it is
+            // encrypted is known only after reading it.
+            let store = open_store(&remote, true)?;
+            let (core, reports) = core::Repository::clone_from(
+                &*store,
+                &request.path,
+                request.secret.as_deref(),
+                &mut |r| copied(ctl, r),
+            )?;
+            core.add_remote(&remote.name, &remote.url)?;
+            ctl.update(|p| p.phase = Phase::Done);
+            Ok(CloneReport {
+                refs: reports
+                    .into_iter()
+                    .map(|(name, report)| ClonedRef { name, report })
+                    .collect(),
+            })
+        })
     }
 
     fn wrap(path: &Path, core: core::Repository) -> Self {
@@ -364,20 +396,7 @@ impl Repository {
     /// Adds a remote. A folder may be given relative to the current folder;
     /// it is stored as an absolute path.
     pub fn add_remote(&self, name: &str, url: &str) -> Result<Remote> {
-        let url = if url.contains("://") {
-            url.to_owned()
-        } else {
-            let path = std::path::absolute(url)
-                .map_err(|e| Error::new(ErrorKind::InvalidInput, format!("{url}: {e}")))?;
-            path.to_str()
-                .ok_or_else(|| {
-                    Error::new(
-                        ErrorKind::InvalidInput,
-                        format!("{} is not valid UTF-8", path.display()),
-                    )
-                })?
-                .to_owned()
-        };
+        let url = absolute_url(url)?;
         self.read().add_remote(name, &url)?;
         Ok(Remote {
             name: name.to_owned(),
@@ -435,6 +454,28 @@ impl Repository {
         core.refresh_index()?;
         Ok(core.repair()?)
     }
+}
+
+/// The name `clone` gives the remote it copied.
+const ORIGIN: &str = "origin";
+
+/// A folder given relative to the current folder, as an absolute path;
+/// other URLs as they are.
+fn absolute_url(url: &str) -> Result<String> {
+    if url.contains("://") {
+        return Ok(url.to_owned());
+    }
+    let path = std::path::absolute(url)
+        .map_err(|e| Error::new(ErrorKind::InvalidInput, format!("{url}: {e}")))?;
+    Ok(path
+        .to_str()
+        .ok_or_else(|| {
+            Error::new(
+                ErrorKind::InvalidInput,
+                format!("{} is not valid UTF-8", path.display()),
+            )
+        })?
+        .to_owned())
 }
 
 /// Connects to a remote. Only an encrypted repository is sent over the

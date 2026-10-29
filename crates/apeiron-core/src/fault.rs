@@ -1143,4 +1143,35 @@ mod transfer {
             assert_reflog_chain(&repo);
         }
     }
+
+    #[test]
+    fn every_crash_during_a_clone_leaves_no_repository_or_a_readable_one() {
+        let f = transfer_fixture();
+        let clone = |_: &mut Repository, remote: &Path| -> Result<()> {
+            let path = remote.with_file_name("clone");
+            let store = FolderStore::open(remote)?;
+            Repository::clone_from(&store, &path, Some(PASSWORD), &mut |_| Ok(())).map(drop)
+        };
+        let states = transfer_states(&f.base, clone);
+        assert!(states.len() > 10, "only {} checkpoints", states.len());
+        for state in &states {
+            let path = state.path().join("clone");
+            let remote = state.path().join("remote");
+            let store = FolderStore::open(&remote).unwrap();
+            if path.join("config").exists() {
+                assert!(readable_main(&open(&path).unwrap(), &f).is_none_or(|t| t == f.first));
+                recover(&path);
+                pull(&mut open(&path).unwrap(), &remote).unwrap();
+            } else {
+                // An interrupted clone without config is deleted and run again.
+                if path.exists() {
+                    fs::remove_dir_all(&path).unwrap();
+                }
+                Repository::clone_from(&store, &path, Some(PASSWORD), &mut |_| Ok(())).unwrap();
+            }
+            let copy = open(&path).unwrap();
+            assert_eq!(readable_main(&copy, &f), Some(f.first));
+            assert!(copy.verify().unwrap().is_ok());
+        }
+    }
 }

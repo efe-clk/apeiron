@@ -2,13 +2,17 @@
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-use super::{CONFIG, INDEX, KEYS, LOCKS, LOGS, PACKS, REFS, REMOTES, Repository, TMP};
+use super::{
+    CONFIG, INDEX, KEYS, LOCKS, LOGS, PACKS, REFS, REMOTES, Repository, TMP, Unlock, create_layout,
+};
 use crate::config::Config;
 use crate::crypto::Keys;
 use crate::error::{Error, IoContext, Result};
+use crate::fsutil;
 use crate::id::{ObjectId, ObjectType, to_hex};
 use crate::index::{self, Location};
 use crate::keyfile;
@@ -35,6 +39,64 @@ pub struct TransferReport {
 }
 
 impl Repository {
+    /// Makes a new repository at `path`, which must not exist or be empty,
+    /// from the copy in `store`, then pulls every ref of it (FORMAT.md
+    /// §15.6). `secret` opens an encrypted copy. A failure before the
+    /// config is written removes what was created; a failure while pulling
+    /// leaves a repository whose refs are pulled again with `pull`.
+    /// `on_copy` gets the totals over all refs.
+    pub fn clone_from(
+        store: &dyn Store,
+        path: &Path,
+        secret: Option<&str>,
+        on_copy: OnCopy<'_>,
+    ) -> Result<(Repository, Vec<(String, TransferReport)>)> {
+        let bytes = store
+            .read(CONFIG)?
+            .ok_or_else(|| Error::InvalidRepository {
+                path: store.location(""),
+                reason: "no config file".to_owned(),
+            })?;
+        let config_path = store.location(CONFIG);
+        let text = String::from_utf8(bytes.clone()).map_err(|_| Error::InvalidRepository {
+            path: config_path.clone(),
+            reason: "config is not UTF-8".to_owned(),
+        })?;
+        let config = Config::from_toml(&config_path, &text)?;
+        let encrypted = config.id_key.is_none();
+        if encrypted && secret.is_none() {
+            return Err(Error::KeyRequired(store.location("")));
+        }
+        let existed = path.exists();
+        create_layout(path, encrypted)?;
+        let unlock = match prepare_clone(store, path, &config, &bytes, secret) {
+            Ok(unlock) => unlock,
+            Err(e) => {
+                // The folder was empty or missing before.
+                let _ = fs::remove_dir_all(path);
+                if existed {
+                    let _ = fs::create_dir(path);
+                }
+                return Err(e);
+            }
+        };
+        let mut repo = Repository::open_with(path, unlock)?;
+        let mut reports = Vec::new();
+        let (mut objects, mut bytes) = (0, 0);
+        for name in store.list_refs()? {
+            let report = repo.pull(store, &name, &mut |r| {
+                let mut sum = r.clone();
+                sum.objects += objects;
+                sum.bytes += bytes;
+                on_copy(&sum)
+            })?;
+            objects += report.objects;
+            bytes += report.bytes;
+            reports.push((name, report));
+        }
+        Ok((repo, reports))
+    }
+
     /// The remotes of this copy, sorted by name.
     pub fn remotes(&self) -> Result<Vec<Remote>> {
         remote::read_remotes(&self.dir(REMOTES))
@@ -303,6 +365,37 @@ impl Repository {
         }
         Ok(())
     }
+}
+
+/// Copies the key files of `store` into the new repository at `path`,
+/// opens them with `secret` and writes the config last.
+fn prepare_clone(
+    store: &dyn Store,
+    path: &Path,
+    config: &Config,
+    config_bytes: &[u8],
+    secret: Option<&str>,
+) -> Result<Unlock<'static>> {
+    let tmp = path.join(TMP);
+    let unlock = match (&config.id_key, secret) {
+        (Some(_), _) => Unlock::None,
+        (None, secret) => {
+            let keys_dir = path.join(KEYS);
+            for name in store.list(KEYS)? {
+                if !name.ends_with(".key") {
+                    continue;
+                }
+                if let Some(bytes) = store.read(&format!("{KEYS}/{name}"))? {
+                    fsutil::write_durable_new(&tmp, &keys_dir.join(&name), &bytes)?;
+                }
+            }
+            fsutil::sync_dir(&keys_dir)?;
+            let (keys, key_id) = keyfile::unlock(&keys_dir, &config.id, secret.unwrap_or(""))?;
+            Unlock::Keys(keys, Some(key_id))
+        }
+    };
+    fsutil::write_durable_new(&tmp, &path.join(CONFIG), config_bytes)?;
+    Ok(unlock)
 }
 
 /// The objects listed by the healthy index files of a remote. Damaged
@@ -574,6 +667,75 @@ mod tests {
         assert_eq!(b.read_ref("main").unwrap(), Some(second));
         assert_eq!(b.reflog("main").unwrap().last().unwrap().new, Some(second));
         assert_eq!(pull(&mut a, &remote).unwrap().objects, 0);
+    }
+
+    #[test]
+    fn clone_copies_keys_config_and_every_ref() {
+        for encrypted in [false, true] {
+            let Setup {
+                _dir,
+                root,
+                mut a,
+                first,
+            } = setup(encrypted);
+            let remote = root.join("remote");
+            push(&a, &remote).unwrap();
+            let other = commit(&mut a, b"other", Some(first));
+            a.update_ref("sync/docs", None, Some(other)).unwrap();
+            let store = FolderStore::open(&remote).unwrap();
+            a.push(&store, "sync/docs", &mut |_| Ok(())).unwrap();
+
+            let path = root.join("b");
+            fs::create_dir(&path).unwrap();
+            let (b, reports) =
+                Repository::clone_from(&store, &path, Some(PASSWORD), &mut |_| Ok(())).unwrap();
+            let names: Vec<&str> = reports.iter().map(|(n, _)| n.as_str()).collect();
+            assert_eq!(names, ["main", "sync/docs"]);
+            assert_eq!(b.read_ref("main").unwrap(), Some(first));
+            assert_eq!(content(&b, &other), b"other");
+            assert!(b.verify().unwrap().is_ok());
+            assert_eq!(b.is_encrypted(), encrypted);
+            Repository::unlock(&path, PASSWORD).unwrap();
+            // The clone is the same repository: push and pull work both ways.
+            assert_eq!(pull(&mut b.reopen().unwrap(), &remote).unwrap().objects, 0);
+
+            // A folder that is not empty is refused and left alone.
+            assert!(matches!(
+                Repository::clone_from(&store, &path, Some(PASSWORD), &mut |_| Ok(())),
+                Err(Error::InvalidRepository { .. })
+            ));
+            assert!(path.join("config").exists());
+        }
+    }
+
+    #[test]
+    fn clone_with_a_wrong_password_leaves_nothing() {
+        let s = setup(true);
+        let remote = s.root.join("remote");
+        push(&s.a, &remote).unwrap();
+        let store = FolderStore::open(&remote).unwrap();
+        let path = s.root.join("b");
+        assert!(matches!(
+            Repository::clone_from(&store, &path, Some("wrong"), &mut |_| Ok(())),
+            Err(Error::WrongKey)
+        ));
+        assert!(!path.exists());
+        assert!(matches!(
+            Repository::clone_from(&store, &path, None, &mut |_| Ok(())),
+            Err(Error::KeyRequired(_))
+        ));
+        fs::create_dir(&path).unwrap();
+        assert!(Repository::clone_from(&store, &path, Some("wrong"), &mut |_| Ok(())).is_err());
+        assert_eq!(fs::read_dir(&path).unwrap().count(), 0);
+        assert!(matches!(
+            Repository::clone_from(
+                &FolderStore::open(&s.root.join("none")).unwrap(),
+                &s.root.join("c"),
+                None,
+                &mut |_| Ok(())
+            ),
+            Err(Error::InvalidRepository { .. })
+        ));
     }
 
     #[test]

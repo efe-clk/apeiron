@@ -4,8 +4,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use apeiron::{
-    BackupRequest, ChangeKind, DeleteRefRequest, DiffRequest, ErrorKind, KeyKind, ListRequest,
-    LogRequest, Phase, Repository, RestoreRequest, TransferRequest,
+    BackupRequest, ChangeKind, CloneRequest, DeleteRefRequest, DiffRequest, ErrorKind, KeyKind,
+    ListRequest, LogRequest, Phase, Repository, RestoreRequest, TransferRequest,
 };
 
 struct Setup {
@@ -407,6 +407,48 @@ fn push_and_pull_through_a_folder_remote() {
     assert_eq!(err.kind, ErrorKind::NotFound);
     s.repo.remove_remote("disk").unwrap();
     assert!(s.repo.remotes().unwrap().is_empty());
+}
+
+#[test]
+fn clone_makes_a_second_copy_that_knows_its_origin() {
+    let s = setup();
+    let first = backup(&s, "one");
+    let disk = s.root.join("disk");
+    s.repo.add_remote("disk", disk.to_str().unwrap()).unwrap();
+    s.repo
+        .push(TransferRequest::new("disk", "main"))
+        .unwrap()
+        .wait()
+        .unwrap();
+
+    let path = s.root.join("copy");
+    let request = CloneRequest {
+        url: disk.to_str().unwrap().to_owned(),
+        path: path.clone(),
+        secret: None,
+    };
+    let job = Repository::clone_from(request.clone()).unwrap();
+    let report = job.wait().unwrap();
+    assert_eq!(report.refs.len(), 1);
+    assert_eq!(report.refs[0].name, "main");
+    assert_eq!(report.refs[0].report.snapshot, first.snapshot);
+    assert!(report.refs[0].report.objects > 0);
+    let copy = Repository::open(&path).unwrap();
+    assert_eq!(copy.resolve("main").unwrap(), first.snapshot);
+    let origin = &copy.remotes().unwrap()[0];
+    assert_eq!(
+        (origin.name.as_str(), origin.url.as_str()),
+        ("origin", disk.to_str().unwrap())
+    );
+    let report = copy
+        .pull(TransferRequest::new("origin", "main"))
+        .unwrap()
+        .wait()
+        .unwrap();
+    assert_eq!(report.objects, 0);
+
+    let err = Repository::clone_from(request).unwrap().wait().unwrap_err();
+    assert_eq!(err.kind, ErrorKind::InvalidInput);
 }
 
 fn copy_dir(src: &std::path::Path, dest: &std::path::Path) {

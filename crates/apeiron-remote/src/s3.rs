@@ -217,6 +217,33 @@ impl Store for S3Store {
             .map(|(id, _)| id))
     }
 
+    fn list_refs(&self) -> Result<Vec<String>> {
+        let mut names = Vec::new();
+        let mut dirs = vec![String::new()];
+        while let Some(dir) = dirs.pop() {
+            let rel = format!("refs{dir}");
+            let listed = self
+                .rt
+                .block_on(self.store.list_with_delimiter(Some(&self.key(&rel))))
+                .map_err(|e| self.error(&rel, e))?;
+            for prefix in &listed.common_prefixes {
+                if let Some(name) = prefix.filename() {
+                    dirs.push(format!("{dir}/{name}"));
+                }
+            }
+            for object in &listed.objects {
+                if let Some(name) = object.location.filename() {
+                    let name = format!("{dir}/{name}");
+                    if apeiron_core::validate_ref_name(&name[1..]).is_ok() {
+                        names.push(name[1..].to_owned());
+                    }
+                }
+            }
+        }
+        names.sort();
+        Ok(names)
+    }
+
     fn swap_ref(&self, name: &str, expected: Option<ObjectId>, new: ObjectId) -> Result<()> {
         self.rt.block_on(self.swap_ref_async(name, expected, new))
     }
@@ -272,6 +299,9 @@ mod tests {
         s.swap_ref("main", Some(a), b).unwrap();
         assert_eq!(s.read_ref("main").unwrap(), Some(b));
         assert!(matches!(s.read_ref("Main"), Err(Error::InvalidRefName(_))));
+        s.swap_ref("sync/docs", None, a).unwrap();
+        s.write_new("refs/main.lock", b"x").unwrap();
+        assert_eq!(s.list_refs().unwrap(), ["main", "sync/docs"]);
     }
 
     #[test]

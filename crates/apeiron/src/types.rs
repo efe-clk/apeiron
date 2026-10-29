@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use apeiron_core::{ObjectId, Snapshot, Time};
+use apeiron_core::{ObjectId, Snapshot, Time, TransferReport};
 use apeiron_services::{ArchiveFormat, Name};
 use serde::{Deserialize, Serialize};
 
@@ -171,4 +171,29 @@ impl TransferRequest {
             ref_name: ref_name.into(),
         }
     }
+}
+
+/// Where to clone a remote copy from and to.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CloneRequest {
+    /// A folder path or an `sftp://` or `s3://` URL, as for a remote.
+    pub url: String,
+    /// The new repository: a folder that does not exist or is empty.
+    pub path: PathBuf,
+    /// The password or recovery key of an encrypted copy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secret: Option<String>,
+}
+
+/// What `clone` copied, ref by ref.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CloneReport {
+    pub refs: Vec<ClonedRef>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ClonedRef {
+    pub name: String,
+    #[serde(flatten)]
+    pub report: TransferReport,
 }

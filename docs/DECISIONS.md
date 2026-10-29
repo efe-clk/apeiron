@@ -27,7 +27,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [017](#adr-017-xchacha20-poly1305-and-argon2id-for-encryption) | Encryption | XChaCha20-Poly1305 for data, Argon2id for passwords | Accepted |
 | [018](#adr-018-whole-repository-copies-as-remotes-russh-for-sftp-object_store-for-s3) | Remote targets | Remotes are whole repository copies; `russh` for SFTP, `object_store` for S3 | Accepted |
 | [019](#adr-019-the-background-service-is-a-user-process-with-a-jobs-file) | Background service | A user process with a TOML jobs file, started by the operating system; missed jobs catch up | Accepted |
-| [020](#adr-020-sync-through-a-remote-with-a-three-way-merge-and-conflict-copies) | Sync | Devices meet at a remote; a three-way merge per path; conflicting versions are kept as copies | Proposed |
+| [020](#adr-020-sync-through-a-remote-with-a-three-way-merge-and-conflict-copies) | Sync | Devices meet at a remote; a three-way merge per path; conflicting versions are kept as copies | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28.
 
@@ -416,7 +416,7 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 
 ## ADR-020: Sync through a remote, with a three-way merge and conflict copies
 
-**Status:** Proposed (2026-10-29)
+**Status:** Accepted (2026-10-29)
 
 **Context.** Stage 2 ends with one month of trouble-free sync between two devices and a remote server ([SYNC.md](SYNC.md)). The devices are laptops and desktops that are often off; the remote is a disk, an SFTP server or S3 (ADR-018). Sync must never lose a change silently and must not become a way for a deletion to destroy the only copy (VISION.md).
 

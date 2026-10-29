@@ -436,6 +436,36 @@ impl Store for SftpStore {
     fn swap_ref(&self, name: &str, expected: Option<ObjectId>, new: ObjectId) -> Result<()> {
         self.rt.block_on(self.swap_ref_async(name, expected, new))
     }
+
+    fn list_refs(&self) -> Result<Vec<String>> {
+        self.rt.block_on(async {
+            let sftp = &self.conn()?.sftp;
+            let mut names = Vec::new();
+            let mut dirs = vec![String::new()];
+            while let Some(dir) = dirs.pop() {
+                let rel = format!("refs{dir}");
+                let entries = match sftp.read_dir(self.path(&rel)).await {
+                    Ok(entries) => entries,
+                    Err(e) if is_not_found(&e) => continue,
+                    Err(e) => return Err(self.sftp_error(&rel, e)),
+                };
+                for entry in entries {
+                    let name = entry.file_name();
+                    if name == "." || name == ".." {
+                        continue;
+                    }
+                    let path = format!("{dir}/{name}");
+                    if entry.file_type().is_dir() {
+                        dirs.push(path);
+                    } else if apeiron_core::validate_ref_name(&path[1..]).is_ok() {
+                        names.push(path[1..].to_owned());
+                    }
+                }
+            }
+            names.sort();
+            Ok(names)
+        })
+    }
 }
 
 fn is_not_found(e: &SftpError) -> bool {

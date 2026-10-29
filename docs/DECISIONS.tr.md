@@ -27,7 +27,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [017](#adr-017-şifreleme-için-xchacha20-poly1305-ve-argon2id) | Şifreleme | Veri için XChaCha20-Poly1305, parolalar için Argon2id | Kabul edildi |
 | [018](#adr-018-uzak-depo-olarak-deponun-tam-kopyası-sftp-için-russh-s3-için-object_store) | Uzak hedefler | Uzak depolar deponun tam kopyasıdır; SFTP için `russh`, S3 için `object_store` | Kabul edildi |
 | [019](#adr-019-arka-plan-hizmeti-iş-dosyalı-bir-kullanıcı-sürecidir) | Arka plan hizmeti | İşletim sisteminin başlattığı, TOML iş dosyalı bir kullanıcı süreci; kaçırılan işler telafi edilir | Kabul edildi |
-| [020](#adr-020-üç-yönlü-birleştirme-ve-çatışma-kopyalarıyla-bir-uzak-depo-üzerinden-senkron) | Senkron | Cihazlar bir uzak depoda buluşur; yol başına üç yönlü birleştirme; çatışan sürümler kopya olarak tutulur | Önerildi |
+| [020](#adr-020-üç-yönlü-birleştirme-ve-çatışma-kopyalarıyla-bir-uzak-depo-üzerinden-senkron) | Senkron | Cihazlar bir uzak depoda buluşur; yol başına üç yönlü birleştirme; çatışan sürümler kopya olarak tutulur | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
@@ -416,7 +416,7 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 
 ## ADR-020: Üç yönlü birleştirme ve çatışma kopyalarıyla bir uzak depo üzerinden senkron
 
-**Durum:** Önerildi (2026-10-29)
+**Durum:** Kabul edildi (2026-10-29)
 
 **Bağlam.** Aşama 2, iki cihaz ve bir uzak sunucu arasında bir ay sorunsuz senkronla biter ([SYNC.tr.md](SYNC.tr.md)). Cihazlar çoğu zaman kapalı olan dizüstü ve masaüstü bilgisayarlardır; uzak depo bir disk, bir SFTP sunucusu ya da S3'tür (ADR-018). Senkron hiçbir değişikliği sessizce kaybetmemeli ve bir silmenin tek kopyayı yok etmesinin yolu olmamalıdır (VISION.tr.md).
 

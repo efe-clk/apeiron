@@ -20,7 +20,7 @@ Implementation status (`apeiron-core`):
 | 13 | Garbage collection | Done |
 | 14 | Encryption | Done |
 | 15 | Remote repositories, push and pull: folders, SFTP and S3 | Done |
-| 15.6 | Clone (draft, awaiting approval) | Planned |
+| 15.6 | Clone | Done |
 
 ## Plain summary
 
@@ -532,6 +532,7 @@ Every remote kind offers the same small set of operations on paths of the layout
 | List a folder | Read the folder | `LIST` with a prefix |
 | Write a new file atomically | Write into `tmp/`, flush, rename (section 9.1) | `PUT` with `If-None-Match: *` |
 | Replace a ref (compare and swap) | Lock file as in section 9.3 | `PUT` with `If-Match: <etag read before>` |
+| List the refs | Read the `refs/` folders | `LIST` with the prefix `refs/` |
 | Delete a file | Delete | `DELETE` |
 | Create the folders of a new copy | Create the folders of section 2 | Nothing; S3 has no folders |
 
@@ -571,9 +572,9 @@ Clone makes a new local repository from a remote, for a second device ([SYNC.md]
 1. Read the remote `config`; there must be one. The local folder must not exist or be empty.
 2. Create the folders of section 2, copy every key file of the remote `keys/` and check that the given password or recovery key opens one of them (section 14.2); a wrong password stops here and removes the new folder.
 3. Write the copied `config` last (section 9.2): from then on the folder is a repository.
-4. Pull every ref of the remote (section 15.4).
+4. Pull every ref of the remote (section 15.4) and add the remote to the `remotes` file as `origin` (section 15.1).
 
-A clone of an unencrypted remote copies no keys. Clone is the only operation that copies keys from a remote; pull never does. An interrupted clone leaves a folder without `config`, which is deleted and cloned again.
+A clone of an unencrypted remote copies no keys. Clone is the only operation that copies keys from a remote; pull never does. An interrupted clone leaves a folder without `config`, which is deleted and cloned again; one interrupted while pulling is a repository whose refs are pulled again.
 
 ## 16. Left for later versions
 

@@ -71,6 +71,7 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | `apeiron remote add <name> <url>` | Bir uzak depo ekler: harici diskteki gibi bir klasör `sftp://[user@]host[:port]/path` ya da `s3://bucket/path?endpoint=…&region=…` (bölüm 2.2) | Tamamlandı |
 | `apeiron remote list` | Uzak depoları listeler | Tamamlandı |
 | `apeiron remote remove <name>` | Bir uzak depoyu unutur; kopyanın kendisine dokunulmaz | Tamamlandı |
+| `apeiron clone <url> <path>` | Bir uzak kopyadan aynı parolayla yeni bir depo oluşturur, her ref'i pull eder ve uzak depoya `origin` adını verir; ikinci bir cihazı kurmanın yolu | Tamamlandı |
 | `apeiron push <remote> [<ref>]` | Bir ref'in (varsayılan `main`) snapshot'larını uzak depoya kopyalar ve ref'i orada taşır | Tamamlandı |
 | `apeiron pull <remote> [<ref>]` | Bir ref'in snapshot'larını uzak depodan kopyalar ve yerel ref'i ileri taşır | Tamamlandı |
 | `apeiron key remove <id>` | Bir parolayı ya da kurtarma anahtarını siler; sonuncusu silinemez | Tamamlandı |

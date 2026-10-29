@@ -213,6 +213,10 @@ pub trait Store {
 
     fn read_ref(&self, name: &str) -> Result<Option<ObjectId>>;
 
+    /// The names of all refs, sorted; lock files and invalid names are
+    /// left out.
+    fn list_refs(&self) -> Result<Vec<String>>;
+
     /// Points the ref `name` at `new` only if it points at `expected`.
     fn swap_ref(&self, name: &str, expected: Option<ObjectId>, new: ObjectId) -> Result<()>;
 }
@@ -303,6 +307,15 @@ impl Store for FolderStore {
 
     fn read_ref(&self, name: &str) -> Result<Option<ObjectId>> {
         self.refs.read(name)
+    }
+
+    fn list_refs(&self) -> Result<Vec<String>> {
+        Ok(self
+            .refs
+            .list()?
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect())
     }
 
     fn swap_ref(&self, name: &str, expected: Option<ObjectId>, new: ObjectId) -> Result<()> {

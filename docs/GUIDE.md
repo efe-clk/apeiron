@@ -173,6 +173,16 @@ Amazon S3 and many other services (Backblaze B2, Cloudflare R2, Wasabi and other
 
 The service must support conditional writes; Apeiron refuses to move a ref otherwise.
 
+### 6.4 A second device
+
+A second computer starts from any of these copies:
+
+```bash
+apeiron clone /run/media/$USER/DISK/apeiron ~/apeiron   # or an sftp:// or s3:// address
+```
+
+It asks for the password of the copy and creates a repository at `~/apeiron` with every backup in it; the copy is then known as `origin`, so `apeiron --repo ~/apeiron pull origin backup/documents` brings later backups. If `clone` is stopped before it finishes, delete the new folder and run it again.
+
 ## 7. Routine
 
 | How often | Command | Why |

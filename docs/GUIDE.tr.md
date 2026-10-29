@@ -173,6 +173,16 @@ Amazon S3 ve başka pek çok hizmet (Backblaze B2, Cloudflare R2, Wasabi ve diğ
 
 Hizmet koşullu yazmayı desteklemelidir; aksi hâlde Apeiron bir ref'i taşımayı reddeder.
 
+### 6.4 İkinci bir cihaz
+
+İkinci bir bilgisayar bu kopyalardan herhangi biriyle başlar:
+
+```bash
+apeiron clone /run/media/$USER/DISK/apeiron ~/apeiron   # ya da bir sftp:// veya s3:// adresi
+```
+
+Kopyanın parolasını sorar ve `~/apeiron` içinde her yedeği barındıran bir depo oluşturur; kopya artık `origin` olarak bilinir, yani `apeiron --repo ~/apeiron pull origin backup/documents` sonraki yedekleri getirir. `clone` bitmeden durdurulursa yeni klasörü silin ve yeniden çalıştırın.
+
 ## 7. Düzen
 
 | Ne sıklıkla | Komut | Neden |

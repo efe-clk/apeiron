@@ -2,7 +2,7 @@
 
 # Apeiron Senkron
 
-> **Durum: Planlandı (taslak, onay bekliyor).** Aşama 2'nin 4. işinin tasarımıdır ([ROADMAP.tr.md](ROADMAP.tr.md) §4): bir klasörün cihazlar arasında tek ve çift yönlü senkronu ve çatışma tespiti. Arkasındaki karar ADR-020'dir ([DECISIONS.tr.md](DECISIONS.tr.md)).
+> **Durum: Devam ediyor** (klon tamamlandı). Aşama 2'nin 4. işinin tasarımıdır ([ROADMAP.tr.md](ROADMAP.tr.md) §4): bir klasörün cihazlar arasında tek ve çift yönlü senkronu ve çatışma tespiti. Arkasındaki karar ADR-020'dir ([DECISIONS.tr.md](DECISIONS.tr.md)).
 
 Senkron, `~/Documents` gibi aynı klasörü birden fazla cihazda eşit tutar. Var olanlardan kurulur: bir yedek klasörü bir snapshot olarak kaydeder, push ve pull snapshot'ları bir uzak depo üzerinden taşır ([FORMAT.tr.md](FORMAT.tr.md) §15) ve bir birleştirme, iki cihazda yapılan değişiklikleri birleştirir.
 
@@ -20,7 +20,7 @@ Senkron, `~/Documents` gibi aynı klasörü birden fazla cihazda eşit tutar. Va
 
 | Komut | Ne yapar | Durum |
 | --- | --- | --- |
-| `apeiron clone <url> <path>` | Bir uzak deponun kopyası olan yerel bir depo oluşturur: aynı config ve anahtarlar, ardından her ref pull edilir | Planlandı |
+| `apeiron clone <url> <path>` | Bir uzak deponun kopyası olan yerel bir depo oluşturur: aynı config ve anahtarlar, ardından her ref pull edilir; uzak depo artık `origin` adını taşır | Tamamlandı |
 | `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run]` | Bir senkron turu çalıştırır (bölüm 3); varsayılan ref `sync/<klasör adı>`'dır | Planlandı |
 
 Arka plan hizmeti senkronu bir iş olarak çalıştırır (`do = "sync"`, [DAEMON.tr.md](DAEMON.tr.md)), örneğin 15 dakikada bir. İkinci bir cihaz `apeiron clone`, ardından `apeiron sync` ile başlar.
@@ -85,7 +85,7 @@ Yerel ref ancak klasör uygulandıktan sonra taşınır. Yarıda kalan bir uygul
 
 ## 6. Klon
 
-`apeiron clone`, bir uzak depodan yeni bir yerel depo oluşturur (FORMAT.tr.md §15.6, yeni): `config`'i ve `keys/`'i kopyalar, bir deponun klasörlerini oluşturur, ardından uzak deponun her ref'ini pull eder. Uzak deponun parolası klonu açar. Uzak depodan anahtar kopyalayan tek işlem budur.
+`apeiron clone`, bir uzak depodan yeni bir yerel depo oluşturur (FORMAT.tr.md §15.6, yeni): `config`'i ve `keys/`'i kopyalar, bir deponun klasörlerini oluşturur, ardından uzak deponun her ref'ini pull eder ve ona `origin` adını verir. Uzak deponun parolası klonu açar. Uzak depodan anahtar kopyalayan tek işlem budur.
 
 ## 7. Bu işin parçası olmayanlar
 
@@ -102,5 +102,7 @@ Yerel ref ancak klasör uygulandıktan sonra taşınır. Yarıda kalan bir uygul
 | Crate | Görev | Durum |
 | --- | --- | --- |
 | `apeiron-services` | Birleştirme ve bir snapshot'ı bir klasöre uygulama | Planlandı |
-| `apeiron` | `clone` ve `sync` işlemleri (API.tr.md §8.3) | Planlandı |
-| `apeiron-cli`, `apeiron-daemon` | `apeiron clone`, `apeiron sync`, `do = "sync"` | Planlandı |
+| `apeiron` | `clone` (API.tr.md §8.2) | Tamamlandı |
+| `apeiron` | `sync` işlemi (API.tr.md §8.3) | Planlandı |
+| `apeiron-cli` | `apeiron clone` | Tamamlandı |
+| `apeiron-cli`, `apeiron-daemon` | `apeiron sync`, `do = "sync"` | Planlandı |

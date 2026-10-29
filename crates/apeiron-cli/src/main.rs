@@ -20,9 +20,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use apeiron::{
-    ArchiveFormat, BackupRequest, DiffRequest, Error, ErrorKind, ExportRequest, GcRequest, Job,
-    KeyKind, ListRequest, LogRequest, Name, Repository, RestoreRequest, RestoreTestRequest,
-    TransferReport, TransferRequest, Warning,
+    ArchiveFormat, BackupRequest, CloneRequest, DiffRequest, Error, ErrorKind, ExportRequest,
+    GcRequest, Job, KeyKind, ListRequest, LogRequest, Name, Repository, RestoreRequest,
+    RestoreTestRequest, TransferReport, TransferRequest, Warning,
 };
 use clap::{Parser, Subcommand};
 use serde::Serialize;
@@ -170,6 +170,13 @@ enum Command {
         /// Folder for the state and the log instead of the usual one
         #[arg(long, global = true, value_name = "PATH")]
         state_dir: Option<PathBuf>,
+    },
+    /// Make a new repository from a remote copy and pull all its refs
+    Clone {
+        /// A folder, sftp://[user@]host[:port]/path or s3://bucket/path
+        url: String,
+        /// The new repository; must not exist or be empty
+        path: PathBuf,
     },
     /// Copy the snapshots of a ref to a remote and move the ref there
     Push {
@@ -648,6 +655,31 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             jobs,
             state_dir,
         } => run_daemon(out, command, jobs, state_dir),
+        Command::Clone { url, path } => {
+            let mut request = CloneRequest {
+                url,
+                path,
+                secret: password_file.map(read_password_file).transpose()?,
+            };
+            let report = match watch(out, Repository::clone_from(request.clone())?) {
+                Err(Failure::Api(e)) if e.kind == ErrorKind::Key && request.secret.is_none() => {
+                    request.secret = Some(prompt("Password or recovery key: ")?);
+                    watch(out, Repository::clone_from(request.clone())?)?
+                }
+                result => result?,
+            };
+            out.result(&report, |r| {
+                for cloned in &r.refs {
+                    say!("{}", transferred(&cloned.report, &cloned.name, "origin"));
+                }
+                say!(
+                    "Cloned {} into {}; the remote is named origin",
+                    format::count(r.refs.len() as u64, "ref"),
+                    request.path.display()
+                );
+            });
+            Ok(0)
+        }
         Command::Push { remote, ref_name } => {
             let repo = open(cli.repo, password_file)?;
             let request = TransferRequest::new(remote.clone(), ref_name.clone());

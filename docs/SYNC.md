@@ -2,7 +2,7 @@
 
 # Apeiron Sync
 
-> **Status: Planned (draft, awaiting approval).** This is the design of Stage 2 work item 4 ([ROADMAP.md](ROADMAP.md) §4): one- and two-way sync of a folder between devices, with conflict detection. The decision behind it is ADR-020 ([DECISIONS.md](DECISIONS.md)).
+> **Status: In progress** (clone done). This is the design of Stage 2 work item 4 ([ROADMAP.md](ROADMAP.md) §4): one- and two-way sync of a folder between devices, with conflict detection. The decision behind it is ADR-020 ([DECISIONS.md](DECISIONS.md)).
 
 Sync keeps the same folder, such as `~/Documents`, equal on several devices. It is built from what exists: a backup records the folder as a snapshot, push and pull move snapshots through a remote ([FORMAT.md](FORMAT.md) §15), and a merge joins changes made on two devices.
 
@@ -20,7 +20,7 @@ Sync keeps the same folder, such as `~/Documents`, equal on several devices. It 
 
 | Command | What it does | Status |
 | --- | --- | --- |
-| `apeiron clone <url> <path>` | Creates a local repository that is a copy of a remote one: the same config and keys, then pulls every ref | Planned |
+| `apeiron clone <url> <path>` | Creates a local repository that is a copy of a remote one: the same config and keys, then pulls every ref; the remote is then named `origin` | Done |
 | `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run]` | Runs one sync round (section 3); the default ref is `sync/<folder name>` | Planned |
 
 The background service runs sync as a job (`do = "sync"`, [DAEMON.md](DAEMON.md)), for example every 15 minutes. A second device starts with `apeiron clone`, then `apeiron sync`.
@@ -85,7 +85,7 @@ The local ref moves only after the folder has been applied. An interrupted apply
 
 ## 6. Clone
 
-`apeiron clone` creates a new local repository from a remote (FORMAT.md §15.6, new): it copies `config` and `keys/`, creates the folders of a repository, then pulls every ref of the remote. The password of the remote repository opens the clone. This is the only operation that copies keys from a remote.
+`apeiron clone` creates a new local repository from a remote (FORMAT.md §15.6, new): it copies `config` and `keys/`, creates the folders of a repository, then pulls every ref of the remote and names it `origin`. The password of the remote repository opens the clone. This is the only operation that copies keys from a remote.
 
 ## 7. Not part of this work item
 
@@ -102,5 +102,7 @@ The local ref moves only after the folder has been applied. An interrupted apply
 | Crate | Role | Status |
 | --- | --- | --- |
 | `apeiron-services` | Merge and applying a snapshot to a folder | Planned |
-| `apeiron` | `clone` and `sync` operations (API.md §8.3) | Planned |
-| `apeiron-cli`, `apeiron-daemon` | `apeiron clone`, `apeiron sync`, `do = "sync"` | Planned |
+| `apeiron` | `clone` (API.md §8.2) | Done |
+| `apeiron` | `sync` operation (API.md §8.3) | Planned |
+| `apeiron-cli` | `apeiron clone` | Done |
+| `apeiron-cli`, `apeiron-daemon` | `apeiron sync`, `do = "sync"` | Planned |

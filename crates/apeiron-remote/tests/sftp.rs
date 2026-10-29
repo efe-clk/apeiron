@@ -284,6 +284,9 @@ fn sftp_refs_are_compare_and_swap_with_locks() {
     assert_eq!(store.read_ref("main").unwrap(), Some(other));
     assert!(!lock.exists());
     assert_eq!(store.read_ref("other").unwrap(), None);
+    store.swap_ref("sync/docs", None, other).unwrap();
+    fs::write(server.path("data/remote/refs/sync/docs.lock"), b"").unwrap();
+    assert_eq!(store.list_refs().unwrap(), ["main", "sync/docs"]);
 
     store.write_new("keys/x.key", b"one").unwrap();
     store.write_new("keys/x.key", b"two").unwrap();
