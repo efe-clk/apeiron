@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 
+mod accounts;
 mod audit;
 mod oidc;
 mod replicate;
@@ -991,6 +992,9 @@ fn router(app: Arc<App>) -> Router {
         .route("/api/jobs/{id}/cancel", post(cancel))
         .route("/api/folders", get(folders))
         .route("/api/audit", get(audit))
+        .route("/api/users", get(accounts::list).post(accounts::add))
+        .route("/api/users/{name}", post(accounts::change))
+        .route("/api/users/{name}/remove", post(accounts::remove))
         .route("/api/shares", get(share_list).post(share_add))
         .route("/api/shares/{id}/remove", post(share_remove))
         .route("/api/shared/{secret}", get(shared_list))

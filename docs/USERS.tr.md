@@ -70,14 +70,17 @@ Sunucu dosya değişince onu yeniden okur; böylece çalışırken eklenen, değ
 | `POST /api/start/search` | Bir `member` ya da `reader` bir snapshot belirtmelidir |
 | `GET /api/folders` | Yalnızca kullanıcının klasörlerinin içinde |
 | Rolün ötesindeki her şey | `unsupported` ile reddedilir; başka bir ref'e yedek ya da klasörlerin dışındaki bir yol `invalid_input` ile |
+| `GET /api/users` | Bir `admin` için: parolanın özeti olmadan her kullanıcı, parolası olup olmadığı ve kullanıcılara verilebilecek klasörler |
+| `POST /api/users` `{"name", "role", "password", "oidc", "backups", "folders"}` | Bir `admin` için: §3'teki denetimlerle bir kullanıcı ekler; klasörler bir `--folder` içinde olmalıdır |
+| `POST /api/users/<ad>` | Bir `admin` için: gönderilen alanları değiştirir; boş bir `password` onu korur, `"no_password": true` onu kaldırır. Bir admin kendi admin rolünü kaldıramaz ve her zaman bir admin vardır |
+| `POST /api/users/<ad>/remove` | Bir `admin` için: kendisi dışındaki bir kullanıcıyı kaldırır |
 
-Sayfalar kullanıcının adını Oturumu kapat'ın yanında gösterir ve rolün yapamadıklarını gizler: bir `reader` için Yedekle ve Geri yükle, `admin` dışındaki herkes için Denetle.
+Sayfalar kullanıcının adını Oturumu kapat'ın yanında gösterir ve rolün yapamadıklarını gizler: bir `reader` için Yedekle ve Geri yükle, `admin` dışındaki herkes için Denetle. Bir `admin`'in ayrıca, yukarıdaki isteklerle kullanıcı ekleyen, değiştiren ve kaldıran bir Kullanıcılar sayfası vardır; her değişiklik o admin'in adıyla denetim kaydına yazılır ve değişen bir parola ya da kimlik kullanıcının oturumlarını bitirir. Sayfaların ve `apeiron web user` komutunun değişiklikleri birer birer ve bütün olarak yazılır (`web.json.lock`).
 
 ## 5. Bu işin parçası olmayanlar
 
 | Konu | Nerede |
 | --- | --- |
-| Kullanıcıları sayfalarda yönetmek | Sonra; o zamana kadar §3'teki komutlar |
 | Kimin ne yaptığının kaydı | 4. iş ([AUDIT.tr.md](AUDIT.tr.md)) |
 | Kullanıcı başına ayrı şifreleme anahtarları | Kullanıcılar deponun anahtarını paylaşır; anahtarı sunucu tutar |
 | Masaüstü arayüzünde kullanıcılar | Gerekmez: yalnızca onu çalıştıran kullanıcıya hizmet eder |

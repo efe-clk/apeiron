@@ -329,6 +329,16 @@ impl WebState {
         }
     }
 
+    /// The users file.
+    pub(crate) fn users_path(&self) -> &Path {
+        &self.users_file
+    }
+
+    /// The canonical `--folder` paths users may be given folders inside.
+    pub(crate) fn roots(&self) -> &[PathBuf] {
+        &self.roots
+    }
+
     /// Whether this server serves a standby copy (REPLICATION.md §5).
     pub(crate) fn standby(&self) -> bool {
         self.standby

@@ -585,6 +585,7 @@ enum OidcCommand {
 
 fn web_oidc(files: &WebFiles, command: OidcCommand, out: &Output) -> Result<(), Failure> {
     let file = &files.users;
+    let _lock = apeiron_server::Users::lock(file)?;
     let mut users = apeiron_server::Users::load(file)?;
     let not_set =
         || Failure::Usage("no identity provider is set up; use `apeiron web oidc set`".to_owned());
@@ -1158,6 +1159,8 @@ fn new_login_password() -> Result<String, Failure> {
 
 fn web_user(files: &WebFiles, command: UserCommand, out: &Output) -> Result<(), Failure> {
     let file = &files.users;
+    // The pages may change the users at the same time (docs/USERS.md §4).
+    let _lock = apeiron_server::Users::lock(file)?;
     let mut users = apeiron_server::Users::load(file)?;
     let audit = &files.audit;
     // Changes are recorded, never passwords (docs/AUDIT.md §1).

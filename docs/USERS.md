@@ -70,14 +70,17 @@ The server reads the file again when it changes, so a user added, changed or rem
 | `POST /api/start/search` | A `member` or `reader` must name a snapshot |
 | `GET /api/folders` | Only inside the user's folders |
 | Anything else beyond the role | Refused with `unsupported`; a backup into another ref or a path outside the folders with `invalid_input` |
+| `GET /api/users` | For an `admin`: every user without the password's hash, whether it has a password, and the folders users may be given |
+| `POST /api/users` `{"name", "role", "password", "oidc", "backups", "folders"}` | For an `admin`: adds a user, with the checks of §3; folders must be inside a `--folder` |
+| `POST /api/users/<name>` | For an `admin`: changes the fields sent; an empty `password` keeps it, `"no_password": true` takes it away. An admin cannot take its own admin role away, and there is always an admin |
+| `POST /api/users/<name>/remove` | For an `admin`: removes a user other than itself |
 
-The pages show the user's name next to Sign out and hide what the role cannot do: Back up for a `reader`, Restore for a `reader`, Check for everyone but an `admin`.
+The pages show the user's name next to Sign out and hide what the role cannot do: Back up for a `reader`, Restore for a `reader`, Check for everyone but an `admin`. An `admin` also has a Users page, which adds, changes and removes users with the requests above; every change is recorded in the audit log under that admin's name, and a changed password or identity ends the user's sessions. Changes of the pages and of `apeiron web user` are written whole, one at a time (`web.json.lock`).
 
 ## 5. Not part of this work item
 
 | Item | Where |
 | --- | --- |
-| Managing users in the pages | Later; the commands of §3 until then |
 | A record of who did what | Work item 4 ([AUDIT.md](AUDIT.md)) |
 | Separate encryption keys per user | Users share the repository's key; the server holds it |
 | Users in the desktop interface | Not needed: it serves only the user who runs it |

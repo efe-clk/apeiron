@@ -130,15 +130,56 @@ impl Users {
         }
     }
 
-    /// Writes the users to `file`, readable only by its owner.
+    /// Writes the users to `file`, readable only by its owner. The file is
+    /// replaced whole, so the server never reads half of it.
     pub fn save(&self, file: &Path) -> Result<(), Error> {
         self.check()?;
         let data = serde_json::to_vec_pretty(self)
             .map_err(|e| Error::new(ErrorKind::Internal, e.to_string()))?;
-        file.parent()
+        let mut tmp = file.as_os_str().to_owned();
+        tmp.push(format!(".{}.tmp", std::process::id()));
+        let tmp = PathBuf::from(tmp);
+        let written = file
+            .parent()
             .map_or(Ok(()), fs::create_dir_all)
-            .and_then(|()| crate::web::write_private(file, &data))
-            .map_err(|e| Error::new(ErrorKind::Io, format!("{}: {e}", file.display())))
+            .and_then(|()| crate::web::write_private(&tmp, &data))
+            .and_then(|()| fs::rename(&tmp, file));
+        if written.is_err() {
+            let _ = fs::remove_file(&tmp);
+        }
+        written.map_err(|e| Error::new(ErrorKind::Io, format!("{}: {e}", file.display())))
+    }
+
+    /// Holds `web.json.lock` until the returned file is dropped, so one
+    /// change of the users file is made at a time.
+    pub fn lock(file: &Path) -> Result<fs::File, Error> {
+        let io = |e: io::Error| Error::new(ErrorKind::Io, format!("{}: {e}", file.display()));
+        let mut lock = file.as_os_str().to_owned();
+        lock.push(".lock");
+        if let Some(dir) = file.parent() {
+            fs::create_dir_all(dir).map_err(io)?;
+        }
+        let lock = fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(PathBuf::from(lock))
+            .map_err(io)?;
+        lock.lock().map_err(io)?;
+        Ok(lock)
+    }
+
+    /// Changes the users in `file` with `change` while no one else does
+    /// (`web.json.lock`), and saves them if it succeeds.
+    pub fn update<T>(
+        file: &Path,
+        change: impl FnOnce(&mut Users) -> Result<T, Error>,
+    ) -> Result<T, Error> {
+        let _lock = Users::lock(file)?;
+        let mut users = Users::load(file)?;
+        let result = change(&mut users)?;
+        users.save(file)?;
+        Ok(result)
     }
 
     /// Fails when the identity provider's settings cannot work or two

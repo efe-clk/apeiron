@@ -943,3 +943,107 @@ fn share_links() {
         assert!(log.contains(&format!("\"event\":\"{event}\"")), "{event}");
     }
 }
+
+#[test]
+fn an_admin_manages_users_in_the_pages() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_server, mut c, home) = start(dir.path());
+    c.sign_in();
+
+    let listed = c.get("/api/users").json();
+    assert_eq!(listed["users"][0]["name"], "root");
+    assert_eq!(listed["users"][0]["password"], true);
+    assert!(listed["users"][0].get("hash").is_none());
+    assert_eq!(listed["folders"], json!([home]));
+
+    // Adding: checked like `apeiron web user add`.
+    let add = |body: Value| c.kind("/api/users", body);
+    assert_eq!(
+        add(json!({"name": "ayse", "role": "member"})).1,
+        "invalid_input"
+    );
+    assert_eq!(
+        add(json!({"name": "ayse", "password": "short"})).1,
+        "invalid_input"
+    );
+    let outside = dir.path().join("elsewhere");
+    fs::create_dir_all(&outside).unwrap();
+    let refused = add(json!({"name": "ayse", "password": PASSWORD, "folders": [outside]}));
+    assert_eq!(refused.1, "invalid_input");
+    let added = c.post(
+        "/api/users",
+        json!({"name": "ayse", "role": "member", "password": PASSWORD,
+               "backups": ["backup/ayse-*", " "], "folders": [home.join("src")]}),
+    );
+    assert_eq!(added.status, 200, "{}", added.body);
+    assert_eq!(
+        add(json!({"name": "ayse", "password": PASSWORD})).1,
+        "already_exists"
+    );
+    let ayse = c.other("ayse");
+    assert_eq!(
+        Users::load(&dir.path().join("config/web.json"))
+            .unwrap()
+            .get("ayse")
+            .unwrap()
+            .backups,
+        ["backup/ayse-*"]
+    );
+
+    // Only an admin manages users.
+    assert_eq!(ayse.get("/api/users").status, 400);
+    assert_eq!(
+        ayse.kind("/api/users/root/remove", json!({})).1,
+        "unsupported"
+    );
+
+    // A new password ends the user's sessions.
+    let changed = c.post("/api/users/ayse", json!({"password": "battery staple"}));
+    assert_eq!(changed.status, 200, "{}", changed.body);
+    assert_eq!(ayse.get("/api/session").json()["signed_in"], false);
+    assert_eq!(c.kind("/api/users/ayse", json!({"role": "chief"})).0, 400);
+
+    // An admin keeps itself, and there is always an admin.
+    assert_eq!(
+        c.kind("/api/users/root", json!({"role": "member"})).1,
+        "invalid_input"
+    );
+    assert_eq!(
+        c.kind("/api/users/root/remove", json!({})).1,
+        "invalid_input"
+    );
+    assert_eq!(c.kind("/api/users/nobody/remove", json!({})).1, "not_found");
+    assert_eq!(c.post("/api/users/ayse/remove", json!({})).status, 200);
+    assert_eq!(
+        c.get("/api/users").json()["users"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+
+    // Every change is recorded with the admin who made it, never a password.
+    let events = Audit::new(dir.path().join("audit.log"))
+        .read(100, None)
+        .unwrap();
+    let made: Vec<(&str, &str)> = events
+        .iter()
+        .filter(|e| e.event.starts_with("user_"))
+        .map(|e| (e.event.as_str(), e.outcome.as_str()))
+        .collect();
+    assert!(made.contains(&("user_add", "ok")));
+    assert!(made.contains(&("user_password", "ok")));
+    assert!(made.contains(&("user_remove", "ok")));
+    assert!(made.contains(&("user_remove", "invalid_input")));
+    assert!(
+        events
+            .iter()
+            .all(|e| !e.detail.to_string().contains("staple"))
+    );
+    assert!(
+        events
+            .iter()
+            .filter(|e| e.event.starts_with("user_"))
+            .all(|e| e.user.as_deref() == Some("root"))
+    );
+}

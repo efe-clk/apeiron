@@ -28,6 +28,7 @@ const may = {
   verify: () => !user || user.role === "admin",
   readLog: () => user?.role === "admin",
   share: () => user !== null && user.role !== "reader",
+  manageUsers: () => user?.role === "admin",
 };
 
 const main = document.getElementById("main");
@@ -290,6 +291,7 @@ function showNav(current) {
     may.verify() ? item("verify", verify) : null,
     may.share() ? item("shares", shares) : null,
     may.readLog() ? item("activity", activity) : null,
+    may.manageUsers() ? item("users", users) : null,
     mode === "web" ? item("sign_out", signOut) : item("close", () => start()),
     h("span", { class: "path" }, user ? `${user.name} · ${repoPath}` : repoPath),
   );
@@ -773,6 +775,93 @@ async function activity() {
   } catch (err) {
     show(h("h1", {}, t("activity_heading")), errorMessage(err));
   }
+}
+
+// ---- Users (USERS.md §4) ----
+
+const lines = (text) => text.split(/[\n,]/).map((s) => s.trim()).filter(Boolean);
+
+async function users() {
+  showNav("users");
+  show(h("p", {}, t("loading")));
+  try {
+    const { users: list, folders, oidc: provider } = await api("GET", "/api/users");
+    const signsIn = (u) => [u.password ? t("users_password") : null, u.oidc ? `${t("users_provider")}: ${u.oidc}` : null].filter(Boolean).join(", ");
+    const rows = list.map((u) => h("tr", {},
+      h("td", { class: "nowrap" }, u.name),
+      h("td", { class: "nowrap" }, t(`role_${u.role}`)),
+      h("td", {}, signsIn(u)),
+      h("td", {}, u.role === "admin" ? t("users_all") : u.backups.join(", ")),
+      h("td", {}, (u.folders.length ? u.folders : u.role === "admin" ? folders : []).join(", ")),
+      h("td", {},
+        h("button", { type: "button", onclick: () => userForm(u, folders, provider) }, t("users_change")),
+        u.name === user.name ? null : h("button", { type: "button", onclick: async (e) => {
+          if (!confirm(t("users_remove_ask", { name: u.name }))) return;
+          e.target.disabled = true;
+          try {
+            await api("POST", `/api/users/${encodeURIComponent(u.name)}/remove`);
+            users();
+          } catch (err) {
+            main.append(errorMessage(err));
+          }
+        } }, t("remove"))),
+    ));
+    show(
+      h("h1", {}, t("users_heading")),
+      h("p", { class: "muted" }, t("users_intro")),
+      h("div", { class: "card scroll" }, h("table", {},
+        h("thead", {}, h("tr", {}, ...["user_name", "users_role", "users_signs_in", "users_backups", "users_folders", ""].map((k) => h("th", {}, k ? t(k) : "")))),
+        h("tbody", {}, ...rows))),
+      h("div", { class: "actions" }, h("button", { type: "button", class: "primary", onclick: () => userForm(null, folders, provider) }, t("users_add"))),
+    );
+  } catch (err) {
+    show(h("h1", {}, t("users_heading")), errorMessage(err));
+  }
+}
+
+// Adds a user, or changes `existing`.
+function userForm(existing, folders, provider) {
+  const name = h("input", { type: "text", autocomplete: "off", autocapitalize: "none", spellcheck: "false", required: true, value: existing?.name || "" });
+  const role = h("select", {}, ...["admin", "member", "reader"].map((r) => h("option", { value: r, selected: (existing?.role || "member") === r }, t(`role_${r}`))));
+  const password = h("input", { type: "password", autocomplete: "new-password", minlength: 8 });
+  const identity = h("input", { type: "text", autocomplete: "off", spellcheck: "false", value: existing?.oidc || "" });
+  const backups = h("textarea", { rows: 3, spellcheck: "false" }, (existing?.backups || []).join("\n"));
+  const chosen = h("textarea", { rows: 3, spellcheck: "false" }, (existing?.folders || []).join("\n"));
+  const noPassword = existing?.password ? h("input", { type: "checkbox" }) : null;
+  const status = h("div");
+  const form = h("form", { onsubmit: async (e) => {
+    e.preventDefault();
+    status.replaceChildren();
+    const request = {
+      role: role.value,
+      password: password.value,
+      no_password: noPassword?.checked === true,
+      oidc: identity.value,
+      backups: lines(backups.value),
+      folders: lines(chosen.value),
+    };
+    try {
+      if (existing) await api("POST", `/api/users/${encodeURIComponent(existing.name)}`, request);
+      else await api("POST", "/api/users", { ...request, name: name.value.trim() });
+      users();
+    } catch (err) {
+      status.replaceChildren(errorMessage(err));
+    }
+  } },
+    existing ? null : field(t("user_name"), name, t("users_name_hint")),
+    ...field(t("users_role"), role, t("users_role_hint")),
+    ...field(t("password"), password, existing ? t("users_password_keep") : t("users_password_hint")),
+    noPassword ? h("label", {}, noPassword, " ", t("users_no_password")) : null,
+    provider ? field(t("users_provider"), identity, t("users_provider_hint")) : null,
+    ...field(t("users_backups"), backups, t("users_backups_hint")),
+    ...field(t("users_folders"), chosen, t("users_folders_hint", { folders: folders.join(", ") })),
+    h("div", { class: "actions" },
+      h("button", { type: "submit", class: "primary" }, existing ? t("users_save") : t("users_add")),
+      h("button", { type: "button", onclick: users }, t("cancel"))),
+  );
+  showNav("users");
+  show(h("h1", {}, existing ? t("users_change_heading", { name: existing.name }) : t("users_add_heading")), h("div", { class: "card" }, form), status);
+  (existing ? role : name).focus();
 }
 
 // ---- Signing in (WEB.md §4) ----
