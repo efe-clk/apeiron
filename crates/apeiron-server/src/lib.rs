@@ -930,9 +930,13 @@ fn percent(text: &str) -> String {
 }
 
 /// Sends the browser to the identity provider (IDENTITY.md §3).
-async fn oidc_start(State(app): State<Arc<App>>) -> Response {
+async fn oidc_start(
+    State(app): State<Arc<App>>,
+    from: Option<Extension<ConnectInfo<SocketAddr>>>,
+) -> Response {
+    let from = from.map(|c| c.0.0.to_string());
     match &app.mode {
-        Mode::Web(web) => web.oidc_start().await,
+        Mode::Web(web) => web.oidc_start(from).await,
         Mode::Local { .. } => StatusCode::NOT_FOUND.into_response(),
     }
 }

@@ -457,6 +457,18 @@ fn signing_in_through_the_provider() {
         false
     );
 
+    // A sign-in that cannot even start is recorded too.
+    let mut users = Users::load(&file).unwrap();
+    users.oidc = None;
+    users.save(&file).unwrap();
+    let started = send(address, "GET", "/api/oidc/start", "", "");
+    assert_eq!(started.header("location"), Some("/#oidc_error=unsupported"));
+    assert!(
+        last_error().contains("no identity provider"),
+        "{}",
+        last_error()
+    );
+
     // Each sign-in is recorded with the identity and how it went.
     let events = log.read(1000, None).unwrap();
     let ok = events

@@ -465,7 +465,7 @@ impl WebState {
     }
 
     /// Sends the browser to the identity provider (IDENTITY.md §3).
-    pub(crate) async fn oidc_start(&self) -> Response {
+    pub(crate) async fn oidc_start(&self, from: Option<String>) -> Response {
         let result = async {
             let config = self.oidc_config().ok_or_else(no_provider)?;
             self.oidc.start(&config).await
@@ -478,7 +478,16 @@ impl WebState {
                     "{OIDC_COOKIE}={state}; HttpOnly; Secure; SameSite=Lax; Path=/api/oidc; Max-Age=600"
                 )],
             ),
-            Err(e) => redirect(&format!("/#oidc_error={}", kind_name(&e)), &[]),
+            Err(e) => {
+                // A provider that cannot be reached is recorded like any
+                // failed sign-in (AUDIT.md §1).
+                let actor = Actor { user: None, from };
+                let detail = json!({"via": "oidc", "error": e.message});
+                if let Err(e) = self.audit.record(&actor, "sign_in", detail, &kind_name(&e)) {
+                    return Failure::from(e).into_response();
+                }
+                redirect(&format!("/#oidc_error={}", kind_name(&e)), &[])
+            }
         }
     }
 
