@@ -1,9 +1,12 @@
-//! The local server of Apeiron (DESKTOP.md): serves the pages of the
-//! desktop interface and a JSON API, the C ABI over HTTP, only on
-//! `127.0.0.1` and only to holders of a token.
+//! The server of Apeiron's pages and JSON API, the C ABI over HTTP. In local
+//! mode (DESKTOP.md) it listens only on `127.0.0.1` for holders of a token;
+//! in web mode (WEB.md) it serves one repository to the network, over TLS,
+//! to a signed-in browser.
 
 #![forbid(unsafe_code)]
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
+
+mod web;
 
 use std::collections::HashMap;
 use std::fs;
@@ -14,6 +17,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread::JoinHandle;
 use std::time::Duration;
+
+use web::WebState;
+pub use web::{Tls, Web, WebOptions, hash_password, load_password, save_password};
 
 use apeiron::json::{self, JsonJob};
 use apeiron::{Error, ErrorKind, Repository};
@@ -55,10 +61,18 @@ const PAGES: &[(&str, &str, &str)] = &[
 const CSP: &str = "default-src 'self'; img-src 'self' data:; style-src 'self'; \
                    script-src 'self'; frame-ancestors 'none'; base-uri 'none'";
 
+/// Who may call the server and what they may reach.
+enum Mode {
+    Local {
+        token: String,
+        /// `127.0.0.1:<port>`, the only `Host` accepted.
+        host: String,
+    },
+    Web(Box<WebState>),
+}
+
 struct App {
-    token: String,
-    /// `127.0.0.1:<port>`, the only `Host` accepted.
-    host: String,
+    mode: Mode,
     repo: Mutex<Option<Repository>>,
     jobs: Mutex<HashMap<u64, Box<dyn JsonJob>>>,
     next_job: AtomicU64,
@@ -152,29 +166,52 @@ async fn blocking<T: Send + 'static>(
         .unwrap_or_else(|e| Err(Error::new(ErrorKind::Internal, e.to_string())))
 }
 
-/// Refuses requests from elsewhere than the pages (DESKTOP.md §4).
+fn refused(status: StatusCode, message: &str) -> Response {
+    Failure(
+        status,
+        json!({"code": 4, "kind": "invalid_input", "message": message}),
+    )
+    .into_response()
+}
+
+/// Refuses requests from elsewhere than the pages (DESKTOP.md §4, WEB.md §5).
 async fn guard(State(app): State<Arc<App>>, request: Request, next: Next) -> Response {
     let headers = request.headers();
-    let header_is =
-        |name, value: &str| headers.get(name).and_then(|v| v.to_str().ok()) == Some(value);
-    let origin = format!("http://{}", app.host);
-    if !header_is(header::HOST, &app.host)
-        || headers.contains_key(header::ORIGIN) && !header_is(header::ORIGIN, &origin)
-    {
-        return Failure(
-            StatusCode::FORBIDDEN,
-            json!({"code": 4, "kind": "invalid_input", "message": "request from another site"}),
-        )
-        .into_response();
-    }
-    if request.uri().path().starts_with("/api/")
-        && !header_is(header::AUTHORIZATION, &format!("Bearer {}", app.token))
-    {
-        return Failure(
-            StatusCode::UNAUTHORIZED,
-            json!({"code": 4, "kind": "invalid_input", "message": "missing or wrong token; open the interface again"}),
-        )
-        .into_response();
+    let header = |name| headers.get(name).and_then(|v| v.to_str().ok());
+    let api = request.uri().path().starts_with("/api/");
+    match &app.mode {
+        Mode::Local { token, host } => {
+            let origin = format!("http://{host}");
+            if header(header::HOST) != Some(host)
+                || header(header::ORIGIN).is_some_and(|o| o != origin)
+            {
+                return refused(StatusCode::FORBIDDEN, "request from another site");
+            }
+            if api && header(header::AUTHORIZATION) != Some(&format!("Bearer {token}")) {
+                return refused(
+                    StatusCode::UNAUTHORIZED,
+                    "missing or wrong token; open the interface again",
+                );
+            }
+        }
+        Mode::Web(web) => {
+            if let Some(origin) = header(header::ORIGIN) {
+                let host = origin
+                    .strip_prefix("https://")
+                    .or_else(|| origin.strip_prefix("http://"));
+                if host.is_none() || host != header(header::HOST) {
+                    return refused(StatusCode::FORBIDDEN, "request from another site");
+                }
+            }
+            let open = matches!(request.uri().path(), "/api/session" | "/api/login");
+            if api && !open && !web.signed_in(headers) {
+                return Failure(
+                    StatusCode::UNAUTHORIZED,
+                    json!({"code": 4, "kind": "invalid_input", "message": "sign in first", "sign_in": true}),
+                )
+                .into_response();
+            }
+        }
     }
     let mut response = next.run(request).await;
     let h = response.headers_mut();
@@ -205,7 +242,18 @@ struct Open {
     password: Option<String>,
 }
 
+fn not_in_web(app: &App, what: &str) -> Result<(), Error> {
+    match app.mode {
+        Mode::Local { .. } => Ok(()),
+        Mode::Web(_) => Err(Error::new(
+            ErrorKind::Unsupported,
+            format!("{what} is not available in the web interface"),
+        )),
+    }
+}
+
 async fn open(State(app): State<Arc<App>>, bytes: Bytes) -> Answer {
+    not_in_web(&app, "opening another repository")?;
     let r: Open = serde_json::from_value(body(&bytes)?).map_err(|e| invalid(e.to_string()))?;
     let path = r.path.clone();
     let repo = blocking(move || match &r.password {
@@ -222,6 +270,7 @@ async fn open(State(app): State<Arc<App>>, bytes: Bytes) -> Answer {
 }
 
 async fn init(State(app): State<Arc<App>>, bytes: Bytes) -> Answer {
+    not_in_web(&app, "creating a repository")?;
     let r: Open = serde_json::from_value(body(&bytes)?).map_err(|e| invalid(e.to_string()))?;
     let path = r.path.clone();
     let (repo, recovery_key) = blocking(move || match &r.password {
@@ -252,6 +301,9 @@ async fn call(
     bytes: Bytes,
 ) -> Answer {
     let request = body(&bytes)?;
+    if let Mode::Web(web) = &app.mode {
+        web.allow_call(&operation)?;
+    }
     let repo = app.repo()?;
     Ok(axum::Json(
         blocking(move || json::call(&repo, &operation, request)).await?,
@@ -263,7 +315,16 @@ async fn start(
     UrlPath(operation): UrlPath<String>,
     bytes: Bytes,
 ) -> Answer {
-    let request = body(&bytes)?;
+    let mut request = body(&bytes)?;
+    if let Mode::Web(web) = &app.mode {
+        let web_request = request;
+        request = blocking({
+            let folders = web.folders.clone();
+            let operation = operation.clone();
+            move || web::allow_start(&folders, &operation, web_request)
+        })
+        .await?;
+    }
     let repo = app.repo()?;
     let job = blocking(move || json::start(&repo, &operation, request)).await?;
     let id = app.next_job.fetch_add(1, Ordering::Relaxed);
@@ -305,12 +366,26 @@ struct FolderQuery {
     path: Option<PathBuf>,
 }
 
-/// The folders inside a folder, for choosing one (DESKTOP.md §3).
-async fn folders(Query(q): Query<FolderQuery>) -> Answer {
+/// The folders inside a folder, for choosing one (DESKTOP.md §3); in web
+/// mode only inside the allowed folders (WEB.md §4).
+async fn folders(State(app): State<Arc<App>>, Query(q): Query<FolderQuery>) -> Answer {
+    let roots = match &app.mode {
+        Mode::Local { .. } => None,
+        Mode::Web(web) => Some(web.folders.clone()),
+    };
     let answer = blocking(move || {
-        let path = match q.path.filter(|p| !p.as_os_str().is_empty()) {
-            Some(p) => p,
-            None => dirs::home_dir().ok_or_else(|| invalid("no home folder"))?,
+        let path = match (q.path.filter(|p| !p.as_os_str().is_empty()), &roots) {
+            (Some(p), None) => p,
+            (Some(p), Some(roots)) => web::inside(roots, &p)?,
+            (None, Some(roots)) => roots
+                .first()
+                .cloned()
+                .ok_or_else(|| invalid("no folder is allowed"))?,
+            (None, None) => dirs::home_dir().ok_or_else(|| invalid("no home folder"))?,
+        };
+        let parent = match &roots {
+            Some(roots) if roots.contains(&path) => None,
+            _ => path.parent().map(Path::to_path_buf),
         };
         let entries = fs::read_dir(&path).map_err(|e| {
             let kind = if e.kind() == io::ErrorKind::NotFound {
@@ -329,7 +404,7 @@ async fn folders(Query(q): Query<FolderQuery>) -> Answer {
         names.sort_by_key(|n| n.to_lowercase());
         Ok(json!({
             "path": path,
-            "parent": path.parent(),
+            "parent": parent,
             "folders": names,
         }))
     })
@@ -357,8 +432,36 @@ impl Options {
     }
 }
 
+async fn session(State(app): State<Arc<App>>, request: Request) -> Answer {
+    Ok(axum::Json(match &app.mode {
+        Mode::Local { .. } => json!({"mode": "local", "signed_in": true}),
+        Mode::Web(web) => json!({"mode": "web", "signed_in": web.signed_in(request.headers())}),
+    }))
+}
+
+async fn login(State(app): State<Arc<App>>, bytes: Bytes) -> Response {
+    match &app.mode {
+        Mode::Local { .. } => Failure::from(Error::new(
+            ErrorKind::Unsupported,
+            "the local interface needs no sign-in",
+        ))
+        .into_response(),
+        Mode::Web(web) => web.login(bytes).await,
+    }
+}
+
+async fn logout(State(app): State<Arc<App>>, request: Request) -> Response {
+    match &app.mode {
+        Mode::Local { .. } => axum::Json(json!({})).into_response(),
+        Mode::Web(web) => web.logout(request.headers()),
+    }
+}
+
 fn router(app: Arc<App>) -> Router {
     Router::new()
+        .route("/api/session", get(session))
+        .route("/api/login", post(login))
+        .route("/api/logout", post(logout))
         .route("/api/state", get(state))
         .route("/api/open", post(open))
         .route("/api/init", post(init))
@@ -372,11 +475,106 @@ fn router(app: Arc<App>) -> Router {
         .with_state(app)
 }
 
+/// A server running on a thread of its own.
+struct Running {
+    stop: Option<tokio::sync::oneshot::Sender<()>>,
+    thread: Option<JoinHandle<()>>,
+}
+
+impl Running {
+    /// Serves `app` on `listener`, over TLS when `tls` is given.
+    fn start(
+        listener: TcpListener,
+        app: Arc<App>,
+        tls: Option<Arc<rustls::ServerConfig>>,
+    ) -> io::Result<Self> {
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_io()
+            .enable_time()
+            .thread_name("apeiron-server")
+            .build()?;
+        let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+        let listener = runtime.block_on(async { tokio::net::TcpListener::from_std(listener) })?;
+        let thread = std::thread::Builder::new()
+            .name("apeiron-server".to_owned())
+            .spawn(move || {
+                runtime.block_on(async move {
+                    let router = router(app);
+                    match tls {
+                        None => {
+                            let serve =
+                                axum::serve(listener, router).with_graceful_shutdown(async {
+                                    let _ = stopped.await;
+                                });
+                            // The server ends only when stopped or when its socket fails.
+                            let _ = serve.await;
+                        }
+                        Some(config) => {
+                            tokio::select! {
+                                () = serve_tls(listener, router, config) => {}
+                                _ = stopped => {}
+                            }
+                        }
+                    }
+                });
+            })?;
+        Ok(Running {
+            stop: Some(stop),
+            thread: Some(thread),
+        })
+    }
+
+    fn wait(mut self) {
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
+}
+
+impl Drop for Running {
+    fn drop(&mut self) {
+        if let Some(stop) = self.stop.take() {
+            let _ = stop.send(());
+        }
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
+}
+
+/// How long a client may take to finish the TLS handshake.
+const HANDSHAKE: Duration = Duration::from_secs(10);
+
+/// Accepts TLS connections and serves each on a task of its own.
+async fn serve_tls(
+    listener: tokio::net::TcpListener,
+    router: Router,
+    config: Arc<rustls::ServerConfig>,
+) {
+    let acceptor = tokio_rustls::TlsAcceptor::from(config);
+    loop {
+        let Ok((tcp, _)) = listener.accept().await else {
+            // Running out of file handles passes; wait instead of spinning.
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            continue;
+        };
+        let acceptor = acceptor.clone();
+        let service = hyper_util::service::TowerToHyperService::new(router.clone());
+        tokio::spawn(async move {
+            let Ok(Ok(stream)) = tokio::time::timeout(HANDSHAKE, acceptor.accept(tcp)).await else {
+                return;
+            };
+            let _ = hyper::server::conn::http1::Builder::new()
+                .serve_connection(hyper_util::rt::TokioIo::new(stream), service)
+                .await;
+        });
+    }
+}
+
 /// A running local server.
 pub struct Local {
     url: String,
-    stop: Option<tokio::sync::oneshot::Sender<()>>,
-    thread: Option<JoinHandle<()>>,
+    running: Running,
 }
 
 impl Local {
@@ -391,35 +589,14 @@ impl Local {
         let token: String = raw.iter().map(|b| format!("{b:02x}")).collect();
         let url = format!("http://{host}/#token={token}");
         let app = Arc::new(App {
-            token,
-            host,
+            mode: Mode::Local { token, host },
             repo: Mutex::new(options.repo),
             jobs: Mutex::new(HashMap::new()),
             next_job: AtomicU64::new(1),
             memory: options.memory,
         });
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .enable_io()
-            .thread_name("apeiron-server")
-            .build()?;
-        let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
-        let listener = runtime.block_on(async { tokio::net::TcpListener::from_std(listener) })?;
-        let thread = std::thread::Builder::new()
-            .name("apeiron-server".to_owned())
-            .spawn(move || {
-                runtime.block_on(async move {
-                    let serve = axum::serve(listener, router(app)).with_graceful_shutdown(async {
-                        let _ = stopped.await;
-                    });
-                    // The server ends only when stopped or when its socket fails.
-                    let _ = serve.await;
-                });
-            })?;
-        Ok(Local {
-            url,
-            stop: Some(stop),
-            thread: Some(thread),
-        })
+        let running = Running::start(listener, app, None)?;
+        Ok(Local { url, running })
     }
 
     /// The address of the pages, with the token in the fragment.
@@ -428,20 +605,7 @@ impl Local {
     }
 
     /// Blocks until the server ends.
-    pub fn wait(mut self) {
-        if let Some(thread) = self.thread.take() {
-            let _ = thread.join();
-        }
-    }
-}
-
-impl Drop for Local {
-    fn drop(&mut self) {
-        if let Some(stop) = self.stop.take() {
-            let _ = stop.send(());
-        }
-        if let Some(thread) = self.thread.take() {
-            let _ = thread.join();
-        }
+    pub fn wait(self) {
+        self.running.wait();
     }
 }

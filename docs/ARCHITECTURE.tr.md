@@ -38,7 +38,7 @@ Temel tasarım fikirleri:
 
 | Katman | Sorumluluk | Crate | Durum |
 | --- | --- | --- | --- |
-| Arayüzler | CLI, arka plan hizmeti, masaüstü, web, mobil | `apeiron-cli`, `apeiron-daemon`, `apeiron-server`, `apeiron-desktop` | Devam ediyor (CLI, arka plan hizmeti ve masaüstü tamamlandı) |
+| Arayüzler | CLI, arka plan hizmeti, masaüstü, web, mobil | `apeiron-cli`, `apeiron-daemon`, `apeiron-server`, `apeiron-desktop` | Devam ediyor (CLI, arka plan hizmeti, masaüstü ve web tamamlandı) |
 | Herkese açık API | Kararlı Rust API; diğer diller için C ABI; üstünde SDK'lar | `apeiron`, `apeiron-ffi` | Devam ediyor (Rust API, C ABI ve Python SDK'sı tamamlandı) |
 | Hizmetler | Sürümleme, arşiv, yedek, senkron, arama, politika | `apeiron-services`, `apeiron-git` | Devam ediyor (yedek, geri yükleme, fark, senkron, Git içe ve dışa aktarma) |
 | Çekirdek | Nesne modeli, depolama motoru, bütünlük, şifreleme, işlem günlüğü | `apeiron-core` | Devam ediyor |

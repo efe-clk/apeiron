@@ -55,6 +55,7 @@ Each layer uses only the layer directly below it. Details: [docs/ARCHITECTURE.md
 | CLI | `apeiron-cli` | The `apeiron` command ([docs/CLI.md](docs/CLI.md)) | In progress |
 | Background service | `apeiron-daemon` | Scheduled jobs and the restore test ([docs/DAEMON.md](docs/DAEMON.md)) | Done |
 | Desktop interface | `apeiron-server`, `apeiron-desktop` | Pages, a local server and a window for backing up and restoring without the command line ([docs/DESKTOP.md](docs/DESKTOP.md)) | Done |
+| Web interface | `apeiron-server`, `apeiron-cli` | The same pages served to other computers with a sign-in password and TLS ([docs/WEB.md](docs/WEB.md)) | Done |
 | Git | `apeiron-git` | Import and export of Git repositories with the same commit ids ([docs/GIT.md](docs/GIT.md)) | Done |
 | Plugins | `apeiron-plugin` | WebAssembly plugin host; type drivers merge files ([docs/PLUGIN.md](docs/PLUGIN.md)) | Done |
 
@@ -121,6 +122,7 @@ Rules for code, commits and format changes: [CONTRIBUTING.md](CONTRIBUTING.md).
 | [Plugins](docs/PLUGIN.md) | WebAssembly plugins and type drivers |
 | [Text plugin](docs/TEXT.md) | Merging text files line by line and showing their differences |
 | [Desktop interface](docs/DESKTOP.md) | Backing up and restoring in a window, without the command line |
+| [Web interface](docs/WEB.md) | Using a backup server from a browser on another computer |
 | [User guide](docs/GUIDE.md) | Installation, daily backup, restore and the one-month test |
 | [Glossary](docs/GLOSSARY.md) | Terms with English–Turkish equivalents |
 | [Contributing](CONTRIBUTING.md) | Development environment and rules |

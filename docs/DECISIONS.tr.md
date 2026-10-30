@@ -34,6 +34,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [024](#adr-024-python-sdksı-c-abiyi-ctypes-ile-çağırır) | Python SDK | C ABI üzerinde `ctypes` ile saf Python; her dil için tek bir uygunluk test paketi | Kabul edildi |
 | [025](#adr-025-eklentiler-hiçbir-şey-verilmeden-çalışır-önce-tür-sürücüleri-gelir) | Eklentiler | İzinsiz, süre ve bellek sınırlı, kullanıcı başına bileşenler; tür sürücüleri çatışma kopyasından önce birleştirir; Rust 1.97 | Kabul edildi |
 | [026](#adr-026-yerelde-sunulan-ve-yerel-bir-pencerede-gösterilen-tek-bir-web-sayfaları-takımı) | Masaüstü arayüzü | Derleme adımı olmayan HTML sayfaları, `127.0.0.1` üzerinde jetonlu bir JSON API, bir `wry` penceresi | Kabul edildi |
+| [027](#adr-027-web-arayüzü-tek-bir-depoyu-tls-üzerinden-parolayla-oturum-açana-sunar) | Web arayüzü | Başlarken sabitlenen tek depo; çerezli oturumla parola girişi; varsayılan olarak kendinden imzalı sertifikayla `rustls`; izinli işlemler ve klasörler | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
@@ -564,3 +565,26 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Derleme adımı olan bir JavaScript çatısı | Birkaç ekran için güncel tutulacak bir araç zinciri |
 
 **Sonuçlar.** Masaüstü uygulamasını Linux'ta derlemek WebKitGTK geliştirme dosyalarını gerektirir. Sayfalar yalnızca program çalışırken çalışır. Masaüstü uygulamasının diske hiç yazmadığı jetonu okuyabilen herkes, kullanıcının açtığı depoyu kullanabilir.
+
+## ADR-027: Web arayüzü tek bir depoyu TLS üzerinden parolayla oturum açana sunar
+
+**Durum:** Kabul edildi (2026-10-30)
+
+**Bağlam.** Aşama 4'ün 2. işi, masaüstü arayüzünün sayfalarını bir ev sunucusundaki depo için başka bilgisayarlara gösterir ([WEB.tr.md](WEB.tr.md)). Ağda yerel sunucunun jetonu yetmez: adrese ulaşan herkes deneyebilir, bir tarayıcı sayfalar boyunca oturumda kalmalıdır ve sunucunun bütün dosya sistemi oturum açan herkese açık olmamalıdır. Kendi hakları olan birden çok kullanıcı 3. iştir.
+
+**Karar.** `apeiron web`, başlarken verilen ve CLI'nın diğer her komuttaki gibi açtığı depoyu sunar. Tarayıcı, yapılandırma klasöründeki `web.json` dosyasında Argon2id özeti olarak saklanan tek bir parolayla oturum açar; oturum açmak, `HttpOnly`, `Secure`, `SameSite=Strict` bir çerezde rastgele 256 bitlik bir oturum verir; oturum 12 saat boşta kalınca ya da 7 gün sonra biter. Art arda beş yanlış parola oturum açmayı bir dakika durdurur. TLS, verilen sertifikayla ya da bir kez oluşturulup parmak iziyle duyurulan kendinden imzalı bir sertifikayla `rustls` üzerinden gelir; `--plain` TLS'yi bir vekile bırakır. Yalnızca sayfaların kullandığı işlemlere izin verilir; yollara da bağlantılar çözüldükten sonra yalnızca `--folder` klasörlerinin içindeyse izin verilir.
+
+**Gerekçe.** Başlarken sabitlenen depo, depo açmayı, oluşturmayı ve onların parolalarını ağdan uzak tutar ve şifreli bir deponun başında kimse olmadan `--password-file` ile açılmasını sağlar. Çerezli bir oturum, bir sırrı tutmak için betik gerektirmez ve başka siteler tarafından gönderilemez. Kendinden imzalı bir sertifika, ev sunucularında çoğu zaman olmayan bir alan adı olmadan TLS'yi çalıştırır; Caddy gibi bir vekil ise herkese açık bir sertifika ekleyebilir. İşlemlerin ve klasörlerin izin listesini denetlemek, bütün C ABI'nin her yolunu denetlemekten küçüktür.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Yerel sunucunun jetonu ağda | Adresteki uzun bir sır geçmişe ve yer imlerine kopyalanır; oturum kapatılamaz |
+| HTTP temel kimlik doğrulaması | Tarayıcı parolayı her istekle gönderir ve oturum kapatamaz |
+| Yalnızca düz HTTP, TLS her zaman bir vekilden | Vekil, bir ev kullanıcısının kurması gereken bir program daha demektir |
+| Programın içinde Let's Encrypt sertifikaları | Herkese açık bir alan adı ve açık bir 80 kapısı ya da DNS erişimi ister; bugün bunu bir vekil yapar |
+| C ABI'nin her işlemi | Uzak hedefler, dışa aktarma ve eklentiler izinli klasörlerin ötesindeki yollara ve programlara uzanır |
+| Diskte bir oturum deposu | Sunucu yeniden başlayınca herkesin oturumunun kapanması kabul edilebilir ve çalınacak bir şey bırakmaz |
+
+**Sonuçlar.** Durmadan tahmin eden biri, sahibinin oturum açmasını birer dakikalık sürelerle engelleyebilir. Oturum açan herkes, izinli klasörlerin içinde sunucuyu çalıştıran kullanıcının haklarına sahiptir. Tarayıcı kendinden imzalı bir sertifika için tarayıcı başına bir kez uyarır. Kullanıcılar ve roller (3. iş) tek parolanın yerini alacak.

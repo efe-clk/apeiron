@@ -68,7 +68,7 @@ Apeiron; sürüm kontrolü, arşivleme, yedekleme, senkronizasyon ve bütünlük
 **Aşama 4 — Arayüzler ve çok kullanıcı.** Devam ediyor. İşler `docs/ROADMAP.md` §6'da, sırasıyla:
 
 1. ~~Masaüstü arayüzü (`docs/DESKTOP.md`).~~ Tamamlandı (2026-10-30).
-2. Web arayüzü.
+2. ~~Web arayüzü (`docs/WEB.md`).~~ Tamamlandı (2026-10-30).
 3. Kullanıcılar ve izinler.
 4. Denetim kaydı.
 5. Paylaşım.

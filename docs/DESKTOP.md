@@ -75,7 +75,7 @@ An error is the error value of API.md §8.6 with status 400 for `invalid_input`,
 | --- | --- |
 | Resolving conflict copies, sync and plugin settings in the window | Later work in this stage |
 | Changing the background service's jobs | Later; `jobs.toml` (DAEMON.md) until then |
-| Reaching the server from other computers, users and logins | Web interface and users and permissions, work items 2 and 3 |
+| Reaching the server from other computers, users and logins | Web interface ([WEB.md](WEB.md)) and users and permissions, work items 2 and 3 |
 | Installers and app icons for each system | With the first release |
 
 ## 6. Crates

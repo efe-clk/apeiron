@@ -252,6 +252,17 @@ apeiron-desktop
 
 Masaüstü uygulamasının derlenemediği yerde `apeiron ui` aynı sayfaları tarayıcınızda gösterir; durdurmak için terminali kapatın ya da Ctrl+C'ye basın.
 
+### 6.10 Başka bir bilgisayardan
+
+Bir ev sunucusunda `apeiron web`, aynı sayfaları ağınızdaki başka bir bilgisayarın tarayıcısına gösterir ([WEB.tr.md](WEB.tr.md)). Bir kez oturum açma parolası belirleyin, sonra depoyla ve kullanabileceği klasörlerle başlatın:
+
+```bash
+apeiron web --set-password
+apeiron web --repo /srv/backup --folder /home/efe
+```
+
+Öbür bilgisayarda `https://<sunucu adresi>:8443` adresini açın. Tarayıcı ilk seferde sertifika için uyarır; yalnızca gösterdiği parmak izi sunucunun yazdığıyla aynıysa kabul edin. Sunucuyu root olarak değil, sıradan bir kullanıcı olarak çalıştırın.
+
 ## 7. Düzen
 
 | Ne sıklıkla | Komut | Neden |

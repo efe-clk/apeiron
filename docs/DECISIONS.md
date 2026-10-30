@@ -34,6 +34,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [024](#adr-024-the-python-sdk-calls-the-c-abi-through-ctypes) | Python SDK | Pure Python over the C ABI with `ctypes`; one conformance suite for every language | Accepted |
 | [025](#adr-025-plugins-run-with-nothing-granted-type-drivers-come-first) | Plugins | Per-user components with no permissions, time and memory limits; type drivers merge before a conflict copy; Rust 1.97 | Accepted |
 | [026](#adr-026-one-set-of-web-pages-served-locally-shown-in-a-native-window) | Desktop interface | HTML pages without a build step, a JSON API on `127.0.0.1` with a token, a `wry` window | Accepted |
+| [027](#adr-027-the-web-interface-serves-one-repository-over-tls-to-a-password-sign-in) | Web interface | One repository fixed at start; password sign-in with a cookie session; `rustls` with a self-signed certificate by default; allowed operations and folders | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28.
 
@@ -564,3 +565,26 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | A JavaScript framework with a build step | A tool chain to keep current for a few screens |
 
 **Consequences.** Building the desktop app on Linux needs the WebKitGTK development files. The pages work only while the program runs. Anyone who can read the token, which is never written to disk by the desktop app, can use the repository the user opened.
+
+## ADR-027: The web interface serves one repository over TLS to a password sign-in
+
+**Status:** Accepted (2026-10-30)
+
+**Context.** Stage 4 work item 2 shows the pages of the desktop interface to other computers, for a repository on a home server ([WEB.md](WEB.md)). On the network, the token of the local server is not enough: anyone who reaches the address could try, a browser must stay signed in across pages, and the server's whole file system must not be open to whoever signs in. Several users with their own rights are work item 3.
+
+**Decision.** `apeiron web` serves the repository given at start, opened by the CLI as for any other command. A browser signs in with one password, stored as an Argon2id hash in `web.json` in the configuration folder; signing in gives a random 256-bit session in an `HttpOnly`, `Secure`, `SameSite=Strict` cookie, which ends after 12 idle hours or 7 days. Five wrong passwords in a row pause sign-ins for a minute. TLS comes from `rustls` with the given certificate, or a self-signed one made once and announced by its fingerprint; `--plain` leaves TLS to a proxy. Only the operations the pages use are allowed, and paths are allowed only inside the `--folder` folders after resolving links.
+
+**Rationale.** The repository fixed at start keeps opening and creating repositories, and their passwords, off the network, and lets an encrypted repository be unlocked by `--password-file` without a person present. A cookie session needs no script to hold a secret and cannot be sent by other sites. A self-signed certificate makes TLS work without a domain name, which a home server often lacks, while a proxy such as Caddy can add a public certificate. An allow-list of operations and folders is smaller to check than every path of the whole C ABI.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| The local server's token on the network | A long secret in an address is copied into history and bookmarks; no sign-out |
+| HTTP basic authentication | The browser sends the password with every request and cannot sign out |
+| Plain HTTP only, TLS always from a proxy | A proxy is one more program for a home user to set up |
+| Certificates from Let's Encrypt in the program | Needs a public domain name and an open port 80 or DNS access; a proxy does it today |
+| Every operation of the C ABI | Remotes, export and plugins reach paths and programs beyond the allowed folders |
+| A session store on disk | Restarting the server signing everyone out is acceptable and leaves nothing to steal |
+
+**Consequences.** Someone who keeps guessing can keep the owner from signing in, a minute at a time. Whoever signs in has the rights of the user that runs the server inside the allowed folders. The browser warns about a self-signed certificate once per browser. Users and roles (work item 3) will replace the single password.

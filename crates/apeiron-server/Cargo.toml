@@ -1,6 +1,6 @@
 [package]
 name = "apeiron-server"
-description = "Local server of Apeiron's pages and JSON API"
+description = "Server of Apeiron's pages and JSON API, local and on the web"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,12 +10,19 @@ publish = false
 
 [dependencies]
 apeiron = { path = "../apeiron" }
+argon2 = "0.6.0"
 axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "query", "tokio"] }
 dirs = "6.0.0"
 getrandom = "0.4.3"
+hyper = { version = "1.12.0", features = ["server", "http1"] }
+hyper-util = { version = "0.1.21", features = ["tokio", "service"] }
+rcgen = "0.14.10"
+rustls = { version = "0.23.46", default-features = false, features = ["aws_lc_rs", "std", "tls12"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
-tokio = { version = "1.54.1", features = ["net", "rt-multi-thread", "sync"] }
+sha2 = "0.11.0"
+tokio = { version = "1.54.1", features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
+tokio-rustls = { version = "0.26.6", default-features = false, features = ["aws_lc_rs", "tls12"] }
 
 [dev-dependencies]
 tempfile = "3.27.0"

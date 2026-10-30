@@ -75,7 +75,7 @@ Bir hata, API.tr.md §8.6'daki hata değeridir; durum kodu `invalid_input`, `amb
 | --- | --- |
 | Pencerede çatışma kopyalarını çözmek, senkron ve eklenti ayarları | Bu aşamada sonraki işler |
 | Arka plan hizmetinin işlerini değiştirmek | Daha sonra; o zamana kadar `jobs.toml` (DAEMON.tr.md) |
-| Sunucuya başka bilgisayarlardan ulaşmak, kullanıcılar ve oturum açma | Web arayüzü ve kullanıcılar ve izinler, 2. ve 3. işler |
+| Sunucuya başka bilgisayarlardan ulaşmak, kullanıcılar ve oturum açma | Web arayüzü ([WEB.tr.md](WEB.tr.md)) ve kullanıcılar ve izinler, 2. ve 3. işler |
 | Her sistem için kurulum programları ve uygulama simgeleri | İlk sürümle |
 
 ## 6. Crate'ler

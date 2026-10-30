@@ -231,6 +231,27 @@ enum Command {
         #[arg(long)]
         no_browser: bool,
     },
+    /// Serve the interface to other computers, with sign-in and TLS (docs/WEB.md)
+    Web {
+        /// Address and port to listen on
+        #[arg(long, default_value = "0.0.0.0:8443", value_name = "ADDRESS")]
+        listen: std::net::SocketAddr,
+        /// Certificate chain, PEM; default a self-signed certificate
+        #[arg(long, value_name = "PATH", requires = "key")]
+        cert: Option<PathBuf>,
+        /// Private key of the certificate, PEM
+        #[arg(long, value_name = "PATH", requires = "cert")]
+        key: Option<PathBuf>,
+        /// Plain HTTP, only behind a proxy that adds TLS
+        #[arg(long, conflicts_with = "cert")]
+        plain: bool,
+        /// A folder that may be backed up or restored into; default the home folder
+        #[arg(long = "folder", value_name = "PATH")]
+        folders: Vec<PathBuf>,
+        /// Set the sign-in password and exit
+        #[arg(long)]
+        set_password: bool,
+    },
     /// Run scheduled jobs: backups, pushes, checks and restore tests
     Daemon {
         #[command(subcommand)]
@@ -942,6 +963,92 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             } else {
                 say!("Open this address in a browser; press Ctrl+C to stop:");
                 say!("{}", server.url());
+            }
+            server.wait();
+            Ok(0)
+        }
+        Command::Web {
+            listen,
+            cert,
+            key,
+            plain,
+            folders,
+            set_password,
+        } => {
+            let config = dirs::config_dir()
+                .map(|d| d.join("apeiron"))
+                .ok_or_else(|| Failure::Usage("no configuration folder".to_owned()))?;
+            let login_file = config.join("web.json");
+            if set_password {
+                let password = prompt("New sign-in password: ")?;
+                if password.chars().count() < 8 {
+                    return Err(Failure::Usage(
+                        "the sign-in password needs at least 8 characters".to_owned(),
+                    ));
+                }
+                if prompt("Again: ")? != password {
+                    return Err(Failure::Usage("the two passwords differ".to_owned()));
+                }
+                apeiron_server::save_password(
+                    &login_file,
+                    &apeiron_server::hash_password(&password)?,
+                )?;
+                say!("Saved the sign-in password in {}", login_file.display());
+                return Ok(0);
+            }
+            let password_hash = apeiron_server::load_password(&login_file)?.ok_or_else(|| {
+                Failure::Usage(
+                    "no sign-in password; set one with `apeiron web --set-password`".to_owned(),
+                )
+            })?;
+            let repo = open(cli.repo, password_file)?;
+            let tls = match (cert, key) {
+                _ if plain => None,
+                (Some(cert), Some(key)) => {
+                    let read = |path: &Path| {
+                        std::fs::read(path).map_err(|e| {
+                            Failure::Usage(format!("cannot read {}: {e}", path.display()))
+                        })
+                    };
+                    Some(apeiron_server::Tls {
+                        cert_pem: read(&cert)?,
+                        key_pem: read(&key)?,
+                    })
+                }
+                _ => {
+                    let mut names = vec!["localhost".to_owned()];
+                    if !listen.ip().is_unspecified() {
+                        names.push(listen.ip().to_string());
+                    }
+                    Some(apeiron_server::Tls::kept_in(&config, names)?)
+                }
+            };
+            let folders = if folders.is_empty() {
+                vec![dirs::home_dir().ok_or_else(|| Failure::Usage("no home folder".to_owned()))?]
+            } else {
+                folders
+            };
+            let fingerprint = tls
+                .as_ref()
+                .map(apeiron_server::Tls::fingerprint)
+                .transpose()?;
+            let server = apeiron_server::Web::start(apeiron_server::WebOptions {
+                repo,
+                listen,
+                tls,
+                password_hash,
+                folders,
+            })?;
+            let scheme = if plain { "http" } else { "https" };
+            say!(
+                "Serving on {scheme}://{}; press Ctrl+C to stop.",
+                server.address()
+            );
+            if let Some(fingerprint) = fingerprint {
+                say!("Certificate fingerprint (SHA-256): {fingerprint}");
+            }
+            if plain {
+                say!("Plain HTTP: use this only behind a proxy that adds TLS.");
             }
             server.wait();
             Ok(0)

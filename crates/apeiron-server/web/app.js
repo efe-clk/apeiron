@@ -1,5 +1,5 @@
-// The desktop interface (DESKTOP.md §2). It speaks only to the JSON API of
-// the local server (DESKTOP.md §3).
+// The desktop and web interface (DESKTOP.md §2, WEB.md §3). It speaks only to
+// the JSON API of the server (DESKTOP.md §3, WEB.md §4).
 
 import { t, lang } from "./i18n.js";
 
@@ -13,6 +13,8 @@ if (fragment.get("token")) {
   history.replaceState(null, "", "/");
 }
 const token = sessionStorage.getItem("apeiron-token") || "";
+// "local" with a token, or "web" with a sign-in cookie.
+let mode = "local";
 
 const main = document.getElementById("main");
 const nav = document.getElementById("nav");
@@ -23,6 +25,7 @@ class ApiError extends Error {
   constructor(value) {
     super(value?.message || t("error"));
     this.kind = value?.kind || "internal";
+    this.signIn = value?.sign_in === true;
   }
 }
 
@@ -30,13 +33,18 @@ async function api(method, path, body) {
   const response = await fetch(path, {
     method,
     headers: {
-      Authorization: `Bearer ${token}`,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(body === undefined ? {} : { "Content-Type": "application/json" }),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const value = await response.json().catch(() => null);
-  if (!response.ok) throw new ApiError(value);
+  if (!response.ok) {
+    const err = new ApiError(value);
+    // A session that ended sends the user back to the sign-in screen.
+    if (err.signIn && path !== "/api/login") signIn();
+    throw err;
+  }
   return value;
 }
 
@@ -184,6 +192,7 @@ async function listFolders(path) {
     const listing = await api("GET", `/api/folders?path=${encodeURIComponent(path || "")}`);
     pickerPath.value = listing.path;
     pickerParent = listing.parent;
+    document.getElementById("picker-up").disabled = !listing.parent;
     pickerList.replaceChildren(
       ...listing.folders.map((name) =>
         h("li", {}, h("button", { type: "button", onclick: () => listFolders(join(listing.path, name)) }, `📁 ${name}`)),
@@ -265,7 +274,7 @@ function showNav(current) {
     item("overview", overview),
     item("backup", () => backup()),
     item("verify", verify),
-    item("close", () => start()),
+    mode === "web" ? item("sign_out", signOut) : item("close", () => start()),
     h("span", { class: "path" }, repoPath),
   );
 }
@@ -595,10 +604,45 @@ function verify() {
   show(h("h1", {}, t("verify_heading")), h("div", { class: "card" }, h("p", { class: "muted" }, t("verify_intro")), h("div", { class: "actions" }, button)), status);
 }
 
+// ---- Signing in (WEB.md §4) ----
+
+function signIn() {
+  nav.hidden = true;
+  const password = h("input", { type: "password", autocomplete: "current-password", required: true });
+  const status = h("div");
+  const form = h("form", { onsubmit: async (e) => {
+    e.preventDefault();
+    status.replaceChildren();
+    try {
+      await api("POST", "/api/login", { password: password.value });
+      begin();
+    } catch (err) {
+      const text = err.kind === "key" ? t("wrong_password") : err.kind === "locked" ? t("too_many_tries") : null;
+      status.replaceChildren(text ? message("bad", text) : errorMessage(err));
+      password.select();
+    }
+  } },
+    ...field(t("password"), password),
+    h("div", { class: "actions" }, h("button", { type: "submit", class: "primary" }, t("sign_in_button"))),
+  );
+  show(h("h1", {}, t("sign_in_heading")), h("div", { class: "card" }, h("p", { class: "muted" }, t("sign_in_intro")), form), status);
+  password.focus();
+}
+
+async function signOut() {
+  await api("POST", "/api/logout").catch(() => {});
+  signIn();
+}
+
 // ---- Begin ----
 
-(async () => {
+async function begin() {
+  const session = await api("GET", "/api/session").catch(() => null);
+  mode = session?.mode || "local";
+  if (!session?.signed_in) return signIn();
   const state = await api("GET", "/api/state").catch(() => null);
   if (state?.open) opened(state.open.path);
   else start();
-})();
+}
+
+begin();
