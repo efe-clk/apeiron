@@ -18,8 +18,8 @@ mod types;
 pub const API_VERSION: &str = "0.1";
 
 pub use apeiron_core::{
-    GcOptions as GcRequest, GcReport, KeyInfo, KeyKind, ObjectId, RefOp, ReflogEntry, Remote,
-    RepairReport, Time, TransferReport, VerifyReport,
+    GcOptions as GcRequest, GcReport, KeyInfo, KeyKind, MAX_RETENTION_DAYS, ObjectId, RefOp,
+    ReflogEntry, Remote, RepairReport, RetentionRule, Time, TransferReport, VerifyReport,
 };
 pub use apeiron_git::{
     ExportReport as GitExportReport, ImportReport as GitImportReport, RefUpdate as GitRefUpdate,

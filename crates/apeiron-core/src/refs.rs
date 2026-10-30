@@ -164,7 +164,7 @@ pub fn decode_ref(path: &Path, text: &str) -> Result<ObjectId> {
         .ok_or_else(corrupt)
 }
 
-fn now() -> u64 {
+pub(crate) fn now() -> u64 {
     SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .map_or(0, |d| d.as_secs())

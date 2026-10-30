@@ -81,6 +81,10 @@ pub enum Error {
     RemoteAhead(String),
     #[error("the local ref {0:?} has snapshots the remote does not have")]
     LocalAhead(String),
+    #[error("invalid retention rule: {0}")]
+    InvalidRetention(String),
+    #[error("ref {name:?} is kept by a retention rule: {reason}")]
+    Retained { name: String, reason: String },
     #[error("cancelled")]
     Cancelled,
     #[error("random number generator failed: {0}")]

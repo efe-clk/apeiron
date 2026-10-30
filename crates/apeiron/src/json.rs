@@ -103,6 +103,12 @@ struct NewRemote {
     url: String,
 }
 
+#[derive(Deserialize)]
+struct NewRetention {
+    refs: String,
+    days: u32,
+}
+
 fn unknown(operation: &str) -> Error {
     Error::new(
         ErrorKind::Unsupported,
@@ -135,6 +141,11 @@ pub fn call(repo: &Repository, operation: &str, request: Value) -> Result<Value>
             json(&repo.add_remote(&r.name, &r.url)?)
         }
         "remove_remote" => json(&repo.remove_remote(&parse::<Named>(request)?.name)?),
+        "retention" => json(&repo.retention()?),
+        "add_retention" => {
+            let r: NewRetention = parse(request)?;
+            json(&repo.add_retention(&r.refs, r.days)?)
+        }
         _ => Err(unknown(operation)),
     }
 }

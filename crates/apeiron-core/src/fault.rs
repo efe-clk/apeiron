@@ -940,6 +940,22 @@ fn every_crash_while_changing_the_password_keeps_a_key_that_opens() {
     assert!(!old_file(&repo_path(states.last().unwrap())).exists());
 }
 
+#[test]
+fn every_crash_while_adding_a_retention_rule_leaves_none_or_a_whole_one() {
+    let f = fixture_of(false);
+    let states = crash_states_of(&f.base, |repo| {
+        repo.add_retention_rule("archive/*", 30).map(drop)
+    });
+    assert!(states.len() > 1);
+    for state in &states {
+        let rules = open(&repo_path(state)).unwrap().retention_rules().unwrap();
+        assert!(rules.len() <= 1);
+        assert!(rules.iter().all(|r| r.refs == "archive/*" && r.days == 30));
+    }
+    let last = open(&repo_path(states.last().unwrap())).unwrap();
+    assert_eq!(last.retention_rules().unwrap().len(), 1);
+}
+
 mod transfer {
     use super::*;
     use crate::object::{EntryKind, Snapshot, Time, Tree, TreeEntry};

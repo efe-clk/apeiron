@@ -275,6 +275,8 @@ To serve several organizations from one server, each at its own address and with
 
 To keep every backup on a second machine as well, add it as a remote (`apeiron remote add dr sftp://backup2/srv/apeiron`) and start the server with `apeiron web --replicate dr`. On the second machine, `apeiron web --standby --repo /srv/apeiron` serves that copy for browsing and restoring; if the first server fails, restart it without `--standby` and point people to it ([REPLICATION.md](REPLICATION.md)).
 
+Records that must be kept for years go to refs under a retention rule: `apeiron retention add "archive/*" --days 3650`, then `apeiron backup <folder> --ref archive/<name>`. Those refs can then only grow and cannot be deleted for ten years, by anyone using Apeiron; the rule itself can never be removed, so choose the days with care. Pushing them to an S3 bucket with Object Lock protects them from people with access to the files too ([ARCHIVE.md](ARCHIVE.md)).
+
 ## 7. Routine
 
 | How often | Command | Why |

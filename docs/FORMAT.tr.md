@@ -55,6 +55,7 @@ Uygulama durumu (`apeiron-core`):
 ├── locks/                 # Depo kilidi, bölüm 12
 ├── keys/                  # Şifreli bir deponun anahtar dosyaları, bölüm 14
 ├── remotes                # Bu kopyanın uzak depoları (TOML), bölüm 15.1
+├── retention/             # Saklama kuralları, bölüm 16
 └── tmp/                   # Yazılmakta olan geçici dosyalar
 ```
 
@@ -585,7 +586,44 @@ Her ref'i push ya da pull etmek bir replikayı güncel tutar ([REPLICATION.tr.md
 
 Push yerel ref'leri gönderir; pull uzak deponun listelediği ref'leri alır. İkisi de öbür tarafta olan bir ref'i silmez. 15.5'teki her kural her ref için geçerlidir; böylece bir kesinti her ref'i ya olduğu yerde ya da kopyalandığı yerde bırakır.
 
-## 16. Sonraki sürümlere bırakılanlar
+## 16. Saklama kuralları (`retention/`)
+
+Bir saklama kuralı, adlarıyla eşleştiği ref'leri korur: geçmişleri yalnızca büyüyebilir ve saklama süresi geçene kadar silinemezler. Kurallar ref'leri, Apeiron üzerinden değiştirilemeyen bir arşive dönüştürür ([ARCHIVE.tr.md](ARCHIVE.tr.md)).
+
+### 16.1 Kural dosyaları
+
+Her kural bir `retention/<id>.toml` dosyasıdır; `id`, dosyanın baytlarının düz BLAKE3 özetinin ilk 32 hex karakteridir:
+
+```toml
+refs = "archive/*"   # bir ref adı ya da ardından "*" gelen bir önek; yalnızca "*" her ref'le eşleşir
+days = 3650          # 1 ile 36500 arası
+added = 1793318400   # Kuralın eklendiği Unix saniyesi
+```
+
+- Bir kural dosyası bir kez yazılır (bölüm 9.1) ve Apeiron tarafından asla değiştirilmez ya da silinmez. Bir kuralı kaldırmanın ya da kısaltmanın yolu yoktur; yanına daha uzun bir kural eklenir.
+- Desen, `*` bir harfle değiştirilerek bölüm 9.3'teki ref adı kurallarına uyar.
+- Ayrıştırılamayan ya da adı içeriğinin özeti olmayan bir dosya bozuktur. Bir kural dosyası bozukken hiçbir ref değiştirilemez: hata dosyayı adlandırır; dosya bir kopyadan geri getirilir (bölüm 15).
+- `retention/` klasörünün olmaması kural olmaması demektir.
+
+### 16.2 Bir kural neyi korur
+
+En az bir kuralın eşleştiği bir ref için, `D` bunların en büyük `days` değeri olmak üzere:
+
+1. Ref'i **taşımak** yalnızca şu anki snapshot'ına ya da onu (ebeveynler üzerinden) ata olarak taşıyan birine izinlidir. Bu yüzden ref'in gösterdiği her snapshot ulaşılabilir kalır ve çöp toplama (bölüm 13) onu tutar.
+2. Ref'i **silmek** yalnızca, reflog'unun en yeni satırının (bölüm 9.4) kaydettiği son değişikliğinden bu yana `D` gün geçtiğinde izinlidir. Reflog satırı olmayan bir ref silinmez.
+3. Ref'i **oluşturmak** izinlidir.
+
+Bir kural, eklendiğinde var olan ref'lere de uygulanır. Denetimler, ref'leri değiştiren her işlem tarafından ref değiştirilmeden önce yapılır.
+
+### 16.3 Kopyalar
+
+Push, uzak depoda olmayan kural dosyalarını anahtar dosyalarından sonra yazar (bölüm 15.3 adım 2); pull ve klon, uzak deponun bu kopyada olmayan kural dosyalarını yazar. Kural dosyaları hiçbir tarafta silinmez; böylece bir replika, geldiği kopyayla aynı ref'leri korur.
+
+### 16.4 Sınırlar
+
+Kurallar bu format sürümünün her Apeiron programını bağlar. Dosyaları doğrudan değiştirebilen biri ya da `retention/` klasörünü bilmeyen bir program ref'leri yine de taşıyabilir ya da silebilir. Object Lock'lu bir S3 kovası gibi değişikliği kendiliğinden reddeden bir depolama bu boşluğu kapatır (ARCHIVE.tr.md §4).
+
+## 17. Sonraki sürümlere bırakılanlar
 
 - Çok katmanlı blob, sabit bağlantılar, Windows ACL'leri, aygıt dosyaları.
 - Format yükseltme aracı: format sürümü değiştiğinde otomatik ve geri alınabilir geçiş.

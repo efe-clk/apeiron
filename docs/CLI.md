@@ -91,6 +91,7 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | `apeiron git export <git-repo> [--prefix <name>]` | Writes them back into a Git repository with the same commit ids; exit code 3 if one could not be reproduced | Done |
 | `apeiron push <remote> [<ref>]` | Copies the snapshots of a ref (default `main`) to a remote and moves the ref there | Done |
 | `apeiron pull <remote> [<ref>]` | Copies the snapshots of a ref from a remote and moves the local ref forward | Done |
+| `apeiron retention add <refs> --days <n>`, `apeiron retention list` | Keeps the refs a name or a prefix followed by `*` matches as an archive: they only move forward and are not deleted until the days have passed since their last change; a rule can never be removed ([ARCHIVE.md](ARCHIVE.md)) | Done |
 | `apeiron push --all <remote>`, `apeiron pull --all <remote>` | Pushes or pulls every ref, to keep a replica or a standby; a ref with a conflict is left and named, the others are copied; exit code 3 then ([REPLICATION.md](REPLICATION.md)) | Done |
 | `apeiron web … [--replicate <remote>]... [--standby]` | Pushes every ref to each replica after each backup, or serves a standby copy that takes no backups ([REPLICATION.md](REPLICATION.md)) | Done |
 | `apeiron key remove <id>` | Removes a password or recovery key; the last one cannot be removed | Done |

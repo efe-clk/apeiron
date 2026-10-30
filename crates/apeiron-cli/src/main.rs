@@ -169,6 +169,11 @@ enum Command {
         #[command(subcommand)]
         command: RefCommand,
     },
+    /// Keep refs as an archive that cannot be changed (docs/ARCHIVE.md)
+    Retention {
+        #[command(subcommand)]
+        command: RetentionCommand,
+    },
     /// Find files by name, size, time and text in a snapshot or its history
     Search {
         /// A name with `*` and `?`; with `/`, a whole path
@@ -326,6 +331,21 @@ enum DaemonCommand {
     Once,
     /// Show each job's last run, its result and the next run
     Status,
+}
+
+#[derive(Subcommand)]
+enum RetentionCommand {
+    /// Keep the refs a name or a prefix followed by * matches: they then only
+    /// move forward and are not deleted until the days have passed since their
+    /// last change. A rule can never be removed or shortened.
+    Add {
+        /// A ref name, or a prefix followed by *, such as "archive/*"
+        refs: String,
+        #[arg(long)]
+        days: u32,
+    },
+    /// List the retention rules
+    List,
 }
 
 #[derive(Subcommand)]
@@ -1447,6 +1467,41 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     let removed = repo.remove_key(&id)?;
                     out.result(&serde_json::json!({ "removed": removed }), |_| {
                         say!("Removed key {}", format::short_key(&removed));
+                    });
+                }
+            }
+            Ok(0)
+        }
+        Command::Retention { command } => {
+            let repo = open(cli.repo, password_file)?;
+            match command {
+                RetentionCommand::Add { refs, days } => {
+                    let rule = repo.add_retention(&refs, days)?;
+                    out.result(&rule, |r| {
+                        say!(
+                            "{} is now kept {}; this cannot be undone",
+                            r.refs,
+                            format::count(u64::from(r.days), "day")
+                        )
+                    });
+                }
+                RetentionCommand::List => {
+                    let rules = repo.retention()?;
+                    out.result(&rules, |rules| {
+                        for r in rules {
+                            say!(
+                                "{}  {}  added {}",
+                                r.refs,
+                                format::count(u64::from(r.days), "day"),
+                                format::time(&apeiron::Time {
+                                    seconds: r.added as i64,
+                                    nanos: 0
+                                })
+                            );
+                        }
+                        if rules.is_empty() {
+                            say!("No retention rules; see docs/ARCHIVE.md");
+                        }
                     });
                 }
             }

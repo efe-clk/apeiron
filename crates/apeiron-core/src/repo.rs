@@ -17,7 +17,8 @@ use crate::keyfile::{self, KeyInfo};
 use crate::lock::RepoLock;
 use crate::object::{Blob, EntryKind, Snapshot, Tree};
 use crate::pack::{self, FileHash, PackEntry, PackWriter};
-use crate::refs::{RefStore, ReflogEntry, RepairReport};
+use crate::refs::{self, RefStore, ReflogEntry, RepairReport};
+use crate::retention;
 
 mod gc;
 mod transfer;
@@ -34,6 +35,7 @@ const LOCKS: &str = "locks";
 const KEYS: &str = "keys";
 const TMP: &str = "tmp";
 const REMOTES: &str = "remotes";
+const RETENTION: &str = "retention";
 const TMP_MAX_AGE: Duration = Duration::from_secs(3600);
 
 /// An open repository.
@@ -507,7 +509,83 @@ impl Repository {
                 Some(_) => {}
             }
         }
+        self.check_retention(name, expected, new)?;
         self.refs.update(name, expected, new)
+    }
+
+    /// The retention rules, sorted by when they were added (FORMAT.md §16).
+    pub fn retention_rules(&self) -> Result<Vec<retention::Rule>> {
+        retention::read_rules(&self.dir(RETENTION))
+    }
+
+    /// Adds a retention rule for the refs `refs` matches; it can never be
+    /// removed or shortened (FORMAT.md §16.1).
+    pub fn add_retention_rule(&self, refs: &str, days: u32) -> Result<retention::Rule> {
+        let rule = retention::Rule::new(refs, days, refs::now())?;
+        self.write_retention_file(&rule.encode()?)?;
+        Ok(rule)
+    }
+
+    /// Writes a rule file as it is, if it is valid and not there yet.
+    pub(crate) fn write_retention_file(&self, (name, bytes): &(String, Vec<u8>)) -> Result<()> {
+        let dir = self.dir(RETENTION);
+        retention::decode(&dir.join(name), name, bytes)?;
+        fsutil::ensure_dir(&dir)?;
+        fsutil::write_durable_new(&self.dir(TMP), &dir.join(name), bytes)?;
+        fsutil::sync_dir(&dir)
+    }
+
+    /// The rule files, by name, with their bytes.
+    pub(crate) fn retention_files(&self) -> Result<Vec<(String, Vec<u8>)>> {
+        Ok(retention::read_files(&self.dir(RETENTION))?
+            .into_iter()
+            .map(|(name, bytes, _)| (name, bytes))
+            .collect())
+    }
+
+    /// Refuses a change of `name` that a retention rule forbids
+    /// (FORMAT.md §16.2).
+    fn check_retention(
+        &self,
+        name: &str,
+        expected: Option<ObjectId>,
+        new: Option<ObjectId>,
+    ) -> Result<()> {
+        let rules = self.retention_rules()?;
+        let Some(days) = retention::days_for(&rules, name) else {
+            return Ok(());
+        };
+        let retained = |reason: String| Error::Retained {
+            name: name.to_owned(),
+            reason,
+        };
+        match (expected, new) {
+            (None, _) => Ok(()),
+            (Some(old), Some(new)) => {
+                if self.is_ancestor(old, new)? {
+                    Ok(())
+                } else {
+                    Err(retained(
+                        "it can only move to a snapshot that follows the one it points to"
+                            .to_owned(),
+                    ))
+                }
+            }
+            (Some(_), None) => {
+                let changed = self.refs.reflog(name)?.last().map(|e| e.time);
+                let now = refs::now();
+                match changed.map(|t| retention::ends(t, days)) {
+                    Some(end) if end <= now => Ok(()),
+                    Some(end) => Err(retained(format!(
+                        "it can be deleted {} days from now",
+                        (end - now).div_ceil(24 * 60 * 60)
+                    ))),
+                    None => Err(retained(
+                        "it has no reflog to date its last change".to_owned(),
+                    )),
+                }
+            }
+        }
     }
 
     /// All refs and their targets, sorted by name.

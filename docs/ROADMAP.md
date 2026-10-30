@@ -110,5 +110,5 @@ Central identity comes first, because a pilot organization signs its people in t
 | 1 | Central identity ([IDENTITY.md](IDENTITY.md)) | Done |
 | 2 | Multi-tenant use ([TENANTS.md](TENANTS.md)) | Done |
 | 3 | Replication and high availability ([REPLICATION.md](REPLICATION.md)) | Done |
-| 4 | Immutable archive | Planned |
+| 4 | Immutable archive ([ARCHIVE.md](ARCHIVE.md)) | Done |
 | 5 | Compliance reports | Planned |

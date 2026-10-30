@@ -21,6 +21,7 @@ mod pack;
 mod refs;
 mod remote;
 mod repo;
+mod retention;
 
 pub use chunker::ChunkerParams;
 pub use config::FORMAT_VERSION;
@@ -34,3 +35,4 @@ pub use remote::{FolderStore, Remote, RemoteUrl, S3Url, SftpUrl, Store};
 pub use repo::{
     GcOptions, GcReport, ObjectWriter, OnCopy, RefOutcome, Repository, TransferReport, VerifyReport,
 };
+pub use retention::{MAX_DAYS as MAX_RETENTION_DAYS, Rule as RetentionRule};

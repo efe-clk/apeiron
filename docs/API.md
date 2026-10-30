@@ -170,6 +170,8 @@ Every operation takes one plain request value and returns one plain result value
 | `remove_remote` | name | —; the remote copy itself is not touched | No |
 | `push` | remote name, ref name (default `main`) | `TransferReport`: snapshot the remote ref points to now, the one before, objects and stored bytes copied; `conflict` if the remote has snapshots this copy does not | Yes |
 | `pull` | remote name, ref name (default `main`) | `TransferReport`, the same for the local ref; `conflict` if the local ref has snapshots the remote does not | Yes |
+| `retention` | — | `Vec<RetentionRule>`: refs pattern, days, when added; oldest first ([ARCHIVE.md](ARCHIVE.md)) | No |
+| `add_retention` | refs (a name, or a prefix followed by `*`), days (1 to 36500) | `RetentionRule`; it can never be removed or shortened ([FORMAT.md](FORMAT.md) §16). A ref change a rule forbids fails with `conflict` | No |
 | `push_all`, `pull_all` | remote name | `MirrorReport`: per ref its name and either a `TransferReport` or the `conflict` that left it; other errors stop them all ([REPLICATION.md](REPLICATION.md) §2, [FORMAT.md](FORMAT.md) §15.7) | Yes |
 | `git_import` | Git repository path, ref prefix (default `git`) | `GitImportReport`: commits and tags stored, refs moved (Git name, ref, Git id, snapshot, previous), skipped refs with the reason, stale refs ([GIT.md](GIT.md)) | Yes |
 | `git_export` | Git repository path (created bare if missing), ref prefix | `GitExportReport`: commits and tags written, refs updated, skipped refs, Git ids not reproduced | Yes |

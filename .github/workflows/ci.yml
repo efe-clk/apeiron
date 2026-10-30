@@ -78,8 +78,14 @@ jobs:
       - run: |
           for i in $(seq 1 60); do curl -sf http://127.0.0.1:4566/_localstack/health && break; sleep 2; done
           curl -sf -X PUT http://127.0.0.1:4566/apeiron-test
+          # A bucket whose objects cannot be deleted or overwritten for a day.
+          curl -sf -X PUT -H "x-amz-bucket-object-lock-enabled: true" http://127.0.0.1:4566/apeiron-locked
+          lock='<ObjectLockConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><ObjectLockEnabled>Enabled</ObjectLockEnabled><Rule><DefaultRetention><Mode>COMPLIANCE</Mode><Days>1</Days></DefaultRetention></Rule></ObjectLockConfiguration>'
+          curl -sf -X PUT "http://127.0.0.1:4566/apeiron-locked?object-lock" \
+            -H "Content-MD5: $(printf '%s' "$lock" | openssl md5 -binary | base64)" --data "$lock"
       - run: cargo test -p apeiron-remote --test s3 -- --nocapture
         env:
           APEIRON_S3_TEST_URL: s3://apeiron-test?endpoint=http://127.0.0.1:4566&region=us-east-1
+          APEIRON_S3_LOCKED_URL: s3://apeiron-locked?endpoint=http://127.0.0.1:4566&region=us-east-1
           AWS_ACCESS_KEY_ID: test
           AWS_SECRET_ACCESS_KEY: test

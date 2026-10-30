@@ -22,8 +22,8 @@ use crate::types::{
 use crate::{
     ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo, ExportReport, GcReport,
     GcRequest, GitExportReport, GitImportReport, KeyInfo, ObjectId, Phase, ReflogEntry, Remote,
-    RepairReport, RestoreReport, RestoreTestReport, SearchReport, SyncReport, TransferReport,
-    VerifyReport,
+    RepairReport, RestoreReport, RestoreTestReport, RetentionRule, SearchReport, SyncReport,
+    TransferReport, VerifyReport,
 };
 
 /// An open repository. Cloning is cheap; clones share the same state and can
@@ -617,6 +617,20 @@ impl Repository {
                 format!("{id:?} is the start of more than one key id"),
             )),
         }
+    }
+
+    /// The retention rules, oldest first ([ARCHIVE.md](ARCHIVE.md) §2).
+    pub fn retention(&self) -> Result<Vec<RetentionRule>> {
+        Ok(self.read().retention_rules()?)
+    }
+
+    /// Adds a retention rule: the refs `refs` matches (a name, or a prefix
+    /// followed by `*`) then only move forward and are not deleted until
+    /// `days` after their last change. A rule can never be removed or
+    /// shortened ([FORMAT.md](FORMAT.md) §16).
+    pub fn add_retention(&self, refs: &str, days: u32) -> Result<RetentionRule> {
+        let _writer = self.lock_writer();
+        Ok(self.read().add_retention_rule(refs, days)?)
     }
 
     /// The remotes of this copy, sorted by name.

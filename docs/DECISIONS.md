@@ -41,6 +41,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [031](#adr-031-central-identity-is-openid-connect-with-users-still-listed-in-webjson) | Central identity | OpenID Connect code flow with PKCE; RS256/ES256 tokens checked against the provider's keys; one claim names a user listed in `web.json`; passwords stay possible | Accepted |
 | [032](#adr-032-tenants-are-told-apart-by-host-each-with-its-own-repository-and-files) | Multi-tenant use | One process, one port; the `Host` header picks a tenant with its own repository, users, audit log, share links and sessions; unknown hosts get nothing | Accepted |
 | [033](#adr-033-replication-is-pushing-every-ref-to-a-remote-copy-taking-over-is-the-admins-decision) | Replication and high availability | Every ref pushed to replicas after each backup and every 30 s on change; a standby serves a replica without backups; `/api/health`; failover by the admin | Accepted |
+| [034](#adr-034-the-archive-is-append-only-refs-under-retention-rules-backed-by-storage-that-locks-itself) | Immutable archive | Rule files `retention/<hash>.toml`, add-only; kept refs only move forward and are deleted only after their days; rules copied with push and pull; SHA-256 checksums for S3 Object Lock | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28.
 
@@ -724,3 +725,25 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Deleting refs on the replica too | A mistake or an attack on the primary would empty the replica as well |
 
 **Consequences.** The replica is behind by one push after a backup, or by a job's period. Users, the identity provider and tenants are copied to the standby by the admin; the audit log and share links stay with each server. Failover needs a person. Refs deleted on the primary stay on the replica until removed there.
+
+## ADR-034: The archive is append-only refs under retention rules, backed by storage that locks itself
+
+**Status:** Accepted (2026-10-30)
+
+**Context.** Stage 5 work item 4 keeps backups that nobody may change or delete before a set time ([ARCHIVE.md](ARCHIVE.md)). Objects are already immutable and named by their hashes, so stored data cannot be changed unnoticed; what can still happen is that a ref is moved back or deleted, after which garbage collection removes what only it reached. A program can only refuse to do that itself; it cannot stop someone who reaches the files by other means.
+
+**Decision.** A retention rule is a small file in `retention/`, named by the hash of its content, written once and never changed or deleted by Apeiron (FORMAT.md §16). For a ref a rule matches, every ref change in the core checks that the ref only moves to a descendant of its snapshot, and that it is deleted only when the rule's days have passed since its last change in the reflog. Push and pull copy rule files the other side lacks and delete none. Against people with access to the storage itself, Apeiron relies on storage that locks itself: every S3 write carries a SHA-256 checksum, so buckets with Object Lock in compliance mode work as remotes.
+
+**Rationale.** Checking in the core's one function that replaces refs means every way of changing a ref, from the CLI to the web interface, sync and merges, is covered without each caller having to remember. Forward-only refs keep every snapshot reachable, so the existing garbage collection needs no change to keep the archive. Rule files that are content-named and add-only fit the format's write-once files, copy safely to every kind of remote, and leave no operation that removes protection. Leaving the last line of defence to S3 Object Lock uses a guarantee no program on the server can give: the storage provider refuses deletion even to the account's owner.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| A retention setting in `config` | `config` is written once at creation and copied as it is; changing it would need a new kind of write and could not be merged between copies |
+| Retention per snapshot instead of per ref | Snapshots would have to be marked one by one; a ref rule covers every future backup on it |
+| Rules that can be removed by an admin | Ransomware with the admin's account would remove them first |
+| Locking files with file system flags (`chattr +i`) | Needs root, works on some file systems only, and root can lift it |
+| Setting Object Lock on each S3 write ourselves | Needs headers the S3 library does not offer; a bucket's default retention locks every write the same way |
+
+**Consequences.** A rule added by mistake cannot be taken back; the CLI says so. A damaged rule file stops every ref change until it is restored from a copy, which is the safe way to fail. Programs that predate this format section ignore `retention/`. Moving files out of the repository's folder by hand still bypasses the rules; only locked storage prevents that.

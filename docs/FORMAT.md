@@ -55,6 +55,7 @@ Implementation status (`apeiron-core`):
 ├── locks/                 # Repository lock, section 12
 ├── keys/                  # Key files of an encrypted repository, section 14
 ├── remotes                # Remote repositories of this copy (TOML), section 15.1
+├── retention/             # Retention rules, section 16
 └── tmp/                   # Temporary files being written
 ```
 
@@ -585,7 +586,44 @@ Pushing or pulling every ref keeps a replica ([REPLICATION.md](REPLICATION.md)).
 
 Push sends the local refs; pull takes the refs the remote lists. Neither deletes a ref the other side has. Every rule of 15.5 holds for each ref, so an interruption leaves each ref either where it was or where it was copied to.
 
-## 16. Left for later versions
+## 16. Retention rules (`retention/`)
+
+A retention rule protects the refs whose names it matches: their history can only grow, and they cannot be deleted until the retention has passed. Rules turn refs into an archive that cannot be changed through Apeiron ([ARCHIVE.md](ARCHIVE.md)).
+
+### 16.1 Rule files
+
+Each rule is one file `retention/<id>.toml`, where `id` is the first 32 hex characters of the plain BLAKE3 hash of the file's bytes:
+
+```toml
+refs = "archive/*"   # a ref name, or a prefix followed by "*"; "*" alone matches every ref
+days = 3650          # 1 to 36500
+added = 1793318400   # Unix seconds when the rule was added
+```
+
+- A rule file is written once (section 9.1) and never changed or deleted by Apeiron. There is no way to remove a rule or shorten it; a longer one is added beside it.
+- The pattern follows the ref name rules of section 9.3 with the `*` replaced by a letter.
+- A file that does not parse, or whose name is not the hash of its content, is damaged. While a rule file is damaged, no ref can be changed: the error names the file, which is restored from a copy (section 15).
+- A missing `retention/` folder means no rules.
+
+### 16.2 What a rule protects
+
+For a ref that at least one rule matches, with `D` the largest `days` among them:
+
+1. **Moving** the ref is allowed only to its current snapshot or one that has it as an ancestor (through parents). Every snapshot the ref has pointed to therefore stays reachable, and garbage collection (section 13) keeps it.
+2. **Deleting** the ref is allowed only when `D` days have passed since its last change, as the newest line of its reflog (section 9.4) records. A ref with no reflog line is not deleted.
+3. **Creating** the ref is allowed.
+
+A rule applies to the refs that exist when it is added as well. The checks are made before the ref is replaced, by every operation that changes refs.
+
+### 16.3 Copies
+
+Push writes the rule files the remote lacks, after the key files (section 15.3 step 2); pull and clone write the rule files of the remote that this copy lacks. Rule files are never deleted on either side, so a replica protects the same refs as the copy it came from.
+
+### 16.4 Limits
+
+The rules bind every Apeiron program of this format version. Someone who can change the files directly, or a program that does not know `retention/`, can still move or delete refs. Storage that refuses changes by itself, such as an S3 bucket with Object Lock, closes that gap (ARCHIVE.md §4).
+
+## 17. Left for later versions
 
 - Multi-level blobs, hard links, Windows ACLs, device files.
 - Format upgrade tool: automatic and reversible migration when the format version changes.

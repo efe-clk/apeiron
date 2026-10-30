@@ -7,7 +7,8 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    CONFIG, INDEX, KEYS, LOCKS, LOGS, PACKS, REFS, REMOTES, Repository, TMP, Unlock, create_layout,
+    CONFIG, INDEX, KEYS, LOCKS, LOGS, PACKS, REFS, REMOTES, RETENTION, Repository, TMP, Unlock,
+    create_layout,
 };
 use crate::config::Config;
 use crate::crypto::Keys;
@@ -410,6 +411,7 @@ impl Repository {
                 });
             }
         }
+        self.take_rules(store)?;
         remote_index(store, &self.keys)
     }
 
@@ -473,7 +475,7 @@ impl Repository {
         match store.read(CONFIG)? {
             Some(bytes) => self.check_remote_config(store, &bytes)?,
             None => {
-                let layout = [PACKS, INDEX, REFS, LOGS, LOCKS, KEYS, TMP];
+                let layout = [PACKS, INDEX, REFS, LOGS, LOCKS, KEYS, RETENTION, TMP];
                 if store
                     .list("")?
                     .iter()
@@ -486,11 +488,45 @@ impl Repository {
                 }
                 store.create_dirs(&[PACKS, INDEX, REFS, LOGS, LOCKS, TMP])?;
                 self.copy_keys(store)?;
+                self.send_rules(store)?;
                 let config = self.dir(CONFIG);
                 return store.write_new(CONFIG, &fs::read(&config).at(&config)?);
             }
         }
-        self.copy_keys(store)
+        self.copy_keys(store)?;
+        self.send_rules(store)
+    }
+
+    /// Writes the retention rule files the remote lacks; none is ever
+    /// deleted (FORMAT.md §16.3).
+    fn send_rules(&self, store: &dyn Store) -> Result<()> {
+        let local = self.retention_files()?;
+        if local.is_empty() {
+            return Ok(());
+        }
+        let remote = store.list(RETENTION)?;
+        store.create_dirs(&[RETENTION])?;
+        for (name, bytes) in local {
+            if !remote.contains(&name) {
+                store.write_new(&format!("{RETENTION}/{name}"), &bytes)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Writes the retention rule files of the remote this copy lacks
+    /// (FORMAT.md §16.3).
+    fn take_rules(&self, store: &dyn Store) -> Result<()> {
+        let local = self.retention_files()?;
+        for name in store.list(RETENTION)? {
+            if !name.ends_with(".toml") || local.iter().any(|(n, _)| *n == name) {
+                continue;
+            }
+            if let Some(bytes) = store.read(&format!("{RETENTION}/{name}"))? {
+                self.write_retention_file(&(name, bytes))?;
+            }
+        }
+        Ok(())
     }
 
     fn check_remote_config(&self, store: &dyn Store, bytes: &[u8]) -> Result<()> {
@@ -989,6 +1025,76 @@ mod tests {
             elsewhere.push_all(&store, &mut |_| Ok(())),
             Err(Error::OtherRepository(_))
         ));
+    }
+
+    #[test]
+    fn retention_keeps_history_and_travels_with_every_copy() {
+        let Setup {
+            _dir,
+            root,
+            mut a,
+            first,
+        } = setup(true);
+        a.update_ref("archive/docs", None, Some(first)).unwrap();
+        a.add_retention_rule("archive/*", 3650).unwrap();
+        // A ref that no rule matches changes freely.
+        let second = commit(&mut a, b"second", Some(first));
+        a.update_ref("main", Some(second), Some(first)).unwrap();
+
+        // A kept ref only moves forward and is not deleted.
+        let docs = commit_on(&mut a, "archive/docs", first);
+        let refused = |r: Result<()>| matches!(r, Err(Error::Retained { .. }));
+        assert!(refused(a.update_ref(
+            "archive/docs",
+            Some(docs),
+            Some(first)
+        )));
+        assert!(refused(a.update_ref(
+            "archive/docs",
+            Some(docs),
+            Some(second)
+        )));
+        assert!(refused(a.update_ref("archive/docs", Some(docs), None)));
+        assert_eq!(a.read_ref("archive/docs").unwrap(), Some(docs));
+        // A new ref may be made under the rule.
+        a.update_ref("archive/new", None, Some(first)).unwrap();
+
+        // The rule goes with a push and comes back with a clone.
+        let remote = root.join("remote");
+        let store = FolderStore::open(&remote).unwrap();
+        a.push_all(&store, &mut |_| Ok(())).unwrap();
+        let copy = Repository::unlock(&remote, PASSWORD).unwrap();
+        assert_eq!(
+            copy.retention_rules().unwrap(),
+            a.retention_rules().unwrap()
+        );
+        assert!(refused(copy.update_ref("archive/docs", Some(docs), None)));
+        let (b, _) =
+            Repository::clone_from(&store, &root.join("b"), Some(PASSWORD), &mut |_| Ok(()))
+                .unwrap();
+        assert_eq!(b.retention_rules().unwrap().len(), 1);
+
+        // A longer rule adds to the first; neither goes away.
+        a.add_retention_rule("archive/docs", 36500).unwrap();
+        assert_eq!(a.retention_rules().unwrap().len(), 2);
+        assert!(a.add_retention_rule("archive/*", 0).is_err());
+
+        // A damaged rule file stops every ref change until it is restored.
+        let rules = root.join("a").join(RETENTION);
+        let file = fs::read_dir(&rules)
+            .unwrap()
+            .next()
+            .unwrap()
+            .unwrap()
+            .path();
+        let kept = fs::read(&file).unwrap();
+        fs::write(&file, b"refs = \"x\"\ndays = 1\nadded = 0\n").unwrap();
+        assert!(matches!(
+            a.update_ref("main", Some(first), Some(second)),
+            Err(Error::Corrupt { .. })
+        ));
+        fs::write(&file, kept).unwrap();
+        a.update_ref("main", Some(first), Some(second)).unwrap();
     }
 
     #[test]

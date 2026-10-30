@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use apeiron_core::{Error, ObjectId, Result, S3Url, Store, decode_ref, encode_ref};
-use object_store::aws::{AmazonS3Builder, S3ConditionalPut};
+use object_store::aws::{AmazonS3Builder, Checksum, S3ConditionalPut};
 use object_store::path::Path;
 use object_store::{
     Error as StoreError, ObjectStore, ObjectStoreExt, PutMode, PutOptions, PutPayload,
@@ -38,7 +38,10 @@ impl S3Store {
     pub fn connect(url: &S3Url) -> Result<Self> {
         let mut builder = AmazonS3Builder::from_env()
             .with_bucket_name(&url.bucket)
-            .with_conditional_put(S3ConditionalPut::ETagMatch);
+            .with_conditional_put(S3ConditionalPut::ETagMatch)
+            // A bucket with Object Lock takes only writes with a checksum
+            // (ARCHIVE.md §4); it also guards every write on the way.
+            .with_checksum_algorithm(Checksum::SHA256);
         if let Some(endpoint) = &url.endpoint {
             builder = builder
                 .with_endpoint(endpoint)

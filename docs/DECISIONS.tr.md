@@ -41,6 +41,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [031](#adr-031-merkezi-kimlik-kullanıcıları-hâlâ-webjson-içinde-listelenen-openid-connecttir) | Merkezi kimlik | PKCE'li OpenID Connect kod akışı; sağlayıcının anahtarlarıyla denetlenen RS256/ES256 belirteçleri; bir alan `web.json` içinde listelenen bir kullanıcıyı adlandırır; parolalar mümkün kalır | Kabul edildi |
 | [032](#adr-032-kiracılar-ana-makineyle-ayrılır-her-birinin-kendi-deposu-ve-dosyaları-vardır) | Çok kiracılı kullanım | Tek süreç, tek port; `Host` başlığı, kendi deposu, kullanıcıları, denetim kaydı, paylaşım bağlantıları ve oturumları olan bir kiracı seçer; bilinmeyen ana makineler hiçbir şey almaz | Kabul edildi |
 | [033](#adr-033-replikasyon-her-refi-uzak-bir-kopyaya-push-etmektir-görevi-devralmak-adminin-kararıdır) | Replikasyon ve yüksek erişilebilirlik | Her ref her yedekten sonra ve değişince her 30 saniyede replikalara push edilir; yedek sunucu bir replikayı yedek almadan sunar; `/api/health`; görev devri admin tarafından | Kabul edildi |
+| [034](#adr-034-arşiv-saklama-kuralları-altında-yalnızca-büyüyen-reflerdir-ve-kendini-kilitleyen-bir-depolamayla-desteklenir) | Değiştirilemez arşiv | Yalnızca eklenebilen `retention/<özet>.toml` kural dosyaları; korunan ref'ler yalnızca ileri gider ve ancak süreleri dolunca silinir; kurallar push ve pull ile kopyalanır; S3 Object Lock için SHA-256 sağlama toplamları | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
@@ -724,3 +725,25 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Ref'leri replikada da silmek | Birincildeki bir hata ya da saldırı replikayı da boşaltırdı |
 
 **Sonuçlar.** Replika bir yedekten sonra bir push kadar ya da bir işin aralığı kadar geridedir. Kullanıcılar, kimlik sağlayıcısı ve kiracılar admin tarafından yedek sunucuya kopyalanır; denetim kaydı ve paylaşım bağlantıları her sunucuda kalır. Görev devri bir kişi gerektirir. Birincilde silinen ref'ler, orada kaldırılana kadar replikada kalır.
+
+## ADR-034: Arşiv, saklama kuralları altında yalnızca büyüyen ref'lerdir ve kendini kilitleyen bir depolamayla desteklenir
+
+**Durum:** Kabul edildi (2026-10-30)
+
+**Bağlam.** Aşama 5'in 4. işi, belirli bir süreden önce kimsenin değiştiremeyeceği ya da silemeyeceği yedekler tutar ([ARCHIVE.tr.md](ARCHIVE.tr.md)). Nesneler zaten değişmezdir ve özetleriyle adlandırılır; bu yüzden saklanan veri fark edilmeden değiştirilemez. Hâlâ olabilecek olan, bir ref'in geri alınması ya da silinmesidir; ardından çöp toplama yalnızca onun ulaştığını kaldırır. Bir program yalnızca bunu kendisi yapmayı reddedebilir; dosyalara başka yollarla ulaşan birini durduramaz.
+
+**Karar.** Bir saklama kuralı, `retention/` içinde, içeriğinin özetiyle adlandırılan, bir kez yazılan ve Apeiron tarafından asla değiştirilmeyen ya da silinmeyen küçük bir dosyadır (FORMAT.tr.md §16). Bir kuralın eşleştiği bir ref için çekirdekteki her ref değişikliği, ref'in yalnızca snapshot'ının bir torununa taşındığını ve yalnızca reflog'daki son değişikliğinden bu yana kuralın gün sayısı geçtiğinde silindiğini denetler. Push ve pull, öbür tarafta olmayan kural dosyalarını kopyalar ve hiçbirini silmez. Depolamanın kendisine erişimi olan kişilere karşı Apeiron kendini kilitleyen bir depolamaya güvenir: her S3 yazması bir SHA-256 sağlama toplamı taşır; böylece uyumluluk kipinde Object Lock'lu kovalar uzak depo olarak çalışır.
+
+**Gerekçe.** Ref'leri değiştiren, çekirdekteki tek işlevde denetlemek, CLI'dan web arayüzüne, senkrona ve birleştirmelere kadar bir ref'i değiştirmenin her yolunun, her çağıranın hatırlamasına gerek kalmadan kapsanması demektir. Yalnızca ileri giden ref'ler her snapshot'ı ulaşılabilir tutar; bu yüzden mevcut çöp toplamanın arşivi tutmak için hiçbir değişikliğe ihtiyacı yoktur. İçerikle adlandırılan ve yalnızca eklenebilen kural dosyaları formatın bir kez yazılan dosyalarına uyar, her tür uzak depoya güvenle kopyalanır ve korumayı kaldıran hiçbir işlem bırakmaz. Son savunma hattını S3 Object Lock'a bırakmak, sunucudaki hiçbir programın veremeyeceği bir güvenceyi kullanır: depolama sağlayıcısı silmeyi hesabın sahibine bile reddeder.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| `config` içinde bir saklama ayarı | `config` oluşturulurken bir kez yazılır ve olduğu gibi kopyalanır; onu değiştirmek yeni bir tür yazma gerektirirdi ve kopyalar arasında birleştirilemezdi |
+| Ref başına değil snapshot başına saklama | Snapshot'ların tek tek işaretlenmesi gerekirdi; bir ref kuralı onun üzerindeki gelecekteki her yedeği kapsar |
+| Bir admin'in kaldırabildiği kurallar | Admin'in hesabını ele geçiren bir fidye yazılımı önce onları kaldırırdı |
+| Dosyaları dosya sistemi bayraklarıyla (`chattr +i`) kilitlemek | Root gerektirir, yalnızca bazı dosya sistemlerinde çalışır ve root onu kaldırabilir |
+| Her S3 yazmasında Object Lock'u kendimiz ayarlamak | S3 kütüphanesinin sunmadığı başlıklar gerektirir; bir kovanın varsayılan saklama süresi her yazmayı aynı biçimde kilitler |
+
+**Sonuçlar.** Yanlışlıkla eklenen bir kural geri alınamaz; CLI bunu söyler. Bozuk bir kural dosyası, bir kopyadan geri getirilene kadar her ref değişikliğini durdurur; bu, başarısız olmanın güvenli yoludur. Bu format bölümünden önceki programlar `retention/` klasörünü yok sayar. Dosyaları deponun klasöründen elle taşımak kuralları yine de atlatır; yalnızca kilitli depolama bunu önler.

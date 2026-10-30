@@ -275,6 +275,8 @@ Tek bir sunucudan, her biri kendi adresinde kendi deposu, kullanıcıları ve ka
 
 Her yedeği ikinci bir makinede de tutmak için onu bir uzak depo olarak ekleyin (`apeiron remote add dr sftp://backup2/srv/apeiron`) ve sunucuyu `apeiron web --replicate dr` ile başlatın. İkinci makinede `apeiron web --standby --repo /srv/apeiron` o kopyayı göz atmak ve geri yüklemek için sunar; ilk sunucu çökerse onu `--standby` olmadan yeniden başlatın ve kişileri ona yönlendirin ([REPLICATION.tr.md](REPLICATION.tr.md)).
 
+Yıllarca saklanması gereken kayıtlar bir saklama kuralı altındaki ref'lere gider: `apeiron retention add "archive/*" --days 3650`, ardından `apeiron backup <klasör> --ref archive/<ad>`. Bu ref'ler bundan sonra yalnızca büyüyebilir ve Apeiron'u kullanan hiç kimse tarafından on yıl boyunca silinemez; kuralın kendisi asla kaldırılamaz, bu yüzden gün sayısını dikkatle seçin. Onları Object Lock'lu bir S3 kovasına push etmek, dosyalara erişimi olan kişilere karşı da korur ([ARCHIVE.tr.md](ARCHIVE.tr.md)).
+
 ## 7. Düzen
 
 | Ne sıklıkla | Komut | Neden |

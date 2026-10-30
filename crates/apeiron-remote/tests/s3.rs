@@ -2,7 +2,8 @@
 //! names an existing bucket, such as
 //! `s3://apeiron-test?endpoint=http://127.0.0.1:4566&region=us-east-1`, and
 //! the `AWS_*` variables hold its credentials; without it the tests are
-//! skipped. CI runs them against LocalStack.
+//! skipped. `APEIRON_S3_LOCKED_URL` names one with Object Lock and a default
+//! retention (ARCHIVE.md §4). CI runs them against LocalStack.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -14,15 +15,17 @@ use apeiron_remote::S3Store;
 
 /// A fresh folder in the test bucket, or `None` to skip.
 fn url() -> Option<S3Url> {
-    let Some(url) = std::env::var("APEIRON_S3_TEST_URL")
-        .ok()
-        .filter(|u| !u.is_empty())
-    else {
-        eprintln!("skipped: APEIRON_S3_TEST_URL is not set");
+    url_of("APEIRON_S3_TEST_URL")
+}
+
+/// A fresh folder in the bucket the variable `name` names.
+fn url_of(name: &str) -> Option<S3Url> {
+    let Some(url) = std::env::var(name).ok().filter(|u| !u.is_empty()) else {
+        eprintln!("skipped: {name} is not set");
         return None;
     };
     let RemoteUrl::S3(mut url) = RemoteUrl::parse(&url).unwrap() else {
-        panic!("APEIRON_S3_TEST_URL is not an s3:// URL");
+        panic!("{name} is not an s3:// URL");
     };
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -145,4 +148,31 @@ fn push_and_pull_through_s3() {
     store.write_new("keys/x.key", b"one").unwrap();
     store.write_new("keys/x.key", b"two").unwrap();
     assert_eq!(store.read("keys/x.key").unwrap().unwrap(), b"one");
+}
+
+#[test]
+fn push_and_clone_through_a_bucket_with_object_lock() {
+    let Some(url) = url_of("APEIRON_S3_LOCKED_URL") else {
+        return;
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let params = ChunkerParams::new(64 * 1024).unwrap();
+    let (mut a, _) = Repository::init_encrypted(&dir.path().join("a"), params, "pw").unwrap();
+    let first = commit(&mut a, 1, None);
+    a.add_retention_rule("main", 3650).unwrap();
+    let second = commit(&mut a, 2, Some(first));
+
+    // Every write carries a checksum, as a locked bucket requires.
+    let store = S3Store::connect(&url).unwrap();
+    let pushed = a.push_all(&store, &mut |_| Ok(())).unwrap();
+    assert!(pushed.iter().all(|(_, r)| r.is_ok()));
+    let (b, refs) =
+        Repository::clone_from(&store, &dir.path().join("b"), Some("pw"), &mut |_| Ok(())).unwrap();
+    assert_eq!(refs[0].1.snapshot, second);
+    assert_eq!(content(&b, &second), data(2));
+    assert_eq!(b.retention_rules().unwrap(), a.retention_rules().unwrap());
+    assert!(matches!(
+        b.update_ref("main", Some(second), Some(first)),
+        Err(Error::Retained { .. })
+    ));
 }

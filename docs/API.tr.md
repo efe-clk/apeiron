@@ -170,6 +170,8 @@ Her işlem tek bir düz istek değeri alır ve tek bir düz sonuç değeri dönd
 | `remove_remote` | ad | —; uzak kopyanın kendisine dokunulmaz | Hayır |
 | `push` | uzak depo adı, ref adı (varsayılan `main`) | `TransferReport`: uzaktaki ref'in şimdi ve önceden gösterdiği snapshot'lar, kopyalanan nesneler ve saklanan baytlar; uzak depoda bu kopyada olmayan snapshot'lar varsa `conflict` | Evet |
 | `pull` | uzak depo adı, ref adı (varsayılan `main`) | yerel ref için aynısı, `TransferReport`; yerel ref'te uzak depoda olmayan snapshot'lar varsa `conflict` | Evet |
+| `retention` | — | `Vec<RetentionRule>`: ref deseni, gün sayısı, ne zaman eklendiği; en eskisi önce ([ARCHIVE.tr.md](ARCHIVE.tr.md)) | Hayır |
+| `add_retention` | ref'ler (bir ad ya da ardından `*` gelen bir önek), gün sayısı (1 ile 36500 arası) | `RetentionRule`; asla kaldırılamaz ya da kısaltılamaz ([FORMAT.tr.md](FORMAT.tr.md) §16). Bir kuralın yasakladığı ref değişikliği `conflict` ile başarısız olur | Hayır |
 | `push_all`, `pull_all` | uzak depo adı | `MirrorReport`: ref başına adı ve ya bir `TransferReport` ya da onu bırakan `conflict`; diğer hatalar hepsini durdurur ([REPLICATION.tr.md](REPLICATION.tr.md) §2, [FORMAT.tr.md](FORMAT.tr.md) §15.7) | Evet |
 | `git_import` | Git deposu yolu, ref öneki (varsayılan `git`) | `GitImportReport`: saklanan commit ve etiketler, taşınan ref'ler (Git adı, ref, Git kimliği, snapshot, önceki), nedeniyle atlanan ref'ler, eskimiş ref'ler ([GIT.tr.md](GIT.tr.md)) | Evet |
 | `git_export` | Git deposu yolu (yoksa çıplak olarak oluşturulur), ref öneki | `GitExportReport`: yazılan commit ve etiketler, güncellenen ref'ler, atlanan ref'ler, yeniden üretilemeyen Git kimlikleri | Evet |
