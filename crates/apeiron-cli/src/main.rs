@@ -767,7 +767,15 @@ fn web_audit(files: &WebFiles, command: AuditCommand, out: &Output) -> Result<u8
         AuditCommand::Verify => match audit.verify() {
             Ok(v) => {
                 out.result(&v, |v| {
-                    say!("The audit log is whole: {} events.", v.events);
+                    if v.first > 1 {
+                        say!(
+                            "The audit log is whole from event {} on: {} events; the parts before it were removed.",
+                            v.first,
+                            v.events
+                        );
+                    } else {
+                        say!("The audit log is whole: {} events.", v.events);
+                    }
                     say!("Hash of the last event: {}", v.last);
                 });
                 Ok(0)
@@ -875,6 +883,9 @@ struct AuditFacts {
     file: PathBuf,
     /// Whether the chain of hashes is whole (docs/AUDIT.md §3).
     whole: bool,
+    /// The first event still in the log; more than 1 when older parts were
+    /// removed (docs/AUDIT.md §3).
+    first: u64,
     events: u64,
     /// The hash of the last event, to keep elsewhere.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -899,8 +910,19 @@ fn web_facts(
     report: &mut apeiron::ComplianceReport,
 ) -> Result<WebFacts, Failure> {
     let users = apeiron_server::Users::load(&files.users)?;
-    let (whole, events, last, error) = match files.audit.verify() {
-        Ok(v) => (true, v.events, Some(v.last), None),
+    let (whole, first, events, last, error) = match files.audit.verify() {
+        Ok(v) => {
+            if v.first > 1 {
+                report.findings.push(apeiron::Finding {
+                    level: apeiron::Level::Warning,
+                    text: format!(
+                        "the audit log starts at event {}; the parts before it were removed",
+                        v.first
+                    ),
+                });
+            }
+            (true, v.first, v.events, Some(v.last), None)
+        }
         Err(e) => {
             report.findings.insert(
                 0,
@@ -909,7 +931,7 @@ fn web_facts(
                     text: format!("the audit log is not whole: {}", e.message),
                 },
             );
-            (false, 0, None, Some(e.message))
+            (false, 0, 0, None, Some(e.message))
         }
     };
     let recent: Vec<apeiron_server::Event> = files
@@ -940,6 +962,7 @@ fn web_facts(
         audit: AuditFacts {
             file: files.audit.file().to_path_buf(),
             whole,
+            first,
             events,
             last,
             error,
@@ -1109,6 +1132,9 @@ fn print_report(full: &FullReport) {
     say!("| --- | --- |");
     say!("| Chain of hashes whole | {} |", yes(a.whole));
     say!("| Events | {} |", a.events);
+    if a.first > 1 {
+        say!("| First event kept | {} |", a.first);
+    }
     if let Some(last) = &a.last {
         say!("| Hash of the last event | `{last}` |");
     }

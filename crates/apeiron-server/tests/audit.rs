@@ -151,3 +151,59 @@ fn writers_at_the_same_time_keep_one_chain() {
     }
     assert_eq!(audit.verify().unwrap().events, 100);
 }
+
+#[test]
+fn the_chain_goes_on_across_parts() {
+    let dir = tempfile::tempdir().unwrap();
+    let audit = Audit::new(dir.path().join("audit.log")).rotating_at(1000);
+    for i in 0..30 {
+        audit
+            .record(&actor("efe"), "call:list", json!({ "i": i }), "ok")
+            .unwrap();
+    }
+    let mut parts: Vec<String> = fs::read_dir(dir.path())
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .filter(|n| n.len() == "audit.log.".len() + 12)
+        .collect();
+    parts.sort();
+    assert!(parts.len() >= 3, "{parts:?}");
+    assert!(fs::metadata(audit.file()).unwrap().len() < 1000 + 300);
+
+    // One log, read and checked across its parts.
+    let verified = audit.verify().unwrap();
+    assert_eq!((verified.first, verified.events), (1, 30));
+    let events = audit.read(100, None).unwrap();
+    let seqs: Vec<u64> = events.iter().map(|e| e.seq).collect();
+    assert_eq!(seqs, (1..=30).collect::<Vec<_>>());
+
+    // A change to the last line of a part shows in the first line of the
+    // next one.
+    let oldest = dir.path().join(&parts[0]);
+    let kept = fs::read_to_string(&oldest).unwrap();
+    let mut changed: Vec<String> = kept.lines().map(str::to_owned).collect();
+    let last = changed.pop().unwrap().replace("\"efe\"", "\"eve\"");
+    changed.push(last);
+    fs::write(&oldest, changed.join("\n") + "\n").unwrap();
+    let message = broken_at(&audit);
+    assert!(
+        message.contains(&format!("{}: line 1 ", parts[1])),
+        "{message}"
+    );
+    fs::write(&oldest, kept).unwrap();
+
+    // With the oldest part removed, the rest is checked from where it starts.
+    fs::remove_file(&oldest).unwrap();
+    let verified = audit.verify().unwrap();
+    assert!(verified.first > 1);
+    assert_eq!(verified.events, 31 - verified.first);
+
+    // A crash right after a part was renamed leaves no `audit.log`; the
+    // next event still follows the last one.
+    fs::rename(audit.file(), dir.path().join("audit.log.000000000030")).unwrap();
+    audit
+        .record(&actor("efe"), "call:list", json!({}), "ok")
+        .unwrap();
+    assert_eq!(audit.read(1, None).unwrap()[0].seq, 31);
+    assert_eq!(audit.verify().unwrap().last.len(), 64);
+}

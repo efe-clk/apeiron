@@ -12,6 +12,8 @@ use sha2::{Digest, Sha256};
 
 /// Longest string kept in `detail` (AUDIT.md §2).
 const MAX_TEXT: usize = 256;
+/// Size past which the log goes on in a new file (AUDIT.md §3).
+const ROTATE_AT: u64 = 16 * 1024 * 1024;
 /// `prev` of the first line.
 const START: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 
@@ -36,6 +38,9 @@ pub struct Event {
 pub struct Verified {
     /// Lines checked.
     pub events: u64,
+    /// The `seq` of the first line checked: 1, or more when older parts
+    /// were removed.
+    pub first: u64,
     /// SHA-256 of the last line, hex; worth keeping elsewhere (AUDIT.md §3).
     pub last: String,
 }
@@ -72,15 +77,106 @@ fn shorten(value: Value) -> Value {
     }
 }
 
-/// The audit log in one file.
+/// The audit log: `audit.log` and the parts it went on from.
 #[derive(Clone, Debug)]
 pub struct Audit {
     file: PathBuf,
+    rotate_at: u64,
 }
 
 impl Audit {
     pub fn new(file: impl Into<PathBuf>) -> Self {
-        Audit { file: file.into() }
+        Audit {
+            file: file.into(),
+            rotate_at: ROTATE_AT,
+        }
+    }
+
+    /// The same log, going on in a new file past `bytes` instead of 16 MiB.
+    pub fn rotating_at(mut self, bytes: u64) -> Self {
+        self.rotate_at = bytes;
+        self
+    }
+
+    /// `audit.log.<suffix>` beside the log.
+    fn beside(&self, suffix: &str) -> PathBuf {
+        let mut name = self.file.file_name().unwrap_or_default().to_owned();
+        name.push(".");
+        name.push(suffix);
+        self.file.with_file_name(name)
+    }
+
+    /// Takes the lock that orders writers and readers, exclusive to write.
+    fn lock(&self, write: bool) -> Result<File, Error> {
+        let path = self.beside("lock");
+        let file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&path)
+            .map_err(|e| io_error(&path, e))?;
+        if write {
+            file.lock()
+        } else {
+            file.lock_shared()
+        }
+        .map_err(|e| io_error(&path, e))?;
+        Ok(file)
+    }
+
+    /// The parts the log went on from, oldest first (AUDIT.md §3).
+    fn parts(&self) -> Result<Vec<PathBuf>, Error> {
+        let dir = self.file.parent().unwrap_or(Path::new("."));
+        let prefix = format!(
+            "{}.",
+            self.file.file_name().unwrap_or_default().to_string_lossy()
+        );
+        let entries = match fs::read_dir(dir) {
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(e) => return Err(io_error(dir, e)),
+            Ok(entries) => entries,
+        };
+        let mut parts = Vec::new();
+        for entry in entries {
+            let entry = entry.map_err(|e| io_error(dir, e))?;
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let is_part = name
+                .strip_prefix(&prefix)
+                .is_some_and(|n| n.len() == 12 && n.bytes().all(|b| b.is_ascii_digit()));
+            if is_part {
+                parts.push(entry.path());
+            }
+        }
+        parts.sort();
+        Ok(parts)
+    }
+
+    /// Renames a full `audit.log` to the part named by its last event.
+    fn rotate(&self) -> Result<(), Error> {
+        let path = &self.file;
+        let size = match fs::metadata(path) {
+            Ok(m) => m.len(),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(()),
+            Err(e) => return Err(io_error(path, e)),
+        };
+        if size < self.rotate_at {
+            return Ok(());
+        }
+        let mut file = File::open(path).map_err(|e| io_error(path, e))?;
+        let last = last_line(&mut file).map_err(|e| io_error(path, e))?;
+        drop(file);
+        let Some(seq) = last
+            .and_then(|l| serde_json::from_slice::<Event>(&l).ok())
+            .map(|e| e.seq)
+        else {
+            // A file ending in a broken line keeps growing; `verify` shows it.
+            return Ok(());
+        };
+        let part = self.beside(&format!("{seq:012}"));
+        if part.exists() {
+            return Ok(());
+        }
+        fs::rename(path, &part).map_err(|e| io_error(path, e))
     }
 
     /// `audit.log` in the state folder (AUDIT.md §2).
@@ -106,15 +202,24 @@ impl Audit {
         if let Some(dir) = path.parent() {
             fs::create_dir_all(dir).map_err(|e| io_error(dir, e))?;
         }
+        // The server and `apeiron web user` may write at the same time.
+        let _lock = self.lock(true)?;
+        self.rotate()?;
         let mut file = OpenOptions::new()
             .read(true)
             .append(true)
             .create(true)
             .open(path)
             .map_err(|e| io_error(path, e))?;
-        // The server and `apeiron web user` may write at the same time.
-        file.lock().map_err(|e| io_error(path, e))?;
-        let (seq, prev) = match last_line(&mut file).map_err(|e| io_error(path, e))? {
+        let mut last = last_line(&mut file).map_err(|e| io_error(path, e))?;
+        // A new file goes on from the last part.
+        if last.is_none()
+            && let Some(part) = self.parts()?.pop()
+        {
+            let mut old = File::open(&part).map_err(|e| io_error(&part, e))?;
+            last = last_line(&mut old).map_err(|e| io_error(&part, e))?;
+        }
+        let (seq, prev) = match last {
             None => (1, START.to_owned()),
             Some(line) => {
                 let seq = serde_json::from_slice::<Event>(&line).map_or(0, |e| e.seq);
@@ -146,24 +251,31 @@ impl Audit {
             .map_err(|e| io_error(path, e))
     }
 
-    /// The lines of the log, read once no event is being written: the
-    /// writer's lock would make a read fail on Windows and could show half a
-    /// line elsewhere.
-    fn lines(&self) -> Result<Vec<Vec<u8>>, Error> {
-        let mut file = match fs::File::open(&self.file) {
-            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
-            Err(e) => return Err(io_error(&self.file, e)),
-            Ok(file) => file,
+    /// The lines of every part and of `audit.log`, oldest first, each with
+    /// its file and line number; read while no event is being written.
+    fn lines(&self) -> Result<Vec<(PathBuf, usize, Vec<u8>)>, Error> {
+        let _lock = match self.file.parent() {
+            Some(dir) if !dir.as_os_str().is_empty() && !dir.exists() => return Ok(Vec::new()),
+            _ => self.lock(false)?,
         };
-        let mut data = Vec::new();
-        file.lock_shared()
-            .and_then(|()| file.read_to_end(&mut data))
-            .map_err(|e| io_error(&self.file, e))?;
-        Ok(data
-            .split(|b| *b == b'\n')
-            .filter(|l| !l.is_empty())
-            .map(<[u8]>::to_vec)
-            .collect())
+        let mut files = self.parts()?;
+        files.push(self.file.clone());
+        let mut lines = Vec::new();
+        for path in files {
+            let data = match fs::read(&path) {
+                Err(e) if e.kind() == io::ErrorKind::NotFound => continue,
+                Err(e) => return Err(io_error(&path, e)),
+                Ok(data) => data,
+            };
+            for (i, line) in data
+                .split(|b| *b == b'\n')
+                .filter(|l| !l.is_empty())
+                .enumerate()
+            {
+                lines.push((path.clone(), i + 1, line.to_vec()));
+            }
+        }
+        Ok(lines)
     }
 
     /// The newest `limit` events, of `user` only if given, oldest first.
@@ -171,7 +283,7 @@ impl Audit {
         let mut events: Vec<Event> = self
             .lines()?
             .iter()
-            .filter_map(|l| serde_json::from_slice::<Event>(l).ok())
+            .filter_map(|(_, _, l)| serde_json::from_slice::<Event>(l).ok())
             .filter(|e| user.is_none_or(|u| e.user.as_deref() == Some(u)))
             .collect();
         let skip = events.len().saturating_sub(limit);
@@ -179,31 +291,44 @@ impl Audit {
         Ok(events)
     }
 
-    /// Checks the chain of the whole log (AUDIT.md §3).
+    /// Checks the chain of the whole log, across its parts (AUDIT.md §3).
     pub fn verify(&self) -> Result<Verified, Error> {
         let mut prev = START.to_owned();
+        let mut next = None;
+        let mut first = 1;
         let mut count = 0;
-        for (i, line) in self.lines()?.iter().enumerate() {
-            let n = i + 1;
+        for (path, n, line) in &self.lines()? {
             let broken = |why: &str| {
                 Error::new(
                     ErrorKind::Corrupt,
-                    format!("{}: line {n} {why}", self.file.display()),
+                    format!("{}: line {n} {why}", path.display()),
                 )
             };
             let event: Event =
                 serde_json::from_slice(line).map_err(|_| broken("is not an event"))?;
-            if event.seq != n as u64 {
-                return Err(broken("is out of order or a line before it is missing"));
+            match next {
+                // The log starts at 1 unless older parts were removed; then
+                // the chain is checked from the oldest line left.
+                None if event.seq > 1 => {
+                    first = event.seq;
+                    prev.clone_from(&event.prev);
+                }
+                None => {}
+                Some(seq) if event.seq != seq => {
+                    return Err(broken("is out of order or a line before it is missing"));
+                }
+                Some(_) => {}
             }
             if event.prev != prev {
                 return Err(broken("does not follow the line before it"));
             }
             prev = hash(line);
-            count = n as u64;
+            next = Some(event.seq + 1);
+            count += 1;
         }
         Ok(Verified {
             events: count,
+            first,
             last: prev,
         })
     }

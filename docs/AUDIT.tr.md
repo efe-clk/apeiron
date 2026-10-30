@@ -43,13 +43,13 @@ Kayıt, durum klasöründeki (Linux'ta `~/.local/state/apeiron`) `audit.log` dos
 | `outcome` | `ok` ya da hata türü (`not_found`, `key`, `unsupported` …); uzun bir işlem izin verilip başladığında `ok` olarak kaydedilir, sonucu `done:` ile gelir |
 | `prev` | Önceki satırın baytlarının SHA-256 özeti, onaltılık; ilk satırda 64 sıfır |
 
-Kısa bir işlem çalıştıktan sonra kaydedilir, böylece hiçbir sonuç kaydedilmeden dışarı çıkmaz; uzun bir işlem başlamadan önce kaydedilir, böylece hiçbir şey kaydedilmeden çalışmaz. Satırlara yalnızca ekleme yapılır. Her biri dosya üzerinde bir kilitle yazılır, böylece sunucu ve `apeiron web user` aynı anda yazabilir; istek sürmeden önce diske aktarılır. Bir satır yazılamazsa istek başarısız olur: kaydedilmeyen hiçbir şey olmaz.
+Kısa bir işlem çalıştıktan sonra kaydedilir, böylece hiçbir sonuç kaydedilmeden dışarı çıkmaz; uzun bir işlem başlamadan önce kaydedilir, böylece hiçbir şey kaydedilmeden çalışmaz. Satırlara yalnızca ekleme yapılır. Her biri bir kilitle (kaydın yanındaki `audit.log.lock`) yazılır, böylece sunucu ve `apeiron web user` aynı anda yazabilir ve okuyanlar asla yarım satır görmez; istek sürmeden önce diske aktarılır. Bir satır yazılamazsa istek başarısız olur: kaydedilmeyen hiçbir şey olmaz.
 
 ## 3. Denetlemek
 
 Her satır kendinden öncekinin özetini tuttuğu için bir satırı değiştirmek, silmek ya da yerini değiştirmek zinciri o noktadan itibaren bozar. `apeiron web audit verify` bütün kaydı okur, ilk bozuk satırı bildirir ve son satırın özetini yazar. Bu özeti ara sıra bir yere yazmak ya da başka bir yere göndermek, zincirin tek başına yakalayamadığı, baştan sona yeniden yazılmış bir kaydı da ortaya çıkarır.
 
-Kayıt hiç döndürülmez; bir olay yaklaşık 300 bayt tutar, yani bir milyon olay yaklaşık 300 MB eder.
+`audit.log` 16 MiB'ı, yaklaşık 50 000 olayı geçtiğinde, sonraki olay önce onu `audit.log.<seq>` olarak yeniden adlandırır (`<seq>` son olayının 12 basamakla yazılmış numarasıdır) ve yeni bir `audit.log` başlatır. Zincir dosyalar boyunca sürer: yeni dosyanın ilk satırı eskisinin son satırının özetini tutar ve `seq` değeri devam eder. `verify` ve `show` parçaları sırayla tek bir kayıt olarak okur. Eski parçalar artık saklanmaları gerekmediğinde bir arşive taşınabilir ya da silinebilir; o zaman `verify` zinciri kalan en eski parçadan denetler ve hangi olaydan itibaren denetlediğini söyler.
 
 ## 4. Okumak
 
@@ -66,7 +66,7 @@ Kayıt hiç döndürülmez; bir olay yaklaşık 300 bayt tutar, yani bir milyon 
 | --- | --- |
 | CLI'nın kendi yedeklerini ve geri yüklemelerini kaydetmek | Sonra; deponun reflog'u her ref değişikliğini zaten kaydeder |
 | Olayları syslog'a ya da merkezi bir kayıt hizmetine göndermek | Aşama 5 |
-| Kaydı döndürmek ve arşivlemek | Sonra |
+| Eski parçaları başka bir yerde arşivlemek | Admin'e bırakılır: parçalar, yeniden adlandırıldıktan sonra hiç değişmeyen düz dosyalardır |
 
 ## 6. Crate'ler
 

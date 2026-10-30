@@ -43,13 +43,13 @@ The log is `audit.log` in the state folder (`~/.local/state/apeiron` on Linux), 
 | `outcome` | `ok`, or the error kind (`not_found`, `key`, `unsupported` …); a long operation is recorded as `ok` when it is allowed and starts, and its result comes with `done:` |
 | `prev` | SHA-256 of the previous line's bytes, hex; 64 zeros on the first line |
 
-A short operation is recorded after it runs, so no result leaves unrecorded; a long one before it starts, so nothing runs unrecorded. Lines are only ever appended. Each is written under a lock on the file, so the server and `apeiron web user` can write at the same time, and flushed to disk before the request goes on. If a line cannot be written, the request fails: nothing happens that is not recorded.
+A short operation is recorded after it runs, so no result leaves unrecorded; a long one before it starts, so nothing runs unrecorded. Lines are only ever appended. Each is written under a lock (`audit.log.lock` beside the log), so the server and `apeiron web user` can write at the same time and readers never see half a line, and flushed to disk before the request goes on. If a line cannot be written, the request fails: nothing happens that is not recorded.
 
 ## 3. Checking it
 
 Because each line holds the hash of the one before it, changing, removing or reordering a line breaks the chain from there on. `apeiron web audit verify` reads the whole log, reports the first broken line, and prints the hash of the last line. Writing that hash down from time to time, or sending it elsewhere, also reveals a log rewritten from start to end, which the chain alone cannot.
 
-The log never rotates; one event takes about 300 bytes, so a million events take about 300 MB.
+When `audit.log` has grown past 16 MiB, about 50 000 events, the next event first renames it to `audit.log.<seq>`, where `<seq>` is the number of its last event written with 12 digits, and starts a new `audit.log`. The chain goes on across the files: the first line of the new file holds the hash of the last line of the old one, and its `seq` follows on. `verify` and `show` read the parts in order as one log. Old parts may be moved to an archive or deleted when they no longer have to be kept; `verify` then checks the chain from the oldest part left and says from which event on.
 
 ## 4. Reading it
 
@@ -66,7 +66,7 @@ The log never rotates; one event takes about 300 bytes, so a million events take
 | --- | --- |
 | Recording the CLI's own backups and restores | Later; the repository's reflog already records every ref change |
 | Sending events to syslog or a central log service | Stage 5 |
-| Rotating and archiving the log | Later |
+| Archiving old parts elsewhere | Left to the admin: the parts are plain files that never change once renamed |
 
 ## 6. Crates
 

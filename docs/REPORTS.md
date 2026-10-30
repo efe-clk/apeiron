@@ -57,7 +57,7 @@ The snapshot ids are the proof: an id fixes every byte under it and all the hist
 | Level | When |
 | --- | --- |
 | Problem | `--verify` found damaged data; damaged files were found when the repository was opened; a remote did not answer; a ref is behind, missing or different on a remote; the audit log is not whole |
-| Warning | A ref is stale; the repository is not encrypted; it is encrypted without a recovery key; it has no remote, so every backup exists in one place only |
+| Warning | A ref is stale; the repository is not encrypted; it is encrypted without a recovery key; it has no remote, so every backup exists in one place only; the audit log's oldest parts were removed (AUDIT.md §3) |
 
 ## 5. In the JSON API and the CLI
 

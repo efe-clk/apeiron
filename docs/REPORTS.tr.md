@@ -57,7 +57,7 @@ Kanıt snapshot kimlikleridir: bir kimlik, altındaki her baytı ve ondan öncek
 | Düzey | Ne zaman |
 | --- | --- |
 | Sorun | `--verify` bozuk veri buldu; depo açılırken bozuk dosyalar bulundu; bir uzak depo yanıt vermedi; bir ref bir uzak depoda geride, yok ya da farklı; denetim kaydı eksiksiz değil |
-| Uyarı | Bir ref eskimiş; depo şifreli değil; kurtarma anahtarı olmadan şifreli; hiç uzak deposu yok, yani her yedek tek bir yerde duruyor |
+| Uyarı | Bir ref eskimiş; depo şifreli değil; kurtarma anahtarı olmadan şifreli; hiç uzak deposu yok, yani her yedek tek bir yerde duruyor; denetim kaydının en eski parçaları kaldırılmış (AUDIT.tr.md §3) |
 
 ## 5. JSON API'de ve CLI'da
 
