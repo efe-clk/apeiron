@@ -42,6 +42,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [032](#adr-032-kiracılar-ana-makineyle-ayrılır-her-birinin-kendi-deposu-ve-dosyaları-vardır) | Çok kiracılı kullanım | Tek süreç, tek port; `Host` başlığı, kendi deposu, kullanıcıları, denetim kaydı, paylaşım bağlantıları ve oturumları olan bir kiracı seçer; bilinmeyen ana makineler hiçbir şey almaz | Kabul edildi |
 | [033](#adr-033-replikasyon-her-refi-uzak-bir-kopyaya-push-etmektir-görevi-devralmak-adminin-kararıdır) | Replikasyon ve yüksek erişilebilirlik | Her ref her yedekten sonra ve değişince her 30 saniyede replikalara push edilir; yedek sunucu bir replikayı yedek almadan sunar; `/api/health`; görev devri admin tarafından | Kabul edildi |
 | [034](#adr-034-arşiv-saklama-kuralları-altında-yalnızca-büyüyen-reflerdir-ve-kendini-kilitleyen-bir-depolamayla-desteklenir) | Değiştirilemez arşiv | Yalnızca eklenebilen `retention/<özet>.toml` kural dosyaları; korunan ref'ler yalnızca ileri gider ve ancak süreleri dolunca silinir; kurallar push ve pull ile kopyalanır; S3 Object Lock için SHA-256 sağlama toplamları | Kabul edildi |
+| [035](#adr-035-uyumluluk-raporları-istek-üzerine-depodan-ve-web-sunucusunun-dosyalarından-oluşturulur) | Uyumluluk raporları | Salt okunur, istek üzerine; ref'lerden, saklamadan, anahtarlardan, doğrulamadan, uzak depolardan ve `--web` ile kullanıcılar ve denetim kaydından gerçekler ve bulgular; Markdown ya da JSON; kanıt olarak snapshot kimlikleri ve denetim özeti | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
@@ -747,3 +748,24 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Her S3 yazmasında Object Lock'u kendimiz ayarlamak | S3 kütüphanesinin sunmadığı başlıklar gerektirir; bir kovanın varsayılan saklama süresi her yazmayı aynı biçimde kilitler |
 
 **Sonuçlar.** Yanlışlıkla eklenen bir kural geri alınamaz; CLI bunu söyler. Bozuk bir kural dosyası, bir kopyadan geri getirilene kadar her ref değişikliğini durdurur; bu, başarısız olmanın güvenli yoludur. Bu format bölümünden önceki programlar `retention/` klasörünü yok sayar. Dosyaları deponun klasöründen elle taşımak kuralları yine de atlatır; yalnızca kilitli depolama bunu önler.
+
+## ADR-035: Uyumluluk raporları, istek üzerine depodan ve web sunucusunun dosyalarından oluşturulur
+
+**Durum:** Kabul edildi (2026-10-30)
+
+**Bağlam.** Aşama 5'in 5. işi bir denetçiye yedekler hakkında tek bir belge verir ([REPORTS.tr.md](REPORTS.tr.md)). İhtiyaç duyduğu her gerçek zaten depoda, uzak depolarında ve web sunucusunun dosyalarında vardır; soru, sonucun güvenilir ve tekrarlanabilir olması için onların nasıl toplanacağıdır.
+
+**Karar.** `apeiron report` ve API'nin `report` işlemi depoyu olduğu gibi okur ve gerçekleri toplar: en yeni snapshot'ları, geçmiş uzunlukları ve saklamalarıyla ref'ler, şifreleme ve anahtarlar ve istek üzerine tam bir doğrulama ve her uzak depoyla bir karşılaştırma. CLI, istek üzerine web sunucusunun kullanıcılarını, kimlik sağlayıcısını ve denetim kaydını ekler. Kurallar gerçekleri bulgulara, sorunlara ve uyarılara dönüştürür. Sonuç Markdown olarak ya da `--json` ile JSON olarak yazdırılır; Apeiron onu hiçbir yerde saklamaz.
+
+**Gerekçe.** Rapor anında okunan gerçekler, saklanan bir kaydın olabileceği gibi eskimiş olamaz ve aynı komut aynı durum için aynı yanıtı verir. Kanıt rapora güvenmeye bağlı değildir: snapshot kimlikleri ve son denetim olayının özeti, sonraki herhangi bir zamanda veriyle karşılaştırılabilir. Web sunucusu bölümünü CLI'da tutmak, katmanların gerektirdiği gibi API'yi sunucunun dosyalarından bağımsız tutar (ARCHITECTURE.tr.md). Markdown olduğu gibi okunabilir ve yaygın araçlarla PDF'e dönüşür; JSON programlara hizmet eder.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Raporlar için her yedeğin sonucunu ayrı bir geçmişe kaydetmek | Depoyla çelişebilecek ikinci bir kayıt; ref'ler ve snapshot'ları zaten o geçmiştir |
+| Standart başına bir rapor (ISO 27001, SOC 2) | Her pilot kendininkini adlandırır; gerçekler aynıdır ve bir eşleme, bir pilot ihtiyaç duyduğunda yazılabilir |
+| Doğrudan PDF üretmek | Herhangi bir dönüştürücünün yaptığı bir adım için bir dizgi kütüphanesi getirir |
+| Önce web arayüzünde raporlar | Denetçileri yanıtlayan kişiler sunucuyu çalıştırır; CLI yeni sayfalar olmadan her gerçeğe ulaşır |
+
+**Sonuçlar.** `--verify` ile bir rapor saklanan her baytı okur ve `apeiron verify` kadar sürer; `--remotes` ile uzak depoların yanıt vermesi gerekir. Raporlar istek üzerine ya da sistemin zamanlayıcısıyla oluşturulur, Apeiron tarafından saklanmaz; onları saklamak sürecin kurumdaki parçasıdır.

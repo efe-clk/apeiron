@@ -277,6 +277,8 @@ Her yedeği ikinci bir makinede de tutmak için onu bir uzak depo olarak ekleyin
 
 Yıllarca saklanması gereken kayıtlar bir saklama kuralı altındaki ref'lere gider: `apeiron retention add "archive/*" --days 3650`, ardından `apeiron backup <klasör> --ref archive/<ad>`. Bu ref'ler bundan sonra yalnızca büyüyebilir ve Apeiron'u kullanan hiç kimse tarafından on yıl boyunca silinemez; kuralın kendisi asla kaldırılamaz, bu yüzden gün sayısını dikkatle seçin. Onları Object Lock'lu bir S3 kovasına push etmek, dosyalara erişimi olan kişilere karşı da korur ([ARCHIVE.tr.md](ARCHIVE.tr.md)).
 
+Bir denetim için `apeiron report --verify --remotes --web > rapor.md`, neyin ne zaman yedeklendiğini, verinin eksiksiz olup olmadığını, her kopyanın güncel olup olmadığını, yedeklerin nasıl korunup saklandığını ve kimin erişimi olduğunu içeren tek bir belge yazar; ilgilenilmesi gereken her şey en başta listelenir ([REPORTS.tr.md](REPORTS.tr.md)).
+
 ## 7. Düzen
 
 | Ne sıklıkla | Komut | Neden |

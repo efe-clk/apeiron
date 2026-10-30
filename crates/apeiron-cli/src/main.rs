@@ -169,6 +169,28 @@ enum Command {
         #[command(subcommand)]
         command: RefCommand,
     },
+    /// Make a compliance report of the repository and, with --web, of the web
+    /// server (docs/REPORTS.md)
+    Report {
+        /// Also read and check every stored byte, as `verify` does
+        #[arg(long)]
+        verify: bool,
+        /// Also compare every ref with each remote
+        #[arg(long)]
+        remotes: bool,
+        /// Days without a new snapshot after which a ref is stale; 0 checks nothing
+        #[arg(long, default_value_t = 7)]
+        stale_days: u32,
+        /// Add the web server's users, identity provider and audit log
+        #[arg(long)]
+        web: bool,
+        /// The tenant whose web server files to report on
+        #[arg(long, requires = "web", value_name = "NAME")]
+        tenant: Option<String>,
+        /// Count audit events from this day on (YYYY-MM-DD); default 30 days ago
+        #[arg(long, requires = "web", value_parser = parse_date)]
+        since: Option<Time>,
+    },
     /// Keep refs as an archive that cannot be changed (docs/ARCHIVE.md)
     Retention {
         #[command(subcommand)]
@@ -829,6 +851,276 @@ struct UserView {
     oidc: Option<String>,
 }
 
+/// A compliance report with, on request, the web server's part
+/// (docs/REPORTS.md §3).
+#[derive(Serialize)]
+struct FullReport {
+    #[serde(flatten)]
+    report: apeiron::ComplianceReport,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    web: Option<WebFacts>,
+}
+
+#[derive(Serialize)]
+struct WebFacts {
+    users: Vec<UserView>,
+    /// The issuer of the identity provider, when one is set.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    identity_provider: Option<String>,
+    audit: AuditFacts,
+}
+
+#[derive(Serialize)]
+struct AuditFacts {
+    file: PathBuf,
+    /// Whether the chain of hashes is whole (docs/AUDIT.md §3).
+    whole: bool,
+    events: u64,
+    /// The hash of the last event, to keep elsewhere.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    last: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
+    /// The counts below are of events from this time on.
+    since: String,
+    sign_ins: u64,
+    failed_sign_ins: u64,
+    backups: u64,
+    restores: u64,
+    shares: u64,
+    failed_replications: u64,
+}
+
+/// The web server's users and audit log; a broken audit log is a problem of
+/// `report`.
+fn web_facts(
+    files: &WebFiles,
+    since: jiff::Timestamp,
+    report: &mut apeiron::ComplianceReport,
+) -> Result<WebFacts, Failure> {
+    let users = apeiron_server::Users::load(&files.users)?;
+    let (whole, events, last, error) = match files.audit.verify() {
+        Ok(v) => (true, v.events, Some(v.last), None),
+        Err(e) => {
+            report.findings.insert(
+                0,
+                apeiron::Finding {
+                    level: apeiron::Level::Problem,
+                    text: format!("the audit log is not whole: {}", e.message),
+                },
+            );
+            (false, 0, None, Some(e.message))
+        }
+    };
+    let recent: Vec<apeiron_server::Event> = files
+        .audit
+        .read(usize::MAX, None)?
+        .into_iter()
+        .filter(|e| e.time.parse::<jiff::Timestamp>().is_ok_and(|t| t >= since))
+        .collect();
+    let count = |event: &str, ok: Option<bool>| {
+        recent
+            .iter()
+            .filter(|e| e.event == event && ok.is_none_or(|ok| (e.outcome == "ok") == ok))
+            .count() as u64
+    };
+    Ok(WebFacts {
+        users: users
+            .users
+            .iter()
+            .map(|u| UserView {
+                name: u.name.clone(),
+                role: u.role,
+                backups: u.backups.clone(),
+                folders: u.folders.clone(),
+                oidc: u.oidc.clone(),
+            })
+            .collect(),
+        identity_provider: users.oidc.map(|o| o.issuer),
+        audit: AuditFacts {
+            file: files.audit.file().to_path_buf(),
+            whole,
+            events,
+            last,
+            error,
+            since: since.round(jiff::Unit::Second).unwrap_or(since).to_string(),
+            sign_ins: count("sign_in", Some(true)),
+            failed_sign_ins: count("sign_in", Some(false)),
+            backups: count("start:backup", Some(true)),
+            restores: count("start:restore", Some(true)),
+            shares: count("share_add", Some(true)),
+            failed_replications: count("replicate", Some(false)),
+        },
+    })
+}
+
+/// Prints a report as Markdown, ready to keep as a document.
+fn print_report(full: &FullReport) {
+    let r = &full.report;
+    let yes = |b: bool| if b { "yes" } else { "no" };
+    say!("# Compliance report");
+    say!("");
+    say!(
+        "Made {} for the repository `{}`.",
+        format::time(&r.time),
+        r.repository.path.display()
+    );
+    say!("");
+    say!("## Findings");
+    say!("");
+    for f in &r.findings {
+        let level = match f.level {
+            apeiron::Level::Problem => "Problem",
+            apeiron::Level::Warning => "Warning",
+        };
+        say!("- **{level}:** {}", f.text);
+    }
+    if r.findings.is_empty() {
+        say!("None.");
+    }
+    say!("");
+    say!("## Repository");
+    say!("");
+    say!("| Item | Value |");
+    say!("| --- | --- |");
+    say!("| Format version | {} |", r.repository.format_version);
+    say!("| Encrypted | {} |", yes(r.repository.encrypted));
+    if r.repository.encrypted {
+        say!("| Passwords | {} |", r.repository.passwords);
+        say!("| Recovery keys | {} |", r.repository.recovery_keys);
+    }
+    match &r.verify {
+        Some(v) => say!(
+            "| Verified | {} objects checked, {} damaged files, {} damaged objects |",
+            v.objects_checked,
+            v.damaged_files.len(),
+            v.damaged_objects.len()
+        ),
+        None => say!("| Verified | not in this report; add `--verify` |"),
+    }
+    say!("");
+    say!("## Backups");
+    say!("");
+    say!("| Ref | Snapshot | Newest | Snapshots | Kept for | Copies |");
+    say!("| --- | --- | --- | --- | --- | --- |");
+    for f in &r.refs {
+        let kept = f
+            .retention_days
+            .map_or_else(|| "—".to_owned(), |d| format::count(u64::from(d), "day"));
+        let copies: Vec<String> = f
+            .copies
+            .iter()
+            .map(|c| {
+                let state = serde_json::to_value(c.state)
+                    .ok()
+                    .and_then(|v| v.as_str().map(str::to_owned))
+                    .unwrap_or_default();
+                format!("{}: {state}", c.remote)
+            })
+            .collect();
+        say!(
+            "| {}{} | `{}` | {} | {} | {} | {} |",
+            f.name,
+            if f.stale { " (stale)" } else { "" },
+            f.snapshot,
+            format::time(&f.time),
+            f.snapshots,
+            kept,
+            if copies.is_empty() {
+                "—".to_owned()
+            } else {
+                copies.join(", ")
+            }
+        );
+    }
+    say!("");
+    say!("A snapshot id fixes every byte under it and all the history before it.");
+    say!("");
+    say!("## Retention rules");
+    say!("");
+    for rule in &r.retention {
+        say!(
+            "- `{}`: {}, added {}",
+            rule.refs,
+            format::count(u64::from(rule.days), "day"),
+            format::time(&apeiron::Time {
+                seconds: rule.added as i64,
+                nanos: 0
+            })
+        );
+    }
+    if r.retention.is_empty() {
+        say!("None.");
+    }
+    say!("");
+    say!("## Remotes");
+    say!("");
+    for remote in &r.remotes {
+        match &remote.error {
+            Some(e) => say!(
+                "- {}: `{}`, did not answer: {}",
+                remote.name,
+                remote.url,
+                e.message
+            ),
+            None => say!("- {}: `{}`", remote.name, remote.url),
+        }
+    }
+    if r.remotes.is_empty() {
+        say!("None.");
+    }
+    let Some(web) = &full.web else { return };
+    say!("");
+    say!("## Web server");
+    say!("");
+    if let Some(issuer) = &web.identity_provider {
+        say!("Identity provider: {issuer}");
+        say!("");
+    }
+    say!("| User | Role | Signs in with | Backups | Folders |");
+    say!("| --- | --- | --- | --- | --- |");
+    for u in &web.users {
+        say!(
+            "| {} | {} | {} | {} | {} |",
+            u.name,
+            u.role.name(),
+            if u.oidc.is_some() {
+                "identity provider"
+            } else {
+                "password"
+            },
+            if u.role == apeiron_server::Role::Admin {
+                "all".to_owned()
+            } else {
+                u.backups.join(", ")
+            },
+            u.folders
+                .iter()
+                .map(|f| f.display().to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+    let a = &web.audit;
+    say!("");
+    say!("Audit log `{}`:", a.file.display());
+    say!("");
+    say!("| Item | Value |");
+    say!("| --- | --- |");
+    say!("| Chain of hashes whole | {} |", yes(a.whole));
+    say!("| Events | {} |", a.events);
+    if let Some(last) = &a.last {
+        say!("| Hash of the last event | `{last}` |");
+    }
+    say!("| Counted from | {} |", a.since);
+    say!("| Sign-ins | {} |", a.sign_ins);
+    say!("| Failed sign-ins | {} |", a.failed_sign_ins);
+    say!("| Backups started | {} |", a.backups);
+    say!("| Restores started | {} |", a.restores);
+    say!("| Share links made | {} |", a.shares);
+    say!("| Failed replications | {} |", a.failed_replications);
+}
+
 /// Asks twice for a new sign-in password and hashes it.
 fn new_login_password() -> Result<String, Failure> {
     let password = prompt("New sign-in password: ")?;
@@ -1471,6 +1763,45 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                 }
             }
             Ok(0)
+        }
+        Command::Report {
+            verify,
+            remotes,
+            stale_days,
+            web,
+            tenant,
+            since,
+        } => {
+            let repo = open(cli.repo, password_file)?;
+            let request = apeiron::ReportRequest {
+                verify,
+                remotes,
+                stale_days,
+            };
+            let mut report = watch(out, repo.report(request)?)?;
+            let web = if web {
+                let since = since.map_or_else(
+                    || jiff::Timestamp::now() - jiff::SignedDuration::from_hours(30 * 24),
+                    |t| jiff::Timestamp::from_second(t.seconds).unwrap_or_default(),
+                );
+                Some(web_facts(
+                    &WebFiles::of(tenant.as_deref())?,
+                    since,
+                    &mut report,
+                )?)
+            } else {
+                None
+            };
+            let full = FullReport { report, web };
+            out.result(&full, print_report);
+            let damaged = full.report.verify.as_ref().is_some_and(|v| !v.is_ok());
+            Ok(if damaged {
+                EXIT_DAMAGED
+            } else if full.report.has_problems() {
+                EXIT_WARNINGS
+            } else {
+                0
+            })
         }
         Command::Retention { command } => {
             let repo = open(cli.repo, password_file)?;

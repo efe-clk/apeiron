@@ -277,6 +277,8 @@ To keep every backup on a second machine as well, add it as a remote (`apeiron r
 
 Records that must be kept for years go to refs under a retention rule: `apeiron retention add "archive/*" --days 3650`, then `apeiron backup <folder> --ref archive/<name>`. Those refs can then only grow and cannot be deleted for ten years, by anyone using Apeiron; the rule itself can never be removed, so choose the days with care. Pushing them to an S3 bucket with Object Lock protects them from people with access to the files too ([ARCHIVE.md](ARCHIVE.md)).
 
+For an audit, `apeiron report --verify --remotes --web > report.md` writes one document with what is backed up and when, whether the data is whole, whether every copy is current, how the backups are protected and kept, and who has access; anything that needs attention is listed first ([REPORTS.md](REPORTS.md)).
+
 ## 7. Routine
 
 | How often | Command | Why |

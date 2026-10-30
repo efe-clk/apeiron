@@ -9,6 +9,7 @@ use apeiron_services as services;
 use crate::MergeReport;
 use crate::error::{Error, ErrorKind, Result};
 use crate::job::Job;
+use crate::report::{ComplianceReport, ReportRequest};
 use crate::spec;
 use crate::types::{
     AddedKey, CloneReport, CloneRequest, ClonedRef, DeleteRefRequest, DiffRequest, ExportRequest,
@@ -174,7 +175,7 @@ impl Repository {
 
     /// Takes the repository lock shared (FORMAT.md §12) and returns the
     /// current view, reloaded if another program changed the index files.
-    fn view(&self) -> Result<View<'_>> {
+    pub(crate) fn view(&self) -> Result<View<'_>> {
         let lock = core::RepoLock::shared(self.path())?;
         self.write().refresh_index()?;
         Ok(View {
@@ -378,6 +379,16 @@ impl Repository {
                 format,
                 ctl,
             )?)
+        })
+    }
+
+    /// A compliance report: what the repository keeps, how fresh and whole
+    /// it is, how it is protected and whether its remotes are current
+    /// ([REPORTS.md](REPORTS.md)).
+    pub fn report(&self, request: ReportRequest) -> Result<Job<ComplianceReport>> {
+        let repo = self.clone();
+        Job::spawn("report", move |ctl| {
+            crate::report::make(&repo, &request, ctl)
         })
     }
 
@@ -794,7 +805,7 @@ fn absolute_url(url: &str) -> Result<String> {
 
 /// Connects to a remote. Only an encrypted repository is sent over the
 /// network (FORMAT.md §15.1).
-fn open_store(remote: &Remote, encrypted: bool) -> Result<Box<dyn core::Store>> {
+pub(crate) fn open_store(remote: &Remote, encrypted: bool) -> Result<Box<dyn core::Store>> {
     let network_needs_encryption = || {
         if encrypted {
             return Ok(());
@@ -852,7 +863,7 @@ fn copied(ctl: &services::Control, report: &TransferReport) -> core::Result<()> 
 }
 
 /// A view of the repository while the repository lock is held shared.
-struct View<'a> {
+pub(crate) struct View<'a> {
     core: RwLockReadGuard<'a, core::Repository>,
     _lock: core::RepoLock,
 }

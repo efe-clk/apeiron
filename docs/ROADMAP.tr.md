@@ -111,4 +111,6 @@ Merkezi kimlik önce gelir, çünkü pilot bir kurum her şeyden önce çalışa
 | 2 | Çok kiracılı kullanım ([TENANTS.tr.md](TENANTS.tr.md)) | Tamamlandı |
 | 3 | Replikasyon ve yüksek erişilebilirlik ([REPLICATION.tr.md](REPLICATION.tr.md)) | Tamamlandı |
 | 4 | Değiştirilemez arşiv ([ARCHIVE.tr.md](ARCHIVE.tr.md)) | Tamamlandı |
-| 5 | Uyumluluk raporları | Planlandı |
+| 5 | Uyumluluk raporları ([REPORTS.tr.md](REPORTS.tr.md)) | Tamamlandı |
+
+Her iş tamamlandı (2026-10-30); aşama, çıkış kriteri olan ilk kurumsal pilot kurulumla biter.

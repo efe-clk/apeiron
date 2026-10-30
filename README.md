@@ -129,6 +129,7 @@ Rules for code, commits and format changes: [CONTRIBUTING.md](CONTRIBUTING.md).
 | [Multi-tenant use](docs/TENANTS.md) | Several organizations on one web server, each at its own address with its own repository, users and records |
 | [Replication](docs/REPLICATION.md) | Keeping every backup on a second place and a standby server ready to take over |
 | [Immutable archive](docs/ARCHIVE.md) | Backups nobody can change or delete before the time they must be kept |
+| [Compliance reports](docs/REPORTS.md) | One document for auditors: what is backed up, whether it is whole, copied, protected and kept, and who had access |
 | [Sharing](docs/SHARE.md) | Links that let someone without an account download a version, folder or file of a backup until they end |
 | [User guide](docs/GUIDE.md) | Installation, daily backup, restore and the one-month test |
 | [Glossary](docs/GLOSSARY.md) | Terms with English–Turkish equivalents |

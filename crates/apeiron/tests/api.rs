@@ -544,3 +544,92 @@ fn search_a_snapshot_and_the_history_of_every_ref() {
         .unwrap_err();
     assert_eq!(err.kind, ErrorKind::InvalidInput);
 }
+
+#[test]
+fn a_compliance_report_shows_what_is_kept_and_what_needs_attention() {
+    use apeiron::{CopyKind, Level, RemoteRequest, ReportRequest};
+    let s = setup();
+    let first = backup(&s, "one");
+    s.repo
+        .create_ref(&apeiron::CreateRefRequest {
+            name: "archive/a".to_owned(),
+            snapshot: "main".to_owned(),
+        })
+        .unwrap();
+    s.repo.add_retention("archive/*", 365).unwrap();
+
+    // One copy, not encrypted: two warnings, no problem.
+    let report = s
+        .repo
+        .report(ReportRequest::default())
+        .unwrap()
+        .wait()
+        .unwrap();
+    let texts: Vec<&str> = report.findings.iter().map(|f| f.text.as_str()).collect();
+    assert_eq!(texts.len(), 2, "{texts:?}");
+    assert!(report.findings.iter().all(|f| f.level == Level::Warning));
+    assert!(!report.has_problems());
+    assert_eq!(report.refs.len(), 2);
+    let archive = &report.refs[0];
+    assert_eq!(
+        (archive.name.as_str(), archive.snapshot, archive.snapshots),
+        ("archive/a", first.snapshot, 1)
+    );
+    assert_eq!(archive.retention_days, Some(365));
+    assert_eq!(report.refs[1].retention_days, None);
+    assert!(!archive.stale && report.verify.is_none());
+
+    // A remote that has `main` only, one snapshot behind.
+    let disk = s.root.join("disk");
+    s.repo.add_remote("disk", disk.to_str().unwrap()).unwrap();
+    s.repo
+        .push(TransferRequest::new("disk", "main"))
+        .unwrap()
+        .wait()
+        .unwrap();
+    fs::write(s.root.join("src/a.txt"), b"changed").unwrap();
+    backup(&s, "two");
+    let request = ReportRequest {
+        verify: true,
+        remotes: true,
+        stale_days: 7,
+    };
+    let report = s.repo.report(request.clone()).unwrap().wait().unwrap();
+    let states: Vec<CopyKind> = report.refs.iter().map(|r| r.copies[0].state).collect();
+    assert_eq!(states, [CopyKind::Missing, CopyKind::Behind]);
+    assert!(report.verify.as_ref().unwrap().is_ok());
+    assert!(report.has_problems());
+    assert_eq!(report.findings[0].level, Level::Problem);
+    assert_eq!(report.refs[1].snapshots, 2);
+
+    // Once every ref is pushed, the copies are current.
+    s.repo
+        .push_all(RemoteRequest {
+            remote: "disk".to_owned(),
+        })
+        .unwrap()
+        .wait()
+        .unwrap();
+    let report = s.repo.report(request).unwrap().wait().unwrap();
+    assert!(
+        report
+            .refs
+            .iter()
+            .all(|r| r.copies[0].state == CopyKind::Current)
+    );
+    assert!(!report.has_problems(), "{:?}", report.findings);
+
+    // A remote that does not answer is a problem of its own.
+    s.repo.add_remote("lost", "sftp://nas.invalid/srv").unwrap();
+    let report = s
+        .repo
+        .report(ReportRequest {
+            remotes: true,
+            ..ReportRequest::default()
+        })
+        .unwrap()
+        .wait()
+        .unwrap();
+    assert!(report.remotes[1].error.is_some());
+    assert!(report.has_problems());
+}

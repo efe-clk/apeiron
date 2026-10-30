@@ -42,6 +42,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [032](#adr-032-tenants-are-told-apart-by-host-each-with-its-own-repository-and-files) | Multi-tenant use | One process, one port; the `Host` header picks a tenant with its own repository, users, audit log, share links and sessions; unknown hosts get nothing | Accepted |
 | [033](#adr-033-replication-is-pushing-every-ref-to-a-remote-copy-taking-over-is-the-admins-decision) | Replication and high availability | Every ref pushed to replicas after each backup and every 30 s on change; a standby serves a replica without backups; `/api/health`; failover by the admin | Accepted |
 | [034](#adr-034-the-archive-is-append-only-refs-under-retention-rules-backed-by-storage-that-locks-itself) | Immutable archive | Rule files `retention/<hash>.toml`, add-only; kept refs only move forward and are deleted only after their days; rules copied with push and pull; SHA-256 checksums for S3 Object Lock | Accepted |
+| [035](#adr-035-compliance-reports-are-made-on-demand-from-the-repository-and-the-web-servers-files) | Compliance reports | Read-only, on demand; facts and findings from refs, retention, keys, verify, remotes and, with `--web`, users and the audit log; Markdown or JSON; snapshot ids and the audit hash as proof | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28.
 
@@ -747,3 +748,24 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Setting Object Lock on each S3 write ourselves | Needs headers the S3 library does not offer; a bucket's default retention locks every write the same way |
 
 **Consequences.** A rule added by mistake cannot be taken back; the CLI says so. A damaged rule file stops every ref change until it is restored from a copy, which is the safe way to fail. Programs that predate this format section ignore `retention/`. Moving files out of the repository's folder by hand still bypasses the rules; only locked storage prevents that.
+
+## ADR-035: Compliance reports are made on demand from the repository and the web server's files
+
+**Status:** Accepted (2026-10-30)
+
+**Context.** Stage 5 work item 5 gives an auditor one document about the backups ([REPORTS.md](REPORTS.md)). Every fact it needs already exists in the repository, its remotes and the web server's files; the question is how to collect them so that the result can be trusted and repeated.
+
+**Decision.** `apeiron report` and the API's `report` read the repository as it is and collect the facts: refs with their newest snapshots, history lengths and retention, encryption and keys, and on request a full verify and a comparison with every remote. The CLI adds, on request, the web server's users, identity provider and audit log. Rules turn the facts into findings, problems and warnings. The result is printed as Markdown, or as JSON with `--json`; it is not stored anywhere by Apeiron.
+
+**Rationale.** Facts read at the time of the report cannot be out of date the way a stored record can, and the same command gives the same answer for the same state. The proof does not depend on trusting the report: snapshot ids and the hash of the last audit event can be checked against the data at any later time. Keeping the web server's part in the CLI keeps the API free of the server's files, as the layers require (ARCHITECTURE.md). Markdown is readable as it is and turns into a PDF with common tools; JSON serves programs.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| Recording every backup's outcome in a separate history for reports | A second record that can disagree with the repository; the refs and their snapshots already are that history |
+| A report per standard (ISO 27001, SOC 2) | Each pilot names its own; the facts are the same, and a mapping can be written once a pilot needs it |
+| Producing PDF directly | Brings a typesetting library for a step any converter does |
+| Reports in the web interface first | The people who answer auditors run the server; the CLI reaches every fact without new pages |
+
+**Consequences.** A report with `--verify` reads every stored byte and takes as long as `apeiron verify`; with `--remotes` it needs the remotes to answer. Reports are made on demand or by the system's scheduler, not kept by Apeiron; keeping them is the organization's part of the process.

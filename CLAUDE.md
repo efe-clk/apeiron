@@ -79,4 +79,6 @@ Apeiron; sürüm kontrolü, arşivleme, yedekleme, senkronizasyon ve bütünlük
 2. ~~Çok kiracılı kullanım (`docs/TENANTS.md`).~~ Tamamlandı (2026-10-30).
 3. ~~Replikasyon ve yüksek erişilebilirlik (`docs/REPLICATION.md`).~~ Tamamlandı (2026-10-30).
 4. ~~Değiştirilemez arşiv (`docs/ARCHIVE.md`).~~ Tamamlandı (2026-10-30).
-5. Uyumluluk raporları.
+5. ~~Uyumluluk raporları (`docs/REPORTS.md`).~~ Tamamlandı (2026-10-30).
+
+Aşama 5'in bütün işleri tamamlandı; aşama, çıkış kriteri olan ilk kurumsal pilot kurulumla biter.
