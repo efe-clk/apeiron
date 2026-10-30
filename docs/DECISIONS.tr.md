@@ -40,6 +40,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [030](#adr-030-paylaşım-yalnızca-özetleri-tutulan-sabit-bir-sürüme-süreli-bağlantılarladır) | Paylaşım | Bağlantıda rastgele bir gizli kısım, yalnızca SHA-256 özeti tutulur; sabit bir sürüm ve yol; 1 ile 30 gün; sahibi artık paylaşamadığında biter | Kabul edildi |
 | [031](#adr-031-merkezi-kimlik-kullanıcıları-hâlâ-webjson-içinde-listelenen-openid-connecttir) | Merkezi kimlik | PKCE'li OpenID Connect kod akışı; sağlayıcının anahtarlarıyla denetlenen RS256/ES256 belirteçleri; bir alan `web.json` içinde listelenen bir kullanıcıyı adlandırır; parolalar mümkün kalır | Kabul edildi |
 | [032](#adr-032-kiracılar-ana-makineyle-ayrılır-her-birinin-kendi-deposu-ve-dosyaları-vardır) | Çok kiracılı kullanım | Tek süreç, tek port; `Host` başlığı, kendi deposu, kullanıcıları, denetim kaydı, paylaşım bağlantıları ve oturumları olan bir kiracı seçer; bilinmeyen ana makineler hiçbir şey almaz | Kabul edildi |
+| [033](#adr-033-replikasyon-her-refi-uzak-bir-kopyaya-push-etmektir-görevi-devralmak-adminin-kararıdır) | Replikasyon ve yüksek erişilebilirlik | Her ref her yedekten sonra ve değişince her 30 saniyede replikalara push edilir; yedek sunucu bir replikayı yedek almadan sunar; `/api/health`; görev devri admin tarafından | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
@@ -702,3 +703,24 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Ref'leri kiracı başına önekli, paylaşılan tek bir depo | Kiracılar arası tekilleştirme, başka bir kiracının aynı dosyayı tutup tutmadığını gösterirdi ve tek bir anahtar hepsini açardı |
 
 **Sonuçlar.** Her kiracının sunucuya ulaşan bir ana makine adına ve onun için geçerli bir sertifikaya ihtiyacı vardır; bir joker (wildcard) sertifika hepsini kapsar. Kendinden imzalı sertifika, yeni bir ana makineli bir kiracı eklenince yeniden oluşturulur; bu yüzden parmak izi değişir. Kiracılar depolamayı paylaşamaz; bu yüzden iki kiracının tuttuğu aynı dosya iki kez saklanır. Sunucunun tamamı tek bir süreçtir: bir yeniden başlatma her kiracıyı bir an durdurur ve kiracı başına sınırlar henüz mümkün değildir.
+
+## ADR-033: Replikasyon her ref'i uzak bir kopyaya push etmektir; görevi devralmak admin'in kararıdır
+
+**Durum:** Kabul edildi (2026-10-30)
+
+**Bağlam.** Aşama 5'in 3. işi her yedeği alındıktan kısa süre sonra ikinci bir yerde tutar ve ilk sunucu çöktüğünde ikinci bir sunucunun görevi devralmasını sağlar ([REPLICATION.tr.md](REPLICATION.tr.md)). Uzak kopyalar, push ve pull zaten vardır (FORMAT.tr.md §15) ve bir uzak kopya eksiksiz bir depodur; ama onlar bir seferde bir ref taşır ve hiçbir şey bir kopyayı güncel tutmuyor ya da sunmuyordu.
+
+**Karar.** Replika sıradan bir uzak kopyadır ve her ref'i ona push ederek güncel tutulur: `push --all` ile, zamanlanmış bir işle ya da web sunucusunun her yedekten hemen sonra ve ref'ler değiştiğinde her 30 saniyede bir yaptığı push'la. Replikanın ilerlediği bir ref bildirilir, diğerleri yine gider. Yedek sunucu, bir replika üzerinde `--standby` ile başlatılan web sunucusudur: yedek almak dışında her şey çalışır ve yeni yedekleri push edildikçe gösterir. `GET /api/health` bir izleyiciye deponun okunup okunamadığını ve sunucunun rolünü söyler. Görevi devralmayı admin, yedek sunucuyu `--standby` olmadan yeniden başlatarak yapar.
+
+**Gerekçe.** Uzak kopyaları kullanmak tek bir format, tek bir bütünlük kuralları kümesi ve test edilmiş tek bir kod yolu demektir: push ve pull'un hata enjeksiyonu testleri replika için de geçerlidir, bir replikadan başka hiçbir şey olmadan geri yükleme yapılabilir ve şifreli bir depo onda da şifreli kalır. Her yedekten sonra push etmek replikayı ikinci bir süreç olmadan bir push geride tutar; dönemsel tur geri kalan her şeyi kapsar. Yedek sunucuda yedek almayı reddetmek ve görev devri kararını bir kişiye bırakmak, iki sunucunun asla aynı anda aynı geçmişe yazmaması demektir; ref'lerdeki karşılaştır-ve-değiştir (compare-and-swap) de eski bir birincilin geri dönüşünü kaybolan yedeklere değil, bildirilen bir çatışmaya çevirir.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Deponun dosyalarını rsync ya da replikalı bir dosya sistemiyle kopyalamak | Dosyaları herhangi bir sırayla kopyalar; böylece kopyalamanın ortasında yakalanan bir replikada bir ref, nesnelerinden önce bulunabilir; bozulmayı da kopyalar |
+| Birkaç sunucu arasında bir uzlaşma protokolü (Raft) | Bir pilotun ihtiyaç duymadığı bir şey için çok daha fazla kod ve en az üç sunucu; her yazma bir çoğunluğu beklerdi |
+| Başarısız bir sağlık denetiminde otomatik görev devri | Bir ağ bölünmesi, ikisi de yedek alan iki birincil oluştururdu; bir admin'in bir dakikasının bedeli daha küçüktür |
+| Ref'leri replikada da silmek | Birincildeki bir hata ya da saldırı replikayı da boşaltırdı |
+
+**Sonuçlar.** Replika bir yedekten sonra bir push kadar ya da bir işin aralığı kadar geridedir. Kullanıcılar, kimlik sağlayıcısı ve kiracılar admin tarafından yedek sunucuya kopyalanır; denetim kaydı ve paylaşım bağlantıları her sunucuda kalır. Görev devri bir kişi gerektirir. Birincilde silinen ref'ler, orada kaldırılana kadar replikada kalır.

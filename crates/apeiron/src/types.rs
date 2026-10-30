@@ -6,6 +6,8 @@ use apeiron_core::{ObjectId, Snapshot, Time, TransferReport};
 use apeiron_services::{ArchiveFormat, ChangeKind, Name, Query, SyncMode};
 use serde::{Deserialize, Serialize};
 
+use crate::Error;
+
 /// Facts about an open repository.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RepoInfo {
@@ -224,6 +226,39 @@ impl TransferRequest {
             ref_name: ref_name.into(),
         }
     }
+}
+
+/// Which remote to push every ref to or pull every ref from
+/// ([REPLICATION.md](REPLICATION.md) §2).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RemoteRequest {
+    /// The name of a remote.
+    pub remote: String,
+}
+
+/// What pushing or pulling every ref did, ref by ref.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MirrorReport {
+    pub refs: Vec<MirroredRef>,
+}
+
+impl MirrorReport {
+    /// The refs left where they were because the other side has moved past
+    /// them.
+    pub fn conflicts(&self) -> impl Iterator<Item = &MirroredRef> {
+        self.refs.iter().filter(|r| r.conflict.is_some())
+    }
+}
+
+/// One ref of a [`MirrorReport`]: what was copied, or the conflict that
+/// kept it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MirroredRef {
+    pub name: String,
+    #[serde(flatten, default, skip_serializing_if = "Option::is_none")]
+    pub report: Option<TransferReport>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conflict: Option<Error>,
 }
 
 /// Where to clone a remote copy from and to.

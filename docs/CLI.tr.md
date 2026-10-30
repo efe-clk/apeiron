@@ -91,6 +91,8 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | `apeiron git export <git-repo> [--prefix <name>]` | Onları aynı commit kimlikleriyle bir Git deposuna geri yazar; biri yeniden üretilemezse çıkış kodu 3'tür | Tamamlandı |
 | `apeiron push <remote> [<ref>]` | Bir ref'in (varsayılan `main`) snapshot'larını uzak depoya kopyalar ve ref'i orada taşır | Tamamlandı |
 | `apeiron pull <remote> [<ref>]` | Bir ref'in snapshot'larını uzak depodan kopyalar ve yerel ref'i ileri taşır | Tamamlandı |
+| `apeiron push --all <remote>`, `apeiron pull --all <remote>` | Bir replikayı ya da yedek sunucuyu güncel tutmak için her ref'i push ya da pull eder; çatışmalı bir ref bırakılır ve adlandırılır, diğerleri kopyalanır; o zaman çıkış kodu 3'tür ([REPLICATION.tr.md](REPLICATION.tr.md)) | Tamamlandı |
+| `apeiron web … [--replicate <remote>]... [--standby]` | Her yedekten sonra her ref'i her replikaya push eder ya da yedek almayan bir yedek sunucu kopyası sunar ([REPLICATION.tr.md](REPLICATION.tr.md)) | Tamamlandı |
 | `apeiron key remove <id>` | Bir parolayı ya da kurtarma anahtarını siler; sonuncusu silinemez | Tamamlandı |
 
 Bir `<snapshot>`; ref adı (`main`), tam snapshot kimliği ya da tek bir snapshot'a uyuyorsa kimliğin ilk 8 ya da daha fazla karakteri olarak yazılabilir. `~N` eki ilk ebeveynler üzerinden N adım geri gider: `main~1`, `main`'den önceki snapshot'tır.

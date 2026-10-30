@@ -9,6 +9,7 @@
 
 mod audit;
 mod oidc;
+mod replicate;
 mod shares;
 mod tenants;
 mod users;
@@ -227,7 +228,11 @@ async fn guard(State(app): State<Arc<App>>, mut request: Request, next: Next) ->
             // A share link is used without signing in (SHARE.md §4).
             let open = matches!(
                 request.uri().path(),
-                "/api/session" | "/api/login" | "/api/oidc/start" | "/api/oidc/callback"
+                "/api/session"
+                    | "/api/login"
+                    | "/api/oidc/start"
+                    | "/api/oidc/callback"
+                    | "/api/health"
             ) || request.uri().path().starts_with("/api/shared/");
             match web.current(headers) {
                 Some(user) => {
@@ -494,6 +499,11 @@ async fn job(
                 if let Err(e) = recorded {
                     return Err(e.into());
                 }
+            }
+            if let (Mode::Web(web), "backup", Ok(_)) =
+                (&app.mode, entry.operation.as_str(), &result)
+            {
+                web.replicate_now();
             }
             jobs.remove(&id);
             match result {
@@ -941,9 +951,29 @@ async fn oidc_callback(
     }
 }
 
+/// For a load balancer or a monitor: whether the repository can be read
+/// and whether this is a standby, without signing in (REPLICATION.md §5).
+async fn health(State(app): State<Arc<App>>) -> Response {
+    let standby = match &app.mode {
+        Mode::Web(web) => web.standby(),
+        Mode::Local { .. } => false,
+    };
+    let role = if standby { "standby" } else { "primary" };
+    let app = app.clone();
+    match blocking(move || app.repo()?.refs()).await {
+        Ok(_) => axum::Json(json!({"ok": true, "role": role})).into_response(),
+        Err(_) => (
+            StatusCode::SERVICE_UNAVAILABLE,
+            axum::Json(json!({"ok": false, "role": role})),
+        )
+            .into_response(),
+    }
+}
+
 fn router(app: Arc<App>) -> Router {
     Router::new()
         .route("/api/session", get(session))
+        .route("/api/health", get(health))
         .route("/api/login", post(login))
         .route("/api/logout", post(logout))
         .route("/api/oidc/start", get(oidc_start))

@@ -36,6 +36,8 @@ apeiron web --repo /srv/backup --listen 0.0.0.0:8443 --folder /home/efe
 | `--cert`, `--key` | Certificate chain and private key, PEM files | A self-signed certificate |
 | `--plain` | Plain HTTP, only behind a proxy that adds TLS | Off |
 | `--folder` | A folder of the server that users may be given (USERS.md §1); can be given more than once | The home folder |
+| `--replicate` | A remote every ref is pushed to after each backup ([REPLICATION.md](REPLICATION.md) §4); can be given more than once | None |
+| `--standby` | Serve a standby copy: everything but backups ([REPLICATION.md](REPLICATION.md) §5) | Off |
 
 Without `--cert` and `--key`, a self-signed certificate for `localhost` and the listen address is made once and kept in the configuration folder (`web-cert.pem`, `web-key.pem`, and `web-cert.names` with the names it was made for); it is made again only when a new name is needed, such as a new tenant's host ([TENANTS.md](TENANTS.md) §3). Its SHA-256 fingerprint is printed at start; the browser warns about it once, and the fingerprint it shows must be the printed one.
 
@@ -61,6 +63,7 @@ The requests of DESKTOP.md §3 stay, with these differences:
 | `GET /api/session` | Allowed without signing in: `{"mode": "local" or "web", "signed_in"}` |
 | `POST /api/login` `{"name", "password"}` | Signs in; sets the cookie `apeiron_session` |
 | `POST /api/logout` | Signs out and forgets the session |
+| `GET /api/health` | Allowed without signing in: `{"ok", "role": "primary" or "standby"}`, `503` when the repository cannot be read ([REPLICATION.md](REPLICATION.md) §5) |
 | `POST /api/open`, `POST /api/init` | Refused with `unsupported` |
 | `POST /api/call/<operation>` | Only `info`, `resolve`, `log`, `list`, `diff`, `diff_text`, `refs`, `reflog`; others are refused with `unsupported` |
 | `POST /api/start/<operation>` | Only `backup`, `restore`, `verify`, `search`; `source` of a backup and `target` of a restore must be inside a `--folder` |

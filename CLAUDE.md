@@ -77,6 +77,6 @@ Apeiron; sürüm kontrolü, arşivleme, yedekleme, senkronizasyon ve bütünlük
 
 1. ~~Merkezi kimlik (`docs/IDENTITY.md`).~~ Tamamlandı (2026-10-30).
 2. ~~Çok kiracılı kullanım (`docs/TENANTS.md`).~~ Tamamlandı (2026-10-30).
-3. Replikasyon ve yüksek erişilebilirlik.
+3. ~~Replikasyon ve yüksek erişilebilirlik (`docs/REPLICATION.md`).~~ Tamamlandı (2026-10-30).
 4. Değiştirilemez arşiv.
 5. Uyumluluk raporları.

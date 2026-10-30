@@ -23,7 +23,7 @@ mod gc;
 mod transfer;
 
 pub use gc::{GcOptions, GcReport};
-pub use transfer::{OnCopy, TransferReport};
+pub use transfer::{OnCopy, RefOutcome, TransferReport};
 
 const CONFIG: &str = "config";
 const PACKS: &str = "packs";

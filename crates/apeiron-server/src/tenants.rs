@@ -26,6 +26,10 @@ pub struct Tenant {
     /// Where the password of an encrypted repository is read from.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub password_file: Option<PathBuf>,
+    /// Remotes of its repository every ref is pushed to (REPLICATION.md
+    /// §4).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub replicas: Vec<String>,
 }
 
 impl Tenant {
@@ -177,6 +181,7 @@ mod tests {
             repo: std::env::temp_dir().join(name),
             folders: Vec::new(),
             password_file: None,
+            replicas: Vec::new(),
         }
     }
 

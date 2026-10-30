@@ -255,6 +255,13 @@ enum Command {
         /// (docs/TENANTS.md)
         #[arg(long, conflicts_with = "folders")]
         tenants: bool,
+        /// A remote every ref is pushed to after each change, to keep a
+        /// replica (docs/REPLICATION.md)
+        #[arg(long = "replicate", value_name = "REMOTE", conflicts_with = "tenants")]
+        replicas: Vec<String>,
+        /// Serve a standby copy: everything but backups (docs/REPLICATION.md)
+        #[arg(long)]
+        standby: bool,
         /// The tenant whose users, audit log, share links or identity
         /// provider to manage
         #[arg(long, global = true, value_name = "NAME")]
@@ -296,12 +303,18 @@ enum Command {
         remote: String,
         #[arg(default_value = "main")]
         ref_name: String,
+        /// Push every ref, to keep a replica (docs/REPLICATION.md)
+        #[arg(long, conflicts_with = "ref_name")]
+        all: bool,
     },
     /// Copy the snapshots of a ref from a remote and move the local ref forward
     Pull {
         remote: String,
         #[arg(default_value = "main")]
         ref_name: String,
+        /// Pull every ref of the remote, to keep a standby (docs/REPLICATION.md)
+        #[arg(long, conflicts_with = "ref_name")]
+        all: bool,
     },
 }
 
@@ -373,6 +386,10 @@ enum TenantCommand {
         /// Read the password of an encrypted repository from this file
         #[arg(long, value_name = "PATH")]
         password_file: Option<PathBuf>,
+        /// A remote of its repository every ref is pushed to after each
+        /// change (docs/REPLICATION.md)
+        #[arg(long = "replicate", value_name = "REMOTE")]
+        replicas: Vec<String>,
     },
     /// List the tenants
     List,
@@ -438,6 +455,7 @@ fn web_tenant(command: TenantCommand, out: &Output) -> Result<(), Failure> {
             repo,
             folders,
             password_file,
+            replicas,
         } => {
             let full = |p: PathBuf| std::path::absolute(&p).unwrap_or(p);
             let tenant = apeiron_server::Tenant {
@@ -446,6 +464,7 @@ fn web_tenant(command: TenantCommand, out: &Output) -> Result<(), Failure> {
                 repo: full(repo),
                 folders: folders.into_iter().map(full).collect(),
                 password_file: password_file.map(full),
+                replicas,
             };
             tenants.add(tenant.clone())?;
             tenants.save(&file)?;
@@ -1597,6 +1616,8 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             plain,
             folders,
             tenants,
+            replicas,
+            standby,
             tenant,
             command,
         } => {
@@ -1680,6 +1701,8 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                         folders: t.folders,
                         audit: files.audit,
                         shares: files.shares,
+                        replicas: t.replicas,
+                        standby,
                     });
                 }
                 apeiron_server::Web::start_tenants(listen, tls, options)?
@@ -1703,6 +1726,8 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     folders,
                     audit: files.audit,
                     shares: files.shares,
+                    replicas,
+                    standby,
                 })?
             };
             let scheme = if plain { "http" } else { "https" };
@@ -1715,6 +1740,9 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             }
             if plain {
                 say!("Plain HTTP: use this only behind a proxy that adds TLS.");
+            }
+            if standby {
+                say!("Standby: backups are refused until the server is started without --standby.");
             }
             server.wait();
             Ok(0)
@@ -1876,14 +1904,38 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                 code => code,
             })
         }
-        Command::Push { remote, ref_name } => {
+        Command::Push {
+            remote, all: true, ..
+        } => {
+            let repo = open(cli.repo, password_file)?;
+            let request = apeiron::RemoteRequest {
+                remote: remote.clone(),
+            };
+            let report = watch(out, repo.push_all(request)?)?;
+            Ok(mirror_result(out, &report, &remote))
+        }
+        Command::Pull {
+            remote, all: true, ..
+        } => {
+            let repo = open(cli.repo, password_file)?;
+            let request = apeiron::RemoteRequest {
+                remote: remote.clone(),
+            };
+            let report = watch(out, repo.pull_all(request)?)?;
+            Ok(mirror_result(out, &report, &remote))
+        }
+        Command::Push {
+            remote, ref_name, ..
+        } => {
             let repo = open(cli.repo, password_file)?;
             let request = TransferRequest::new(remote.clone(), ref_name.clone());
             let report = watch(out, repo.push(request)?)?;
             out.result(&report, |r| say!("{}", transferred(r, &ref_name, &remote)));
             Ok(0)
         }
-        Command::Pull { remote, ref_name } => {
+        Command::Pull {
+            remote, ref_name, ..
+        } => {
             let repo = open(cli.repo, password_file)?;
             let request = TransferRequest::new(remote.clone(), ref_name.clone());
             let report = watch(out, repo.pull(request)?)?;
@@ -2139,6 +2191,28 @@ fn print_sync(r: &SyncReport, remote: &str, dry_run: bool) {
             format::count(r.changes.len() as u64, "change"),
             format::count(r.conflicts.len() as u64, "conflict")
         ),
+    }
+}
+
+/// Prints what pushing or pulling every ref did; exit code 3 when a ref
+/// was left because of a conflict.
+fn mirror_result(out: &Output, report: &apeiron::MirrorReport, remote: &str) -> u8 {
+    out.result(report, |r| {
+        for m in &r.refs {
+            match (&m.report, &m.conflict) {
+                (Some(t), _) => say!("{}", transferred(t, &m.name, remote)),
+                (None, Some(e)) => say!("{}: not copied: {}", m.name, e.message),
+                (None, None) => {}
+            }
+        }
+        if r.refs.is_empty() {
+            say!("No refs to copy");
+        }
+    });
+    if report.conflicts().next().is_some() {
+        EXIT_WARNINGS
+    } else {
+        0
     }
 }
 

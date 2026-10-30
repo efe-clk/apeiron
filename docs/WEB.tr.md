@@ -36,6 +36,8 @@ apeiron web --repo /srv/backup --listen 0.0.0.0:8443 --folder /home/efe
 | `--cert`, `--key` | Sertifika zinciri ve özel anahtar, PEM dosyaları | Kendinden imzalı bir sertifika |
 | `--plain` | Düz HTTP, yalnızca TLS ekleyen bir vekilin arkasında | Kapalı |
 | `--folder` | Sunucunun kullanıcılara verilebilen bir klasörü (USERS.tr.md §1); birden çok kez verilebilir | Ev klasörü |
+| `--replicate` | Her yedekten sonra her ref'in push edildiği bir uzak depo ([REPLICATION.tr.md](REPLICATION.tr.md) §4); birden çok kez verilebilir | Yok |
+| `--standby` | Bir yedek sunucu kopyası sunar: yedek almak dışında her şey ([REPLICATION.tr.md](REPLICATION.tr.md) §5) | Kapalı |
 
 `--cert` ve `--key` verilmezse, `localhost` ve dinlenen adres için kendinden imzalı bir sertifika bir kez oluşturulur ve yapılandırma klasöründe tutulur (`web-cert.pem`, `web-key.pem` ve oluşturulduğu adlarla `web-cert.names`); yalnızca yeni bir kiracının ana makinesi gibi yeni bir ad gerektiğinde yeniden oluşturulur ([TENANTS.tr.md](TENANTS.tr.md) §3). SHA-256 parmak izi başlarken yazılır; tarayıcı bir kez uyarır ve gösterdiği parmak izi yazılanla aynı olmalıdır.
 
@@ -61,6 +63,7 @@ DESKTOP.tr.md §3'teki istekler şu farklarla kalır:
 | `GET /api/session` | Oturum açmadan izinli: `{"mode": "local" ya da "web", "signed_in"}` |
 | `POST /api/login` `{"name", "password"}` | Oturum açar; `apeiron_session` çerezini koyar |
 | `POST /api/logout` | Oturumu kapatır ve unutur |
+| `GET /api/health` | Oturum açmadan izinli: `{"ok", "role": "primary" ya da "standby"}`; depo okunamıyorsa `503` ([REPLICATION.tr.md](REPLICATION.tr.md) §5) |
 | `POST /api/open`, `POST /api/init` | `unsupported` ile reddedilir |
 | `POST /api/call/<operation>` | Yalnızca `info`, `resolve`, `log`, `list`, `diff`, `diff_text`, `refs`, `reflog`; diğerleri `unsupported` ile reddedilir |
 | `POST /api/start/<operation>` | Yalnızca `backup`, `restore`, `verify`, `search`; bir yedeğin `source` alanı ve bir geri yüklemenin `target` alanı bir `--folder` içinde olmalıdır |

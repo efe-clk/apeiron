@@ -176,6 +176,8 @@ fn start(dir: &Path) -> (Web, Client, PathBuf) {
         audit: Audit::new(dir.join("audit.log")),
         shares: Shares::new(dir.join("shares.json")),
         folders: vec![home.clone()],
+        replicas: Vec::new(),
+        standby: false,
     })
     .unwrap();
     let client = Client {
@@ -384,6 +386,8 @@ fn tls_with_a_kept_certificate() {
         audit: Audit::new(dir.path().join("audit.log")),
         shares: Shares::new(dir.path().join("shares.json")),
         folders: vec![dir.path().to_path_buf()],
+        replicas: Vec::new(),
+        standby: false,
     })
     .unwrap();
 

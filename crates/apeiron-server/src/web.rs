@@ -25,6 +25,7 @@ use sha2::{Digest, Sha256};
 
 use crate::audit::{Actor, Audit};
 use crate::oidc::{Oidc, OidcConfig};
+use crate::replicate::Replicator;
 use crate::shares::{Share, Shares, gone};
 use crate::users::{Role, User, Users, hash_password};
 use crate::{App, Failure, Mode, Running, blocking, body, invalid, lock};
@@ -164,6 +165,10 @@ pub struct WebOptions {
     pub audit: Audit,
     /// The share links (SHARE.md).
     pub shares: Shares,
+    /// Remotes every ref is pushed to after changes (REPLICATION.md §4).
+    pub replicas: Vec<String>,
+    /// Serves a standby copy: everything but backups (REPLICATION.md §5).
+    pub standby: bool,
 }
 
 /// One tenant of a web server (TENANTS.md).
@@ -176,6 +181,8 @@ pub struct TenantOptions {
     pub folders: Vec<PathBuf>,
     pub audit: Audit,
     pub shares: Shares,
+    pub replicas: Vec<String>,
+    pub standby: bool,
 }
 
 struct Session {
@@ -243,6 +250,9 @@ pub(crate) struct WebState {
     /// password.
     decoy: String,
     oidc: Oidc,
+    /// Pushes to the replicas, if there are any.
+    replicator: Option<Replicator>,
+    standby: bool,
 }
 
 fn cookie_value(headers: &HeaderMap) -> Option<&str> {
@@ -312,6 +322,18 @@ fn hidden() -> Error {
 }
 
 impl WebState {
+    /// Pushes to the replicas now, as after a backup.
+    pub(crate) fn replicate_now(&self) {
+        if let Some(r) = &self.replicator {
+            r.nudge();
+        }
+    }
+
+    /// Whether this server serves a standby copy (REPLICATION.md §5).
+    pub(crate) fn standby(&self) -> bool {
+        self.standby
+    }
+
     /// The users file as it is now.
     fn users(&self) -> std::sync::MutexGuard<'_, Loaded> {
         let modified = fs::metadata(&self.users_file)
@@ -588,6 +610,12 @@ impl WebState {
         let known = if long { STARTS } else { CALLS };
         if !known.contains(&operation) {
             return Err(not_here(operation));
+        }
+        if self.standby && operation == "backup" {
+            return Err(Error::new(
+                ErrorKind::Unsupported,
+                "this server is a standby and takes no backups; back up to the primary",
+            ));
         }
         let allowed = match operation {
             "backup" | "restore" => user.role != Role::Reader,
@@ -874,28 +902,47 @@ pub(crate) fn inside(folders: &[PathBuf], path: &Path) -> Result<PathBuf, Error>
     }
 }
 
-/// The server of one repository and its users, files and folders.
-fn site(
+/// What one site of a web server is made of: a single server's options, or
+/// a tenant's.
+struct Site {
     repo: Repository,
     users: PathBuf,
-    folders: &[PathBuf],
+    folders: Vec<PathBuf>,
     audit: Audit,
     shares: Shares,
-) -> Result<Arc<App>, Error> {
+    replicas: Vec<String>,
+    standby: bool,
+}
+
+/// The server of one repository and its users, files and folders.
+fn site(site: Site) -> Result<Arc<App>, Error> {
     let mut roots = Vec::new();
-    for folder in folders {
+    for folder in &site.folders {
         roots.push(
             folder.canonicalize().map_err(|e| {
                 Error::new(ErrorKind::NotFound, format!("{}: {e}", folder.display()))
             })?,
         );
     }
-    Users::load(&users)?.need_admin()?;
-    Ok(Arc::new(App {
+    Users::load(&site.users)?.need_admin()?;
+    let remotes = site.repo.remotes()?;
+    if let Some(missing) = site
+        .replicas
+        .iter()
+        .find(|r| !remotes.iter().any(|known| &known.name == *r))
+    {
+        return Err(Error::new(
+            ErrorKind::NotFound,
+            format!("no remote named {missing}; add it with `apeiron remote add`"),
+        ));
+    }
+    let decoy = hash_password("not the password of anyone")?;
+    let oidc = Oidc::new()?;
+    let app = Arc::new_cyclic(|app| App {
         mode: Mode::Web(Box::new(WebState {
-            audit,
-            shares,
-            users_file: users,
+            audit: site.audit,
+            shares: site.shares,
+            users_file: site.users,
             users: Mutex::new(Loaded {
                 modified: None,
                 users: Users::default(),
@@ -904,14 +951,20 @@ fn site(
             sessions: Mutex::new(HashMap::new()),
             attempts: tokio::sync::Mutex::new(Attempts::default()),
             reachable: Mutex::new(HashMap::new()),
-            decoy: hash_password("not the password of anyone")?,
-            oidc: Oidc::new()?,
+            decoy,
+            oidc,
+            replicator: Replicator::start(site.replicas, app.clone()),
+            standby: site.standby,
         })),
-        repo: Mutex::new(Some(repo)),
+        repo: Mutex::new(Some(site.repo)),
         jobs: Mutex::new(HashMap::new()),
         next_job: AtomicU64::new(1),
         memory: None,
-    }))
+    });
+    if let Mode::Web(web) = &app.mode {
+        web.replicate_now();
+    }
+    Ok(app)
 }
 
 /// A running web server.
@@ -923,13 +976,15 @@ pub struct Web {
 impl Web {
     /// Starts a web server for one repository on a thread of its own.
     pub fn start(options: WebOptions) -> Result<Self, Error> {
-        let app = site(
-            options.repo,
-            options.users,
-            &options.folders,
-            options.audit,
-            options.shares,
-        )?;
+        let app = site(Site {
+            repo: options.repo,
+            users: options.users,
+            folders: options.folders,
+            audit: options.audit,
+            shares: options.shares,
+            replicas: options.replicas,
+            standby: options.standby,
+        })?;
         Web::serve(options.listen, options.tls, crate::router(app))
     }
 
@@ -947,8 +1002,16 @@ impl Web {
         }
         let mut sites = HashMap::new();
         for t in tenants {
-            let app = site(t.repo, t.users, &t.folders, t.audit, t.shares)
-                .map_err(|e| Error::new(e.kind, format!("tenant {}: {}", t.name, e.message)))?;
+            let app = site(Site {
+                repo: t.repo,
+                users: t.users,
+                folders: t.folders,
+                audit: t.audit,
+                shares: t.shares,
+                replicas: t.replicas,
+                standby: t.standby,
+            })
+            .map_err(|e| Error::new(e.kind, format!("tenant {}: {}", t.name, e.message)))?;
             if sites
                 .insert(crate::host_name(&t.host), crate::router(app))
                 .is_some()

@@ -57,6 +57,7 @@ The tenants are listed in `tenants.json` in the configuration folder (`~/.config
 | `repo` | The tenant's repository, made beforehand with `apeiron init` |
 | `folders` | Full paths of folders its users may be given; none if left out |
 | `password_file` | For an encrypted repository: the file its password is read from; the server asks at start if left out |
+| `replicas` | Remotes of its repository every ref is pushed to after each backup ([REPLICATION.md](REPLICATION.md) §4); none if left out |
 
 The other files of a tenant are kept by its name:
 
@@ -88,7 +89,7 @@ The host names must lead to the server, through DNS records or the proxy.
 
 | Command | What it does |
 | --- | --- |
-| `apeiron web tenant add <name> --host <host> --repo <path> [--folder <path>]... [--password-file <path>]` | Adds a tenant and prints the command for its first admin |
+| `apeiron web tenant add <name> --host <host> --repo <path> [--folder <path>]... [--password-file <path>] [--replicate <remote>]...` | Adds a tenant and prints the command for its first admin |
 | `apeiron web tenant list` | Lists the tenants with their hosts and repositories |
 | `apeiron web tenant remove <name>` | Stops serving a tenant; its files stay |
 | `apeiron web --tenants [--listen <address>] [--cert <file> --key <file> \| --plain]` | Serves every tenant |

@@ -1145,6 +1145,48 @@ mod transfer {
     }
 
     #[test]
+    fn every_crash_while_pushing_and_pulling_every_ref_keeps_both_readable() {
+        let f = transfer_fixture();
+        let push_all = |local: &mut Repository, remote: &Path| -> Result<()> {
+            local
+                .push_all(&FolderStore::open(remote)?, &mut |_| Ok(()))
+                .map(drop)
+        };
+        let states = transfer_states(&f.base, push_all);
+        assert!(states.len() > 10, "only {} checkpoints", states.len());
+        for state in &states {
+            let remote = state.path().join("remote");
+            assert!(readable_main(&open(&remote).unwrap(), &f).is_some());
+            recover(&remote);
+            push_all(&mut open(&state.path().join("local")).unwrap(), &remote).unwrap();
+            let copy = open(&remote).unwrap();
+            assert_eq!(readable_main(&copy, &f), Some(f.second));
+            assert!(copy.verify().unwrap().is_ok());
+        }
+
+        let base = f.base.join("swapped");
+        copy_dir(&f.base.join("local"), &base.join("remote"));
+        copy_dir(&f.base.join("remote"), &base.join("local"));
+        let pull_all = |local: &mut Repository, remote: &Path| -> Result<()> {
+            local
+                .pull_all(&FolderStore::open(remote)?, &mut |_| Ok(()))
+                .map(drop)
+        };
+        let states = transfer_states(&base, pull_all);
+        assert!(states.len() > 10, "only {} checkpoints", states.len());
+        for state in &states {
+            let local = state.path().join("local");
+            assert!(readable_main(&open(&local).unwrap(), &f).is_some());
+            recover(&local);
+            let mut repo = open(&local).unwrap();
+            pull_all(&mut repo, &state.path().join("remote")).unwrap();
+            assert_eq!(readable_main(&repo, &f), Some(f.second));
+            assert!(repo.verify().unwrap().is_ok());
+            assert_reflog_chain(&repo);
+        }
+    }
+
+    #[test]
     fn every_crash_during_a_clone_leaves_no_repository_or_a_readable_one() {
         let f = transfer_fixture();
         let clone = |_: &mut Repository, remote: &Path| -> Result<()> {

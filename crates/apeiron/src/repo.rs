@@ -15,7 +15,10 @@ use crate::types::{
     GitRequest, ListRequest, LogPage, LogRequest, RefInfo, RepoInfo, RestoreRequest,
     RestoreTestRequest, SnapshotInfo, SyncRequest, TransferRequest,
 };
-use crate::types::{CreateRefRequest, MergeRequest, SearchRequest, TextDiff};
+use crate::types::{
+    CreateRefRequest, MergeRequest, MirrorReport, MirroredRef, RemoteRequest, SearchRequest,
+    TextDiff,
+};
 use crate::{
     ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo, ExportReport, GcReport,
     GcRequest, GitExportReport, GitImportReport, KeyInfo, ObjectId, Phase, ReflogEntry, Remote,
@@ -673,6 +676,42 @@ impl Repository {
         })
     }
 
+    /// Pushes every ref to a remote, reading its index once
+    /// ([REPLICATION.md](REPLICATION.md) §2). A ref the remote has moved
+    /// past is reported in [`MirrorReport::conflicts`] and the others are
+    /// still pushed.
+    pub fn push_all(&self, request: RemoteRequest) -> Result<Job<MirrorReport>> {
+        let remote = self.read().remote(&request.remote)?;
+        let repo = self.clone();
+        Job::spawn("push", move |ctl| {
+            ctl.update(|p| p.phase = Phase::Copying);
+            let store = open_store(&remote, repo.info().encrypted)?;
+            let outcomes = repo.view()?.push_all(&*store, &mut |r| copied(ctl, r))?;
+            ctl.update(|p| p.phase = Phase::Done);
+            Ok(mirrored(outcomes))
+        })
+    }
+
+    /// Pulls every ref of a remote, reading its index once
+    /// ([REPLICATION.md](REPLICATION.md) §2). A ref this copy has moved past
+    /// is reported in [`MirrorReport::conflicts`] and the others are still
+    /// pulled.
+    pub fn pull_all(&self, request: RemoteRequest) -> Result<Job<MirrorReport>> {
+        let remote = self.read().remote(&request.remote)?;
+        let repo = self.clone();
+        Job::spawn("pull", move |ctl| {
+            ctl.update(|p| p.phase = Phase::Copying);
+            let store = open_store(&remote, repo.info().encrypted)?;
+            let _writer = repo.lock_writer();
+            let _lock = core::RepoLock::shared(repo.path())?;
+            let mut core = repo.read().reopen()?;
+            let outcomes = core.pull_all(&*store, &mut |r| copied(ctl, r))?;
+            *repo.write() = core;
+            ctl.update(|p| p.phase = Phase::Done);
+            Ok(mirrored(outcomes))
+        })
+    }
+
     /// Removes stale ref locks, adds reflog lines lost in a crash and
     /// replaces damaged index files.
     pub fn repair(&self) -> Result<RepairReport> {
@@ -767,6 +806,26 @@ fn open_store(remote: &Remote, encrypted: bool) -> Result<Box<dyn core::Store>> 
 }
 
 /// Reports the progress of a push or pull and stops it once cancelled.
+fn mirrored(outcomes: Vec<core::RefOutcome>) -> MirrorReport {
+    MirrorReport {
+        refs: outcomes
+            .into_iter()
+            .map(|(name, result)| match result {
+                Ok(report) => MirroredRef {
+                    name,
+                    report: Some(report),
+                    conflict: None,
+                },
+                Err(e) => MirroredRef {
+                    name,
+                    report: None,
+                    conflict: Some(e.into()),
+                },
+            })
+            .collect(),
+    }
+}
+
 fn copied(ctl: &services::Control, report: &TransferReport) -> core::Result<()> {
     ctl.update(|p| {
         p.items_done = report.objects;

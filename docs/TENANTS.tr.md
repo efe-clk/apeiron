@@ -57,6 +57,7 @@ Kiracılar, yapılandırma klasöründeki (Linux'ta `~/.config/apeiron`) `tenant
 | `repo` | Kiracının, önceden `apeiron init` ile oluşturulmuş deposu |
 | `folders` | Kullanıcılarına verilebilecek klasörlerin tam yolları; boş bırakılırsa hiçbiri |
 | `password_file` | Şifreli bir depo için parolanın okunduğu dosya; boş bırakılırsa sunucu başlarken sorar |
+| `replicas` | Her yedekten sonra her ref'in push edildiği, deposunun uzak depoları ([REPLICATION.tr.md](REPLICATION.tr.md) §4); boş bırakılırsa hiçbiri |
 
 Bir kiracının diğer dosyaları adıyla tutulur:
 
@@ -88,7 +89,7 @@ Ana makine adları, DNS kayıtları ya da vekil sunucu üzerinden sunucuya ulaş
 
 | Komut | Ne yapar |
 | --- | --- |
-| `apeiron web tenant add <ad> --host <ana makine> --repo <yol> [--folder <yol>]... [--password-file <yol>]` | Bir kiracı ekler ve ilk admin'i için komutu yazar |
+| `apeiron web tenant add <ad> --host <ana makine> --repo <yol> [--folder <yol>]... [--password-file <yol>] [--replicate <uzak>]...` | Bir kiracı ekler ve ilk admin'i için komutu yazar |
 | `apeiron web tenant list` | Kiracıları ana makineleri ve depolarıyla listeler |
 | `apeiron web tenant remove <ad>` | Bir kiracıyı sunmayı bırakır; dosyaları kalır |
 | `apeiron web --tenants [--listen <adres>] [--cert <dosya> --key <dosya> \| --plain]` | Her kiracıyı sunar |

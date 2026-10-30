@@ -576,6 +576,15 @@ Clone makes a new local repository from a remote, for a second device ([SYNC.md]
 
 A clone of an unencrypted remote copies no keys. Clone is the only operation that copies keys from a remote; pull never does. An interrupted clone leaves a folder without `config`, which is deleted and cloned again; one interrupted while pulling is a repository whose refs are pulled again.
 
+### 15.7 Every ref
+
+Pushing or pulling every ref keeps a replica ([REPLICATION.md](REPLICATION.md)). It is the steps of push or pull for each ref in turn, sorted by name, with two differences:
+
+1. The remote `config` is checked, and its index files read, once for all refs. On a push, the objects written for one ref are added to that set, so a later ref does not copy them again.
+2. A ref refused because the other side has snapshots this copy does not (15.3 step 4, 15.4 step 4) is reported with the ref and the next ref is copied. Any other error stops them all, as for one ref.
+
+Push sends the local refs; pull takes the refs the remote lists. Neither deletes a ref the other side has. Every rule of 15.5 holds for each ref, so an interruption leaves each ref either where it was or where it was copied to.
+
 ## 16. Left for later versions
 
 - Multi-level blobs, hard links, Windows ACLs, device files.

@@ -273,6 +273,8 @@ Kendi oturum açma hizmeti olan bir kurumda (Keycloak, Microsoft Entra ID, Googl
 
 Tek bir sunucudan, her biri kendi adresinde kendi deposu, kullanıcıları ve kayıtlarıyla birkaç kuruma hizmet etmek için her birini `apeiron web tenant add <ad> --host <ana makine> --repo <yol>` ile ekleyin, `apeiron web user add <ad> --role admin --tenant <ad>` ile bir admin verin ve sunucuyu `apeiron web --tenants` ile başlatın ([TENANTS.tr.md](TENANTS.tr.md)).
 
+Her yedeği ikinci bir makinede de tutmak için onu bir uzak depo olarak ekleyin (`apeiron remote add dr sftp://backup2/srv/apeiron`) ve sunucuyu `apeiron web --replicate dr` ile başlatın. İkinci makinede `apeiron web --standby --repo /srv/apeiron` o kopyayı göz atmak ve geri yüklemek için sunar; ilk sunucu çökerse onu `--standby` olmadan yeniden başlatın ve kişileri ona yönlendirin ([REPLICATION.tr.md](REPLICATION.tr.md)).
+
 ## 7. Düzen
 
 | Ne sıklıkla | Komut | Neden |

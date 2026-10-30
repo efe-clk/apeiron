@@ -42,7 +42,8 @@ pub use plugins::{add_plugin, plugin_dir, plugins, remove_plugin};
 pub use repo::Repository;
 pub use types::{
     AddedKey, CloneReport, CloneRequest, ClonedRef, DeleteRefRequest, DiffRequest, ExportRequest,
-    GitRequest, ListRequest, LogPage, LogRequest, RefInfo, RepoInfo, RestoreRequest,
-    RestoreTestRequest, SnapshotInfo, SyncRequest, TransferRequest,
+    GitRequest, ListRequest, LogPage, LogRequest, MirrorReport, MirroredRef, RefInfo,
+    RemoteRequest, RepoInfo, RestoreRequest, RestoreTestRequest, SnapshotInfo, SyncRequest,
+    TransferRequest,
 };
 pub use types::{CreateRefRequest, MergeRequest, SearchRequest, TextDiff};

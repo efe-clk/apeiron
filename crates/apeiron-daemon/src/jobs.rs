@@ -31,8 +31,14 @@ pub enum Action {
         push: Vec<String>,
     },
     Push {
-        ref_name: String,
+        /// `None` for every ref (`ref = "*"`, REPLICATION.md §3).
+        ref_name: Option<String>,
         remotes: Vec<String>,
+    },
+    Pull {
+        remote: String,
+        /// `None` for every ref of the remote (`ref = "*"`).
+        ref_name: Option<String>,
     },
     Verify,
     RestoreTest {
@@ -54,6 +60,7 @@ impl Action {
         match self {
             Action::Backup { .. } => "backup",
             Action::Push { .. } => "push",
+            Action::Pull { .. } => "pull",
             Action::Verify => "verify",
             Action::RestoreTest { .. } => "restore-test",
             Action::Gc => "gc",
@@ -129,9 +136,20 @@ fn to_job(name: &str, raw: RawJob) -> std::result::Result<Job, String> {
     }
     let ref_name = raw.ref_name.clone().unwrap_or_else(|| "main".to_owned());
     if raw.action != "sync" {
-        not_here_for(&raw.action, "remote", raw.remote.is_some())?;
         not_here_for(&raw.action, "mode", raw.mode.is_some())?;
     }
+    if raw.action != "sync" && raw.action != "pull" {
+        not_here_for(&raw.action, "remote", raw.remote.is_some())?;
+    }
+    // `ref = "*"` names every ref, for `push` and `pull` only.
+    let every_ref = ref_name == "*";
+    if every_ref && raw.action != "push" && raw.action != "pull" {
+        return Err(format!(
+            "`ref = \"*\"` does not apply to `do = {:?}`",
+            raw.action
+        ));
+    }
+    let some_ref = (!every_ref).then(|| ref_name.clone());
     let not_here = |key: &str, present: bool| {
         if present {
             Err(format!("`{key}` does not apply to `do = {:?}`", raw.action))
@@ -156,8 +174,22 @@ fn to_job(name: &str, raw: RawJob) -> std::result::Result<Job, String> {
             not_here("sample_mb", raw.sample_mb.is_some())?;
             let remotes = raw.push.clone().filter(|p| !p.is_empty());
             Action::Push {
-                ref_name,
+                ref_name: some_ref,
                 remotes: remotes.ok_or("`push` must name at least one remote")?,
+            }
+        }
+        "pull" => {
+            for (key, present) in [
+                ("folder", raw.folder.is_some()),
+                ("message", raw.message.is_some()),
+                ("push", raw.push.is_some()),
+                ("sample_mb", raw.sample_mb.is_some()),
+            ] {
+                not_here(key, present)?;
+            }
+            Action::Pull {
+                remote: raw.remote.clone().ok_or("`remote` is missing")?,
+                ref_name: some_ref,
             }
         }
         "verify" | "gc" => {
@@ -206,7 +238,7 @@ fn to_job(name: &str, raw: RawJob) -> std::result::Result<Job, String> {
         }
         other => {
             return Err(format!(
-                "unknown `do = {other:?}`; use backup, push, verify, restore-test, gc or sync"
+                "unknown `do = {other:?}`; use backup, push, pull, verify, restore-test, gc or sync"
             ));
         }
     };
@@ -345,6 +377,49 @@ mod tests {
             )
         );
         assert!(parse("").unwrap().is_empty());
+
+        let jobs = parse(
+            r#"
+            [job.mirror]
+            repo = "/r"
+            do = "push"
+            ref = "*"
+            push = ["dr"]
+            every = "15m"
+
+            [job.standby]
+            repo = "/s"
+            do = "pull"
+            remote = "origin"
+            ref = "*"
+            every = "15m"
+
+            [job.one]
+            repo = "/s"
+            do = "pull"
+            remote = "origin"
+            every = "1h"
+            "#,
+        )
+        .unwrap();
+        let actions: Vec<&Action> = jobs.iter().map(|j| &j.action).collect();
+        assert_eq!(
+            actions,
+            [
+                &Action::Push {
+                    ref_name: None,
+                    remotes: vec!["dr".to_owned()]
+                },
+                &Action::Pull {
+                    remote: "origin".to_owned(),
+                    ref_name: Some("main".to_owned())
+                },
+                &Action::Pull {
+                    remote: "origin".to_owned(),
+                    ref_name: None
+                },
+            ]
+        );
     }
 
     #[test]
@@ -378,6 +453,15 @@ mod tests {
                 "`remote` does not apply",
             ),
             ("do = \"copy\"\nevery = \"day\"", "unknown `do"),
+            ("do = \"pull\"\nevery = \"day\"", "`remote` is missing"),
+            (
+                "do = \"verify\"\nref = \"*\"\nevery = \"day\"",
+                "does not apply",
+            ),
+            (
+                "do = \"backup\"\nfolder = \"/f\"\nref = \"*\"\nevery = \"day\"",
+                "`ref = \"*\"` does not apply",
+            ),
             ("do = \"gc\"\nevery = \"day\"\ncolour = 1", "unknown field"),
         ];
         for (body, expected) in bad {

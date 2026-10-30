@@ -61,9 +61,10 @@ every = "week"
 | --- | --- |
 | `repo` | İşin çalıştığı depo; bir klasör uzak deposu, o kopyayı test etmek için doğrudan burada yazılabilir |
 | `password_file` | İlk satırı, şifreli bir deponun parolası ya da kurtarma anahtarıdır |
-| `do` | `backup`, `push`, `verify`, `restore-test`, `gc` ya da `sync` ([SYNC.tr.md](SYNC.tr.md)) |
+| `do` | `backup`, `push`, `pull`, `verify`, `restore-test`, `gc` ya da `sync` ([SYNC.tr.md](SYNC.tr.md)) |
 | `folder`, `ref`, `message` | `backup` için: neyin saklanacağı ve hangi ref'in taşınacağı; `sync` için: klasör ve ref, varsayılan `sync/<klasör adı>` |
-| `remote`, `mode` | `sync` için: uzak depo ve `two-way` (varsayılan), `send` ya da `receive` |
+| `remote`, `mode` | `sync` için: uzak depo ve `two-way` (varsayılan), `send` ya da `receive`; `pull` için: uzak depo |
+| `ref = "*"` | `push` ve `pull` için: bir replikayı ya da yedek sunucuyu güncel tutmak için her ref ([REPLICATION.tr.md](REPLICATION.tr.md) §3) |
 | `push` | `backup` için: başarılı bir yedekten sonra ref'in push edileceği uzak depolar; `push` için: uzak depolar |
 | `every` | `hour`, `day`, `week` ya da dakika, saat veya gün sayısı: `15m`, `6h`, `2d` |
 | `at` | `day` ve `week` için: günün en erken yerel saati, `HH:MM` |

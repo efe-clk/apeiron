@@ -267,6 +267,8 @@ fn start(dir: &Path, idp: &Shared) -> (Web, SocketAddr, std::path::PathBuf) {
         folders: vec![dir.join("home")],
         audit: Audit::new(dir.join("audit.log")),
         shares: Shares::new(dir.join("shares.json")),
+        replicas: Vec::new(),
+        standby: false,
     })
     .unwrap();
     let address = server.address();

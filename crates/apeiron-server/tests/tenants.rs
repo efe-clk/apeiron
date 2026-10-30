@@ -84,6 +84,8 @@ fn tenant(dir: &Path, name: &str, host: &str) -> TenantOptions {
         folders: vec![home],
         audit: Audit::new(dir.join("audit.log")),
         shares: Shares::new(dir.join("shares.json")),
+        replicas: Vec::new(),
+        standby: false,
     }
 }
 

@@ -7,8 +7,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, SystemTime};
 
 use apeiron::{
-    BackupRequest, ErrorKind, GcRequest, Repository, RestoreTestRequest, SyncAction, SyncRequest,
-    TransferRequest,
+    BackupRequest, ErrorKind, GcRequest, MirrorReport, RemoteRequest, Repository,
+    RestoreTestRequest, SyncAction, SyncRequest, TransferRequest,
 };
 use jiff::tz::TimeZone;
 use jiff::{SignedDuration, Timestamp};
@@ -271,8 +271,8 @@ fn try_run(job: &Job, stop: &AtomicBool) -> apeiron::Result<(RunResult, String)>
                 result = RunResult::Warnings;
                 text.push_str(&format!("; {} files skipped", report.warnings.len()));
             }
-            match push_all(&repo, ref_name, push, stop) {
-                Ok(pushed) => text.push_str(&pushed),
+            match push_to(&repo, Some(ref_name), push, stop) {
+                Ok((_, pushed)) => text.push_str(&pushed),
                 Err(e) => {
                     text.push_str(&format!("; push failed: {}", e.message));
                     result = RunResult::Failed;
@@ -281,9 +281,25 @@ fn try_run(job: &Job, stop: &AtomicBool) -> apeiron::Result<(RunResult, String)>
             (result, text)
         }
         Action::Push { ref_name, remotes } => {
-            let pushed = push_all(&repo, ref_name, remotes, stop)?;
-            (RunResult::Ok, pushed.trim_start_matches("; ").to_owned())
+            let (result, pushed) = push_to(&repo, ref_name.as_deref(), remotes, stop)?;
+            (result, pushed.trim_start_matches("; ").to_owned())
         }
+        Action::Pull { remote, ref_name } => match ref_name {
+            Some(name) => {
+                let report = wait(repo.pull(TransferRequest::new(remote, name))?, stop)?;
+                (
+                    RunResult::Ok,
+                    format!("pulled from {remote}: {} objects", report.objects),
+                )
+            }
+            None => {
+                let request = RemoteRequest {
+                    remote: remote.clone(),
+                };
+                let report = wait(repo.pull_all(request)?, stop)?;
+                mirrored("pulled from", remote, &report)
+            }
+        },
         Action::Verify => {
             let report = wait(repo.verify()?, stop)?;
             if report.is_ok() {
@@ -383,19 +399,62 @@ fn try_run(job: &Job, stop: &AtomicBool) -> apeiron::Result<(RunResult, String)>
     })
 }
 
-/// Pushes the ref to each remote; returns `; pushed to …` per remote.
-fn push_all(
+/// Pushes the ref, or every ref for `None`, to each remote; returns
+/// `; pushed to …` per remote, with a warning when a ref was left because
+/// the remote has moved past it.
+fn push_to(
     repo: &Repository,
-    ref_name: &str,
+    ref_name: Option<&str>,
     remotes: &[String],
     stop: &AtomicBool,
-) -> apeiron::Result<String> {
+) -> apeiron::Result<(RunResult, String)> {
     let mut text = String::new();
+    let mut result = RunResult::Ok;
     for remote in remotes {
-        let report = wait(repo.push(TransferRequest::new(remote, ref_name))?, stop)?;
-        text.push_str(&format!("; pushed to {remote}: {} objects", report.objects));
+        let (r, line) = match ref_name {
+            Some(name) => {
+                let report = wait(repo.push(TransferRequest::new(remote, name))?, stop)?;
+                (
+                    RunResult::Ok,
+                    format!("pushed to {remote}: {} objects", report.objects),
+                )
+            }
+            None => {
+                let request = RemoteRequest {
+                    remote: remote.clone(),
+                };
+                let report = wait(repo.push_all(request)?, stop)?;
+                mirrored("pushed to", remote, &report)
+            }
+        };
+        if r != RunResult::Ok {
+            result = r;
+        }
+        text.push_str("; ");
+        text.push_str(&line);
     }
-    Ok(text)
+    Ok((result, text))
+}
+
+/// What pushing or pulling every ref did, in one line; a warning when a
+/// ref was left because of a conflict.
+fn mirrored(verb: &str, remote: &str, report: &MirrorReport) -> (RunResult, String) {
+    let objects: u64 = report
+        .refs
+        .iter()
+        .filter_map(|r| r.report.as_ref())
+        .map(|r| r.objects)
+        .sum();
+    let mut text = format!(
+        "{verb} {remote}: {} refs, {objects} objects",
+        report.refs.len()
+    );
+    let left: Vec<&str> = report.conflicts().map(|r| r.name.as_str()).collect();
+    if left.is_empty() {
+        return (RunResult::Ok, text);
+    }
+    text.push_str(&format!("; conflict on {}", left.join(", ")));
+    (RunResult::Warnings, text)
 }
 
 #[cfg(test)]
@@ -523,6 +582,102 @@ mod tests {
         let status = status(&s.paths).unwrap();
         let last_end = status[0].last.as_ref().unwrap().last_end;
         assert_eq!(status[0].next_run.duration_since(last_end).as_secs(), 3600);
+    }
+
+    #[test]
+    fn every_ref_is_pushed_to_a_replica_and_pulled_into_a_standby() {
+        let s = setup(
+            r#"
+            [job.a]
+            repo = "ROOT/repo"
+            do = "backup"
+            folder = "ROOT/src"
+            every = "day"
+
+            [job.b]
+            repo = "ROOT/repo"
+            do = "backup"
+            folder = "ROOT/src"
+            ref = "backup/src"
+            every = "day"
+
+            [job.c]
+            repo = "ROOT/repo"
+            do = "push"
+            ref = "*"
+            push = ["replica"]
+            every = "15m"
+
+            [job.d]
+            repo = "ROOT/standby"
+            do = "pull"
+            remote = "origin"
+            ref = "*"
+            every = "15m"
+            "#,
+        );
+        let root = s.dir.path();
+        let replica = root.join("replica");
+        Repository::open(root.join("repo"))
+            .unwrap()
+            .add_remote("replica", replica.to_str().unwrap())
+            .unwrap();
+        let daemon = Daemon::start(s.paths.clone()).unwrap();
+        let jobs = load_jobs(&s.paths.jobs).unwrap();
+        let stop = AtomicBool::new(false);
+        let runs = daemon.run_due(&jobs[..3], &stop).unwrap();
+        assert!(
+            runs.iter().all(|r| r.run.result == RunResult::Ok),
+            "{runs:?}"
+        );
+        assert!(
+            runs[2]
+                .run
+                .message
+                .starts_with("pushed to replica: 2 refs, "),
+            "{}",
+            runs[2].run.message
+        );
+        let copy = Repository::open(&replica).unwrap();
+        assert_eq!(copy.refs().unwrap().len(), 2);
+
+        // The standby starts as a clone of the replica and then follows it.
+        wait(
+            Repository::clone_from(apeiron::CloneRequest {
+                url: replica.to_string_lossy().into_owned(),
+                path: root.join("standby"),
+                secret: None,
+            })
+            .unwrap(),
+            &stop,
+        )
+        .unwrap();
+        fs::write(root.join("src/b.txt"), b"more").unwrap();
+        let repo = Repository::open(root.join("repo")).unwrap();
+        let later = wait(
+            repo.backup(BackupRequest::new(root.join("src"), "main"))
+                .unwrap(),
+            &stop,
+        )
+        .unwrap();
+        wait(
+            repo.push_all(RemoteRequest {
+                remote: "replica".to_owned(),
+            })
+            .unwrap(),
+            &stop,
+        )
+        .unwrap();
+        let runs = daemon.run_due(&jobs[3..], &stop).unwrap();
+        assert_eq!(runs[0].run.result, RunResult::Ok, "{runs:?}");
+        assert!(
+            runs[0]
+                .run
+                .message
+                .starts_with("pulled from origin: 2 refs")
+        );
+        let standby = Repository::open(root.join("standby")).unwrap();
+        assert_eq!(standby.resolve("main").unwrap(), later.snapshot);
     }
 
     #[test]

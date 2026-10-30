@@ -576,6 +576,15 @@ Klon, ikinci bir cihaz için bir uzak depodan yeni bir yerel depo oluşturur ([S
 
 Şifresiz bir uzak deponun klonu anahtar kopyalamaz. Klon, uzak depodan anahtar kopyalayan tek işlemdir; pull asla kopyalamaz. Yarıda kalan bir klon, `config`'i olmayan bir klasör bırakır; bu klasör silinir ve yeniden klonlanır. Pull sırasında yarıda kalan bir klon ise ref'leri yeniden pull edilen bir depodur.
 
+### 15.7 Her ref
+
+Her ref'i push ya da pull etmek bir replikayı güncel tutar ([REPLICATION.tr.md](REPLICATION.tr.md)). Bu, ada göre sıralanmış her ref için sırayla push ya da pull adımlarıdır; iki farkla:
+
+1. Uzaktaki `config` tüm ref'ler için bir kez denetlenir ve indeks dosyaları bir kez okunur. Push'ta bir ref için yazılan nesneler bu kümeye eklenir; böylece sonraki bir ref onları yeniden kopyalamaz.
+2. Öbür tarafta bu kopyada olmayan snapshot'lar olduğu için reddedilen bir ref (15.3 adım 4, 15.4 adım 4) ref'le birlikte bildirilir ve sonraki ref kopyalanır. Başka her hata, tek bir ref'teki gibi hepsini durdurur.
+
+Push yerel ref'leri gönderir; pull uzak deponun listelediği ref'leri alır. İkisi de öbür tarafta olan bir ref'i silmez. 15.5'teki her kural her ref için geçerlidir; böylece bir kesinti her ref'i ya olduğu yerde ya da kopyalandığı yerde bırakır.
+
 ## 16. Sonraki sürümlere bırakılanlar
 
 - Çok katmanlı blob, sabit bağlantılar, Windows ACL'leri, aygıt dosyaları.

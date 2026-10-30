@@ -40,6 +40,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [030](#adr-030-sharing-is-by-expiring-links-to-a-fixed-version-kept-only-as-hashes) | Sharing | A random secret in the link, only its SHA-256 kept; a fixed version and path; 1 to 30 days; ends when the owner may no longer share it | Accepted |
 | [031](#adr-031-central-identity-is-openid-connect-with-users-still-listed-in-webjson) | Central identity | OpenID Connect code flow with PKCE; RS256/ES256 tokens checked against the provider's keys; one claim names a user listed in `web.json`; passwords stay possible | Accepted |
 | [032](#adr-032-tenants-are-told-apart-by-host-each-with-its-own-repository-and-files) | Multi-tenant use | One process, one port; the `Host` header picks a tenant with its own repository, users, audit log, share links and sessions; unknown hosts get nothing | Accepted |
+| [033](#adr-033-replication-is-pushing-every-ref-to-a-remote-copy-taking-over-is-the-admins-decision) | Replication and high availability | Every ref pushed to replicas after each backup and every 30 s on change; a standby serves a replica without backups; `/api/health`; failover by the admin | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28.
 
@@ -702,3 +703,24 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | One shared repository with refs prefixed per tenant | Deduplication across tenants would show whether another tenant holds the same file, and one key would open all of them |
 
 **Consequences.** Every tenant needs a host name that leads to the server and a certificate valid for it; a wildcard certificate covers them all. The self-signed certificate is made again when a tenant with a new host is added, so its fingerprint changes. Tenants cannot share storage, so the same file kept by two tenants is stored twice. The whole server is one process: a restart stops every tenant for a moment, and limits per tenant are not yet possible.
+
+## ADR-033: Replication is pushing every ref to a remote copy; taking over is the admin's decision
+
+**Status:** Accepted (2026-10-30)
+
+**Context.** Stage 5 work item 3 keeps every backup in a second place soon after it is made and lets a second server take over when the first fails ([REPLICATION.md](REPLICATION.md)). Remote copies, push and pull already exist (FORMAT.md §15) and a remote copy is a complete repository, but they move one ref at a time, and nothing kept a copy current or served it.
+
+**Decision.** A replica is an ordinary remote copy, kept current by pushing every ref to it: with `push --all`, a scheduled job, or the web server right after each backup and every 30 seconds when the refs have changed. A ref the replica has moved past is reported and the others still go. A standby is the web server started with `--standby` on a replica: everything but backups works, and it shows new backups as they are pushed. `GET /api/health` tells a monitor whether the repository can be read and which role the server has. Taking over is done by the admin, by restarting the standby without `--standby`.
+
+**Rationale.** Using remote copies means one format, one set of integrity rules and one tested code path: the fault-injection tests of push and pull hold for the replica, a replica can be restored from with nothing else, and an encrypted repository stays encrypted on it. Pushing after each backup keeps the replica one push behind without a second process; the periodic round covers everything else. Refusing backups on the standby, and leaving the decision to take over to a person, means two servers never write to the same history at once; compare-and-swap on refs then turns the return of an old primary into a reported conflict instead of lost backups.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| Copying the repository's files with rsync or a replicated file system | Copies files in any order, so a replica caught mid-copy can have a ref before its objects; also copies damage |
+| A consensus protocol (Raft) among several servers | Much more code and at least three servers for something a pilot does not need; every write would wait for a majority |
+| Automatic failover on a failed health check | A network split would make two primaries that both take backups; the cost of a minute of an admin's time is smaller |
+| Deleting refs on the replica too | A mistake or an attack on the primary would empty the replica as well |
+
+**Consequences.** The replica is behind by one push after a backup, or by a job's period. Users, the identity provider and tenants are copied to the standby by the admin; the audit log and share links stay with each server. Failover needs a person. Refs deleted on the primary stay on the replica until removed there.

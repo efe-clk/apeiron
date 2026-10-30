@@ -61,9 +61,10 @@ every = "week"
 | --- | --- |
 | `repo` | The repository the job works on; a folder remote can be named here directly to test that copy |
 | `password_file` | The first line is the password or recovery key of an encrypted repository |
-| `do` | `backup`, `push`, `verify`, `restore-test`, `gc` or `sync` ([SYNC.md](SYNC.md)) |
+| `do` | `backup`, `push`, `pull`, `verify`, `restore-test`, `gc` or `sync` ([SYNC.md](SYNC.md)) |
 | `folder`, `ref`, `message` | For `backup`: what to store and which ref to move; for `sync`: the folder and the ref, by default `sync/<folder name>` |
-| `remote`, `mode` | For `sync`: the remote, and `two-way` (default), `send` or `receive` |
+| `remote`, `mode` | For `sync`: the remote, and `two-way` (default), `send` or `receive`; for `pull`: the remote |
+| `ref = "*"` | For `push` and `pull`: every ref, to keep a replica or a standby ([REPLICATION.md](REPLICATION.md) §3) |
 | `push` | For `backup`: remotes to push the ref to after a successful backup; for `push`: the remotes |
 | `every` | `hour`, `day`, `week`, or a number of minutes, hours or days: `15m`, `6h`, `2d` |
 | `at` | For `day` and `week`: the earliest local time of day, `HH:MM` |

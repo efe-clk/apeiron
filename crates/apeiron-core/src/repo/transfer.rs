@@ -38,6 +38,36 @@ pub struct TransferReport {
     pub bytes: u64,
 }
 
+/// What happened to one ref when every ref was pushed or pulled: the
+/// report, or the conflict that kept it where it was.
+pub type RefOutcome = (String, std::result::Result<TransferReport, Error>);
+
+/// `report` with the objects and bytes of the refs before it added.
+fn summed(report: &TransferReport, (objects, bytes): (u64, u64)) -> TransferReport {
+    let mut sum = report.clone();
+    sum.objects += objects;
+    sum.bytes += bytes;
+    sum
+}
+
+/// The outcome of one ref of a push or pull of every ref: a conflict is
+/// kept with the ref, any other error stops them all.
+fn outcome(
+    name: String,
+    result: Result<TransferReport>,
+    totals: &mut (u64, u64),
+) -> Result<RefOutcome> {
+    match result {
+        Ok(report) => {
+            totals.0 += report.objects;
+            totals.1 += report.bytes;
+            Ok((name, Ok(report)))
+        }
+        Err(e @ (Error::RemoteAhead(_) | Error::LocalAhead(_))) => Ok((name, Err(e))),
+        Err(e) => Err(e),
+    }
+}
+
 impl Repository {
     /// Makes a new repository at `path`, which must not exist or be empty,
     /// from the copy in `store`, then pulls every ref of it (FORMAT.md
@@ -172,11 +202,44 @@ impl Repository {
         on_copy: OnCopy<'_>,
     ) -> Result<TransferReport> {
         validate_ref_name(name)?;
+        if self.read_ref(name)?.is_none() {
+            return Err(Error::RefNotFound(name.to_owned()));
+        }
+        self.prepare_remote(store)?;
+        let mut have = remote_index(store, &self.keys)?.into_keys().collect();
+        self.push_ref(store, name, &mut have, on_copy)
+    }
+
+    /// Pushes every ref to `store`, reading its index once (FORMAT.md
+    /// §15.7). A ref the remote has moved past is reported and the others
+    /// are still pushed; any other error stops the push. `on_copy` gets the
+    /// totals over all refs.
+    pub fn push_all(&self, store: &dyn Store, on_copy: OnCopy<'_>) -> Result<Vec<RefOutcome>> {
+        self.prepare_remote(store)?;
+        let mut have = remote_index(store, &self.keys)?.into_keys().collect();
+        let mut done = Vec::new();
+        let mut totals = (0, 0);
+        for (name, _) in self.list_refs()? {
+            let result = self.push_ref(store, &name, &mut have, &mut |r| {
+                on_copy(&summed(r, totals))
+            });
+            done.push(outcome(name, result, &mut totals)?);
+        }
+        Ok(done)
+    }
+
+    /// Pushes one ref; `have` holds the objects the remote has and gets
+    /// the ones copied.
+    fn push_ref(
+        &self,
+        store: &dyn Store,
+        name: &str,
+        have: &mut HashSet<ObjectId>,
+        on_copy: OnCopy<'_>,
+    ) -> Result<TransferReport> {
         let local = self
             .read_ref(name)?
             .ok_or_else(|| Error::RefNotFound(name.to_owned()))?;
-        self.prepare_remote(store)?;
-        let have = remote_index(store, &self.keys)?;
         let previous = store.read_ref(name)?;
         let mut report = TransferReport {
             snapshot: local,
@@ -195,9 +258,10 @@ impl Repository {
 
         let missing = missing_objects(
             local,
-            |id| have.contains_key(id),
+            |id| have.contains(id),
             |id, ty| self.read_typed(id, ty),
         )?;
+        let copied: Vec<ObjectId> = missing.iter().map(|(id, _)| *id).collect();
         let mut packs = Vec::new();
         let mut writer: Option<PackWriter> = None;
         for (id, ty) in missing {
@@ -226,6 +290,8 @@ impl Repository {
             let (file, bytes) = index::encode_index(&packs, &self.keys)?;
             store.write_new(&format!("{INDEX}/{file}"), &bytes)?;
         }
+        // Listed on the remote now, so the next ref need not copy them.
+        have.extend(copied);
         store.swap_ref(name, previous, local)?;
         Ok(report)
     }
@@ -240,6 +306,33 @@ impl Repository {
     ) -> Result<TransferReport> {
         validate_ref_name(name)?;
         let have = self.open_remote(store)?;
+        self.pull_ref(store, &have, name, on_copy)
+    }
+
+    /// Pulls every ref of `store`, reading its index once (FORMAT.md
+    /// §15.7). A ref this copy has moved past is reported and the others
+    /// are still pulled; any other error stops the pull. `on_copy` gets the
+    /// totals over all refs.
+    pub fn pull_all(&mut self, store: &dyn Store, on_copy: OnCopy<'_>) -> Result<Vec<RefOutcome>> {
+        let have = self.open_remote(store)?;
+        let mut done = Vec::new();
+        let mut totals = (0, 0);
+        for name in store.list_refs()? {
+            let result = self.pull_ref(store, &have, &name, &mut |r| on_copy(&summed(r, totals)));
+            done.push(outcome(name, result, &mut totals)?);
+        }
+        Ok(done)
+    }
+
+    /// Pulls one ref; `have` is the remote's index.
+    fn pull_ref(
+        &mut self,
+        store: &dyn Store,
+        have: &HashMap<ObjectId, Location>,
+        name: &str,
+        on_copy: OnCopy<'_>,
+    ) -> Result<TransferReport> {
+        validate_ref_name(name)?;
         let remote = store
             .read_ref(name)?
             .ok_or_else(|| Error::RefNotFound(name.to_owned()))?;
@@ -260,7 +353,7 @@ impl Repository {
                 } else {
                     Snapshot::decode(&read_remote(
                         store,
-                        &have,
+                        have,
                         &self.keys,
                         id,
                         ObjectType::Snapshot,
@@ -276,7 +369,7 @@ impl Repository {
                 return Err(Error::LocalAhead(name.to_owned()));
             }
         }
-        self.copy_objects(store, &have, &mut report, on_copy)?;
+        self.copy_objects(store, have, &mut report, on_copy)?;
         self.update_ref(name, previous, Some(remote))?;
         Ok(report)
     }
@@ -653,6 +746,22 @@ mod tests {
         snapshot
     }
 
+    /// Moves `name` from `parent` to a new snapshot of `main`'s content.
+    fn commit_on(repo: &mut Repository, name: &str, parent: ObjectId) -> ObjectId {
+        let parent_snapshot = repo.read_snapshot(&parent).unwrap();
+        let mut w = repo.writer();
+        let snapshot = w
+            .put_snapshot(&Snapshot {
+                parents: vec![parent],
+                message: Some(name.to_owned()),
+                ..parent_snapshot
+            })
+            .unwrap();
+        w.finish().unwrap();
+        repo.update_ref(name, Some(parent), Some(snapshot)).unwrap();
+        snapshot
+    }
+
     fn content(repo: &Repository, snapshot: &ObjectId) -> Vec<u8> {
         let tree = repo
             .read_tree(&repo.read_snapshot(snapshot).unwrap().tree)
@@ -822,6 +931,63 @@ mod tests {
                 &mut |_| Ok(())
             ),
             Err(Error::InvalidRepository { .. })
+        ));
+    }
+
+    #[test]
+    fn every_ref_is_pushed_and_pulled_past_a_conflict() {
+        let Setup {
+            _dir,
+            root,
+            mut a,
+            first,
+        } = setup(true);
+        a.update_ref("backup/docs", None, Some(first)).unwrap();
+        let remote = root.join("remote");
+        let store = FolderStore::open(&remote).unwrap();
+        let mut seen = 0;
+        let pushed = a
+            .push_all(&store, &mut |r| {
+                assert!(r.objects > seen);
+                seen = r.objects;
+                Ok(())
+            })
+            .unwrap();
+        let names: Vec<&str> = pushed.iter().map(|(n, _)| n.as_str()).collect();
+        assert_eq!(names, ["backup/docs", "main"]);
+        // The second ref reaches only objects the first one copied.
+        let copied: Vec<u64> = pushed
+            .iter()
+            .map(|(_, r)| r.as_ref().unwrap().objects)
+            .collect();
+        assert!(copied[0] > 0);
+        assert_eq!(copied[1], 0);
+
+        // A copy that went its own way on `main` still gets `backup/docs`.
+        drop(store);
+        copy_dir(&remote, &root.join("b"));
+        let mut b = Repository::unlock(&root.join("b"), PASSWORD).unwrap();
+        let on_b = commit(&mut b, b"b", Some(first));
+        let on_a = commit(&mut a, b"a", Some(first));
+        let docs = commit_on(&mut a, "backup/docs", first);
+        let store = FolderStore::open(&remote).unwrap();
+        a.push_all(&store, &mut |_| Ok(())).unwrap();
+        let pulled = b.pull_all(&store, &mut |_| Ok(())).unwrap();
+        assert_eq!(pulled[0].0, "backup/docs");
+        assert_eq!(pulled[0].1.as_ref().unwrap().snapshot, docs);
+        assert!(matches!(pulled[1], (_, Err(Error::LocalAhead(_)))));
+        assert_eq!(b.read_ref("main").unwrap(), Some(on_b));
+        assert_eq!(b.read_ref("backup/docs").unwrap(), Some(docs));
+        let pushed = b.push_all(&store, &mut |_| Ok(())).unwrap();
+        assert!(pushed[0].1.as_ref().is_ok());
+        assert!(matches!(pushed[1], (_, Err(Error::RemoteAhead(_)))));
+        assert_eq!(store.read_ref("main").unwrap(), Some(on_a));
+
+        // Any other error stops them all.
+        let elsewhere = init(&root.join("c"), true);
+        assert!(matches!(
+            elsewhere.push_all(&store, &mut |_| Ok(())),
+            Err(Error::OtherRepository(_))
         ));
     }
 

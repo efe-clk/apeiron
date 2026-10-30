@@ -20,6 +20,7 @@ When several people share a backup server, the admin must be able to answer "who
 | `shared:list`, `shared:read` | Every use of a share link, without signing in | The link's id and the path; never the link's secret |
 | `user_add`, `user_change`, `user_password`, `user_remove` | `apeiron web user` | The name, role, backups, folders and identity; never the password |
 | `oidc_set`, `oidc_remove` | `apeiron web oidc` | The provider's settings; never the client secret |
+| `replicate` | Each push to a replica by the web server | The remote, refs and objects, the refs left by a conflict, or the error ([REPLICATION.md](REPLICATION.md) §7) |
 | `tenant_add`, `tenant_remove` | `apeiron web tenant`, in that tenant's own log | The tenant's settings ([TENANTS.md](TENANTS.md) §5) |
 
 An operation refused by the checks is recorded with its error, so attempts are visible too. Polling a job, the session state and the folder browser are not recorded. The desktop interface records nothing: it serves only the person who runs it.
