@@ -34,6 +34,7 @@ fn users_file(dir: &Path) -> PathBuf {
             role: Role::Admin,
             backups: Vec::new(),
             folders: Vec::new(),
+            oidc: None,
         })
         .unwrap();
     users.save(&file).unwrap();
@@ -194,7 +195,7 @@ fn nothing_without_signing_in() {
     assert_eq!(c.get("/").status, 200);
     assert_eq!(
         c.get("/api/session").json(),
-        json!({"mode": "web", "signed_in": false})
+        json!({"mode": "web", "signed_in": false, "oidc": false})
     );
     let refused = c.get("/api/state");
     assert_eq!(refused.status, 401);
@@ -432,6 +433,7 @@ fn the_users_file() {
         role: Role::Member,
         backups: vec!["backup/a-*".to_owned()],
         folders: Vec::new(),
+        oidc: None,
     };
     assert!(users.add(user("Bad Name")).is_err());
     assert!(users.add(user("root")).is_err());
@@ -467,6 +469,7 @@ fn each_user_sees_and_uses_only_their_own() {
         role,
         backups: backups.iter().map(|b| (*b).to_owned()).collect(),
         folders,
+        oidc: None,
     };
     users
         .add(user(
@@ -715,6 +718,7 @@ fn every_request_is_recorded() {
             role: Role::Member,
             backups: vec!["backup/src".to_owned()],
             folders: Vec::new(),
+            oidc: None,
         })
         .unwrap();
     users.save(&dir.path().join("config/web.json")).unwrap();
@@ -761,6 +765,7 @@ fn share_links() {
                 role,
                 backups: vec!["backup/ayse-*".to_owned()],
                 folders: Vec::new(),
+                oidc: None,
             })
             .unwrap();
     }

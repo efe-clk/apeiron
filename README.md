@@ -6,7 +6,7 @@
 
 Apeiron treats a developer's repository, a musician's project and a family photo archive the same way: as snapshots of content-addressed, immutable objects. Backup, archive, sync and versioning are different policies over the same object graph, not four separate engines. It is local first: no core function needs a cloud, an account or an internet connection.
 
-> **Status:** Early development. Stage 0 (format and core) is done; Stage 1 (local MVP) is done; Stage 2 (remote and sync) is done; Stage 3 (developer and ecosystem) is done; Stage 4 (interfaces and multi-user) is done. The `apeiron` command can already back up, sync, branch, merge, search and restore folders and import Git repositories, but there is no release or stable API yet. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status:** Early development. Stage 0 (format and core) is done; Stage 1 (local MVP) is done; Stage 2 (remote and sync) is done; Stage 3 (developer and ecosystem) is done; Stage 4 (interfaces and multi-user) is done; Stage 5 (enterprise) is in progress. The `apeiron` command can already back up, sync, branch, merge, search and restore folders and import Git repositories, but there is no release or stable API yet. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Core principles
 
@@ -125,6 +125,7 @@ Rules for code, commits and format changes: [CONTRIBUTING.md](CONTRIBUTING.md).
 | [Web interface](docs/WEB.md) | Using a backup server from a browser on another computer |
 | [Users and permissions](docs/USERS.md) | Several people on one backup server, each with their own backups |
 | [Audit log](docs/AUDIT.md) | A record of who did what in the web interface that cannot be changed unnoticed |
+| [Central identity](docs/IDENTITY.md) | Signing in to the web interface through an organization's OpenID Connect identity provider |
 | [Sharing](docs/SHARE.md) | Links that let someone without an account download a version, folder or file of a backup until they end |
 | [User guide](docs/GUIDE.md) | Installation, daily backup, restore and the one-month test |
 | [Glossary](docs/GLOSSARY.md) | Terms with English–Turkish equivalents |

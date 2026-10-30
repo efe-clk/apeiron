@@ -10,7 +10,7 @@ Birkaç kişi bir yedek sunucusunu paylaştığında admin, "bu klasörü kim, n
 
 | Olay | Ne zaman | Ayrıntı |
 | --- | --- | --- |
-| `sign_in` | Doğru ya da yanlış, her oturum açma | Verilen ad; parola asla |
+| `sign_in` | Doğru ya da yanlış, her oturum açma | Verilen ad, ya da kimlik sağlayıcısı için kimlikle birlikte `"via": "oidc"` ([IDENTITY.tr.md](IDENTITY.tr.md) §5); parola asla |
 | `sign_out` | Oturumu kapatma | |
 | `call:<operation>` | `list` ya da `log` gibi her kısa işlem | USERS.tr.md §4'teki denetimlerden sonraki istek; snapshot'lar kimlik olarak, yollar çözülmüş olarak |
 | `start:<operation>` | Başlatılan her uzun işlem: `backup`, `restore`, `verify`, `search` | Aynısı |
@@ -18,7 +18,8 @@ Birkaç kişi bir yedek sunucusunu paylaştığında admin, "bu klasörü kim, n
 | `cancel` | Bir işi durdurma isteği | İş numarası |
 | `share_add`, `share_remove` | Bir paylaşım bağlantısı oluşturmak ya da kaldırmak | Bağlantının kimliği, sürümü, yolu ve bitişi ([SHARE.tr.md](SHARE.tr.md) §6) |
 | `shared:list`, `shared:read` | Bir paylaşım bağlantısının oturum açmadan her kullanımı | Bağlantının kimliği ve yol; bağlantının gizli kısmı asla |
-| `user_add`, `user_change`, `user_password`, `user_remove` | `apeiron web user` | Ad, rol, yedekler ve klasörler; parola asla |
+| `user_add`, `user_change`, `user_password`, `user_remove` | `apeiron web user` | Ad, rol, yedekler, klasörler ve kimlik; parola asla |
+| `oidc_set`, `oidc_remove` | `apeiron web oidc` | Sağlayıcının ayarları; gizli anahtar asla |
 
 Denetimlerin reddettiği bir işlem hatasıyla kaydedilir; böylece denemeler de görünür. Bir işin durumunu yoklamak, oturum durumu ve klasör seçici kaydedilmez. Masaüstü arayüzü hiçbir şey kaydetmez: yalnızca onu çalıştıran kişiye hizmet eder.
 

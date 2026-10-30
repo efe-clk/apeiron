@@ -10,7 +10,7 @@ When several people share a backup server, the admin must be able to answer "who
 
 | Event | When | Detail |
 | --- | --- | --- |
-| `sign_in` | Every sign-in, right or wrong | The name given; never the password |
+| `sign_in` | Every sign-in, right or wrong | The name given, or for the identity provider `"via": "oidc"` with the identity ([IDENTITY.md](IDENTITY.md) §5); never the password |
 | `sign_out` | Signing out | |
 | `call:<operation>` | Every short operation, such as `list` or `log` | The request after the checks of USERS.md §4, with snapshots as ids and paths resolved |
 | `start:<operation>` | Every long operation started: `backup`, `restore`, `verify`, `search` | The same |
@@ -18,7 +18,8 @@ When several people share a backup server, the admin must be able to answer "who
 | `cancel` | A request to stop a job | The job number |
 | `share_add`, `share_remove` | Making or removing a share link | The link's id, version, path and end ([SHARE.md](SHARE.md) §6) |
 | `shared:list`, `shared:read` | Every use of a share link, without signing in | The link's id and the path; never the link's secret |
-| `user_add`, `user_change`, `user_password`, `user_remove` | `apeiron web user` | The name, role, backups and folders; never the password |
+| `user_add`, `user_change`, `user_password`, `user_remove` | `apeiron web user` | The name, role, backups, folders and identity; never the password |
+| `oidc_set`, `oidc_remove` | `apeiron web oidc` | The provider's settings; never the client secret |
 
 An operation refused by the checks is recorded with its error, so attempts are visible too. Polling a job, the session state and the folder browser are not recorded. The desktop interface records nothing: it serves only the person who runs it.
 

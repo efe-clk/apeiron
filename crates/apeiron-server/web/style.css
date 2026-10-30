@@ -113,6 +113,7 @@ a.button {
   text-decoration: none;
 }
 a.button:hover { border-color: var(--accent); }
+a.button.primary { padding: 8px 14px; background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
 button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
 button.link { border: none; background: none; color: var(--accent); padding: 4px 6px; text-decoration: underline; }

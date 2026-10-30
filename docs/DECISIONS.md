@@ -38,6 +38,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [028](#adr-028-users-with-three-roles-backups-by-ref-name-and-visibility-through-parents) | Users and permissions | `admin`, `member`, `reader`; backups as ref names with a prefix; a snapshot is visible when reachable from the user's refs | Accepted |
 | [029](#adr-029-the-audit-log-is-a-hash-chained-json-lines-file-written-before-anything-happens) | Audit log | JSON lines with a SHA-256 chain, appended under a lock and flushed before the request goes on; a request that cannot be recorded fails | Accepted |
 | [030](#adr-030-sharing-is-by-expiring-links-to-a-fixed-version-kept-only-as-hashes) | Sharing | A random secret in the link, only its SHA-256 kept; a fixed version and path; 1 to 30 days; ends when the owner may no longer share it | Accepted |
+| [031](#adr-031-central-identity-is-openid-connect-with-users-still-listed-in-webjson) | Central identity | OpenID Connect code flow with PKCE; RS256/ES256 tokens checked against the provider's keys; one claim names a user listed in `web.json`; passwords stay possible | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28.
 
@@ -657,3 +658,25 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Keeping the secret so the link can be shown again | Anyone who reads the file could use every link |
 
 **Consequences.** A lost link cannot be shown again; a new one must be made. Anyone who holds the link can read what it names until it ends, so it must be sent over a channel the sharer trusts. Each use reads the shares file and the users file, which is fine for the numbers of a home or small office. Folders are downloaded one file at a time until archives are added.
+
+## ADR-031: Central identity is OpenID Connect, with users still listed in web.json
+
+**Status:** Accepted (2026-10-30)
+
+**Context.** Stage 5 work item 1 lets the people of an organization sign in to the web interface with the account they already have ([IDENTITY.md](IDENTITY.md)). Organizations use many identity products; the server must work with the common ones, must not let a forged or replayed sign-in through, and must stay reachable when the provider is down.
+
+**Decision.** The server is an OpenID Connect relying party using the authorization code flow with PKCE, a state tied to the browser by a short-lived cookie, and a nonce. It reads the provider's settings and keys from the issuer's well-known address and checks the ID token itself: an RS256 or ES256 signature with a published key, the issuer, the audience, the expiry and the nonce. One configured claim, `email` by default, names the user, who must be listed in `web.json` with that identity; the role, backups and folders stay there. A user may keep a password, so an `admin` can sign in when the provider cannot be reached.
+
+**Rationale.** OpenID Connect is spoken by every common provider, including the ones that put LDAP or Active Directory behind them, so one protocol reaches them all. The code flow with PKCE keeps tokens out of the browser's address bar, and checking the token on the server with the provider's keys means no trust in the network path beyond TLS. Accepting only two asymmetric algorithms rules out the `none` and shared-secret confusions JSON Web Tokens are known for. Keeping users listed in `web.json` means an account at the provider gives no access to backups by itself; the admin still decides who sees what.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| LDAP bind against a directory | Passwords would pass through the backup server, second factors would be lost, and cloud providers do not offer it |
+| SAML | XML signatures are hard to check safely, and every provider that speaks SAML also speaks OpenID Connect |
+| A general OpenID Connect library | Brings a second HTTP stack and many features not used here; the checks needed fit in one small module with the crypto library already in use |
+| Creating users from any account the provider confirms | Anyone in the organization could reach the server; groups mapped to roles may come later |
+| A proxy in front that does the sign-in | Needs another program to run and trust, and the audit log would no longer see who signed in |
+
+**Consequences.** The admin registers the server at the provider and keeps the client secret in `web.json`, readable only by its owner. Accounts turned off at the provider keep sessions already open until they end. Only RS256 and ES256 tokens work; a provider set to anything else must be changed. Users are still added one by one with `apeiron web user add --oidc`.

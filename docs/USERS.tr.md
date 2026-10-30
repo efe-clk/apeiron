@@ -38,7 +38,8 @@ Kullanıcılar, yapılandırma klasöründeki ve yalnızca sahibinin okuyabildi�
 | Alan | Anlamı |
 | --- | --- |
 | `name` | 1 ile 32 arasında küçük harf, rakam, `-` ve `_` |
-| `password` | En az 8 karakterlik parolanın Argon2id özeti |
+| `password` | En az 8 karakterlik parolanın Argon2id özeti; `oidc` alanı olan bir kullanıcı için boş bırakılabilir |
+| `oidc` | Kullanıcının, kurumun kimlik sağlayıcısındaki kimliği ([IDENTITY.tr.md](IDENTITY.tr.md)) |
 | `role` | `admin`, `member` ya da `reader` |
 | `backups` | Ref adları, önek için sonda `*` ile; `admin` için kullanılmaz |
 | `folders` | Sunucunun klasörleri |
@@ -80,7 +81,7 @@ Sayfalar kullanıcının adını Oturumu kapat'ın yanında gösterir ve rolün 
 | Kimin ne yaptığının kaydı | 4. iş ([AUDIT.tr.md](AUDIT.tr.md)) |
 | Kullanıcı başına ayrı şifreleme anahtarları | Kullanıcılar deponun anahtarını paylaşır; anahtarı sunucu tutar |
 | Masaüstü arayüzünde kullanıcılar | Gerekmez: yalnızca onu çalıştıran kullanıcıya hizmet eder |
-| Merkezi kimlik (LDAP, OIDC) | Aşama 5 |
+| Merkezi kimlik | Aşama 5'in 1. işi ([IDENTITY.tr.md](IDENTITY.tr.md)) |
 
 ## 6. Crate'ler
 

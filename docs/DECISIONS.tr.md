@@ -38,6 +38,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [028](#adr-028-üç-rollü-kullanıcılar-ref-adıyla-yedekler-ve-üst-sürümler-yoluyla-görünürlük) | Kullanıcılar ve izinler | `admin`, `member`, `reader`; önekli ref adları olarak yedekler; kullanıcının ref'lerinden ulaşılabilen snapshot görünür | Kabul edildi |
 | [029](#adr-029-denetim-kaydı-her-şeyden-önce-yazılan-özet-zincirli-bir-json-satırları-dosyasıdır) | Denetim kaydı | SHA-256 zincirli JSON satırları; bir kilit altında eklenir ve istek sürmeden önce diske aktarılır; kaydedilemeyen istek başarısız olur | Kabul edildi |
 | [030](#adr-030-paylaşım-yalnızca-özetleri-tutulan-sabit-bir-sürüme-süreli-bağlantılarladır) | Paylaşım | Bağlantıda rastgele bir gizli kısım, yalnızca SHA-256 özeti tutulur; sabit bir sürüm ve yol; 1 ile 30 gün; sahibi artık paylaşamadığında biter | Kabul edildi |
+| [031](#adr-031-merkezi-kimlik-kullanıcıları-hâlâ-webjson-içinde-listelenen-openid-connecttir) | Merkezi kimlik | PKCE'li OpenID Connect kod akışı; sağlayıcının anahtarlarıyla denetlenen RS256/ES256 belirteçleri; bir alan `web.json` içinde listelenen bir kullanıcıyı adlandırır; parolalar mümkün kalır | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
@@ -657,3 +658,25 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Bağlantının yeniden gösterilebilmesi için gizli kısmı tutmak | Dosyayı okuyabilen herkes her bağlantıyı kullanabilirdi |
 
 **Sonuçlar.** Kaybolan bir bağlantı yeniden gösterilemez; yenisi oluşturulmalıdır. Bağlantıya sahip olan herkes, bitene kadar onun gösterdiğini okuyabilir; bu yüzden paylaşanın güvendiği bir yoldan gönderilmelidir. Her kullanım paylaşımlar dosyasını ve kullanıcılar dosyasını okur; bu bir ev ya da küçük ofisin sayıları için sorun değildir. Arşivler eklenene kadar klasörler dosya dosya indirilir.
+
+## ADR-031: Merkezi kimlik, kullanıcıları hâlâ web.json içinde listelenen OpenID Connect'tir
+
+**Durum:** Kabul edildi (2026-10-30)
+
+**Bağlam.** Aşama 5'in 1. işi, bir kurumun çalışanlarının web arayüzünde zaten sahip oldukları hesapla oturum açmasını sağlar ([IDENTITY.tr.md](IDENTITY.tr.md)). Kurumlar pek çok kimlik ürünü kullanır; sunucu yaygın olanlarla çalışmalı, sahte ya da yeniden oynatılan bir oturum açmayı geçirmemeli ve sağlayıcı çalışmadığında da ulaşılabilir kalmalıdır.
+
+**Karar.** Sunucu, PKCE'li yetkilendirme kodu akışını, kısa ömürlü bir çerezle tarayıcıya bağlanan bir state'i ve bir nonce'u kullanan bir OpenID Connect güvenen tarafıdır (relying party). Sağlayıcının ayarlarını ve anahtarlarını yayıncının bilinen adresinden okur ve ID belirtecini kendisi denetler: yayımlanmış bir anahtarla RS256 ya da ES256 imzası, yayıncı, hedef, süre ve nonce. Ayarlanmış tek bir alan, varsayılan olarak `email`, kullanıcıyı adlandırır; kullanıcı o kimlikle `web.json` içinde listelenmiş olmalıdır; rol, yedekler ve klasörler orada kalır. Bir kullanıcı parolasını tutabilir; böylece sağlayıcıya ulaşılamadığında bir `admin` oturum açabilir.
+
+**Gerekçe.** OpenID Connect'i, LDAP ya da Active Directory'yi arkalarına koyanlar da dahil her yaygın sağlayıcı konuşur; bu yüzden tek bir protokol hepsine ulaşır. PKCE'li kod akışı belirteçleri tarayıcının adres çubuğundan uzak tutar; belirteci sunucuda sağlayıcının anahtarlarıyla denetlemek, ağ yoluna TLS'in ötesinde güvenmemek demektir. Yalnızca iki asimetrik algoritmayı kabul etmek, JSON Web Token'ların bilinen `none` ve paylaşılan gizli anahtar karışıklıklarını dışarıda bırakır. Kullanıcıları `web.json` içinde listelemek, sağlayıcıdaki bir hesabın tek başına yedeklere erişim vermemesi demektir; kimin neyi göreceğine yine admin karar verir.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Bir dizine LDAP bind | Parolalar yedek sunucusundan geçerdi, ikinci adımlar kaybolurdu ve bulut sağlayıcıları bunu sunmaz |
+| SAML | XML imzalarını güvenle denetlemek zordur ve SAML konuşan her sağlayıcı OpenID Connect de konuşur |
+| Genel bir OpenID Connect kütüphanesi | İkinci bir HTTP yığını ve burada kullanılmayan pek çok özellik getirir; gereken denetimler, zaten kullanılan şifreleme kütüphanesiyle küçük bir modüle sığar |
+| Sağlayıcının onayladığı her hesaptan kullanıcı oluşturmak | Kurumdaki herkes sunucuya ulaşabilirdi; rollere eşlenen gruplar sonra gelebilir |
+| Oturum açmayı önde bir vekil sunucuya yaptırmak | Çalıştırılacak ve güvenilecek başka bir program gerekir ve denetim kaydı kimin oturum açtığını artık görmezdi |
+
+**Sonuçlar.** Admin sunucuyu sağlayıcıya kaydeder ve gizli anahtarı, yalnızca sahibinin okuyabildiği `web.json` içinde tutar. Sağlayıcıda kapatılan hesapların zaten açık oturumları bitene kadar sürer. Yalnızca RS256 ve ES256 belirteçleri çalışır; başka bir şeye ayarlanmış bir sağlayıcı değiştirilmelidir. Kullanıcılar hâlâ `apeiron web user add --oidc` ile tek tek eklenir.

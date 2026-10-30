@@ -24,6 +24,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use crate::audit::{Actor, Audit};
+use crate::oidc::{Oidc, OidcConfig};
 use crate::shares::{Share, Shares, gone};
 use crate::users::{Role, User, Users, hash_password};
 use crate::{App, Failure, Mode, Running, blocking, body, invalid, lock};
@@ -151,8 +152,9 @@ pub struct WebOptions {
 
 struct Session {
     user: String,
-    /// The password hash at sign-in; a new password ends the session.
-    password: String,
+    /// The user's password hash and identity at sign-in; a change to
+    /// either ends the session.
+    stamp: String,
     made: Instant,
     used: Instant,
 }
@@ -162,6 +164,15 @@ struct Attempts {
     wrong: u32,
     paused_until: Option<Instant>,
 }
+
+/// What a session of `user` stays valid with.
+fn stamp(user: &User) -> String {
+    format!("{}\n{}", user.password, user.oidc.as_deref().unwrap_or(""))
+}
+
+/// The cookie that ties a sign-in through the identity provider to the
+/// browser that started it (IDENTITY.md §3).
+const OIDC_COOKIE: &str = "apeiron_oidc";
 
 /// The users file as last read.
 struct Loaded {
@@ -203,15 +214,46 @@ pub(crate) struct WebState {
     /// Checked when the name is unknown, so that takes as long as a wrong
     /// password.
     decoy: String,
+    oidc: Oidc,
 }
 
 fn cookie_value(headers: &HeaderMap) -> Option<&str> {
+    named_cookie(headers, COOKIE)
+}
+
+fn named_cookie<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
     headers
         .get_all(header::COOKIE)
         .iter()
         .filter_map(|v| v.to_str().ok())
         .flat_map(|v| v.split(';'))
-        .find_map(|pair| pair.trim().strip_prefix(COOKIE)?.strip_prefix('='))
+        .find_map(|pair| pair.trim().strip_prefix(name)?.strip_prefix('='))
+}
+
+fn no_provider() -> Error {
+    Error::new(
+        ErrorKind::Unsupported,
+        "no identity provider is set up; see `apeiron web oidc set`",
+    )
+}
+
+/// The kind of an error as its JSON name, such as `key`.
+fn kind_name(e: &Error) -> String {
+    serde_json::to_value(e.kind)
+        .ok()
+        .and_then(|v| v.as_str().map(str::to_owned))
+        .unwrap_or_else(|| "internal".to_owned())
+}
+
+/// A redirect to `to` that sets `cookies`.
+fn redirect(to: &str, cookies: &[String]) -> Response {
+    let mut response = (StatusCode::FOUND, [(header::LOCATION, to.to_owned())]).into_response();
+    for cookie in cookies {
+        if let Ok(v) = HeaderValue::from_str(cookie) {
+            response.headers_mut().append(header::SET_COOKIE, v);
+        }
+    }
+    response
 }
 
 fn random_hex() -> Result<String, Error> {
@@ -242,8 +284,8 @@ fn hidden() -> Error {
 }
 
 impl WebState {
-    /// The user named `name` in the users file as it is now.
-    fn user(&self, name: &str) -> Option<User> {
+    /// The users file as it is now.
+    fn users(&self) -> std::sync::MutexGuard<'_, Loaded> {
         let modified = fs::metadata(&self.users_file)
             .and_then(|m| m.modified())
             .ok();
@@ -254,19 +296,29 @@ impl WebState {
                 *loaded = Loaded { modified, users };
             }
         }
-        loaded.users.get(name).cloned()
+        loaded
+    }
+
+    /// The user named `name` in the users file as it is now.
+    fn user(&self, name: &str) -> Option<User> {
+        self.users().users.get(name).cloned()
+    }
+
+    /// The identity provider's settings, if sign-ins through one are on.
+    pub(crate) fn oidc_config(&self) -> Option<OidcConfig> {
+        self.users().users.oidc.clone()
     }
 
     /// The user of the request's live session; using it keeps it alive.
     pub(crate) fn current(&self, headers: &HeaderMap) -> Option<User> {
         let id = cookie_value(headers)?;
-        let (name, password) = {
+        let (name, kept) = {
             let mut sessions = lock(&self.sessions);
             let now = Instant::now();
             match sessions.get_mut(id) {
                 Some(s) if now - s.used < IDLE && now - s.made < LIFETIME => {
                     s.used = now;
-                    (s.user.clone(), s.password.clone())
+                    (s.user.clone(), s.stamp.clone())
                 }
                 Some(_) => {
                     sessions.remove(id);
@@ -276,7 +328,7 @@ impl WebState {
             }
         };
         match self.user(&name) {
-            Some(user) if user.password == password => Some(user),
+            Some(user) if stamp(&user) == kept => Some(user),
             _ => {
                 lock(&self.sessions).remove(id);
                 None
@@ -318,8 +370,9 @@ impl WebState {
         let user = blocking(move || {
             Ok(match user {
                 Some(user) if user.verify(&r.password) => Some(user),
-                Some(_) => None,
-                None => {
+                // A user without a password takes as long as anyone.
+                Some(user) if !user.password.is_empty() => None,
+                _ => {
                     let _ =
                         Argon2::default().verify_password(r.password.as_bytes(), decoy.as_str());
                     None
@@ -338,22 +391,127 @@ impl WebState {
         };
         record(Some(&user.name), "ok")?;
         *attempts = Attempts::default();
+        Ok(with_cookie(json!({}), &self.new_session(&user)?))
+    }
+
+    /// Starts a session of `user`; returns its cookie.
+    fn new_session(&self, user: &User) -> Result<String, Error> {
         let id = random_hex()?;
+        let now = Instant::now();
         let mut sessions = lock(&self.sessions);
         sessions.retain(|_, s| now - s.used < IDLE && now - s.made < LIFETIME);
         sessions.insert(
             id.clone(),
             Session {
-                user: user.name,
-                password: user.password,
+                user: user.name.clone(),
+                stamp: stamp(user),
                 made: now,
                 used: now,
             },
         );
-        Ok(with_cookie(
-            json!({}),
-            &format!("{COOKIE}={id}; HttpOnly; Secure; SameSite=Strict; Path=/"),
+        Ok(format!(
+            "{COOKIE}={id}; HttpOnly; Secure; SameSite=Strict; Path=/"
         ))
+    }
+
+    /// Sends the browser to the identity provider (IDENTITY.md §3).
+    pub(crate) async fn oidc_start(&self) -> Response {
+        let result = async {
+            let config = self.oidc_config().ok_or_else(no_provider)?;
+            self.oidc.start(&config).await
+        }
+        .await;
+        match result {
+            Ok((url, state)) => redirect(
+                &url,
+                &[format!(
+                    "{OIDC_COOKIE}={state}; HttpOnly; Secure; SameSite=Lax; Path=/api/oidc; Max-Age=600"
+                )],
+            ),
+            Err(e) => redirect(&format!("/#oidc_error={}", kind_name(&e)), &[]),
+        }
+    }
+
+    /// Where the identity provider sends the browser back: checks the sign-in,
+    /// starts a session and goes to the pages (IDENTITY.md §3).
+    pub(crate) async fn oidc_callback(
+        &self,
+        headers: &HeaderMap,
+        query: &HashMap<String, String>,
+        from: Option<String>,
+    ) -> Response {
+        let clear =
+            format!("{OIDC_COOKIE}=; HttpOnly; Secure; SameSite=Lax; Path=/api/oidc; Max-Age=0");
+        let result = async {
+            let config = self.oidc_config().ok_or_else(|| (None, no_provider()))?;
+            if let Some(error) = query.get("error") {
+                return Err((
+                    None,
+                    Error::new(
+                        ErrorKind::Key,
+                        format!("the identity provider said {error}"),
+                    ),
+                ));
+            }
+            let state = query.get("state").map(String::as_str).unwrap_or("");
+            // The state must come back to the browser that started the sign-in.
+            if state.is_empty() || named_cookie(headers, OIDC_COOKIE) != Some(state) {
+                return Err((
+                    None,
+                    Error::new(
+                        ErrorKind::Key,
+                        "this sign-in was started in another browser",
+                    ),
+                ));
+            }
+            let code = query.get("code").map(String::as_str).unwrap_or("");
+            let value = self
+                .oidc
+                .finish(&config, code, state)
+                .await
+                .map_err(|e| (None, e))?;
+            let user = self
+                .users()
+                .users
+                .by_identity(&value)
+                .cloned()
+                .ok_or_else(|| {
+                    (
+                        Some(value.clone()),
+                        Error::new(ErrorKind::Key, format!("no user of this server is {value}")),
+                    )
+                })?;
+            Ok((value, user))
+        }
+        .await;
+        let actor = |user: Option<&str>| Actor {
+            user: user.map(str::to_owned),
+            from: from.clone(),
+        };
+        match result {
+            Ok((value, user)) => {
+                let recorded = self.audit.record(
+                    &actor(Some(&user.name)),
+                    "sign_in",
+                    json!({"via": "oidc", "identity": value}),
+                    "ok",
+                );
+                match recorded.and_then(|()| self.new_session(&user)) {
+                    Ok(cookie) => redirect("/", &[cookie, clear]),
+                    Err(e) => Failure::from(e).into_response(),
+                }
+            }
+            Err((value, e)) => {
+                let detail = json!({"via": "oidc", "identity": value, "error": e.message});
+                if let Err(e) = self
+                    .audit
+                    .record(&actor(None), "sign_in", detail, &kind_name(&e))
+                {
+                    return Failure::from(e).into_response();
+                }
+                redirect(&format!("/#oidc_error={}", kind_name(&e)), &[clear])
+            }
+        }
     }
 
     pub(crate) fn logout(&self, headers: &HeaderMap, who: Option<&Who>) -> Response {
@@ -728,6 +886,7 @@ impl Web {
                 attempts: tokio::sync::Mutex::new(Attempts::default()),
                 reachable: Mutex::new(HashMap::new()),
                 decoy: hash_password("not the password of anyone")?,
+                oidc: Oidc::new()?,
             })),
             repo: Mutex::new(Some(options.repo)),
             jobs: Mutex::new(HashMap::new()),

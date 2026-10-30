@@ -7,6 +7,7 @@
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 
 mod audit;
+mod oidc;
 mod shares;
 mod users;
 mod web;
@@ -22,6 +23,7 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 pub use audit::{Actor, Audit, Event, Verified};
+pub use oidc::{OidcConfig, Provider, check_provider};
 pub use shares::{DEFAULT_DAYS, MAX_DAYS, Share, Shares};
 pub use users::{MIN_PASSWORD, Role, User, Users, hash_password};
 pub use web::{Tls, Web, WebOptions};
@@ -219,8 +221,10 @@ async fn guard(State(app): State<Arc<App>>, mut request: Request, next: Next) ->
                 }
             }
             // A share link is used without signing in (SHARE.md §4).
-            let open = matches!(request.uri().path(), "/api/session" | "/api/login")
-                || request.uri().path().starts_with("/api/shared/");
+            let open = matches!(
+                request.uri().path(),
+                "/api/session" | "/api/login" | "/api/oidc/start" | "/api/oidc/callback"
+            ) || request.uri().path().starts_with("/api/shared/");
             match web.current(headers) {
                 Some(user) => {
                     let from = peer(&request);
@@ -628,7 +632,11 @@ impl Options {
 async fn session(State(app): State<Arc<App>>, user: Option<Extension<Who>>) -> Answer {
     Ok(axum::Json(match (&app.mode, user) {
         (Mode::Local { .. }, _) => json!({"mode": "local", "signed_in": true}),
-        (Mode::Web(_), None) => json!({"mode": "web", "signed_in": false}),
+        (Mode::Web(web), None) => json!({
+            "mode": "web",
+            "signed_in": false,
+            "oidc": web.oidc_config().is_some(),
+        }),
         (Mode::Web(_), Some(Extension(who))) => json!({
             "mode": "web",
             "signed_in": true,
@@ -907,11 +915,35 @@ fn percent(text: &str) -> String {
         .collect()
 }
 
+/// Sends the browser to the identity provider (IDENTITY.md §3).
+async fn oidc_start(State(app): State<Arc<App>>) -> Response {
+    match &app.mode {
+        Mode::Web(web) => web.oidc_start().await,
+        Mode::Local { .. } => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+/// Where the identity provider sends the browser back.
+async fn oidc_callback(
+    State(app): State<Arc<App>>,
+    Query(query): Query<HashMap<String, String>>,
+    from: Option<Extension<ConnectInfo<SocketAddr>>>,
+    headers: axum::http::HeaderMap,
+) -> Response {
+    let from = from.map(|c| c.0.0.to_string());
+    match &app.mode {
+        Mode::Web(web) => web.oidc_callback(&headers, &query, from).await,
+        Mode::Local { .. } => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
 fn router(app: Arc<App>) -> Router {
     Router::new()
         .route("/api/session", get(session))
         .route("/api/login", post(login))
         .route("/api/logout", post(logout))
+        .route("/api/oidc/start", get(oidc_start))
+        .route("/api/oidc/callback", get(oidc_callback))
         .route("/api/state", get(state))
         .route("/api/open", post(open))
         .route("/api/init", post(init))

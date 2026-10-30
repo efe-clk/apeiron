@@ -4,7 +4,7 @@
 
 Pahalı kararlar (format, nesne modeli, API ve eklenti sınırı) Aşama 0'da verilir; geri kalan her şey bu temelin üstüne kurulur. Her aşama kendi başına kullanılabilir bir ürün bırakır. Aşamalar ve çıkış kriterleri [VISION.tr.md](VISION.tr.md) belgesinden alınmıştır.
 
-**Şu anki aşama: Aşama 5 — Kurumsal (Planlandı).** Aşama 0 ve Aşama 1 2026-10-28'de, Aşama 2 ve Aşama 3 2026-10-29'da, Aşama 4 2026-10-30'da tamamlandı; Aşama 1'in ve Aşama 2'nin bir aylık denemeleri proje sahibinin kararıyla atlandı.
+**Şu anki aşama: Aşama 5 — Kurumsal (Devam ediyor).** Aşama 0 ve Aşama 1 2026-10-28'de, Aşama 2 ve Aşama 3 2026-10-29'da, Aşama 4 2026-10-30'da tamamlandı; Aşama 1'in ve Aşama 2'nin bir aylık denemeleri proje sahibinin kararıyla atlandı.
 
 ## 1. Genel bakış
 
@@ -15,7 +15,7 @@ flowchart LR
     S2["Aşama 2<br/>Uzak ve senkron<br/>Tamamlandı"]
     S3["Aşama 3<br/>Geliştirici ve ekosistem<br/>Tamamlandı"]
     S4["Aşama 4<br/>Arayüzler ve çok kullanıcı<br/>Tamamlandı"]
-    S5["Aşama 5<br/>Kurumsal<br/>Planlandı"]
+    S5["Aşama 5<br/>Kurumsal<br/>Devam ediyor"]
     S0 --> S1 --> S2 --> S3 --> S4 --> S5
 ```
 
@@ -26,7 +26,7 @@ flowchart LR
 | 2. Uzak ve senkron | Arka plan hizmeti, zamanlanmış yedek, şifreleme, SFTP ve S3 hedefleri, tek/çift yönlü senkron, çatışma tespiti, geri yükleme testi | İki cihaz ve bir uzak sunucu arasında bir ay sorunsuz senkron | Tamamlandı (bir aylık deneme atlandı) |
 | 3. Geliştirici ve ekosistem | Dal ve birleştirme, Git içe/dışa aktarma (hedef: Git ağ protokolü), C ABI ve Python SDK, WebAssembly eklenti sistemi, metin diff eklentisi, arama | Gerçek bir Git deposu Apeiron'a taşınıp geri alınabiliyor | Tamamlandı |
 | 4. Arayüzler ve çok kullanıcı | Masaüstü ve web arayüzü, kullanıcı ve izinler, denetim kaydı, paylaşım | Teknik olmayan bir kullanıcı CLI'sız yedek alıp geri yükleyebiliyor | Tamamlandı |
-| 5. Kurumsal | Merkezi kimlik, çok kiracılı kullanım, replikasyon, yüksek erişilebilirlik, değiştirilemez arşiv, uyumluluk raporları | İlk kurumsal pilot kurulum | Planlandı |
+| 5. Kurumsal | Merkezi kimlik, çok kiracılı kullanım, replikasyon, yüksek erişilebilirlik, değiştirilemez arşiv, uyumluluk raporları | İlk kurumsal pilot kurulum | Devam ediyor |
 
 ## 2. Aşama 0 — Format ve çekirdek
 
@@ -103,10 +103,12 @@ Masaüstü arayüzü önce gelir, çünkü çıkış kriterini tek başına kar�
 
 **Çıkış kriteri:** İlk kurumsal pilot kurulum.
 
-| İş | Durum |
-| --- | --- |
-| Merkezi kimlik | Planlandı |
-| Çok kiracılı kullanım | Planlandı |
-| Replikasyon ve yüksek erişilebilirlik | Planlandı |
-| Değiştirilemez arşiv | Planlandı |
-| Uyumluluk raporları | Planlandı |
+Merkezi kimlik önce gelir, çünkü pilot bir kurum her şeyden önce çalışanlarını kendi kimlik sağlayıcısı üzerinden oturum açtırır.
+
+| # | İş | Durum |
+| --- | --- | --- |
+| 1 | Merkezi kimlik ([IDENTITY.tr.md](IDENTITY.tr.md)) | Tamamlandı |
+| 2 | Çok kiracılı kullanım | Planlandı |
+| 3 | Replikasyon ve yüksek erişilebilirlik | Planlandı |
+| 4 | Değiştirilemez arşiv | Planlandı |
+| 5 | Uyumluluk raporları | Planlandı |

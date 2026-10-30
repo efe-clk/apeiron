@@ -336,6 +336,126 @@ enum WebCommand {
         #[command(subcommand)]
         command: ShareCommand,
     },
+    /// Sign in through an identity provider with OpenID Connect (docs/IDENTITY.md)
+    Oidc {
+        #[command(subcommand)]
+        command: OidcCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum OidcCommand {
+    /// Set up the identity provider; asks for the client secret
+    Set {
+        /// The provider's issuer URL
+        #[arg(long)]
+        issuer: String,
+        /// The id of this server at the provider
+        #[arg(long)]
+        client_id: String,
+        /// The address browsers reach this server at, such as https://backup.example.com
+        #[arg(long)]
+        address: String,
+        /// The claim of the ID token that names a user
+        #[arg(long, default_value = "email")]
+        claim: String,
+        /// Read the client secret from this file instead of asking; an empty
+        /// file means none
+        #[arg(long, value_name = "PATH")]
+        client_secret_file: Option<PathBuf>,
+    },
+    /// Show the settings, without the secret
+    Show,
+    /// Read the provider's settings and keys, to see that it can be reached
+    Check,
+    /// Turn signing in through the provider off
+    Remove,
+}
+
+fn web_oidc(file: &Path, command: OidcCommand, out: &Output) -> Result<(), Failure> {
+    let mut users = apeiron_server::Users::load(file)?;
+    let not_set =
+        || Failure::Usage("no identity provider is set up; use `apeiron web oidc set`".to_owned());
+    // The secret is never shown or recorded.
+    let view = |c: &apeiron_server::OidcConfig| {
+        serde_json::json!({
+            "issuer": c.issuer, "client_id": c.client_id, "address": c.address,
+            "claim": c.claim, "secret": c.client_secret.is_some(),
+        })
+    };
+    match command {
+        OidcCommand::Set {
+            issuer,
+            client_id,
+            address,
+            claim,
+            client_secret_file,
+        } => {
+            let secret = match client_secret_file {
+                Some(path) => std::fs::read_to_string(&path)
+                    .map_err(|e| Failure::Usage(format!("cannot read {}: {e}", path.display())))?
+                    .trim()
+                    .to_owned(),
+                None => prompt("Client secret (empty if there is none): ")?,
+            };
+            let config = apeiron_server::OidcConfig {
+                issuer,
+                client_id,
+                client_secret: Some(secret).filter(|s| !s.is_empty()),
+                address,
+                claim,
+            };
+            config.check()?;
+            say!(
+                "Redirect address to register at the provider: {}",
+                config.redirect()
+            );
+            let detail = view(&config);
+            users.oidc = Some(config);
+            users.save(file)?;
+            audit_log()?.record(&apeiron_server::Actor::default(), "oidc_set", detail, "ok")?;
+        }
+        OidcCommand::Show => {
+            let config = users.oidc.as_ref().ok_or_else(not_set)?;
+            out.result(&view(config), |_| {
+                say!("issuer: {}", config.issuer);
+                say!("client id: {}", config.client_id);
+                say!(
+                    "client secret: {}",
+                    if config.client_secret.is_some() {
+                        "set"
+                    } else {
+                        "none"
+                    }
+                );
+                say!("address: {}", config.address);
+                say!("redirect address: {}", config.redirect());
+                say!("claim: {}", config.claim);
+            });
+        }
+        OidcCommand::Check => {
+            let config = users.oidc.as_ref().ok_or_else(not_set)?;
+            let (provider, keys) = apeiron_server::check_provider(config)?;
+            out.result(&provider, |p| {
+                say!("The identity provider {} answers.", p.issuer);
+                say!("Sign-in page: {}", p.authorization_endpoint);
+                say!("Token address: {}", p.token_endpoint);
+                say!("Signing keys: {keys}");
+            });
+        }
+        OidcCommand::Remove => {
+            users.oidc.take().ok_or_else(not_set)?;
+            users.save(file)?;
+            audit_log()?.record(
+                &apeiron_server::Actor::default(),
+                "oidc_remove",
+                serde_json::Value::Null,
+                "ok",
+            )?;
+            say!("Signing in through the identity provider is off.");
+        }
+    }
+    Ok(())
 }
 
 #[derive(Subcommand)]
@@ -472,6 +592,10 @@ enum UserCommand {
         /// A folder of the server the user may use
         #[arg(long = "folder", value_name = "PATH")]
         folders: Vec<PathBuf>,
+        /// The user's identity at the identity provider, such as an e-mail
+        /// address; the user then needs no password
+        #[arg(long, value_name = "IDENTITY")]
+        oidc: Option<String>,
     },
     /// Replace the role, backups or folders of a user
     Change {
@@ -482,6 +606,12 @@ enum UserCommand {
         backups: Vec<String>,
         #[arg(long = "folder", value_name = "PATH")]
         folders: Vec<PathBuf>,
+        /// The user's identity at the identity provider
+        #[arg(long, value_name = "IDENTITY")]
+        oidc: Option<String>,
+        /// Remove the user's password, so it signs in only through the provider
+        #[arg(long)]
+        no_password: bool,
     },
     /// Set a new password for a user; ends the user's sessions
     Password { name: String },
@@ -515,6 +645,8 @@ struct UserView {
     role: apeiron_server::Role,
     backups: Vec<String>,
     folders: Vec<PathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    oidc: Option<String>,
 }
 
 /// Asks twice for a new sign-in password and hashes it.
@@ -534,6 +666,7 @@ fn web_user(file: &Path, command: UserCommand, out: &Output) -> Result<(), Failu
         let detail = match user {
             Some(u) => serde_json::json!({
                 "name": u.name, "role": u.role, "backups": u.backups, "folders": u.folders,
+                "oidc": u.oidc,
             }),
             None => serde_json::json!({ "name": name }),
         };
@@ -549,6 +682,7 @@ fn web_user(file: &Path, command: UserCommand, out: &Output) -> Result<(), Failu
                     role: u.role,
                     backups: u.backups,
                     folders: u.folders,
+                    oidc: u.oidc,
                 })
                 .collect();
             out.result(&list, |list| {
@@ -556,7 +690,7 @@ fn web_user(file: &Path, command: UserCommand, out: &Output) -> Result<(), Failu
                     let folders: Vec<String> =
                         u.folders.iter().map(|f| f.display().to_string()).collect();
                     say!(
-                        "{}  {}  backups: {}  folders: {}",
+                        "{}  {}  backups: {}  folders: {}{}",
                         u.name,
                         u.role.name(),
                         if u.role == apeiron_server::Role::Admin {
@@ -564,7 +698,11 @@ fn web_user(file: &Path, command: UserCommand, out: &Output) -> Result<(), Failu
                         } else {
                             u.backups.join(" ")
                         },
-                        folders.join(" ")
+                        folders.join(" "),
+                        u.oidc
+                            .as_deref()
+                            .map(|i| format!("  identity: {i}"))
+                            .unwrap_or_default()
                     );
                 }
                 if list.is_empty() {
@@ -578,6 +716,7 @@ fn web_user(file: &Path, command: UserCommand, out: &Output) -> Result<(), Failu
             role,
             backups,
             folders,
+            oidc,
         } => {
             if users.get(&name).is_some() {
                 return Err(Error::new(
@@ -586,13 +725,17 @@ fn web_user(file: &Path, command: UserCommand, out: &Output) -> Result<(), Failu
                 )
                 .into());
             }
-            let password = new_login_password()?;
+            let password = match oidc {
+                Some(_) => String::new(),
+                None => new_login_password()?,
+            };
             users.add(apeiron_server::User {
                 name: name.clone(),
                 password,
                 role: role.into(),
                 backups,
                 folders,
+                oidc,
             })?;
             users.need_admin()?;
             users.save(file)?;
@@ -604,8 +747,21 @@ fn web_user(file: &Path, command: UserCommand, out: &Output) -> Result<(), Failu
             role,
             backups,
             folders,
+            oidc,
+            no_password,
         } => {
             let user = users.get_mut(&name)?;
+            if oidc.is_some() {
+                user.oidc = oidc;
+            }
+            if no_password {
+                if user.oidc.is_none() {
+                    return Err(Failure::Usage(format!(
+                        "{name} would have no way to sign in; give it an identity with --oidc"
+                    )));
+                }
+                user.password.clear();
+            }
             if let Some(role) = role {
                 user.role = role.into();
             }
@@ -1304,6 +1460,10 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     return Ok(0);
                 }
                 Some(WebCommand::Audit { command }) => return web_audit(command, out),
+                Some(WebCommand::Oidc { command }) => {
+                    web_oidc(&users_file, command, out)?;
+                    return Ok(0);
+                }
                 Some(WebCommand::Share { command }) => {
                     web_share(command, out)?;
                     return Ok(0);

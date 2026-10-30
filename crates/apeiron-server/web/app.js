@@ -13,6 +13,11 @@ if (fragment.get("token")) {
   history.replaceState(null, "", "/");
 }
 const token = sessionStorage.getItem("apeiron-token") || "";
+// A sign-in through the identity provider that did not work (IDENTITY.md §4).
+const oidcError = fragment.get("oidc_error");
+if (oidcError) history.replaceState(null, "", "/");
+// Whether the sign-in screen offers the identity provider.
+let oidc = false;
 // "local" with a token, or "web" with a sign-in cookie.
 let mode = "local";
 // The signed-in user in web mode: {name, role} (USERS.md §4).
@@ -772,7 +777,7 @@ async function activity() {
 
 // ---- Signing in (WEB.md §4) ----
 
-function signIn() {
+function signIn(error = null) {
   nav.hidden = true;
   const name = h("input", { type: "text", autocomplete: "username", autocapitalize: "none", spellcheck: "false", required: true });
   const password = h("input", { type: "password", autocomplete: "current-password", required: true });
@@ -793,7 +798,13 @@ function signIn() {
     ...field(t("password"), password),
     h("div", { class: "actions" }, h("button", { type: "submit", class: "primary" }, t("sign_in_button"))),
   );
-  show(h("h1", {}, t("sign_in_heading")), h("div", { class: "card" }, h("p", { class: "muted" }, t("sign_in_intro")), form), status);
+  const provider = oidc
+    ? h("div", { class: "card" },
+      h("p", { class: "muted" }, t("oidc_intro")),
+      h("div", { class: "actions" }, h("a", { class: "button primary", href: "/api/oidc/start" }, t("oidc_button"))))
+    : null;
+  if (error) status.replaceChildren(message("bad", error === "key" ? t("oidc_refused") : t("oidc_failed")));
+  show(h("h1", {}, t("sign_in_heading")), provider, h("div", { class: "card" }, h("p", { class: "muted" }, t("sign_in_intro")), form), status);
   name.focus();
 }
 
@@ -809,7 +820,8 @@ async function begin() {
   const session = await api("GET", "/api/session").catch(() => null);
   mode = session?.mode || "local";
   user = session?.user || null;
-  if (!session?.signed_in) return signIn();
+  oidc = session?.oidc === true;
+  if (!session?.signed_in) return signIn(oidcError);
   const state = await api("GET", "/api/state").catch(() => null);
   if (state?.open) opened(state.open.path);
   else start();

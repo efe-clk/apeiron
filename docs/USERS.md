@@ -38,7 +38,8 @@ Users are kept in `web.json` in the configuration folder, readable only by its o
 | Field | Meaning |
 | --- | --- |
 | `name` | 1 to 32 lowercase letters, digits, `-` and `_` |
-| `password` | Argon2id hash of the password, at least 8 characters long |
+| `password` | Argon2id hash of the password, at least 8 characters long; may be left out for a user with `oidc` |
+| `oidc` | The user's identity at the organization's identity provider ([IDENTITY.md](IDENTITY.md)) |
 | `role` | `admin`, `member` or `reader` |
 | `backups` | Ref names, with `*` at the end for a prefix; ignored for `admin` |
 | `folders` | Folders of the server |
@@ -80,7 +81,7 @@ The pages show the user's name next to Sign out and hide what the role cannot do
 | A record of who did what | Work item 4 ([AUDIT.md](AUDIT.md)) |
 | Separate encryption keys per user | Users share the repository's key; the server holds it |
 | Users in the desktop interface | Not needed: it serves only the user who runs it |
-| Central identity (LDAP, OIDC) | Stage 5 |
+| Central identity | Stage 5 work item 1 ([IDENTITY.md](IDENTITY.md)) |
 
 ## 6. Crates
 

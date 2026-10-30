@@ -269,6 +269,8 @@ Everything done in the web interface is recorded. An admin sees it on the Activi
 
 To give someone without an account a folder or file from a backup, look inside the version, press Share and send the link. It works for the days you choose, shows only what you shared, and stops at once when you remove it on the Links page ([SHARE.md](SHARE.md)).
 
+In an organization with its own sign-in service (Keycloak, Microsoft Entra ID, Google Workspace and the like), register the server there, run `apeiron web oidc set --issuer <url> --client-id <id> --address https://<server>` and add people with `apeiron web user add <name> --role member --oidc <their e-mail>`. They then press "Sign in with your organization" and need no password of Apeiron ([IDENTITY.md](IDENTITY.md)).
+
 ## 7. Routine
 
 | How often | Command | Why |

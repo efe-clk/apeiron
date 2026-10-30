@@ -73,4 +73,10 @@ Apeiron; sürüm kontrolü, arşivleme, yedekleme, senkronizasyon ve bütünlük
 4. ~~Denetim kaydı (`docs/AUDIT.md`).~~ Tamamlandı (2026-10-30).
 5. ~~Paylaşım (`docs/SHARE.md`).~~ Tamamlandı (2026-10-30).
 
-**Aşama 5 — Kurumsal.** Planlandı. İşler `docs/ROADMAP.md` §7'de.
+**Aşama 5 — Kurumsal.** Devam ediyor. İşler `docs/ROADMAP.md` §7'de, sırasıyla:
+
+1. ~~Merkezi kimlik (`docs/IDENTITY.md`).~~ Tamamlandı (2026-10-30).
+2. Çok kiracılı kullanım.
+3. Replikasyon ve yüksek erişilebilirlik.
+4. Değiştirilemez arşiv.
+5. Uyumluluk raporları.

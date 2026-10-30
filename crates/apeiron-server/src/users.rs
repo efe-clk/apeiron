@@ -10,6 +10,7 @@ use argon2::password_hash::{PasswordHasher, PasswordVerifier};
 use serde::{Deserialize, Serialize};
 
 use crate::invalid;
+use crate::oidc::OidcConfig;
 
 /// Shortest sign-in password (USERS.md §2).
 pub const MIN_PASSWORD: usize = 8;
@@ -51,7 +52,9 @@ impl std::str::FromStr for Role {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct User {
     pub name: String,
-    /// Argon2id hash of the password, as a PHC string.
+    /// Argon2id hash of the password, as a PHC string; empty when the user
+    /// signs in only through the identity provider (IDENTITY.md §2).
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub password: String,
     pub role: Role,
     /// Ref names, with `*` at the end for a prefix; not used for `admin`.
@@ -60,6 +63,9 @@ pub struct User {
     /// Folders of the server.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub folders: Vec<PathBuf>,
+    /// The value of the identity provider's claim that names this user.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oidc: Option<String>,
 }
 
 impl User {
@@ -74,9 +80,10 @@ impl User {
 
     /// Whether `password` is the user's password.
     pub fn verify(&self, password: &str) -> bool {
-        Argon2::default()
-            .verify_password(password.as_bytes(), self.password.as_str())
-            .is_ok()
+        !self.password.is_empty()
+            && Argon2::default()
+                .verify_password(password.as_bytes(), self.password.as_str())
+                .is_ok()
     }
 }
 
@@ -103,6 +110,9 @@ fn valid_name(name: &str) -> bool {
 /// The users file, `web.json` (USERS.md §2).
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Users {
+    /// Signing in through an identity provider (IDENTITY.md §2).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oidc: Option<OidcConfig>,
     pub users: Vec<User>,
 }
 
@@ -122,12 +132,44 @@ impl Users {
 
     /// Writes the users to `file`, readable only by its owner.
     pub fn save(&self, file: &Path) -> Result<(), Error> {
+        self.check()?;
         let data = serde_json::to_vec_pretty(self)
             .map_err(|e| Error::new(ErrorKind::Internal, e.to_string()))?;
         file.parent()
             .map_or(Ok(()), fs::create_dir_all)
             .and_then(|()| crate::web::write_private(file, &data))
             .map_err(|e| Error::new(ErrorKind::Io, format!("{}: {e}", file.display())))
+    }
+
+    /// Fails when the identity provider's settings cannot work or two
+    /// users have the same identity there.
+    pub fn check(&self) -> Result<(), Error> {
+        if let Some(config) = &self.oidc {
+            config.check()?;
+        }
+        for (i, user) in self.users.iter().enumerate() {
+            let Some(id) = &user.oidc else { continue };
+            if let Some(other) = self.users[..i]
+                .iter()
+                .find(|o| o.oidc.as_ref().is_some_and(|o| o.eq_ignore_ascii_case(id)))
+            {
+                return Err(invalid(format!(
+                    "{} and {} have the same identity {id}",
+                    other.name, user.name
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    /// The user the identity provider names with `value` (IDENTITY.md §3).
+    pub fn by_identity(&self, value: &str) -> Option<&User> {
+        let config = self.oidc.as_ref()?;
+        self.users.iter().find(|u| {
+            u.oidc
+                .as_deref()
+                .is_some_and(|known| config.same(known, value))
+        })
     }
 
     pub fn get(&self, name: &str) -> Option<&User> {
