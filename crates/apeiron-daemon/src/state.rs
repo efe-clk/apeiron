@@ -35,6 +35,18 @@ pub enum RunResult {
     Locked,
 }
 
+impl RunResult {
+    /// How the result is shown to people, in the log and by `status`.
+    pub fn name(self) -> &'static str {
+        match self {
+            RunResult::Ok => "ok",
+            RunResult::Warnings => "ok with warnings",
+            RunResult::Failed => "FAILED",
+            RunResult::Locked => "waiting for a lock",
+        }
+    }
+}
+
 impl State {
     /// Reads the state; a missing or unreadable file is an empty state, so
     /// that every job runs again.

@@ -2403,7 +2403,7 @@ fn run_daemon(
                     say!(
                         "{}: {}: {}",
                         r.job,
-                        result_name(r.run.result),
+                        apeiron_daemon::RunResult::name(r.run.result),
                         r.run.message
                     );
                 }
@@ -2433,7 +2433,7 @@ fn run_daemon(
                                 "{}  {}  {} {}  {next}",
                                 j.name,
                                 j.action,
-                                result_name(last.result),
+                                apeiron_daemon::RunResult::name(last.result),
                                 local_time(last.last_start)
                             );
                             say!("    {}", last.message);
@@ -2485,16 +2485,6 @@ fn open_browser(url: &str) -> std::io::Result<()> {
         let _ = std::fs::remove_file(page);
     });
     launched.map(|_| ())
-}
-
-fn result_name(result: apeiron_daemon::RunResult) -> &'static str {
-    use apeiron_daemon::RunResult;
-    match result {
-        RunResult::Ok => "ok",
-        RunResult::Warnings => "ok with warnings",
-        RunResult::Failed => "FAILED",
-        RunResult::Locked => "waiting for a lock",
-    }
 }
 
 /// A size in bytes, or with `K`, `M` or `G` (powers of 1024).

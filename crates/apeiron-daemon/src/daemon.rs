@@ -136,7 +136,12 @@ impl Daemon {
                 result,
                 message,
             };
-            self.log(&format!("{} {:?}: {}", job.name, run.result, run.message));
+            self.log(&format!(
+                "{} {}: {}",
+                job.name,
+                run.result.name(),
+                run.message
+            ));
             state.jobs.insert(job.name.clone(), run.clone());
             state.save(&self.paths.state_file())?;
             records.push(RunRecord {

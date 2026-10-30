@@ -62,9 +62,10 @@ What `apeiron-core` contains today:
 | `refs` | Ref files, compare-and-swap updates, reflogs | Done |
 | `config` | The repository `config` file | Done |
 | `repo` | Opening/creating a repository, writing and reading objects | Done |
-| Blob, tree, snapshot encoding | Canonical CBOR (FORMAT.md §6) | Planned |
+| `object` | Blob, tree and snapshot encoding as canonical CBOR (FORMAT.md §6) | Done |
 | `crypto`, `keyfile` | Encryption: sealed boxes and key files (FORMAT.md §14) | Done |
-| `remote`, `repo::transfer` | The `remotes` file, the `Store` interface, folder remotes, push and pull (FORMAT.md §15) | Done (folders) |
+| `remote`, `repo::transfer` | The `remotes` file, the `Store` interface, folder remotes, push and pull (FORMAT.md §15); SFTP and S3 stores are in `apeiron-remote` | Done |
+| `retention` | Retention rules and the checks of every ref change (FORMAT.md §16) | Done |
 | Operation log | — | Planned |
 
 ## 3. Object model

@@ -62,9 +62,10 @@ Her crate için geçerli kurallar:
 | `refs` | Ref dosyaları, karşılaştır-ve-değiştir güncellemeleri, reflog'lar | Tamamlandı |
 | `config` | Deponun `config` dosyası | Tamamlandı |
 | `repo` | Depo açma/oluşturma, nesne yazma ve okuma | Tamamlandı |
-| Blob, tree, snapshot kodlaması | Kanonik CBOR (FORMAT.tr.md §6) | Planlandı |
+| `object` | Blob, tree ve snapshot'ın kanonik CBOR olarak kodlanması (FORMAT.tr.md §6) | Tamamlandı |
 | `crypto`, `keyfile` | Şifreleme: mühürlü kutular ve anahtar dosyaları (FORMAT.tr.md §14) | Tamamlandı |
-| `remote`, `repo::transfer` | `remotes` dosyası, `Store` arayüzü, klasör uzak depoları, push ve pull (FORMAT.tr.md §15) | Tamamlandı (klasörler) |
+| `remote`, `repo::transfer` | `remotes` dosyası, `Store` arayüzü, klasör uzak depoları, push ve pull (FORMAT.tr.md §15); SFTP ve S3 depoları `apeiron-remote` içinde | Tamamlandı |
+| `retention` | Saklama kuralları ve her ref değişikliğinin denetimleri (FORMAT.tr.md §16) | Tamamlandı |
 | İşlem günlüğü | — | Planlandı |
 
 ## 3. Nesne modeli
