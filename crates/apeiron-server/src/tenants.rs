@@ -173,7 +173,8 @@ mod tests {
         Tenant {
             name: name.to_owned(),
             host: host.to_owned(),
-            repo: PathBuf::from("/srv/apeiron").join(name),
+            // A full path on every system.
+            repo: std::env::temp_dir().join(name),
             folders: Vec::new(),
             password_file: None,
         }
