@@ -11,7 +11,7 @@ use std::time::Duration;
 use apeiron::Repository;
 use rustls::pki_types::pem::PemObject;
 
-use apeiron_server::{Audit, Role, Tls, User, Users, Web, WebOptions, hash_password};
+use apeiron_server::{Audit, Role, Shares, Tls, User, Users, Web, WebOptions, hash_password};
 use serde_json::{Value, json};
 
 const PASSWORD: &str = "correct horse";
@@ -173,6 +173,7 @@ fn start(dir: &Path) -> (Web, Client, PathBuf) {
         tls: None,
         users: users_file(dir),
         audit: Audit::new(dir.join("audit.log")),
+        shares: Shares::new(dir.join("shares.json")),
         folders: vec![home.clone()],
     })
     .unwrap();
@@ -371,6 +372,7 @@ fn tls_with_a_kept_certificate() {
         tls: Some(tls.clone()),
         users: users_file(dir.path()),
         audit: Audit::new(dir.path().join("audit.log")),
+        shares: Shares::new(dir.path().join("shares.json")),
         folders: vec![dir.path().to_path_buf()],
     })
     .unwrap();
@@ -735,4 +737,191 @@ fn every_request_is_recorded() {
             .status,
         500
     );
+}
+
+#[test]
+fn share_links() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_server, mut root, home) = start(dir.path());
+    for folder in ["ayse/docs/sub", "root"] {
+        fs::create_dir_all(home.join(folder)).unwrap();
+    }
+    fs::write(home.join("ayse/docs/f.txt"), "first").unwrap();
+    fs::write(home.join("ayse/docs/sub/ş ğ.txt"), "second").unwrap();
+    let big: String = (0..300_000).map(|i| format!("{i:07}\n")).collect();
+    fs::write(home.join("ayse/docs/sub/big.txt"), &big).unwrap();
+    fs::write(home.join("root/r.txt"), "root").unwrap();
+    let file = dir.path().join("config/web.json");
+    let mut users = Users::load(&file).unwrap();
+    for (name, role) in [("ayse", Role::Member), ("okan", Role::Reader)] {
+        users
+            .add(User {
+                name: name.to_owned(),
+                password: hash(),
+                role,
+                backups: vec!["backup/ayse-*".to_owned()],
+                folders: Vec::new(),
+            })
+            .unwrap();
+    }
+    users.save(&file).unwrap();
+    root.sign_in();
+    for (folder, r) in [("ayse/docs", "backup/ayse-docs"), ("root", "backup/root")] {
+        let done = root.run("backup", json!({"source": home.join(folder), "ref": r}));
+        assert!(done["result"]["snapshot"].is_string(), "{done}");
+    }
+    let ayse = root.other("ayse");
+    let okan = root.other("okan");
+
+    // Only what the user sees, for 1 to 30 days, and not by a reader.
+    let share = |c: &Client, body: Value| c.post("/api/shares", body);
+    let refused = |c: &Client, body: Value| {
+        let reply = share(c, body);
+        (
+            reply.status,
+            reply.json()["kind"].as_str().unwrap().to_owned(),
+        )
+    };
+    let not_found = (404, "not_found".to_owned());
+    let invalid = (400, "invalid_input".to_owned());
+    assert_eq!(
+        refused(&ayse, json!({"snapshot": "backup/root"})),
+        not_found
+    );
+    assert_eq!(
+        refused(
+            &ayse,
+            json!({"snapshot": "backup/ayse-docs", "path": "missing"})
+        ),
+        not_found
+    );
+    assert_eq!(
+        refused(
+            &ayse,
+            json!({"snapshot": "backup/ayse-docs", "path": "sub/.."})
+        ),
+        invalid
+    );
+    assert_eq!(
+        refused(&ayse, json!({"snapshot": "backup/ayse-docs", "days": 31})),
+        invalid
+    );
+    assert_eq!(
+        refused(&okan, json!({"snapshot": "backup/ayse-docs"})),
+        (400, "unsupported".to_owned())
+    );
+    let made = share(&ayse, json!({"snapshot": "backup/ayse-docs", "days": 1})).json();
+    let folder = made["secret"].as_str().unwrap().to_owned();
+    assert_eq!(folder.len(), 64);
+    assert!(made["share"].get("hash").is_none(), "{made}");
+    let made = share(
+        &ayse,
+        json!({"snapshot": "backup/ayse-docs", "path": "/f.txt"}),
+    )
+    .json();
+    let one = made["secret"].as_str().unwrap().to_owned();
+    let one_id = made["share"]["id"].as_str().unwrap().to_owned();
+
+    // Anyone with the link reads what it names and nothing else.
+    let stranger = Client {
+        address: root.address,
+        tls: None,
+        cookie: None,
+    };
+    let page = stranger.get(&format!("/s/{folder}"));
+    assert_eq!(page.status, 200);
+    assert!(page.headers.contains("referrer-policy: no-referrer"));
+    let listed = stranger.get(&format!("/api/shared/{folder}")).json();
+    let names: Vec<&str> = listed["entries"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["f.txt", "sub"]);
+    assert!(listed["time"].is_object(), "{listed}");
+    let sub = stranger
+        .get(&format!("/api/shared/{folder}?path=sub"))
+        .json();
+    assert_eq!(sub["entries"][1]["name"], "ş ğ.txt");
+    // A large file comes whole, as it is read.
+    let got = stranger.get(&format!("/api/shared/{folder}/file?path=sub/big.txt"));
+    assert!(got.body == big, "{} of {} bytes", got.body.len(), big.len());
+    let got = stranger.get(&format!(
+        "/api/shared/{folder}/file?path=sub/%C5%9F%20%C4%9F.txt"
+    ));
+    assert_eq!((got.status, got.body.as_str()), (200, "second"));
+    assert!(
+        got.headers
+            .contains("content-disposition: attachment; filename*=utf-8''%c5%9f%20%c4%9f.txt"),
+        "{}",
+        got.headers
+    );
+    for path in ["..", "sub/../..", "sub/../../root"] {
+        let reply = stranger.get(&format!("/api/shared/{folder}?path={path}"));
+        assert_eq!(reply.status, 404, "{path}");
+    }
+    let folder_file = stranger.get(&format!("/api/shared/{folder}/file?path=sub"));
+    assert_eq!(folder_file.status, 400);
+    let single = stranger.get(&format!("/api/shared/{one}")).json();
+    assert_eq!(single["entry"]["kind"], "file");
+    assert_eq!(single["entries"], json!([]));
+    assert_eq!(
+        stranger.get(&format!("/api/shared/{one}/file")).body,
+        "first"
+    );
+    assert_eq!(
+        stranger
+            .get(&format!("/api/shared/{}", "0".repeat(64)))
+            .status,
+        404
+    );
+    // The signed-in API stays closed to the link holder.
+    assert_eq!(stranger.get("/api/shares").status, 401);
+
+    // Each user sees and removes their own links; an admin all.
+    let ids = |c: &Client| -> Vec<String> {
+        c.get("/api/shares")
+            .json()
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s["id"].as_str().unwrap().to_owned())
+            .collect()
+    };
+    assert_eq!(ids(&ayse).len(), 2);
+    assert_eq!(ids(&root).len(), 2);
+    assert!(ids(&okan).is_empty());
+    let remove = |c: &Client, id: &str| {
+        c.post(&format!("/api/shares/{id}/remove"), json!({}))
+            .status
+    };
+    assert_eq!(remove(&okan, &one_id), 404);
+    assert_eq!(remove(&ayse, &one_id), 200);
+    assert_eq!(stranger.get(&format!("/api/shared/{one}")).status, 404);
+
+    // A link ends when its time is up.
+    let shares_file = dir.path().join("shares.json");
+    let mut kept: Value = serde_json::from_slice(&fs::read(&shares_file).unwrap()).unwrap();
+    assert!(!fs::read_to_string(&shares_file).unwrap().contains(&folder));
+    let expires = kept["shares"][0]["expires"].clone();
+    kept["shares"][0]["expires"] = json!("2020-01-01T00:00:00Z");
+    fs::write(&shares_file, kept.to_string()).unwrap();
+    assert_eq!(stranger.get(&format!("/api/shared/{folder}")).status, 404);
+    kept["shares"][0]["expires"] = expires;
+    fs::write(&shares_file, kept.to_string()).unwrap();
+    assert_eq!(stranger.get(&format!("/api/shared/{folder}")).status, 200);
+
+    // And when its owner may no longer share what it names.
+    let mut users = Users::load(&file).unwrap();
+    users.get_mut("ayse").unwrap().role = Role::Reader;
+    users.save(&file).unwrap();
+    assert_eq!(stranger.get(&format!("/api/shared/{folder}")).status, 404);
+
+    // Every use of a link is recorded, without the secret.
+    let log = fs::read_to_string(dir.path().join("audit.log")).unwrap();
+    assert!(!log.contains(&folder) && !log.contains(&one));
+    for event in ["share_add", "share_remove", "shared:list", "shared:read"] {
+        assert!(log.contains(&format!("\"event\":\"{event}\"")), "{event}");
+    }
 }

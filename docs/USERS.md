@@ -14,6 +14,7 @@ A family or a small office shares one backup server: each person backs up and re
 | Back up a folder | Into any backup | Into its backups | No |
 | Restore | Yes | Yes | No |
 | Check the repository | Yes | No | No |
+| Share with a link ([SHARE.md](SHARE.md)) | Any version | Versions it sees | No |
 | Folders of the server | Its folders, or all `--folder` folders when it has none | Its folders only | None |
 
 A user's **backups** are a list of ref names; a name ending in `*` stands for every ref that starts with what comes before it, so `backup/ayse-*` covers `backup/ayse-photos` and `backup/ayse-documents`. A user's **folders** are folders of the server; only those inside a `--folder` of `apeiron web` count.

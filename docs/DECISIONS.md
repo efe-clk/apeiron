@@ -37,6 +37,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [027](#adr-027-the-web-interface-serves-one-repository-over-tls-to-a-password-sign-in) | Web interface | One repository fixed at start; password sign-in with a cookie session; `rustls` with a self-signed certificate by default; allowed operations and folders | Accepted |
 | [028](#adr-028-users-with-three-roles-backups-by-ref-name-and-visibility-through-parents) | Users and permissions | `admin`, `member`, `reader`; backups as ref names with a prefix; a snapshot is visible when reachable from the user's refs | Accepted |
 | [029](#adr-029-the-audit-log-is-a-hash-chained-json-lines-file-written-before-anything-happens) | Audit log | JSON lines with a SHA-256 chain, appended under a lock and flushed before the request goes on; a request that cannot be recorded fails | Accepted |
+| [030](#adr-030-sharing-is-by-expiring-links-to-a-fixed-version-kept-only-as-hashes) | Sharing | A random secret in the link, only its SHA-256 kept; a fixed version and path; 1 to 30 days; ends when the owner may no longer share it | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28.
 
@@ -634,3 +635,25 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Recording after a long operation ends | A crash or a lost result would leave a restore unrecorded |
 
 **Consequences.** Every request in the web interface waits for a write to disk. The log grows without limit until rotation is added. The log can be rewritten whole by someone with access to the file; only a hash kept elsewhere reveals that.
+
+## ADR-030: Sharing is by expiring links to a fixed version, kept only as hashes
+
+**Status:** Accepted (2026-10-30)
+
+**Context.** Stage 4 work item 5 lets a user of the web interface give a version, folder or file of a backup to someone who has no account on the server ([SHARE.md](SHARE.md)). The person receiving it must need nothing but a browser; the person sharing it must be able to end it; a leaked copy of the server's files must not open the links; and sharing must not reach past what the user may see.
+
+**Decision.** A link carries a secret of 32 random bytes; the server keeps only its SHA-256 hash, with the owner, the version's id, the path and an end 1 to 30 days away, in `shares.json` in the state folder, changed under a lock and replaced whole. Each use checks that the link has not ended and that its owner still exists, is not a `reader` and still sees the version. The link holder can only list and download below the shared path; files are streamed with a new `Repository::read_file`. Every use is recorded in the audit log without the secret.
+
+**Rationale.** A random secret needs no account and no password to type, and 256 bits cannot be guessed. Keeping only its hash means a copy of the file opens nothing, as with passwords. A fixed version means the link shows exactly what was checked when it was made. Checking the owner at every use makes a link follow the owner's rights instead of outliving them. A small file of its own keeps links apart from users, so removing one never touches the other.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| Signed links with no state (HMAC of the path and end) | A single link could not be removed before it ends without keeping a list anyway |
+| Guest accounts in the users file | The receiver would need a name and a password, and the admin would have to clean up afterwards |
+| Exporting an archive and serving the file | Copies the data on the server for each share and does not show the folder before downloading |
+| Links to a backup that follow its newest version | What is shared would change after it was checked; a user would share files they never looked at |
+| Keeping the secret so the link can be shown again | Anyone who reads the file could use every link |
+
+**Consequences.** A lost link cannot be shown again; a new one must be made. Anyone who holds the link can read what it names until it ends, so it must be sent over a channel the sharer trusts. Each use reads the shares file and the users file, which is fine for the numbers of a home or small office. Folders are downloaded one file at a time until archives are added.

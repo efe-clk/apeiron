@@ -6,7 +6,7 @@
 
 Apeiron, bir yazılımcının deposuna, bir müzisyenin projesine ve bir ailenin fotoğraf arşivine aynı gözle bakar: hepsi, içerik adresli ve değişmez nesnelerden oluşan snapshot'lardır. Yedek, arşiv, senkron ve sürümleme dört ayrı motor değil, aynı nesne grafiği üzerinde çalışan farklı politikalardır. Yerel önceliklidir: hiçbir temel işlev bulut, hesap ya da internet bağlantısı istemez.
 
-> **Durum:** Erken geliştirme. Aşama 0 (format ve çekirdek) tamamlandı; Aşama 1 (yerel MVP) tamamlandı; Aşama 2 (uzak ve senkron) tamamlandı; Aşama 3 (geliştirici ve ekosistem) tamamlandı; Aşama 4 (arayüzler ve çok kullanıcı) devam ediyor. `apeiron` komutu klasörleri yedekleyebiliyor, senkronlayabiliyor, dallayıp birleştirebiliyor, arayabiliyor ve geri yükleyebiliyor, Git depolarını içe aktarabiliyor; ancak henüz bir sürüm ya da kararlı API yok. Bkz. [docs/ROADMAP.tr.md](docs/ROADMAP.tr.md).
+> **Durum:** Erken geliştirme. Aşama 0 (format ve çekirdek) tamamlandı; Aşama 1 (yerel MVP) tamamlandı; Aşama 2 (uzak ve senkron) tamamlandı; Aşama 3 (geliştirici ve ekosistem) tamamlandı; Aşama 4 (arayüzler ve çok kullanıcı) tamamlandı. `apeiron` komutu klasörleri yedekleyebiliyor, senkronlayabiliyor, dallayıp birleştirebiliyor, arayabiliyor ve geri yükleyebiliyor, Git depolarını içe aktarabiliyor; ancak henüz bir sürüm ya da kararlı API yok. Bkz. [docs/ROADMAP.tr.md](docs/ROADMAP.tr.md).
 
 ## Temel ilkeler
 
@@ -125,6 +125,7 @@ Kod, commit ve format değişikliği kuralları: [CONTRIBUTING.tr.md](CONTRIBUTI
 | [Web arayüzü](docs/WEB.tr.md) | Bir yedek sunucusunu başka bir bilgisayardaki tarayıcıdan kullanmak |
 | [Kullanıcılar ve izinler](docs/USERS.tr.md) | Tek bir yedek sunucusunda, her biri kendi yedekleriyle birkaç kişi |
 | [Denetim kaydı](docs/AUDIT.tr.md) | Web arayüzünde kimin ne yaptığının, fark edilmeden değiştirilemeyen kaydı |
+| [Paylaşım](docs/SHARE.tr.md) | Hesabı olmayan birinin, bitene kadar bir yedeğin sürümünü, klasörünü ya da dosyasını indirebildiği bağlantılar |
 | [Kullanım rehberi](docs/GUIDE.tr.md) | Kurulum, günlük yedek, geri yükleme ve bir aylık deneme |
 | [Sözlük](docs/GLOSSARY.tr.md) | Terimler ve İngilizce–Türkçe karşılıkları |
 | [Katkı](CONTRIBUTING.tr.md) | Geliştirme ortamı ve kurallar |

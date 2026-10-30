@@ -11,7 +11,7 @@ use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime};
 
-use apeiron::{Error, ErrorKind, LogRequest, ObjectId, Repository};
+use apeiron::{EntryInfo, Error, ErrorKind, ListRequest, LogRequest, ObjectId, Repository};
 use argon2::Argon2;
 use argon2::password_hash::PasswordVerifier;
 use axum::body::Bytes;
@@ -24,6 +24,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use crate::audit::{Actor, Audit};
+use crate::shares::{Share, Shares, gone};
 use crate::users::{Role, User, Users, hash_password};
 use crate::{App, Failure, Mode, Running, blocking, body, invalid, lock};
 
@@ -144,6 +145,8 @@ pub struct WebOptions {
     pub folders: Vec<PathBuf>,
     /// Where every request is recorded (AUDIT.md).
     pub audit: Audit,
+    /// The share links (SHARE.md).
+    pub shares: Shares,
 }
 
 struct Session {
@@ -187,6 +190,7 @@ const KEPT_HEADS: usize = 256;
 
 pub(crate) struct WebState {
     pub(crate) audit: Audit,
+    pub(crate) shares: Shares,
     users_file: PathBuf,
     users: Mutex<Loaded>,
     /// Canonical `--folder` paths.
@@ -513,6 +517,133 @@ impl WebState {
     }
 }
 
+/// The entry at `path` in `snapshot`; `None` for the root.
+fn entry_at(repo: &Repository, snapshot: ObjectId, path: &str) -> Result<Option<EntryInfo>, Error> {
+    if path.is_empty() {
+        return Ok(None);
+    }
+    let (parent, name) = path.rsplit_once('/').unwrap_or(("", path));
+    repo.list(&ListRequest {
+        snapshot: snapshot.to_string(),
+        path: parent.into(),
+    })?
+    .into_iter()
+    .find(|e| e.name.to_string() == name)
+    .map(Some)
+    .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("path {path}")))
+}
+
+/// A link's path joined with `sub`, a path below it; `.` and `..` are
+/// refused, so nothing outside the shared path is reached (SHARE.md §4).
+pub(crate) fn below(share: &Share, sub: &str) -> Result<String, Error> {
+    let mut parts: Vec<&str> = share.path.split('/').filter(|p| !p.is_empty()).collect();
+    for part in sub.split('/').filter(|p| !p.is_empty()) {
+        if part == "." || part == ".." {
+            return Err(gone());
+        }
+        parts.push(part);
+    }
+    Ok(parts.join("/"))
+}
+
+impl WebState {
+    /// Makes a link to `path` in the snapshot `spec` for `user` (SHARE.md
+    /// §1); the answer holds the secret, shown only now.
+    pub(crate) fn share(
+        &self,
+        repo: &Repository,
+        user: &User,
+        spec: &str,
+        path: &str,
+        days: u32,
+    ) -> Result<(Share, String), Error> {
+        if user.role == Role::Reader {
+            return Err(Error::new(
+                ErrorKind::Unsupported,
+                "sharing is not allowed for the role reader",
+            ));
+        }
+        let snapshot = repo.resolve(spec).map_err(|e| match e.kind {
+            ErrorKind::NotFound if user.role != Role::Admin => hidden(),
+            _ => e,
+        })?;
+        if user.role != Role::Admin {
+            self.visible(repo, user, snapshot)?;
+        }
+        let path = path.trim_matches('/');
+        if path.split('/').any(|p| p == "." || p == "..") {
+            return Err(invalid(format!("{path} is not a path inside a backup")));
+        }
+        entry_at(repo, snapshot, path)?;
+        self.shares.add(&user.name, snapshot, path, days)
+    }
+
+    /// The link whose secret is `secret`, while its owner may still share
+    /// what it names (SHARE.md §2).
+    pub(crate) fn shared(&self, repo: &Repository, secret: &str) -> Result<Share, Error> {
+        let share = self.shares.find(secret)?;
+        let owner = self.user(&share.owner).ok_or_else(gone)?;
+        match owner.role {
+            Role::Admin => {}
+            Role::Member => self
+                .visible(repo, &owner, share.snapshot)
+                .map_err(|_| gone())?,
+            Role::Reader => return Err(gone()),
+        }
+        Ok(share)
+    }
+
+    /// What a link shows at `sub` below its path: the entry there and, for
+    /// a folder, what it holds (SHARE.md §4).
+    pub(crate) fn shared_list(
+        &self,
+        repo: &Repository,
+        share: &Share,
+        sub: &str,
+    ) -> Result<Value, Error> {
+        let path = below(share, sub)?;
+        let entry = entry_at(repo, share.snapshot, &path).map_err(|_| gone())?;
+        let entries = match &entry {
+            Some(e) if e.kind != apeiron::Kind::Dir => Vec::new(),
+            _ => repo.list(&ListRequest {
+                snapshot: share.snapshot.to_string(),
+                path: path.as_str().into(),
+            })?,
+        };
+        let time = repo
+            .log(&LogRequest {
+                start: share.snapshot.to_string(),
+                limit: 1,
+            })?
+            .snapshots
+            .first()
+            .map(|s| s.time);
+        Ok(json!({
+            "name": share.path.rsplit('/').next().unwrap_or_default(),
+            "path": sub.trim_matches('/'),
+            "entry": entry,
+            "entries": entries,
+            "time": time,
+            "expires": share.expires,
+        }))
+    }
+
+    /// The file at `sub` below a link's path and its size, before it is
+    /// read (SHARE.md §4).
+    pub(crate) fn shared_file(
+        &self,
+        repo: &Repository,
+        share: &Share,
+        sub: &str,
+    ) -> Result<(String, u64), Error> {
+        let path = below(share, sub)?;
+        match entry_at(repo, share.snapshot, &path).map_err(|_| gone())? {
+            Some(e) if e.kind == apeiron::Kind::File => Ok((path, e.size.unwrap_or(0))),
+            _ => Err(invalid("only files can be downloaded")),
+        }
+    }
+}
+
 fn not_here(operation: &str) -> Error {
     Error::new(
         ErrorKind::Unsupported,
@@ -586,6 +717,7 @@ impl Web {
         let app = Arc::new(App {
             mode: Mode::Web(Box::new(WebState {
                 audit: options.audit,
+                shares: options.shares,
                 users_file: options.users,
                 users: Mutex::new(Loaded {
                     modified: None,

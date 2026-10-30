@@ -16,6 +16,8 @@ When several people share a backup server, the admin must be able to answer "who
 | `start:<operation>` | Every long operation started: `backup`, `restore`, `verify`, `search` | The same |
 | `done:<operation>` | When the result of a long operation is collected | The job number |
 | `cancel` | A request to stop a job | The job number |
+| `share_add`, `share_remove` | Making or removing a share link | The link's id, version, path and end ([SHARE.md](SHARE.md) §6) |
+| `shared:list`, `shared:read` | Every use of a share link, without signing in | The link's id and the path; never the link's secret |
 | `user_add`, `user_change`, `user_password`, `user_remove` | `apeiron web user` | The name, role, backups and folders; never the password |
 
 An operation refused by the checks is recorded with its error, so attempts are visible too. Polling a job, the session state and the folder browser are not recorded. The desktop interface records nothing: it serves only the person who runs it.
@@ -32,7 +34,7 @@ The log is `audit.log` in the state folder (`~/.local/state/apeiron` on Linux), 
 | --- | --- |
 | `seq` | 1 for the first line, one more for each next line |
 | `time` | UTC time of the event |
-| `user` | The signed-in user; absent for `apeiron web user` and for sign-ins that failed |
+| `user` | The signed-in user; absent for `apeiron web user`, for sign-ins that failed and for uses of a share link |
 | `from` | The address and port of the browser's connection; behind a proxy, the proxy's |
 | `event`, `detail` | §1; strings in `detail` longer than 256 characters are cut |
 | `outcome` | `ok`, or the error kind (`not_found`, `key`, `unsupported` …); a long operation is recorded as `ok` when it is allowed and starts, and its result comes with `done:` |

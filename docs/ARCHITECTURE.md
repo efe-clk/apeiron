@@ -218,8 +218,8 @@ flowchart LR
 | Privacy | Object identifiers use keyed BLAKE3, so a remote target cannot test whether a known file is stored | Done |
 | Crash safety | Write → `fsync` → rename → directory `fsync`; refs are updated with compare-and-swap | Done |
 | Encryption | Client-side encryption; the remote target never sees plaintext; keys stay with the user | Done |
-| Identity and permissions | Separate read, write, delete, share and admin permissions | Planned (Stage 4) |
-| Audit log | Sensitive operations are logged; sensitive data never is | Planned (Stage 4) |
+| Identity and permissions | Separate read, write, delete, share and admin permissions | Done for the web interface ([USERS.md](USERS.md), [SHARE.md](SHARE.md)) |
+| Audit log | Sensitive operations are logged; sensitive data never is | Done for the web interface ([AUDIT.md](AUDIT.md)) |
 | Plugins | WASM sandbox with declared, user-approved permissions | In place; no permissions granted yet |
 | Memory safety | `unsafe` only in the FFI crate and `apeiron-sys` | In effect |
 | Remote access | Off by default; configured explicitly | Planned (Stage 2) |

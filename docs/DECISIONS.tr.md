@@ -37,6 +37,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [027](#adr-027-web-arayüzü-tek-bir-depoyu-tls-üzerinden-parolayla-oturum-açana-sunar) | Web arayüzü | Başlarken sabitlenen tek depo; çerezli oturumla parola girişi; varsayılan olarak kendinden imzalı sertifikayla `rustls`; izinli işlemler ve klasörler | Kabul edildi |
 | [028](#adr-028-üç-rollü-kullanıcılar-ref-adıyla-yedekler-ve-üst-sürümler-yoluyla-görünürlük) | Kullanıcılar ve izinler | `admin`, `member`, `reader`; önekli ref adları olarak yedekler; kullanıcının ref'lerinden ulaşılabilen snapshot görünür | Kabul edildi |
 | [029](#adr-029-denetim-kaydı-her-şeyden-önce-yazılan-özet-zincirli-bir-json-satırları-dosyasıdır) | Denetim kaydı | SHA-256 zincirli JSON satırları; bir kilit altında eklenir ve istek sürmeden önce diske aktarılır; kaydedilemeyen istek başarısız olur | Kabul edildi |
+| [030](#adr-030-paylaşım-yalnızca-özetleri-tutulan-sabit-bir-sürüme-süreli-bağlantılarladır) | Paylaşım | Bağlantıda rastgele bir gizli kısım, yalnızca SHA-256 özeti tutulur; sabit bir sürüm ve yol; 1 ile 30 gün; sahibi artık paylaşamadığında biter | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
@@ -634,3 +635,25 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Uzun bir işlemi bittikten sonra kaydetmek | Bir çökme ya da kaybolan bir sonuç bir geri yüklemeyi kayıtsız bırakırdı |
 
 **Sonuçlar.** Web arayüzündeki her istek diske bir yazmayı bekler. Döndürme eklenene kadar kayıt sınırsız büyür. Dosyaya erişimi olan biri kaydı baştan sona yeniden yazabilir; bunu yalnızca başka yerde tutulan bir özet ortaya çıkarır.
+
+## ADR-030: Paylaşım, yalnızca özetleri tutulan, sabit bir sürüme süreli bağlantılarladır
+
+**Durum:** Kabul edildi (2026-10-30)
+
+**Bağlam.** Aşama 4'ün 5. işi, web arayüzünün bir kullanıcısının bir yedeğin sürümünü, klasörünü ya da dosyasını sunucuda hesabı olmayan birine vermesini sağlar ([SHARE.tr.md](SHARE.tr.md)). Alan kişinin bir tarayıcıdan başka bir şeye ihtiyacı olmamalı; paylaşan kişi paylaşımı bitirebilmeli; sunucunun dosyalarının sızan bir kopyası bağlantıları açmamalı ve paylaşım kullanıcının görebildiğinin ötesine geçmemelidir.
+
+**Karar.** Bir bağlantı 32 rastgele bayttan oluşan bir gizli kısım taşır; sunucu yalnızca onun SHA-256 özetini; sahibi, sürümün kimliği, yol ve 1 ile 30 gün sonraki bir bitişle birlikte, durum klasöründeki, bir kilit altında değiştirilen ve bütünüyle yenisiyle değiştirilen `shares.json` dosyasında tutar. Her kullanım, bağlantının bitmediğini ve sahibinin hâlâ var olduğunu, `reader` olmadığını ve sürümü hâlâ gördüğünü denetler. Bağlantıyı açan kişi yalnızca paylaşılan yolun altında listeleyebilir ve indirebilir; dosyalar yeni `Repository::read_file` ile akış olarak gönderilir. Her kullanım, gizli kısım olmadan denetim kaydına yazılır.
+
+**Gerekçe.** Rastgele bir gizli kısım ne bir hesap ne de yazılacak bir parola gerektirir ve 256 bit tahmin edilemez. Yalnızca özetini tutmak, parolalarda olduğu gibi, dosyanın bir kopyasının hiçbir şey açmaması demektir. Sabit bir sürüm, bağlantının tam olarak oluşturulurken denetleneni göstermesini sağlar. Sahibini her kullanımda denetlemek, bağlantının sahibinin haklarından uzun yaşamak yerine onları izlemesini sağlar. Kendine ait küçük bir dosya bağlantıları kullanıcılardan ayrı tutar; birini kaldırmak hiçbir zaman diğerine dokunmaz.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Durum tutmayan imzalı bağlantılar (yol ve bitişin HMAC'i) | Tek bir bağlantı, yine de bir liste tutmadan, bitmeden kaldırılamazdı |
+| Kullanıcılar dosyasında konuk hesapları | Alan kişinin bir ada ve parolaya ihtiyacı olurdu ve admin sonradan temizlik yapmak zorunda kalırdı |
+| Bir arşivi dışa aktarıp dosyayı sunmak | Her paylaşım için veriyi sunucuda kopyalar ve indirmeden önce klasörü göstermez |
+| Bir yedeğin en yeni sürümünü izleyen bağlantılar | Paylaşılan şey denetlendikten sonra değişirdi; kullanıcı hiç bakmadığı dosyaları paylaşırdı |
+| Bağlantının yeniden gösterilebilmesi için gizli kısmı tutmak | Dosyayı okuyabilen herkes her bağlantıyı kullanabilirdi |
+
+**Sonuçlar.** Kaybolan bir bağlantı yeniden gösterilemez; yenisi oluşturulmalıdır. Bağlantıya sahip olan herkes, bitene kadar onun gösterdiğini okuyabilir; bu yüzden paylaşanın güvendiği bir yoldan gönderilmelidir. Her kullanım paylaşımlar dosyasını ve kullanıcılar dosyasını okur; bu bir ev ya da küçük ofisin sayıları için sorun değildir. Arşivler eklenene kadar klasörler dosya dosya indirilir.

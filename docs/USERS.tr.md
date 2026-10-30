@@ -14,6 +14,7 @@ Bir aile ya da küçük bir ofis tek bir yedek sunucusunu paylaşır: herkes ken
 | Bir klasörü yedeklemek | Herhangi bir yedeğe | Kendi yedeklerine | Hayır |
 | Geri yüklemek | Evet | Evet | Hayır |
 | Depoyu denetlemek | Evet | Hayır | Hayır |
+| Bağlantıyla paylaşmak ([SHARE.tr.md](SHARE.tr.md)) | Her sürümü | Gördüğü sürümleri | Hayır |
 | Sunucunun klasörleri | Kendi klasörleri, hiç yoksa bütün `--folder` klasörleri | Yalnızca kendi klasörleri | Hiçbiri |
 
 Bir kullanıcının **yedekleri** ref adlarından oluşan bir listedir; `*` ile biten bir ad, kendisinden önceki kısımla başlayan her ref'in yerini tutar; yani `backup/ayse-*`, `backup/ayse-photos` ve `backup/ayse-documents` yedeklerini kapsar. Bir kullanıcının **klasörleri** sunucunun klasörleridir; yalnızca `apeiron web` komutunun bir `--folder` klasörünün içindekiler sayılır.

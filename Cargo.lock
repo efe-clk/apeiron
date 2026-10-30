@@ -253,6 +253,7 @@ dependencies = [
  "argon2",
  "axum",
  "dirs 6.0.0",
+ "futures-util",
  "getrandom 0.4.3",
  "hyper",
  "hyper-util",

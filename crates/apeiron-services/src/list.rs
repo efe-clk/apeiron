@@ -105,6 +105,31 @@ pub fn read_path(
     Ok(Some(data))
 }
 
+/// Writes the content of the file at `path` in `snapshot` to `out` and
+/// returns its size; a folder or a link there is `invalid_input`.
+pub fn read_to<W: std::io::Write>(
+    repo: &Repository,
+    snapshot: &ObjectId,
+    path: &[u8],
+    mut out: W,
+) -> Result<u64> {
+    let root = repo.read_snapshot(snapshot)?.tree;
+    let not_file = || Error::InvalidInput(format!("{} is not a file", Name(path.to_vec())));
+    let Node::Entry(entry) = lookup(repo, &root, path)? else {
+        return Err(not_file());
+    };
+    match entry.kind {
+        EntryKind::File {
+            blob: Some(blob), ..
+        } => Ok(repo.read_file(&blob, out)?),
+        EntryKind::File { blob: None, .. } => {
+            out.flush().map_err(apeiron_core::Error::Output)?;
+            Ok(0)
+        }
+        _ => Err(not_file()),
+    }
+}
+
 /// Lists the folder at `path` in `snapshot`, or the single entry if `path` is a file.
 pub fn list(repo: &Repository, snapshot: &ObjectId, path: &[u8]) -> Result<Vec<EntryInfo>> {
     let root = repo.read_snapshot(snapshot)?.tree;

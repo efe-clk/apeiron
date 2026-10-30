@@ -331,6 +331,64 @@ enum WebCommand {
         #[command(subcommand)]
         command: AuditCommand,
     },
+    /// List and remove share links (docs/SHARE.md)
+    Share {
+        #[command(subcommand)]
+        command: ShareCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum ShareCommand {
+    /// List the links that have not ended
+    List,
+    /// Remove a link, so it no longer works
+    Remove { id: String },
+}
+
+fn share_file() -> Result<apeiron_server::Shares, Failure> {
+    apeiron_server::Shares::default_file()
+        .map(apeiron_server::Shares::new)
+        .ok_or_else(|| Failure::Usage("no state folder for share links".to_owned()))
+}
+
+fn web_share(command: ShareCommand, out: &Output) -> Result<(), Failure> {
+    let shares = share_file()?;
+    match command {
+        ShareCommand::List => {
+            let list: Vec<apeiron_server::Share> = shares
+                .list()?
+                .iter()
+                .map(apeiron_server::Share::public)
+                .collect();
+            out.result(&list, |list| {
+                for s in list {
+                    say!(
+                        "{}  {}  {}:/{}  until {}",
+                        s.id,
+                        s.owner,
+                        &s.snapshot.to_string()[..12],
+                        s.path,
+                        s.expires
+                    );
+                }
+                if list.is_empty() {
+                    say!("No share links.");
+                }
+            });
+        }
+        ShareCommand::Remove { id } => {
+            let removed = shares.remove(&id, |_| true)?;
+            audit_log()?.record(
+                &apeiron_server::Actor::default(),
+                "share_remove",
+                serde_json::json!({ "id": removed.id }),
+                "ok",
+            )?;
+            out.result(&removed.public(), |s| say!("Removed link {}", s.id));
+        }
+    }
+    Ok(())
 }
 
 #[derive(Subcommand)]
@@ -1246,6 +1304,10 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     return Ok(0);
                 }
                 Some(WebCommand::Audit { command }) => return web_audit(command, out),
+                Some(WebCommand::Share { command }) => {
+                    web_share(command, out)?;
+                    return Ok(0);
+                }
                 None => {}
             }
             apeiron_server::Users::load(&users_file)?.need_admin()?;
@@ -1287,6 +1349,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                 users: users_file,
                 folders,
                 audit: audit_log()?,
+                shares: share_file()?,
             })?;
             let scheme = if plain { "http" } else { "https" };
             say!(

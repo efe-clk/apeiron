@@ -218,8 +218,8 @@ flowchart LR
 | Gizlilik | Nesne kimlikleri anahtarlı BLAKE3'tür; uzak hedef bilinen bir dosyanın saklanıp saklanmadığını sınayamaz | Tamamlandı |
 | Kesinti güvenliği | Yaz → `fsync` → yeniden adlandır → klasör `fsync`; ref'ler karşılaştır-ve-değiştir ile güncellenir | Tamamlandı |
 | Şifreleme | İstemci tarafı şifreleme; uzak hedef düz metni hiç görmez; anahtarlar kullanıcıda kalır | Tamamlandı |
-| Kimlik ve izinler | Okuma, yazma, silme, paylaşma ve yönetme izinleri ayrıdır | Planlandı (Aşama 4) |
-| Denetim kaydı | Hassas işlemler kaydedilir; hassas veri hiçbir zaman kaydedilmez | Planlandı (Aşama 4) |
+| Kimlik ve izinler | Okuma, yazma, silme, paylaşma ve yönetme izinleri ayrıdır | Web arayüzü için tamamlandı ([USERS.tr.md](USERS.tr.md), [SHARE.tr.md](SHARE.tr.md)) |
+| Denetim kaydı | Hassas işlemler kaydedilir; hassas veri hiçbir zaman kaydedilmez | Web arayüzü için tamamlandı ([AUDIT.tr.md](AUDIT.tr.md)) |
 | Eklentiler | Bildirilmiş ve kullanıcının onayladığı izinlerle WASM sandbox | Yerinde; henüz izin verilmiyor |
 | Bellek güvenliği | `unsafe` yalnızca FFI crate'inde ve `apeiron-sys` içinde | Uygulanıyor |
 | Uzak erişim | Varsayılan olarak kapalı; açıkça yapılandırılır | Planlandı (Aşama 2) |

@@ -267,6 +267,8 @@ Other people of the house get their own name, backups and folders, for example `
 
 Everything done in the web interface is recorded. An admin sees it on the Activity page; `apeiron web audit verify` checks that nobody changed the record ([AUDIT.md](AUDIT.md)).
 
+To give someone without an account a folder or file from a backup, look inside the version, press Share and send the link. It works for the days you choose, shows only what you shared, and stops at once when you remove it on the Links page ([SHARE.md](SHARE.md)).
+
 ## 7. Routine
 
 | How often | Command | Why |

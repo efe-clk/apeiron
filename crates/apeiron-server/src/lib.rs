@@ -7,6 +7,7 @@
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 
 mod audit;
+mod shares;
 mod users;
 mod web;
 
@@ -21,12 +22,13 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 pub use audit::{Actor, Audit, Event, Verified};
+pub use shares::{DEFAULT_DAYS, MAX_DAYS, Share, Shares};
 pub use users::{MIN_PASSWORD, Role, User, Users, hash_password};
 pub use web::{Tls, Web, WebOptions};
 use web::{WebState, Who};
 
 use apeiron::json::{self, JsonJob};
-use apeiron::{Error, ErrorKind, Repository};
+use apeiron::{Error, ErrorKind, ListRequest, Repository};
 use axum::body::Bytes;
 use axum::extract::{ConnectInfo, Path as UrlPath, Query, Request, State};
 use axum::http::{HeaderValue, StatusCode, header};
@@ -216,7 +218,9 @@ async fn guard(State(app): State<Arc<App>>, mut request: Request, next: Next) ->
                     return refused(StatusCode::FORBIDDEN, "request from another site");
                 }
             }
-            let open = matches!(request.uri().path(), "/api/session" | "/api/login");
+            // A share link is used without signing in (SHARE.md §4).
+            let open = matches!(request.uri().path(), "/api/session" | "/api/login")
+                || request.uri().path().starts_with("/api/shared/");
             match web.current(headers) {
                 Some(user) => {
                     let from = peer(&request);
@@ -243,6 +247,11 @@ async fn guard(State(app): State<Arc<App>>, mut request: Request, next: Next) ->
         HeaderValue::from_static(CSP),
     );
     h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    // A share link in the address must not leave with a request elsewhere.
+    h.insert(
+        header::REFERRER_POLICY,
+        HeaderValue::from_static("no-referrer"),
+    );
     h.insert(
         "x-content-type-options",
         HeaderValue::from_static("nosniff"),
@@ -259,7 +268,11 @@ fn peer(request: &Request) -> Option<String> {
 }
 
 async fn page(request: Request) -> Response {
-    let path = request.uri().path();
+    // A share link shows the same pages (SHARE.md §4).
+    let path = match request.uri().path() {
+        p if p.starts_with("/s/") => "/",
+        p => p,
+    };
     match PAGES.iter().find(|(p, ..)| *p == path) {
         Some((_, kind, text)) => ([(header::CONTENT_TYPE, *kind)], *text).into_response(),
         None => StatusCode::NOT_FOUND.into_response(),
@@ -650,6 +663,250 @@ async fn logout(State(app): State<Arc<App>>, request: Request) -> Response {
     }
 }
 
+/// The web state and the signed-in user; sharing is only for the web
+/// interface (SHARE.md §5).
+fn web_user(app: &App, who: Option<Extension<Who>>) -> Result<(&WebState, Who), Error> {
+    match (&app.mode, who) {
+        (Mode::Web(web), Some(Extension(who))) => Ok((web, who)),
+        (Mode::Web(_), None) => Err(invalid("sign in first")),
+        (Mode::Local { .. }, _) => Err(Error::new(
+            ErrorKind::Unsupported,
+            "sharing is only for the web interface",
+        )),
+    }
+}
+
+#[derive(Deserialize)]
+struct NewShare {
+    snapshot: String,
+    #[serde(default)]
+    path: String,
+    #[serde(default = "default_days")]
+    days: u32,
+}
+
+fn default_days() -> u32 {
+    DEFAULT_DAYS
+}
+
+/// Makes a share link; its secret is in the answer only (SHARE.md §5).
+async fn share_add(
+    State(app): State<Arc<App>>,
+    who_: Option<Extension<Who>>,
+    bytes: Bytes,
+) -> Answer {
+    let r: NewShare = serde_json::from_value(body(&bytes)?).map_err(|e| invalid(e.to_string()))?;
+    let repo = app.repo()?;
+    let answer = blocking(move || {
+        let (web, who) = web_user(&app, who_)?;
+        match web.share(&repo, &who.user, &r.snapshot, &r.path, r.days) {
+            Ok((share, secret)) => {
+                let detail = json!({
+                    "id": share.id,
+                    "snapshot": share.snapshot,
+                    "path": share.path,
+                    "expires": share.expires,
+                });
+                // A link that cannot be recorded does not stay.
+                if let Err(e) = web.audit.record(&who.actor(), "share_add", detail, "ok") {
+                    let _ = web.shares.remove(&share.id, |_| true);
+                    return Err(e);
+                }
+                Ok(json!({"share": share.public(), "secret": secret}))
+            }
+            Err(e) => {
+                let detail = json!({"snapshot": r.snapshot, "path": r.path, "days": r.days});
+                web.audit
+                    .record(&who.actor(), "share_add", detail, &outcome(Err(&e)))?;
+                Err(e)
+            }
+        }
+    })
+    .await?;
+    Ok(axum::Json(answer))
+}
+
+/// The user's live links; an `admin` sees everyone's.
+async fn share_list(State(app): State<Arc<App>>, who_: Option<Extension<Who>>) -> Answer {
+    let shares = blocking(move || {
+        let (web, who) = web_user(&app, who_)?;
+        Ok(web
+            .shares
+            .list()?
+            .into_iter()
+            .filter(|s| who.user.role == Role::Admin || s.owner == who.user.name)
+            .map(|s| s.public())
+            .collect::<Vec<_>>())
+    })
+    .await?;
+    Ok(axum::Json(
+        serde_json::to_value(shares).unwrap_or(Value::Null),
+    ))
+}
+
+/// Removes a link of the user; an `admin` may remove anyone's.
+async fn share_remove(
+    State(app): State<Arc<App>>,
+    UrlPath(id): UrlPath<String>,
+    who_: Option<Extension<Who>>,
+) -> Answer {
+    blocking(move || {
+        let (web, who) = web_user(&app, who_)?;
+        let user = &who.user;
+        let removed = web
+            .shares
+            .remove(&id, |s| user.role == Role::Admin || s.owner == user.name);
+        web.audit.record(
+            &who.actor(),
+            "share_remove",
+            json!({ "id": id }),
+            &outcome(removed.as_ref().map(|_| ())),
+        )?;
+        removed.map(|_| ())
+    })
+    .await?;
+    Ok(axum::Json(json!({})))
+}
+
+#[derive(Deserialize)]
+struct SharedQuery {
+    #[serde(default)]
+    path: String,
+}
+
+/// Runs `f` for a request through a share link, recorded with the link's
+/// id and the path asked for, without a user (SHARE.md §6).
+async fn through_link<T: Send + 'static>(
+    app: Arc<App>,
+    secret: String,
+    from: Option<Extension<ConnectInfo<SocketAddr>>>,
+    event: &'static str,
+    sub: String,
+    f: impl FnOnce(&WebState, &Repository, &Share) -> Result<T, Error> + Send + 'static,
+) -> Result<T, Error> {
+    let actor = Actor {
+        user: None,
+        from: from.map(|c| c.0.0.to_string()),
+    };
+    blocking(move || {
+        let Mode::Web(web) = &app.mode else {
+            return Err(Error::new(
+                ErrorKind::Unsupported,
+                "sharing is only for the web interface",
+            ));
+        };
+        let repo = app.repo()?;
+        let (share, result) = match web.shared(&repo, &secret) {
+            Ok(share) => {
+                let result = f(web, &repo, &share);
+                (Some(share), result)
+            }
+            Err(e) => (None, Err(e)),
+        };
+        let detail = json!({"id": share.map(|s| s.id), "path": sub});
+        web.audit
+            .record(&actor, event, detail, &outcome(result.as_ref().map(|_| ())))?;
+        result
+    })
+    .await
+}
+
+/// What a share link shows at a path below it (SHARE.md §4).
+async fn shared_list(
+    State(app): State<Arc<App>>,
+    UrlPath(secret): UrlPath<String>,
+    from: Option<Extension<ConnectInfo<SocketAddr>>>,
+    Query(q): Query<SharedQuery>,
+) -> Answer {
+    let sub = q.path.clone();
+    let answer = through_link(
+        app,
+        secret,
+        from,
+        "shared:list",
+        q.path,
+        move |web, repo, share| web.shared_list(repo, share, &sub),
+    )
+    .await?;
+    Ok(axum::Json(answer))
+}
+
+/// Writes into a channel, for a body read as it is written.
+struct ToChannel(tokio::sync::mpsc::Sender<Result<Bytes, io::Error>>);
+
+impl io::Write for ToChannel {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        self.0
+            .blocking_send(Ok(Bytes::copy_from_slice(buf)))
+            .map_err(|_| io::Error::from(io::ErrorKind::BrokenPipe))?;
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+/// A file below a share link, sent as it is read (SHARE.md §4).
+async fn shared_file(
+    State(app): State<Arc<App>>,
+    UrlPath(secret): UrlPath<String>,
+    from: Option<Extension<ConnectInfo<SocketAddr>>>,
+    Query(q): Query<SharedQuery>,
+) -> Result<Response, Failure> {
+    let sub = q.path.clone();
+    let (repo, snapshot, path, size) = through_link(
+        app,
+        secret,
+        from,
+        "shared:read",
+        q.path,
+        move |web, repo, share| {
+            let (path, size) = web.shared_file(repo, share, &sub)?;
+            Ok((repo.clone(), share.snapshot, path, size))
+        },
+    )
+    .await?;
+    let name = path.rsplit('/').next().unwrap_or("file").to_owned();
+    let (tx, rx) = tokio::sync::mpsc::channel(4);
+    tokio::task::spawn_blocking(move || {
+        let mut out = io::BufWriter::with_capacity(1 << 18, ToChannel(tx.clone()));
+        let request = ListRequest {
+            snapshot: snapshot.to_string(),
+            path: path.as_str().into(),
+        };
+        // An error after the first bytes can only cut the download short.
+        if let Err(e) = repo.read_file(&request, &mut out) {
+            let _ = tx.blocking_send(Err(io::Error::other(e.to_string())));
+        }
+    });
+    let stream = futures_util::stream::unfold(rx, |mut rx| async move {
+        rx.recv().await.map(|item| (item, rx))
+    });
+    let disposition = format!("attachment; filename*=UTF-8''{}", percent(&name));
+    Ok((
+        [
+            (header::CONTENT_TYPE, "application/octet-stream".to_owned()),
+            (header::CONTENT_LENGTH, size.to_string()),
+            (header::CONTENT_DISPOSITION, disposition),
+        ],
+        axum::body::Body::from_stream(stream),
+    )
+        .into_response())
+}
+
+/// `text` with every byte but letters, digits and `-._~` as `%XX`.
+fn percent(text: &str) -> String {
+    text.bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                (b as char).to_string()
+            }
+            _ => format!("%{b:02X}"),
+        })
+        .collect()
+}
+
 fn router(app: Arc<App>) -> Router {
     Router::new()
         .route("/api/session", get(session))
@@ -664,6 +921,10 @@ fn router(app: Arc<App>) -> Router {
         .route("/api/jobs/{id}/cancel", post(cancel))
         .route("/api/folders", get(folders))
         .route("/api/audit", get(audit))
+        .route("/api/shares", get(share_list).post(share_add))
+        .route("/api/shares/{id}/remove", post(share_remove))
+        .route("/api/shared/{secret}", get(shared_list))
+        .route("/api/shared/{secret}/file", get(shared_file))
         .fallback(page)
         .layer(middleware::from_fn_with_state(app.clone(), guard))
         .with_state(app)

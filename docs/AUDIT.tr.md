@@ -16,6 +16,8 @@ Birkaç kişi bir yedek sunucusunu paylaştığında admin, "bu klasörü kim, n
 | `start:<operation>` | Başlatılan her uzun işlem: `backup`, `restore`, `verify`, `search` | Aynısı |
 | `done:<operation>` | Uzun bir işlemin sonucu alındığında | İş numarası |
 | `cancel` | Bir işi durdurma isteği | İş numarası |
+| `share_add`, `share_remove` | Bir paylaşım bağlantısı oluşturmak ya da kaldırmak | Bağlantının kimliği, sürümü, yolu ve bitişi ([SHARE.tr.md](SHARE.tr.md) §6) |
+| `shared:list`, `shared:read` | Bir paylaşım bağlantısının oturum açmadan her kullanımı | Bağlantının kimliği ve yol; bağlantının gizli kısmı asla |
 | `user_add`, `user_change`, `user_password`, `user_remove` | `apeiron web user` | Ad, rol, yedekler ve klasörler; parola asla |
 
 Denetimlerin reddettiği bir işlem hatasıyla kaydedilir; böylece denemeler de görünür. Bir işin durumunu yoklamak, oturum durumu ve klasör seçici kaydedilmez. Masaüstü arayüzü hiçbir şey kaydetmez: yalnızca onu çalıştıran kişiye hizmet eder.
@@ -32,7 +34,7 @@ Kayıt, durum klasöründeki (Linux'ta `~/.local/state/apeiron`) `audit.log` dos
 | --- | --- |
 | `seq` | İlk satırda 1, sonraki her satırda bir fazlası |
 | `time` | Olayın UTC zamanı |
-| `user` | Oturum açmış kullanıcı; `apeiron web user` ve başarısız oturum açmalar için yoktur |
+| `user` | Oturum açmış kullanıcı; `apeiron web user`, başarısız oturum açmalar ve paylaşım bağlantısı kullanımları için yoktur |
 | `from` | Tarayıcı bağlantısının adresi ve kapısı; bir vekilin arkasında vekilinki |
 | `event`, `detail` | §1; `detail` içindeki 256 karakterden uzun dizeler kesilir |
 | `outcome` | `ok` ya da hata türü (`not_found`, `key`, `unsupported` …); uzun bir işlem izin verilip başladığında `ok` olarak kaydedilir, sonucu `done:` ile gelir |

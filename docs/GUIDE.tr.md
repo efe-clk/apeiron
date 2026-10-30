@@ -267,6 +267,8 @@ Evdeki diğer kişiler kendi adlarını, yedeklerini ve klasörlerini alır, ör
 
 Web arayüzünde yapılan her şey kaydedilir. Bir admin bunu Etkinlik sayfasında görür; `apeiron web audit verify` kaydı kimsenin değiştirmediğini denetler ([AUDIT.tr.md](AUDIT.tr.md)).
 
+Hesabı olmayan birine bir yedekten bir klasör ya da dosya vermek için sürümün içine bakın, Paylaş'a basın ve bağlantıyı gönderin. Bağlantı seçtiğiniz gün sayısı kadar çalışır, yalnızca paylaştığınızı gösterir ve Bağlantılar sayfasında kaldırdığınızda hemen durur ([SHARE.tr.md](SHARE.tr.md)).
+
 ## 7. Düzen
 
 | Ne sıklıkla | Komut | Neden |

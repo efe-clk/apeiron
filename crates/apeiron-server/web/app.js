@@ -22,6 +22,7 @@ const may = {
   restore: () => user?.role !== "reader",
   verify: () => !user || user.role === "admin",
   readLog: () => user?.role === "admin",
+  share: () => user !== null && user.role !== "reader",
 };
 
 const main = document.getElementById("main");
@@ -282,6 +283,7 @@ function showNav(current) {
     item("overview", overview),
     may.backUp() ? item("backup", () => backup()) : null,
     may.verify() ? item("verify", verify) : null,
+    may.share() ? item("shares", shares) : null,
     may.readLog() ? item("activity", activity) : null,
     mode === "web" ? item("sign_out", signOut) : item("close", () => start()),
     h("span", { class: "path" }, user ? `${user.name} · ${repoPath}` : repoPath),
@@ -519,12 +521,16 @@ async function browse(snapshot, path) {
         h("td", {}, name),
         h("td", { class: "num" }, e.size === null ? "" : bytes(e.size)),
         h("td", {}, when(e.mtime)),
-        h("td", {}, may.restore() ? h("button", { type: "button", onclick: () => restore(snapshot, full) }, t("restore_this")) : null),
+        h("td", {}, h("div", { class: "actions" },
+          may.restore() ? h("button", { type: "button", onclick: () => restore(snapshot, full) }, t("restore_this")) : null,
+          may.share() && e.kind !== "symlink" ? h("button", { type: "button", onclick: () => share(snapshot, full) }, t("share")) : null,
+        )),
       );
     });
     show(
       h("h1", {}, t("browse_heading", { time: when(snapshot.time) })),
       h("div", { class: "card" }, crumbs, rows.length ? h("table", {}, h("tbody", {}, rows)) : h("p", { class: "muted" }, t("empty_folder"))),
+      may.share() ? h("div", { class: "actions" }, h("button", { type: "button", onclick: () => share(snapshot, path) }, t("share_folder"))) : null,
     );
   } catch (err) {
     show(errorMessage(err));
@@ -613,6 +619,129 @@ function verify() {
   show(h("h1", {}, t("verify_heading")), h("div", { class: "card" }, h("p", { class: "muted" }, t("verify_intro")), h("div", { class: "actions" }, button)), status);
 }
 
+// ---- Sharing (SHARE.md §5) ----
+
+function share(snapshot, path) {
+  showNav("shares");
+  const days = h("select", {}, ...[1, 7, 30].map((n) => h("option", { value: n, selected: n === 7 }, t(`days_${n}`))));
+  const status = h("div");
+  const form = h("form", { onsubmit: async (e) => {
+    e.preventDefault();
+    status.replaceChildren();
+    try {
+      const made = await api("POST", "/api/shares", { snapshot: snapshot.id, path, days: Number(days.value) });
+      const link = h("input", { type: "text", readonly: true, value: `${location.origin}/s/${made.secret}` });
+      const copied = h("span", { class: "muted", role: "status" });
+      form.replaceChildren(
+        message("good", t("share_made")),
+        h("div", { class: "row" }, link, h("button", { type: "button", onclick: async () => {
+          link.select();
+          await navigator.clipboard?.writeText(link.value).catch(() => {});
+          copied.textContent = t("copied");
+        } }, t("copy"))),
+        copied,
+      );
+      link.select();
+    } catch (err) {
+      status.replaceChildren(errorMessage(err));
+    }
+  } },
+    ...field(t("share_days"), days),
+    h("div", { class: "actions" }, h("button", { type: "submit", class: "primary" }, t("share_button"))),
+  );
+  const what = path || t("share_what_all");
+  show(
+    h("h1", {}, t("share_heading")),
+    h("div", { class: "card" }, h("p", {}, t("share_intro", { time: when(snapshot.time), what })), form),
+    status,
+  );
+}
+
+const until = (time) => new Date(time).toLocaleString(lang, { dateStyle: "medium", timeStyle: "short" });
+
+async function shares() {
+  showNav("shares");
+  show(h("p", {}, t("loading")));
+  try {
+    const list = await api("GET", "/api/shares");
+    const owners = user?.role === "admin";
+    const rows = list.map((s) => h("tr", {},
+      h("td", {}, `${s.snapshot.slice(0, 12)}:/${s.path}`),
+      owners ? h("td", {}, s.owner) : null,
+      h("td", {}, until(s.expires)),
+      h("td", {}, h("button", { type: "button", onclick: async (e) => {
+        e.target.disabled = true;
+        try {
+          await api("POST", `/api/shares/${s.id}/remove`);
+          shares();
+        } catch (err) {
+          main.append(errorMessage(err));
+        }
+      } }, t("remove"))),
+    ));
+    const heads = ["shares_what", ...(owners ? ["shares_owner"] : []), "shares_until", ""];
+    show(
+      h("h1", {}, t("shares_heading")),
+      h("p", { class: "muted" }, t("shares_intro")),
+      list.length === 0
+        ? h("div", { class: "card" }, h("p", {}, t("shares_empty")))
+        : h("div", { class: "card scroll" }, h("table", {},
+          h("thead", {}, h("tr", {}, ...heads.map((k) => h("th", {}, k ? t(k) : "")))),
+          h("tbody", {}, ...rows))),
+    );
+  } catch (err) {
+    show(h("h1", {}, t("shares_heading")), errorMessage(err));
+  }
+}
+
+// What a share link shows to anyone who has it (SHARE.md §4).
+async function shared(secret, path = "") {
+  nav.hidden = true;
+  show(h("p", {}, t("loading")));
+  const base = `/api/shared/${encodeURIComponent(secret)}`;
+  const download = (sub) => h("a", { class: "button", href: `${base}/file?path=${encodeURIComponent(sub)}`, download: "" }, t("download"));
+  try {
+    const view = await api("GET", `${base}?path=${encodeURIComponent(path)}`);
+    let body;
+    if (view.entry && view.entry.kind !== "dir") {
+      body = h("table", {}, h("tbody", {}, h("tr", {},
+        h("td", {}, `📄 ${view.entry.name}`),
+        h("td", { class: "num" }, view.entry.size === null ? "" : bytes(view.entry.size)),
+        h("td", {}, download(path)),
+      )));
+    } else {
+      const parts = path.split("/").filter(Boolean);
+      const crumbs = h("div", { class: "crumbs" },
+        h("button", { type: "button", class: "link", onclick: () => shared(secret, "") }, view.name || "/"),
+        parts.map((part, i) => [
+          " / ",
+          h("button", { type: "button", class: "link", onclick: () => shared(secret, parts.slice(0, i + 1).join("/")) }, part),
+        ]),
+      );
+      const rows = view.entries.map((e) => {
+        const full = path ? `${path}/${e.name}` : e.name;
+        const name = e.kind === "dir"
+          ? h("button", { type: "button", class: "link", onclick: () => shared(secret, full) }, `📁 ${e.name}`)
+          : `${e.kind === "symlink" ? "🔗" : "📄"} ${e.name}`;
+        return h("tr", {},
+          h("td", {}, name),
+          h("td", { class: "num" }, e.size === null ? "" : bytes(e.size)),
+          h("td", {}, when(e.mtime)),
+          h("td", {}, e.kind === "file" ? download(full) : null),
+        );
+      });
+      body = [crumbs, rows.length ? h("table", {}, h("tbody", {}, rows)) : h("p", { class: "muted" }, t("empty_folder"))];
+    }
+    show(
+      h("h1", {}, t("shared_heading")),
+      h("p", { class: "muted" }, t("shared_intro", { time: when(view.time), until: until(view.expires) })),
+      h("div", { class: "card" }, body),
+    );
+  } catch (err) {
+    show(h("h1", {}, t("shared_heading")), err.kind === "not_found" ? message("bad", t("shared_gone")) : errorMessage(err));
+  }
+}
+
 // ---- Activity (AUDIT.md §4) ----
 
 async function activity() {
@@ -676,6 +805,7 @@ async function signOut() {
 // ---- Begin ----
 
 async function begin() {
+  if (location.pathname.startsWith("/s/")) return shared(decodeURIComponent(location.pathname.slice(3)));
   const session = await api("GET", "/api/session").catch(() => null);
   mode = session?.mode || "local";
   user = session?.user || null;

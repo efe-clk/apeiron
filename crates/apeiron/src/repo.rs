@@ -413,6 +413,19 @@ impl Repository {
         Ok(services::list(&core, &snapshot, request.path.as_bytes())?)
     }
 
+    /// Writes the content of the file at a path to `out`, as a stream, and
+    /// returns its size; a folder or a link there is `invalid_input`.
+    pub fn read_file(&self, request: &ListRequest, out: impl std::io::Write) -> Result<u64> {
+        let core = self.view()?;
+        let snapshot = spec::resolve(&core, &request.snapshot)?;
+        Ok(services::read_to(
+            &core,
+            &snapshot,
+            request.path.as_bytes(),
+            out,
+        )?)
+    }
+
     /// Paths added, removed and modified between two snapshots.
     pub fn diff(&self, request: &DiffRequest) -> Result<Vec<Change>> {
         let core = self.view()?;

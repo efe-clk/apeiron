@@ -147,6 +147,7 @@ Every operation takes one plain request value and returns one plain result value
 | `restore_test` | snapshot, bytes to restore (default 100 MiB) | `RestoreTestReport`: files and bytes restored and checked, damaged files | Yes |
 | `log` | start snapshot, maximum count | `LogPage`: snapshots, newest first, and where the next page starts | No |
 | `list` | snapshot, path | `Vec<EntryInfo>`: name, kind, size, mode, mtime | No |
+| `read_file` | snapshot, path of a file | the file's size; its content is written to a `Write` as it is read, so it is not in the JSON API ([SHARE.md](SHARE.md)) | No |
 | `diff` | two snapshots | `Vec<Change>`: path and added, removed or modified | No |
 | `diff_text` | two snapshots | `Vec<TextDiff>`: path, kind, and the changed lines a plugin shows or why it could not ([TEXT.md](TEXT.md)) | No |
 | `refs` | — | `Vec<RefInfo>`: name and snapshot id | No |
