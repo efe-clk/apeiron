@@ -76,7 +76,7 @@ Sayfalar kullanıcının adını Oturumu kapat'ın yanında gösterir ve rolün 
 | Konu | Nerede |
 | --- | --- |
 | Kullanıcıları sayfalarda yönetmek | Sonra; o zamana kadar §3'teki komutlar |
-| Kimin ne yaptığının kaydı | 4. iş (denetim kaydı) |
+| Kimin ne yaptığının kaydı | 4. iş ([AUDIT.tr.md](AUDIT.tr.md)) |
 | Kullanıcı başına ayrı şifreleme anahtarları | Kullanıcılar deponun anahtarını paylaşır; anahtarı sunucu tutar |
 | Masaüstü arayüzünde kullanıcılar | Gerekmez: yalnızca onu çalıştıran kullanıcıya hizmet eder |
 | Merkezi kimlik (LDAP, OIDC) | Aşama 5 |

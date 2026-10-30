@@ -76,7 +76,7 @@ The pages show the user's name next to Sign out and hide what the role cannot do
 | Item | Where |
 | --- | --- |
 | Managing users in the pages | Later; the commands of §3 until then |
-| A record of who did what | Work item 4 (audit log) |
+| A record of who did what | Work item 4 ([AUDIT.md](AUDIT.md)) |
 | Separate encryption keys per user | Users share the repository's key; the server holds it |
 | Users in the desktop interface | Not needed: it serves only the user who runs it |
 | Central identity (LDAP, OIDC) | Stage 5 |

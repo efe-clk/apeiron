@@ -265,6 +265,8 @@ apeiron web --repo /srv/backup --folder /home/efe
 
 Evdeki diğer kişiler kendi adlarını, yedeklerini ve klasörlerini alır, örneğin `apeiron web user add ayse --role member --backup "backup/ayse-*" --folder /home/ayse`; yalnızca kendi yedeklerini görürler ([USERS.tr.md](USERS.tr.md)).
 
+Web arayüzünde yapılan her şey kaydedilir. Bir admin bunu Etkinlik sayfasında görür; `apeiron web audit verify` kaydı kimsenin değiştirmediğini denetler ([AUDIT.tr.md](AUDIT.tr.md)).
+
 ## 7. Düzen
 
 | Ne sıklıkla | Komut | Neden |

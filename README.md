@@ -124,6 +124,7 @@ Rules for code, commits and format changes: [CONTRIBUTING.md](CONTRIBUTING.md).
 | [Desktop interface](docs/DESKTOP.md) | Backing up and restoring in a window, without the command line |
 | [Web interface](docs/WEB.md) | Using a backup server from a browser on another computer |
 | [Users and permissions](docs/USERS.md) | Several people on one backup server, each with their own backups |
+| [Audit log](docs/AUDIT.md) | A record of who did what in the web interface that cannot be changed unnoticed |
 | [User guide](docs/GUIDE.md) | Installation, daily backup, restore and the one-month test |
 | [Glossary](docs/GLOSSARY.md) | Terms with English–Turkish equivalents |
 | [Contributing](CONTRIBUTING.md) | Development environment and rules |

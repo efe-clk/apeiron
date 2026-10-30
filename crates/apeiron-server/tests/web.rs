@@ -11,7 +11,7 @@ use std::time::Duration;
 use apeiron::Repository;
 use rustls::pki_types::pem::PemObject;
 
-use apeiron_server::{Role, Tls, User, Users, Web, WebOptions, hash_password};
+use apeiron_server::{Audit, Role, Tls, User, Users, Web, WebOptions, hash_password};
 use serde_json::{Value, json};
 
 const PASSWORD: &str = "correct horse";
@@ -172,6 +172,7 @@ fn start(dir: &Path) -> (Web, Client, PathBuf) {
         listen: "127.0.0.1:0".parse().unwrap(),
         tls: None,
         users: users_file(dir),
+        audit: Audit::new(dir.join("audit.log")),
         folders: vec![home.clone()],
     })
     .unwrap();
@@ -369,6 +370,7 @@ fn tls_with_a_kept_certificate() {
         listen: "127.0.0.1:0".parse().unwrap(),
         tls: Some(tls.clone()),
         users: users_file(dir.path()),
+        audit: Audit::new(dir.path().join("audit.log")),
         folders: vec![dir.path().to_path_buf()],
     })
     .unwrap();
@@ -639,4 +641,98 @@ fn each_user_sees_and_uses_only_their_own() {
     assert_eq!(okan.get("/api/state").status, 401);
     assert_eq!(ayse.get("/api/state").status, 401);
     assert_eq!(root.get("/api/state").status, 200);
+}
+
+#[test]
+fn every_request_is_recorded() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_server, mut root, home) = start(dir.path());
+    let audit = Audit::new(dir.path().join("audit.log"));
+
+    assert_eq!(
+        root.post(
+            "/api/login",
+            json!({"name": "root", "password": "wrong one"})
+        )
+        .status,
+        401
+    );
+    root.sign_in();
+    root.post("/api/call/refs", json!({}));
+    let done = root.run(
+        "backup",
+        json!({"source": home.join("src"), "ref": "backup/src"}),
+    );
+    assert!(done["result"].is_object());
+    let outside = dir.path().join("elsewhere");
+    let refused = root.post(
+        "/api/start/restore",
+        json!({"snapshot": "backup/src", "target": outside}),
+    );
+    assert_eq!(refused.status, 400);
+    root.post("/api/logout", json!({}));
+
+    let events = audit.read(100, None).unwrap();
+    let seen: Vec<(Option<&str>, &str, &str)> = events
+        .iter()
+        .map(|e| (e.user.as_deref(), e.event.as_str(), e.outcome.as_str()))
+        .collect();
+    assert_eq!(
+        seen,
+        [
+            (None, "sign_in", "key"),
+            (Some("root"), "sign_in", "ok"),
+            (Some("root"), "call:refs", "ok"),
+            (Some("root"), "start:backup", "ok"),
+            (Some("root"), "done:backup", "ok"),
+            (Some("root"), "start:restore", "invalid_input"),
+            (Some("root"), "sign_out", "ok"),
+        ]
+    );
+    assert_eq!(events[0].detail, json!({"name": "root"}));
+    assert_eq!(events[3].detail["ref"], "backup/src");
+    assert!(events.iter().all(|e| {
+        e.from
+            .as_deref()
+            .is_some_and(|f| f.starts_with("127.0.0.1:"))
+    }));
+    let text = fs::read_to_string(audit.file()).unwrap();
+    assert!(!text.contains(PASSWORD) && !text.contains("wrong one"));
+    assert_eq!(audit.verify().unwrap().events, 7);
+
+    // Only an admin reads it, newest first.
+    root.sign_in();
+    let read = root.get("/api/audit?limit=2").json();
+    assert_eq!(read[0]["event"], "sign_in");
+    assert_eq!(read[1]["event"], "sign_out");
+    let mut users = Users::load(&dir.path().join("config/web.json")).unwrap();
+    users
+        .add(User {
+            name: "ayse".to_owned(),
+            password: hash(),
+            role: Role::Member,
+            backups: vec!["backup/src".to_owned()],
+            folders: Vec::new(),
+        })
+        .unwrap();
+    users.save(&dir.path().join("config/web.json")).unwrap();
+    let ayse = root.other("ayse");
+    let reply = ayse.get("/api/audit");
+    assert_eq!(reply.json()["kind"], "unsupported");
+
+    // Nothing happens unrecorded: with the log unwritable, requests fail.
+    fs::remove_file(audit.file()).unwrap();
+    fs::create_dir(audit.file()).unwrap();
+    let failed = root.post("/api/call/refs", json!({}));
+    assert_eq!(failed.status, 500, "{}", failed.body);
+    let failed = root.post(
+        "/api/start/backup",
+        json!({"source": home.join("src"), "ref": "backup/src"}),
+    );
+    assert_eq!(failed.status, 500);
+    assert_eq!(
+        root.post("/api/login", json!({"name": "root", "password": PASSWORD}))
+            .status,
+        500
+    );
 }

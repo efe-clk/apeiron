@@ -36,6 +36,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [026](#adr-026-one-set-of-web-pages-served-locally-shown-in-a-native-window) | Desktop interface | HTML pages without a build step, a JSON API on `127.0.0.1` with a token, a `wry` window | Accepted |
 | [027](#adr-027-the-web-interface-serves-one-repository-over-tls-to-a-password-sign-in) | Web interface | One repository fixed at start; password sign-in with a cookie session; `rustls` with a self-signed certificate by default; allowed operations and folders | Accepted |
 | [028](#adr-028-users-with-three-roles-backups-by-ref-name-and-visibility-through-parents) | Users and permissions | `admin`, `member`, `reader`; backups as ref names with a prefix; a snapshot is visible when reachable from the user's refs | Accepted |
+| [029](#adr-029-the-audit-log-is-a-hash-chained-json-lines-file-written-before-anything-happens) | Audit log | JSON lines with a SHA-256 chain, appended under a lock and flushed before the request goes on; a request that cannot be recorded fails | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28.
 
@@ -611,3 +612,25 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Managing users in the pages now | The CLI covers it; the pages can follow once the audit log records changes |
 
 **Consequences.** Everyone who can sign in relies on the server holding the repository's key, so users are protected from each other by the server, not by cryptography. A snapshot merged into a user's backup becomes visible to that user. A `member` or `reader` must name a snapshot to search. The `--set-password` option of ADR-027 is gone.
+
+## ADR-029: The audit log is a hash-chained JSON lines file, written before anything happens
+
+**Status:** Accepted (2026-10-30)
+
+**Context.** Stage 4 work item 4 records who did what in the web interface ([AUDIT.md](AUDIT.md)). An admin must be able to trust the record: a user who gains access to the file, or a mistake, must not change it unnoticed, and nothing may happen that is missing from it. The server and the CLI both write to it.
+
+**Decision.** The log is one file of JSON lines in the state folder. Each line has a sequence number and the SHA-256 hash of the line before it; `apeiron web audit verify` checks the chain and prints the hash of the last line. A line is appended under a file lock and flushed to disk before the request goes on; a short operation is recorded after it runs and before its result is sent, a long one after its checks and before it starts. If recording fails, the request fails. Admins read the log on an Activity page and with `apeiron web audit show`.
+
+**Rationale.** A hash chain shows changed, removed and reordered lines with nothing more than a file and a hash function, and the last hash, kept elsewhere, also shows a rewritten or shortened log. JSON lines can be read with any tool and appended without rewriting. Failing closed is what makes the record complete: an operation that cannot be recorded does not happen. The lock of the standard library lets the CLI record user changes while the server runs.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| Keeping the log inside the repository as snapshots | Every page view would write a snapshot; the repository's history would fill with records |
+| syslog or journald | Not on every system, not tamper-evident, and not readable by the pages without more rights |
+| Signing each line with a key | The server would hold the key, so anyone who can change the file can usually sign too; the chain plus a hash kept elsewhere covers the same cases |
+| Recording only changes, not reading | "Who looked at my files?" is one of the questions the log must answer |
+| Recording after a long operation ends | A crash or a lost result would leave a restore unrecorded |
+
+**Consequences.** Every request in the web interface waits for a write to disk. The log grows without limit until rotation is added. The log can be rewritten whole by someone with access to the file; only a hash kept elsewhere reveals that.

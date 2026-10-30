@@ -96,7 +96,7 @@ Masaüstü arayüzü önce gelir, çünkü çıkış kriterini tek başına kar�
 | 1 | Masaüstü arayüzü ([DESKTOP.tr.md](DESKTOP.tr.md)) | Tamamlandı |
 | 2 | Web arayüzü ([WEB.tr.md](WEB.tr.md)) | Tamamlandı |
 | 3 | Kullanıcılar ve izinler ([USERS.tr.md](USERS.tr.md)) | Tamamlandı |
-| 4 | Denetim kaydı | Planlandı |
+| 4 | Denetim kaydı ([AUDIT.tr.md](AUDIT.tr.md)) | Tamamlandı |
 | 5 | Paylaşım | Planlandı |
 
 ## 7. Aşama 5 — Kurumsal

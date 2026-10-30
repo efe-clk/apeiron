@@ -36,6 +36,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [026](#adr-026-yerelde-sunulan-ve-yerel-bir-pencerede-gösterilen-tek-bir-web-sayfaları-takımı) | Masaüstü arayüzü | Derleme adımı olmayan HTML sayfaları, `127.0.0.1` üzerinde jetonlu bir JSON API, bir `wry` penceresi | Kabul edildi |
 | [027](#adr-027-web-arayüzü-tek-bir-depoyu-tls-üzerinden-parolayla-oturum-açana-sunar) | Web arayüzü | Başlarken sabitlenen tek depo; çerezli oturumla parola girişi; varsayılan olarak kendinden imzalı sertifikayla `rustls`; izinli işlemler ve klasörler | Kabul edildi |
 | [028](#adr-028-üç-rollü-kullanıcılar-ref-adıyla-yedekler-ve-üst-sürümler-yoluyla-görünürlük) | Kullanıcılar ve izinler | `admin`, `member`, `reader`; önekli ref adları olarak yedekler; kullanıcının ref'lerinden ulaşılabilen snapshot görünür | Kabul edildi |
+| [029](#adr-029-denetim-kaydı-her-şeyden-önce-yazılan-özet-zincirli-bir-json-satırları-dosyasıdır) | Denetim kaydı | SHA-256 zincirli JSON satırları; bir kilit altında eklenir ve istek sürmeden önce diske aktarılır; kaydedilemeyen istek başarısız olur | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
@@ -611,3 +612,25 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Kullanıcıları şimdi sayfalarda yönetmek | CLI bunu karşılar; denetim kaydı değişiklikleri kaydettiğinde sayfalar gelebilir |
 
 **Sonuçlar.** Oturum açabilen herkes, deponun anahtarını sunucunun tutmasına güvenir; yani kullanıcılar birbirlerinden kriptografiyle değil sunucuyla korunur. Bir kullanıcının yedeğine birleştirilen bir snapshot o kullanıcıya görünür olur. Bir `member` ya da `reader` aramak için bir snapshot belirtmelidir. ADR-027'deki `--set-password` seçeneği kaldırıldı.
+
+## ADR-029: Denetim kaydı, her şeyden önce yazılan, özet zincirli bir JSON satırları dosyasıdır
+
+**Durum:** Kabul edildi (2026-10-30)
+
+**Bağlam.** Aşama 4'ün 4. işi, web arayüzünde kimin ne yaptığını kaydeder ([AUDIT.tr.md](AUDIT.tr.md)). Bir admin kayda güvenebilmelidir: dosyaya erişim kazanan bir kullanıcı ya da bir hata onu fark edilmeden değiştirmemeli ve kayıtta olmayan hiçbir şey olmamalıdır. Hem sunucu hem CLI ona yazar.
+
+**Karar.** Kayıt, durum klasöründeki tek bir JSON satırları dosyasıdır. Her satırda bir sıra numarası ve önceki satırın SHA-256 özeti vardır; `apeiron web audit verify` zinciri denetler ve son satırın özetini yazar. Bir satır, bir dosya kilidi altında eklenir ve istek sürmeden önce diske aktarılır; kısa bir işlem çalıştıktan sonra ve sonucu gönderilmeden önce, uzun bir işlem denetimlerinden sonra ve başlamadan önce kaydedilir. Kaydetmek başarısız olursa istek de başarısız olur. Adminler kaydı bir Etkinlik sayfasında ve `apeiron web audit show` ile okur.
+
+**Gerekçe.** Bir özet zinciri, bir dosya ve bir özet işlevinden fazlası olmadan değiştirilmiş, silinmiş ve yeri değiştirilmiş satırları gösterir; başka bir yerde tutulan son özet ise yeniden yazılmış ya da kısaltılmış bir kaydı da gösterir. JSON satırları her araçla okunabilir ve yeniden yazmadan eklenebilir. Kaydı eksiksiz kılan, kapalı kalarak başarısız olmaktır: kaydedilemeyen bir işlem olmaz. Standart kütüphanenin kilidi, sunucu çalışırken CLI'nın kullanıcı değişikliklerini kaydetmesini sağlar.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Kaydı deponun içinde snapshot olarak tutmak | Her sayfa görüntüleme bir snapshot yazardı; deponun geçmişi kayıtlarla dolardı |
+| syslog ya da journald | Her sistemde yok, değişiklik belli olmaz ve sayfalar daha çok hak olmadan okuyamaz |
+| Her satırı bir anahtarla imzalamak | Anahtarı sunucu tutardı; dosyayı değiştirebilen genellikle imzalayabilir de; zincir ve başka yerde tutulan bir özet aynı durumları karşılar |
+| Okumaları değil yalnızca değişiklikleri kaydetmek | "Dosyalarıma kim baktı?" kaydın yanıtlaması gereken sorulardan biridir |
+| Uzun bir işlemi bittikten sonra kaydetmek | Bir çökme ya da kaybolan bir sonuç bir geri yüklemeyi kayıtsız bırakırdı |
+
+**Sonuçlar.** Web arayüzündeki her istek diske bir yazmayı bekler. Döndürme eklenene kadar kayıt sınırsız büyür. Dosyaya erişimi olan biri kaydı baştan sona yeniden yazabilir; bunu yalnızca başka yerde tutulan bir özet ortaya çıkarır.

@@ -117,6 +117,9 @@ th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--line); v
 th { font-size: 0.85rem; color: var(--muted); font-weight: 600; }
 td.num { text-align: right; white-space: nowrap; }
 td .actions { margin: 0; }
+td.bad { color: var(--bad); }
+.card.scroll { overflow-x: auto; }
+.card.scroll td { overflow-wrap: anywhere; font-size: 0.85rem; }
 
 .message { padding: 12px 16px; border-radius: 8px; margin: 12px 0; border: 1px solid var(--line); }
 .message.good { border-color: var(--good); color: var(--good); }

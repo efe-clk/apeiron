@@ -326,6 +326,79 @@ enum WebCommand {
         #[command(subcommand)]
         command: UserCommand,
     },
+    /// Read and check the audit log (docs/AUDIT.md)
+    Audit {
+        #[command(subcommand)]
+        command: AuditCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum AuditCommand {
+    /// Show the newest events, oldest first
+    Show {
+        /// Only the events of this user
+        #[arg(long)]
+        user: Option<String>,
+        #[arg(long, default_value_t = 50)]
+        limit: usize,
+    },
+    /// Check that no event was changed, removed or reordered
+    Verify,
+}
+
+fn audit_log() -> Result<apeiron_server::Audit, Failure> {
+    apeiron_server::Audit::default_file()
+        .map(apeiron_server::Audit::new)
+        .ok_or_else(|| Failure::Usage("no state folder for the audit log".to_owned()))
+}
+
+fn web_audit(command: AuditCommand, out: &Output) -> Result<u8, Failure> {
+    let audit = audit_log()?;
+    match command {
+        AuditCommand::Show { user, limit } => {
+            let events = audit.read(limit, user.as_deref())?;
+            out.result(&events, |events| {
+                for e in events {
+                    say!(
+                        "{} {:>6}  {}  {}  {}  {}{}",
+                        e.time,
+                        e.seq,
+                        e.user.as_deref().unwrap_or("-"),
+                        e.event,
+                        e.outcome,
+                        if e.detail.is_null() {
+                            String::new()
+                        } else {
+                            e.detail.to_string()
+                        },
+                        e.from
+                            .as_deref()
+                            .map(|f| format!("  from {f}"))
+                            .unwrap_or_default()
+                    );
+                }
+                if events.is_empty() {
+                    say!("No events in {}", audit.file().display());
+                }
+            });
+            Ok(0)
+        }
+        AuditCommand::Verify => match audit.verify() {
+            Ok(v) => {
+                out.result(&v, |v| {
+                    say!("The audit log is whole: {} events.", v.events);
+                    say!("Hash of the last event: {}", v.last);
+                });
+                Ok(0)
+            }
+            Err(e) if e.kind == ErrorKind::Corrupt => {
+                eprintln!("error: {}", e.message);
+                Ok(EXIT_DAMAGED)
+            }
+            Err(e) => Err(e.into()),
+        },
+    }
 }
 
 #[derive(Subcommand)]
@@ -397,6 +470,17 @@ fn new_login_password() -> Result<String, Failure> {
 
 fn web_user(file: &Path, command: UserCommand, out: &Output) -> Result<(), Failure> {
     let mut users = apeiron_server::Users::load(file)?;
+    let audit = audit_log()?;
+    // Changes are recorded, never passwords (docs/AUDIT.md §1).
+    let record = |event: &str, user: Option<&apeiron_server::User>, name: &str| {
+        let detail = match user {
+            Some(u) => serde_json::json!({
+                "name": u.name, "role": u.role, "backups": u.backups, "folders": u.folders,
+            }),
+            None => serde_json::json!({ "name": name }),
+        };
+        audit.record(&apeiron_server::Actor::default(), event, detail, "ok")
+    };
     match command {
         UserCommand::List => {
             let list: Vec<UserView> = users
@@ -454,6 +538,7 @@ fn web_user(file: &Path, command: UserCommand, out: &Output) -> Result<(), Failu
             })?;
             users.need_admin()?;
             users.save(file)?;
+            record("user_add", users.get(&name), &name)?;
             say!("Added {name}");
         }
         UserCommand::Change {
@@ -474,6 +559,7 @@ fn web_user(file: &Path, command: UserCommand, out: &Output) -> Result<(), Failu
             }
             users.need_admin()?;
             users.save(file)?;
+            record("user_change", users.get(&name), &name)?;
             say!("Changed {name}");
         }
         UserCommand::Password { name } => {
@@ -481,11 +567,13 @@ fn web_user(file: &Path, command: UserCommand, out: &Output) -> Result<(), Failu
             let password = new_login_password()?;
             users.get_mut(&name)?.password = password;
             users.save(file)?;
+            record("user_password", None, &name)?;
             say!("Set a new password for {name}");
         }
         UserCommand::Remove { name } => {
             users.remove(&name)?;
             users.save(file)?;
+            record("user_remove", None, &name)?;
             say!("Removed {name}");
         }
     }
@@ -1152,9 +1240,13 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                 .map(|d| d.join("apeiron"))
                 .ok_or_else(|| Failure::Usage("no configuration folder".to_owned()))?;
             let users_file = config.join("web.json");
-            if let Some(WebCommand::User { command }) = command {
-                web_user(&users_file, command, out)?;
-                return Ok(0);
+            match command {
+                Some(WebCommand::User { command }) => {
+                    web_user(&users_file, command, out)?;
+                    return Ok(0);
+                }
+                Some(WebCommand::Audit { command }) => return web_audit(command, out),
+                None => {}
             }
             apeiron_server::Users::load(&users_file)?.need_admin()?;
             let repo = open(cli.repo, password_file)?;
@@ -1194,6 +1286,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                 tls,
                 users: users_file,
                 folders,
+                audit: audit_log()?,
             })?;
             let scheme = if plain { "http" } else { "https" };
             say!(

@@ -21,6 +21,7 @@ const may = {
   backUp: () => user?.role !== "reader",
   restore: () => user?.role !== "reader",
   verify: () => !user || user.role === "admin",
+  readLog: () => user?.role === "admin",
 };
 
 const main = document.getElementById("main");
@@ -281,6 +282,7 @@ function showNav(current) {
     item("overview", overview),
     may.backUp() ? item("backup", () => backup()) : null,
     may.verify() ? item("verify", verify) : null,
+    may.readLog() ? item("activity", activity) : null,
     mode === "web" ? item("sign_out", signOut) : item("close", () => start()),
     h("span", { class: "path" }, user ? `${user.name} · ${repoPath}` : repoPath),
   );
@@ -609,6 +611,34 @@ function verify() {
       : message("good", t("verify_ok", { objects: result.objects_checked.toLocaleString(lang) })));
   } }, t("verify_button"));
   show(h("h1", {}, t("verify_heading")), h("div", { class: "card" }, h("p", { class: "muted" }, t("verify_intro")), h("div", { class: "actions" }, button)), status);
+}
+
+// ---- Activity (AUDIT.md §4) ----
+
+async function activity() {
+  showNav("activity");
+  show(h("p", {}, t("loading")));
+  try {
+    const events = await api("GET", "/api/audit?limit=200");
+    const rows = events.map((e) => h("tr", {},
+      h("td", {}, new Date(e.time).toLocaleString(lang, { dateStyle: "medium", timeStyle: "medium" })),
+      h("td", {}, e.user || "—"),
+      h("td", {}, e.event),
+      h("td", { class: e.outcome === "ok" ? "" : "bad" }, e.outcome),
+      h("td", { class: "muted" }, e.detail ? JSON.stringify(e.detail) : "", e.from ? ` (${e.from})` : ""),
+    ));
+    show(
+      h("h1", {}, t("activity_heading")),
+      h("p", { class: "muted" }, t("activity_intro")),
+      events.length === 0
+        ? h("div", { class: "card" }, h("p", {}, t("activity_empty")))
+        : h("div", { class: "card scroll" }, h("table", {},
+          h("thead", {}, h("tr", {}, ...["activity_time", "activity_user", "activity_event", "activity_outcome", "details"].map((k) => h("th", {}, t(k))))),
+          h("tbody", {}, ...rows))),
+    );
+  } catch (err) {
+    show(h("h1", {}, t("activity_heading")), errorMessage(err));
+  }
 }
 
 // ---- Signing in (WEB.md §4) ----

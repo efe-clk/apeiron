@@ -256,6 +256,7 @@ dependencies = [
  "getrandom 0.4.3",
  "hyper",
  "hyper-util",
+ "jiff",
  "rcgen",
  "rustls",
  "serde",

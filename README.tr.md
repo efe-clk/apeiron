@@ -124,6 +124,7 @@ Kod, commit ve format değişikliği kuralları: [CONTRIBUTING.tr.md](CONTRIBUTI
 | [Masaüstü arayüzü](docs/DESKTOP.tr.md) | Komut satırı olmadan, bir pencerede yedekleme ve geri yükleme |
 | [Web arayüzü](docs/WEB.tr.md) | Bir yedek sunucusunu başka bir bilgisayardaki tarayıcıdan kullanmak |
 | [Kullanıcılar ve izinler](docs/USERS.tr.md) | Tek bir yedek sunucusunda, her biri kendi yedekleriyle birkaç kişi |
+| [Denetim kaydı](docs/AUDIT.tr.md) | Web arayüzünde kimin ne yaptığının, fark edilmeden değiştirilemeyen kaydı |
 | [Kullanım rehberi](docs/GUIDE.tr.md) | Kurulum, günlük yedek, geri yükleme ve bir aylık deneme |
 | [Sözlük](docs/GLOSSARY.tr.md) | Terimler ve İngilizce–Türkçe karşılıkları |
 | [Katkı](CONTRIBUTING.tr.md) | Geliştirme ortamı ve kurallar |

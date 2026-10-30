@@ -265,6 +265,8 @@ Open `https://<server address>:8443` on the other computer. The browser warns ab
 
 Other people of the house get their own name, backups and folders, for example `apeiron web user add ayse --role member --backup "backup/ayse-*" --folder /home/ayse`; they see only their own backups ([USERS.md](USERS.md)).
 
+Everything done in the web interface is recorded. An admin sees it on the Activity page; `apeiron web audit verify` checks that nobody changed the record ([AUDIT.md](AUDIT.md)).
+
 ## 7. Routine
 
 | How often | Command | Why |

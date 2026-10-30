@@ -23,6 +23,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
+use crate::audit::{Actor, Audit};
 use crate::users::{Role, User, Users, hash_password};
 use crate::{App, Failure, Mode, Running, blocking, body, invalid, lock};
 
@@ -141,6 +142,8 @@ pub struct WebOptions {
     pub users: PathBuf,
     /// The folders users may be given.
     pub folders: Vec<PathBuf>,
+    /// Where every request is recorded (AUDIT.md).
+    pub audit: Audit,
 }
 
 struct Session {
@@ -163,14 +166,27 @@ struct Loaded {
     users: Users,
 }
 
-/// The signed-in user of a request.
+/// The signed-in user of a request and the address of the connection.
 #[derive(Clone)]
-pub(crate) struct Who(pub(crate) Arc<User>);
+pub(crate) struct Who {
+    pub(crate) user: Arc<User>,
+    pub(crate) from: Option<String>,
+}
+
+impl Who {
+    pub(crate) fn actor(&self) -> Actor {
+        Actor {
+            user: Some(self.user.name.clone()),
+            from: self.from.clone(),
+        }
+    }
+}
 
 /// Ref heads whose reachable snapshots are kept, at most.
 const KEPT_HEADS: usize = 256;
 
 pub(crate) struct WebState {
+    pub(crate) audit: Audit,
     users_file: PathBuf,
     users: Mutex<Loaded>,
     /// Canonical `--folder` paths.
@@ -264,18 +280,30 @@ impl WebState {
         }
     }
 
-    pub(crate) async fn login(&self, bytes: Bytes) -> Response {
-        match self.try_login(bytes).await {
+    pub(crate) async fn login(&self, bytes: Bytes, from: Option<String>) -> Response {
+        match self.try_login(bytes, from).await {
             Ok(response) => response,
             Err(f) => f.into_response(),
         }
     }
 
-    async fn try_login(&self, bytes: Bytes) -> Result<Response, Failure> {
+    async fn try_login(&self, bytes: Bytes, from: Option<String>) -> Result<Response, Failure> {
         let r: Login = serde_json::from_value(body(&bytes)?).map_err(|e| invalid(e.to_string()))?;
+        let name = r.name.clone();
+        // Only a sign-in that worked names the user; a failed one keeps the
+        // name given in `detail` (AUDIT.md §2).
+        let record = |user: Option<&str>, outcome: &str| {
+            let actor = Actor {
+                user: user.map(str::to_owned),
+                from: from.clone(),
+            };
+            self.audit
+                .record(&actor, "sign_in", json!({ "name": name }), outcome)
+        };
         let mut attempts = self.attempts.lock().await;
         let now = Instant::now();
         if attempts.paused_until.is_some_and(|until| now < until) {
+            record(None, "locked")?;
             return Err(Failure(
                 StatusCode::TOO_MANY_REQUESTS,
                 json!({"code": 7, "kind": "locked", "message": "too many wrong passwords; try again in a minute"}),
@@ -296,6 +324,7 @@ impl WebState {
         })
         .await?;
         let Some(user) = user else {
+            record(None, "key")?;
             attempts.wrong += 1;
             if attempts.wrong >= TRIES {
                 attempts.wrong = 0;
@@ -303,6 +332,7 @@ impl WebState {
             }
             return Err(Error::new(ErrorKind::Key, "wrong name or password").into());
         };
+        record(Some(&user.name), "ok")?;
         *attempts = Attempts::default();
         let id = random_hex()?;
         let mut sessions = lock(&self.sessions);
@@ -322,7 +352,14 @@ impl WebState {
         ))
     }
 
-    pub(crate) fn logout(&self, headers: &HeaderMap) -> Response {
+    pub(crate) fn logout(&self, headers: &HeaderMap, who: Option<&Who>) -> Response {
+        if let Some(who) = who
+            && let Err(e) = self
+                .audit
+                .record(&who.actor(), "sign_out", Value::Null, "ok")
+        {
+            return Failure::from(e).into_response();
+        }
         if let Some(id) = cookie_value(headers) {
             lock(&self.sessions).remove(id);
         }
@@ -548,6 +585,7 @@ impl Web {
         let address = listener.local_addr().map_err(io_error)?;
         let app = Arc::new(App {
             mode: Mode::Web(Box::new(WebState {
+                audit: options.audit,
                 users_file: options.users,
                 users: Mutex::new(Loaded {
                     modified: None,

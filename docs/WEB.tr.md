@@ -88,7 +88,7 @@ Bir `admin` deponun her yedeğini okuyabilir ve sunucuyu çalıştıran kullanı
 | Konu | Nerede |
 | --- | --- |
 | Birden çok kullanıcı, roller ve yedek başına haklar | 3. iş ([USERS.tr.md](USERS.tr.md)) |
-| Kimin ne yaptığının kaydı | 4. iş (denetim kaydı) |
+| Kimin ne yaptığının kaydı | 4. iş ([AUDIT.tr.md](AUDIT.tr.md)) |
 | Let's Encrypt sertifikaları | Sonra; bugün Caddy gibi bir vekil bunu `--plain` ile yapar |
 | Sayfalarda uzak hedefler, senkron, anahtarlar ve eklentiler | Sonra |
 

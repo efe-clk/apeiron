@@ -1,0 +1,71 @@
+> **English:** [AUDIT.md](AUDIT.md)
+
+# Denetim Kaydı
+
+> **Durum: Tamamlandı.** Aşama 4'ün 4. işinin tasarımıdır ([ROADMAP.tr.md](ROADMAP.tr.md) §6): web arayüzünde ([WEB.tr.md](WEB.tr.md)) ve kullanıcılarında ([USERS.tr.md](USERS.tr.md)) kimin ne yaptığının, kimsenin fark edilmeden değiştiremeyeceği bir kaydı. Arkasındaki karar ADR-029'dur ([DECISIONS.tr.md](DECISIONS.tr.md)).
+
+Birkaç kişi bir yedek sunucusunu paylaştığında admin, "bu klasörü kim, ne zaman geri yükledi?" ve "biri benim adımla oturum açmayı denedi mi?" sorularını yanıtlayabilmelidir.
+
+## 1. Neler kaydedilir
+
+| Olay | Ne zaman | Ayrıntı |
+| --- | --- | --- |
+| `sign_in` | Doğru ya da yanlış, her oturum açma | Verilen ad; parola asla |
+| `sign_out` | Oturumu kapatma | |
+| `call:<operation>` | `list` ya da `log` gibi her kısa işlem | USERS.tr.md §4'teki denetimlerden sonraki istek; snapshot'lar kimlik olarak, yollar çözülmüş olarak |
+| `start:<operation>` | Başlatılan her uzun işlem: `backup`, `restore`, `verify`, `search` | Aynısı |
+| `done:<operation>` | Uzun bir işlemin sonucu alındığında | İş numarası |
+| `cancel` | Bir işi durdurma isteği | İş numarası |
+| `user_add`, `user_change`, `user_password`, `user_remove` | `apeiron web user` | Ad, rol, yedekler ve klasörler; parola asla |
+
+Denetimlerin reddettiği bir işlem hatasıyla kaydedilir; böylece denemeler de görünür. Bir işin durumunu yoklamak, oturum durumu ve klasör seçici kaydedilmez. Masaüstü arayüzü hiçbir şey kaydetmez: yalnızca onu çalıştıran kişiye hizmet eder.
+
+## 2. Dosya
+
+Kayıt, durum klasöründeki (Linux'ta `~/.local/state/apeiron`) `audit.log` dosyasıdır; her satırda bir JSON nesnesi vardır:
+
+```json
+{"seq":12,"time":"2026-10-30T14:03:11Z","user":"ayse","from":"192.168.1.20:51544","event":"start:restore","detail":{"snapshot":"5c1e…","target":"/home/ayse/out"},"outcome":"ok","prev":"9f86…"}
+```
+
+| Alan | Anlamı |
+| --- | --- |
+| `seq` | İlk satırda 1, sonraki her satırda bir fazlası |
+| `time` | Olayın UTC zamanı |
+| `user` | Oturum açmış kullanıcı; `apeiron web user` ve başarısız oturum açmalar için yoktur |
+| `from` | Tarayıcı bağlantısının adresi ve kapısı; bir vekilin arkasında vekilinki |
+| `event`, `detail` | §1; `detail` içindeki 256 karakterden uzun dizeler kesilir |
+| `outcome` | `ok` ya da hata türü (`not_found`, `key`, `unsupported` …); uzun bir işlem izin verilip başladığında `ok` olarak kaydedilir, sonucu `done:` ile gelir |
+| `prev` | Önceki satırın baytlarının SHA-256 özeti, onaltılık; ilk satırda 64 sıfır |
+
+Kısa bir işlem çalıştıktan sonra kaydedilir, böylece hiçbir sonuç kaydedilmeden dışarı çıkmaz; uzun bir işlem başlamadan önce kaydedilir, böylece hiçbir şey kaydedilmeden çalışmaz. Satırlara yalnızca ekleme yapılır. Her biri dosya üzerinde bir kilitle yazılır, böylece sunucu ve `apeiron web user` aynı anda yazabilir; istek sürmeden önce diske aktarılır. Bir satır yazılamazsa istek başarısız olur: kaydedilmeyen hiçbir şey olmaz.
+
+## 3. Denetlemek
+
+Her satır kendinden öncekinin özetini tuttuğu için bir satırı değiştirmek, silmek ya da yerini değiştirmek zinciri o noktadan itibaren bozar. `apeiron web audit verify` bütün kaydı okur, ilk bozuk satırı bildirir ve son satırın özetini yazar. Bu özeti ara sıra bir yere yazmak ya da başka bir yere göndermek, zincirin tek başına yakalayamadığı, baştan sona yeniden yazılmış bir kaydı da ortaya çıkarır.
+
+Kayıt hiç döndürülmez; bir olay yaklaşık 300 bayt tutar, yani bir milyon olay yaklaşık 300 MB eder.
+
+## 4. Okumak
+
+| Nerede | Ne |
+| --- | --- |
+| `apeiron web audit show [--user <name>] [--limit <n>]` | En yeni olaylar, varsayılan olarak 50 tane, en eskisi önce; JSON için `--json` |
+| `apeiron web audit verify` | §3 |
+| Etkinlik sayfası | Web arayüzündeki bir `admin` için: en yeni 200 olay, en yenisi önce |
+| `GET /api/audit?limit=<n>` | Bir `admin` için aynısı; diğerleri `unsupported` alır |
+
+## 5. Bu işin parçası olmayanlar
+
+| Konu | Nerede |
+| --- | --- |
+| CLI'nın kendi yedeklerini ve geri yüklemelerini kaydetmek | Sonra; deponun reflog'u her ref değişikliğini zaten kaydeder |
+| Olayları syslog'a ya da merkezi bir kayıt hizmetine göndermek | Aşama 5 |
+| Kaydı döndürmek ve arşivlemek | Sonra |
+
+## 6. Crate'ler
+
+| Crate | Görevi | Durum |
+| --- | --- | --- |
+| `apeiron-server` | Kayıt, web kipinde kaydetme, `/api/audit` ve Etkinlik sayfası | Tamamlandı |
+| `apeiron-cli` | `apeiron web audit`, kullanıcı değişikliklerini kaydetme | Tamamlandı |

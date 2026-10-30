@@ -88,7 +88,7 @@ An `admin` can read every backup of the repository and write into the `--folder`
 | Item | Where |
 | --- | --- |
 | Several users, roles and rights per backup | Work item 3 ([USERS.md](USERS.md)) |
-| A record of who did what | Work item 4 (audit log) |
+| A record of who did what | Work item 4 ([AUDIT.md](AUDIT.md)) |
 | Certificates from Let's Encrypt | Later; a proxy such as Caddy does this today with `--plain` |
 | Remotes, sync, keys and plugins in the pages | Later |
 

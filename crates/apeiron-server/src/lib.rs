@@ -6,6 +6,7 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 
+mod audit;
 mod users;
 mod web;
 
@@ -19,6 +20,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
+pub use audit::{Actor, Audit, Event, Verified};
 pub use users::{MIN_PASSWORD, Role, User, Users, hash_password};
 pub use web::{Tls, Web, WebOptions};
 use web::{WebState, Who};
@@ -26,7 +28,7 @@ use web::{WebState, Who};
 use apeiron::json::{self, JsonJob};
 use apeiron::{Error, ErrorKind, Repository};
 use axum::body::Bytes;
-use axum::extract::{Path as UrlPath, Query, Request, State};
+use axum::extract::{ConnectInfo, Path as UrlPath, Query, Request, State};
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
@@ -73,8 +75,14 @@ enum Mode {
     Web(Box<WebState>),
 }
 
-/// Running jobs by id, with the user who started each in web mode.
-type Jobs = HashMap<u64, (Option<String>, Box<dyn JsonJob>)>;
+/// A running job, with the user who started it in web mode.
+struct JobEntry {
+    owner: Option<String>,
+    operation: String,
+    job: Box<dyn JsonJob>,
+}
+
+type Jobs = HashMap<u64, JobEntry>;
 
 struct App {
     mode: Mode,
@@ -211,7 +219,11 @@ async fn guard(State(app): State<Arc<App>>, mut request: Request, next: Next) ->
             let open = matches!(request.uri().path(), "/api/session" | "/api/login");
             match web.current(headers) {
                 Some(user) => {
-                    request.extensions_mut().insert(Who(Arc::new(user)));
+                    let from = peer(&request);
+                    request.extensions_mut().insert(Who {
+                        user: Arc::new(user),
+                        from,
+                    });
                 }
                 None if api && !open => {
                     return Failure(
@@ -236,6 +248,14 @@ async fn guard(State(app): State<Arc<App>>, mut request: Request, next: Next) ->
         HeaderValue::from_static("nosniff"),
     );
     response
+}
+
+/// The address of the connection, as `address:port`.
+fn peer(request: &Request) -> Option<String> {
+    request
+        .extensions()
+        .get::<ConnectInfo<SocketAddr>>()
+        .map(|c| c.0.to_string())
 }
 
 async fn page(request: Request) -> Response {
@@ -307,19 +327,21 @@ async fn state(State(app): State<Arc<App>>) -> Answer {
 }
 
 /// The signed-in user in web mode, `None` in local mode.
-fn who(app: &App, who: Option<Extension<Who>>) -> Result<Option<Arc<crate::User>>, Error> {
+fn who(app: &App, who: Option<Extension<Who>>) -> Result<Option<Who>, Error> {
     match (&app.mode, who) {
         (Mode::Local { .. }, _) => Ok(None),
-        (Mode::Web(_), Some(Extension(Who(user)))) => Ok(Some(user)),
+        (Mode::Web(_), Some(Extension(who))) => Ok(Some(who)),
         (Mode::Web(_), None) => Err(invalid("sign in first")),
     }
 }
 
 /// Runs `f` with the repository and, in web mode, the request after the
-/// user's checks (USERS.md §4).
+/// user's checks (USERS.md §4), recorded in the audit log (AUDIT.md §1): a
+/// short operation once it has run, so no result leaves unrecorded, and a
+/// long one before it starts.
 async fn checked<T: Send + 'static>(
     app: &Arc<App>,
-    user: Option<Arc<crate::User>>,
+    who: Option<Who>,
     long: bool,
     operation: String,
     request: Value,
@@ -328,34 +350,72 @@ async fn checked<T: Send + 'static>(
     let repo = app.repo()?;
     let app = app.clone();
     blocking(move || {
-        let request = match (&app.mode, &user) {
-            (Mode::Web(web), Some(user)) => web.check(&repo, user, long, &operation, request)?,
-            _ => request,
+        let (Mode::Web(web), Some(who)) = (&app.mode, &who) else {
+            return f(&repo, &operation, request);
         };
-        f(&repo, &operation, request)
+        let event = format!("{}:{operation}", if long { "start" } else { "call" });
+        let checked = web.check(&repo, &who.user, long, &operation, request.clone());
+        let detail = checked.as_ref().map_or(request, Value::clone);
+        let checked = match checked {
+            Err(e) => {
+                web.audit
+                    .record(&who.actor(), &event, detail, &outcome(Err(&e)))?;
+                return Err(e);
+            }
+            Ok(checked) => checked,
+        };
+        if long {
+            web.audit.record(&who.actor(), &event, detail, "ok")?;
+            let result = f(&repo, &operation, checked);
+            if let Err(e) = &result {
+                web.audit
+                    .record(&who.actor(), &event, Value::Null, &outcome(Err(e)))?;
+            }
+            result
+        } else {
+            let result = f(&repo, &operation, checked);
+            web.audit.record(
+                &who.actor(),
+                &event,
+                detail,
+                &outcome(result.as_ref().map(|_| ())),
+            )?;
+            result
+        }
     })
     .await
+}
+
+/// `ok` or the kind of the error, for the audit log.
+fn outcome(result: Result<(), &Error>) -> String {
+    match result {
+        Ok(()) => "ok".to_owned(),
+        Err(e) => serde_json::to_value(e.kind)
+            .ok()
+            .and_then(|v| v.as_str().map(str::to_owned))
+            .unwrap_or_else(|| "error".to_owned()),
+    }
 }
 
 async fn call(
     State(app): State<Arc<App>>,
     UrlPath(operation): UrlPath<String>,
-    user: Option<Extension<Who>>,
+    who_: Option<Extension<Who>>,
     bytes: Bytes,
 ) -> Answer {
     let request = body(&bytes)?;
-    let user = who(&app, user)?;
+    let who = who(&app, who_)?;
     let result = checked(
         &app,
-        user.clone(),
+        who.clone(),
         false,
         operation.clone(),
         request,
         json::call,
     )
     .await?;
-    Ok(axum::Json(match (&app.mode, &user) {
-        (Mode::Web(web), Some(user)) => web.filter(user, &operation, result),
+    Ok(axum::Json(match (&app.mode, &who) {
+        (Mode::Web(web), Some(who)) => web.filter(&who.user, &operation, result),
         _ => result,
     }))
 }
@@ -363,29 +423,29 @@ async fn call(
 async fn start(
     State(app): State<Arc<App>>,
     UrlPath(operation): UrlPath<String>,
-    user: Option<Extension<Who>>,
+    who_: Option<Extension<Who>>,
     bytes: Bytes,
 ) -> Answer {
     let request = body(&bytes)?;
-    let user = who(&app, user)?;
-    let owner = user.as_ref().map(|u| u.name.clone());
-    let job = checked(&app, user, true, operation, request, |repo, op, r| {
-        json::start(repo, op, r)
-    })
-    .await?;
+    let who = who(&app, who_)?;
+    let owner = who.as_ref().map(|w| w.user.name.clone());
+    let job = checked(&app, who, true, operation.clone(), request, json::start).await?;
     let id = app.next_job.fetch_add(1, Ordering::Relaxed);
-    lock(&app.jobs).insert(id, (owner, job));
+    lock(&app.jobs).insert(
+        id,
+        JobEntry {
+            owner,
+            operation,
+            job,
+        },
+    );
     Ok(axum::Json(json!({ "job": id })))
 }
 
 /// A job of the user, or of anyone in local mode.
-fn own_job<'a>(
-    jobs: &'a mut Jobs,
-    id: u64,
-    user: Option<&Arc<crate::User>>,
-) -> Result<&'a mut Box<dyn JsonJob>, Error> {
+fn own_job<'a>(jobs: &'a mut Jobs, id: u64, who: Option<&Who>) -> Result<&'a mut JobEntry, Error> {
     match jobs.get_mut(&id) {
-        Some((owner, job)) if owner.as_deref() == user.map(|u| u.name.as_str()) => Ok(job),
+        Some(entry) if entry.owner.as_deref() == who.map(|w| w.user.name.as_str()) => Ok(entry),
         _ => Err(Error::new(ErrorKind::NotFound, format!("job {id}"))),
     }
 }
@@ -393,15 +453,27 @@ fn own_job<'a>(
 async fn job(
     State(app): State<Arc<App>>,
     UrlPath(id): UrlPath<u64>,
-    user: Option<Extension<Who>>,
+    who_: Option<Extension<Who>>,
 ) -> Answer {
-    let user = who(&app, user)?;
+    let who = who(&app, who_)?;
     let mut jobs = lock(&app.jobs);
-    let job = own_job(&mut jobs, id, user.as_ref())?;
-    let progress = job.progress();
-    let answer = match job.wait(Some(Duration::ZERO)) {
+    let entry = own_job(&mut jobs, id, who.as_ref())?;
+    let progress = entry.job.progress();
+    let answer = match entry.job.wait(Some(Duration::ZERO)) {
         None => json!({"progress": progress, "done": false}),
         Some(result) => {
+            if let (Mode::Web(web), Some(who)) = (&app.mode, &who) {
+                // An unrecorded result stays with the job, to be fetched again.
+                let recorded = web.audit.record(
+                    &who.actor(),
+                    &format!("done:{}", entry.operation),
+                    json!({ "job": id }),
+                    &outcome(result.as_ref().map(|_| ())),
+                );
+                if let Err(e) = recorded {
+                    return Err(e.into());
+                }
+            }
             jobs.remove(&id);
             match result {
                 Ok(result) => json!({"progress": progress, "done": true, "result": result}),
@@ -415,12 +487,52 @@ async fn job(
 async fn cancel(
     State(app): State<Arc<App>>,
     UrlPath(id): UrlPath<u64>,
-    user: Option<Extension<Who>>,
+    who_: Option<Extension<Who>>,
 ) -> Answer {
-    let user = who(&app, user)?;
+    let who = who(&app, who_)?;
     let mut jobs = lock(&app.jobs);
-    own_job(&mut jobs, id, user.as_ref())?.cancel();
+    let entry = own_job(&mut jobs, id, who.as_ref())?;
+    if let (Mode::Web(web), Some(who)) = (&app.mode, &who) {
+        web.audit
+            .record(&who.actor(), "cancel", json!({ "job": id }), "ok")?;
+    }
+    entry.job.cancel();
     Ok(axum::Json(json!({})))
+}
+
+#[derive(Deserialize)]
+struct AuditQuery {
+    #[serde(default = "default_audit_limit")]
+    limit: usize,
+}
+
+fn default_audit_limit() -> usize {
+    200
+}
+
+/// The newest events of the audit log, newest first, for an `admin`
+/// (AUDIT.md §4).
+async fn audit(
+    State(app): State<Arc<App>>,
+    who_: Option<Extension<Who>>,
+    Query(q): Query<AuditQuery>,
+) -> Answer {
+    let who = who(&app, who_)?;
+    let events = blocking(move || match (&app.mode, &who) {
+        (Mode::Web(web), Some(who)) if who.user.role == Role::Admin => {
+            let mut events = web.audit.read(q.limit.min(1000), None)?;
+            events.reverse();
+            Ok(events)
+        }
+        _ => Err(Error::new(
+            ErrorKind::Unsupported,
+            "only an admin of the web interface reads the audit log",
+        )),
+    })
+    .await?;
+    Ok(axum::Json(
+        serde_json::to_value(events).unwrap_or(Value::Null),
+    ))
 }
 
 #[derive(Deserialize)]
@@ -433,13 +545,13 @@ struct FolderQuery {
 /// mode only inside the allowed folders (WEB.md §4).
 async fn folders(
     State(app): State<Arc<App>>,
-    user: Option<Extension<Who>>,
+    who_: Option<Extension<Who>>,
     Query(q): Query<FolderQuery>,
 ) -> Answer {
-    let user = who(&app, user)?;
+    let who = who(&app, who_)?;
     let answer = blocking(move || {
-        let roots = match (&app.mode, &user) {
-            (Mode::Web(web), Some(user)) => Some(web.folders(user)),
+        let roots = match (&app.mode, &who) {
+            (Mode::Web(web), Some(who)) => Some(web.folders(&who.user)),
             _ => None,
         };
         let path = match (q.path.filter(|p| !p.as_os_str().is_empty()), &roots) {
@@ -504,29 +616,37 @@ async fn session(State(app): State<Arc<App>>, user: Option<Extension<Who>>) -> A
     Ok(axum::Json(match (&app.mode, user) {
         (Mode::Local { .. }, _) => json!({"mode": "local", "signed_in": true}),
         (Mode::Web(_), None) => json!({"mode": "web", "signed_in": false}),
-        (Mode::Web(_), Some(Extension(Who(user)))) => json!({
+        (Mode::Web(_), Some(Extension(who))) => json!({
             "mode": "web",
             "signed_in": true,
-            "user": {"name": user.name, "role": user.role},
+            "user": {"name": who.user.name, "role": who.user.role},
         }),
     }))
 }
 
-async fn login(State(app): State<Arc<App>>, bytes: Bytes) -> Response {
+async fn login(State(app): State<Arc<App>>, request: Request) -> Response {
+    let from = peer(&request);
+    let bytes = match axum::body::to_bytes(request.into_body(), 1 << 16).await {
+        Ok(bytes) => bytes,
+        Err(e) => return Failure::from(invalid(format!("request: {e}"))).into_response(),
+    };
     match &app.mode {
         Mode::Local { .. } => Failure::from(Error::new(
             ErrorKind::Unsupported,
             "the local interface needs no sign-in",
         ))
         .into_response(),
-        Mode::Web(web) => web.login(bytes).await,
+        Mode::Web(web) => web.login(bytes, from).await,
     }
 }
 
 async fn logout(State(app): State<Arc<App>>, request: Request) -> Response {
     match &app.mode {
         Mode::Local { .. } => axum::Json(json!({})).into_response(),
-        Mode::Web(web) => web.logout(request.headers()),
+        Mode::Web(web) => {
+            let who = request.extensions().get::<Who>().cloned();
+            web.logout(request.headers(), who.as_ref())
+        }
     }
 }
 
@@ -543,6 +663,7 @@ fn router(app: Arc<App>) -> Router {
         .route("/api/jobs/{id}", get(job))
         .route("/api/jobs/{id}/cancel", post(cancel))
         .route("/api/folders", get(folders))
+        .route("/api/audit", get(audit))
         .fallback(page)
         .layer(middleware::from_fn_with_state(app.clone(), guard))
         .with_state(app)
@@ -575,10 +696,13 @@ impl Running {
                     let router = router(app);
                     match tls {
                         None => {
-                            let serve =
-                                axum::serve(listener, router).with_graceful_shutdown(async {
-                                    let _ = stopped.await;
-                                });
+                            let serve = axum::serve(
+                                listener,
+                                router.into_make_service_with_connect_info::<SocketAddr>(),
+                            )
+                            .with_graceful_shutdown(async {
+                                let _ = stopped.await;
+                            });
                             // The server ends only when stopped or when its socket fails.
                             let _ = serve.await;
                         }
@@ -626,13 +750,15 @@ async fn serve_tls(
 ) {
     let acceptor = tokio_rustls::TlsAcceptor::from(config);
     loop {
-        let Ok((tcp, _)) = listener.accept().await else {
+        let Ok((tcp, address)) = listener.accept().await else {
             // Running out of file handles passes; wait instead of spinning.
             tokio::time::sleep(Duration::from_millis(100)).await;
             continue;
         };
         let acceptor = acceptor.clone();
-        let service = hyper_util::service::TowerToHyperService::new(router.clone());
+        let service = hyper_util::service::TowerToHyperService::new(
+            router.clone().layer(Extension(ConnectInfo(address))),
+        );
         tokio::spawn(async move {
             let Ok(Ok(stream)) = tokio::time::timeout(HANDSHAKE, acceptor.accept(tcp)).await else {
                 return;
