@@ -1,7 +1,8 @@
 //! The server of Apeiron's pages and JSON API, the C ABI over HTTP. In local
 //! mode (DESKTOP.md) it listens only on `127.0.0.1` for holders of a token;
 //! in web mode (WEB.md) it serves one repository to the network, over TLS,
-//! to a signed-in browser.
+//! to a signed-in browser, or one for each tenant at its own address
+//! (TENANTS.md).
 
 #![forbid(unsafe_code)]
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
@@ -9,6 +10,7 @@
 mod audit;
 mod oidc;
 mod shares;
+mod tenants;
 mod users;
 mod web;
 
@@ -25,8 +27,9 @@ use std::time::Duration;
 pub use audit::{Actor, Audit, Event, Verified};
 pub use oidc::{OidcConfig, Provider, check_provider};
 pub use shares::{DEFAULT_DAYS, MAX_DAYS, Share, Shares};
+pub use tenants::{Tenant, Tenants};
 pub use users::{MIN_PASSWORD, Role, User, Users, hash_password};
-pub use web::{Tls, Web, WebOptions};
+pub use web::{TenantOptions, Tls, Web, WebOptions};
 use web::{WebState, Who};
 
 use apeiron::json::{self, JsonJob};
@@ -40,6 +43,7 @@ use axum::routing::{get, post};
 use axum::{Extension, Router};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use tower::ServiceExt;
 
 /// The pages, compiled into the program (DESKTOP.md §1).
 const PAGES: &[(&str, &str, &str)] = &[
@@ -962,6 +966,41 @@ fn router(app: Arc<App>) -> Router {
         .with_state(app)
 }
 
+/// The host name a `Host` header names, without the port, lowercase.
+fn host_name(host: &str) -> String {
+    let name = match host.strip_prefix('[') {
+        Some(rest) => rest.split(']').next().unwrap_or_default(),
+        None => host.split(':').next().unwrap_or_default(),
+    };
+    name.trim_end_matches('.').to_ascii_lowercase()
+}
+
+/// Sends each request to the site of the host its `Host` header names; no
+/// site answers for other hosts (TENANTS.md §3).
+fn by_host(sites: HashMap<String, Router>) -> Router {
+    let sites = Arc::new(sites);
+    Router::new().fallback(move |request: Request| {
+        let sites = sites.clone();
+        async move {
+            let site = request
+                .headers()
+                .get(header::HOST)
+                .and_then(|v| v.to_str().ok())
+                .and_then(|h| sites.get(&host_name(h)));
+            match site {
+                Some(site) => match site.clone().oneshot(request).await {
+                    Ok(response) => response,
+                    Err(never) => match never {},
+                },
+                None => refused(
+                    StatusCode::MISDIRECTED_REQUEST,
+                    "this server has no site at this address",
+                ),
+            }
+        }
+    })
+}
+
 /// A server running on a thread of its own.
 struct Running {
     stop: Option<tokio::sync::oneshot::Sender<()>>,
@@ -969,10 +1008,10 @@ struct Running {
 }
 
 impl Running {
-    /// Serves `app` on `listener`, over TLS when `tls` is given.
+    /// Serves `router` on `listener`, over TLS when `tls` is given.
     fn start(
         listener: TcpListener,
-        app: Arc<App>,
+        router: Router,
         tls: Option<Arc<rustls::ServerConfig>>,
     ) -> io::Result<Self> {
         let runtime = tokio::runtime::Builder::new_multi_thread()
@@ -986,7 +1025,6 @@ impl Running {
             .name("apeiron-server".to_owned())
             .spawn(move || {
                 runtime.block_on(async move {
-                    let router = router(app);
                     match tls {
                         None => {
                             let serve = axum::serve(
@@ -1087,7 +1125,7 @@ impl Local {
             next_job: AtomicU64::new(1),
             memory: options.memory,
         });
-        let running = Running::start(listener, app, None)?;
+        let running = Running::start(listener, router(app), None)?;
         Ok(Local { url, running })
     }
 

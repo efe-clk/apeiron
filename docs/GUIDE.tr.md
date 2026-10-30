@@ -271,6 +271,8 @@ Hesabı olmayan birine bir yedekten bir klasör ya da dosya vermek için sürüm
 
 Kendi oturum açma hizmeti olan bir kurumda (Keycloak, Microsoft Entra ID, Google Workspace gibi) sunucuyu oraya kaydedin, `apeiron web oidc set --issuer <url> --client-id <id> --address https://<sunucu>` komutunu çalıştırın ve kişileri `apeiron web user add <ad> --role member --oidc <e-postaları>` ile ekleyin. Sonra "Kurumunuzla oturum açın" düğmesine basarlar ve Apeiron'a ait bir parolaya ihtiyaçları olmaz ([IDENTITY.tr.md](IDENTITY.tr.md)).
 
+Tek bir sunucudan, her biri kendi adresinde kendi deposu, kullanıcıları ve kayıtlarıyla birkaç kuruma hizmet etmek için her birini `apeiron web tenant add <ad> --host <ana makine> --repo <yol>` ile ekleyin, `apeiron web user add <ad> --role admin --tenant <ad>` ile bir admin verin ve sunucuyu `apeiron web --tenants` ile başlatın ([TENANTS.tr.md](TENANTS.tr.md)).
+
 ## 7. Düzen
 
 | Ne sıklıkla | Komut | Neden |

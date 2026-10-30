@@ -29,6 +29,7 @@ serde_json = "1.0.154"
 sha2 = "0.11.0"
 tokio = { version = "1.54.1", features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
 tokio-rustls = { version = "0.26.6", default-features = false, features = ["aws_lc_rs", "tls12"] }
+tower = { version = "0.5.3", default-features = false, features = ["util"] }
 url = "2.5.8"
 
 [dev-dependencies]

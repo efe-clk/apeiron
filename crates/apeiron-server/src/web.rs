@@ -1,6 +1,6 @@
 //! Web mode (WEB.md): one repository served to the network over TLS, to
 //! signed-in users, with only the operations, backups and folders their
-//! role and rights allow (USERS.md).
+//! role and rights allow (USERS.md); or one for each tenant (TENANTS.md).
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -70,22 +70,38 @@ impl Tls {
     }
 
     /// The certificate kept in `dir` (`web-cert.pem`, `web-key.pem`), made
-    /// for `names` the first time (WEB.md §2).
+    /// for `names` the first time, and again when a name it was not made
+    /// for is added, such as the host of a new tenant (WEB.md §2,
+    /// TENANTS.md §3).
     pub fn kept_in(dir: &Path, names: Vec<String>) -> Result<Tls, Error> {
         let (cert, key) = (dir.join("web-cert.pem"), dir.join("web-key.pem"));
+        // The names the kept certificate was made for, one per line.
+        let made_for = dir.join("web-cert.names");
         let io_error = |path: &Path, e: io::Error| {
             Error::new(ErrorKind::Io, format!("{}: {e}", path.display()))
         };
+        let listed = names.join("\n") + "\n";
         if cert.exists() && key.exists() {
-            return Ok(Tls {
-                cert_pem: fs::read(&cert).map_err(|e| io_error(&cert, e))?,
-                key_pem: fs::read(&key).map_err(|e| io_error(&key, e))?,
-            });
+            let covered = match fs::read_to_string(&made_for) {
+                Ok(known) => names.iter().all(|n| known.lines().any(|k| k == n)),
+                // Kept before the names were: taken to cover them.
+                Err(_) => {
+                    let _ = fs::write(&made_for, &listed);
+                    true
+                }
+            };
+            if covered {
+                return Ok(Tls {
+                    cert_pem: fs::read(&cert).map_err(|e| io_error(&cert, e))?,
+                    key_pem: fs::read(&key).map_err(|e| io_error(&key, e))?,
+                });
+            }
         }
         let tls = Tls::self_signed(names)?;
         fs::create_dir_all(dir).map_err(|e| io_error(dir, e))?;
         write_private(&key, &tls.key_pem).map_err(|e| io_error(&key, e))?;
         fs::write(&cert, &tls.cert_pem).map_err(|e| io_error(&cert, e))?;
+        fs::write(&made_for, &listed).map_err(|e| io_error(&made_for, e))?;
         Ok(tls)
     }
 
@@ -147,6 +163,18 @@ pub struct WebOptions {
     /// Where every request is recorded (AUDIT.md).
     pub audit: Audit,
     /// The share links (SHARE.md).
+    pub shares: Shares,
+}
+
+/// One tenant of a web server (TENANTS.md).
+pub struct TenantOptions {
+    pub name: String,
+    /// The host name browsers reach the tenant at.
+    pub host: String,
+    pub repo: Repository,
+    pub users: PathBuf,
+    pub folders: Vec<PathBuf>,
+    pub audit: Audit,
     pub shares: Shares,
 }
 
@@ -846,6 +874,46 @@ pub(crate) fn inside(folders: &[PathBuf], path: &Path) -> Result<PathBuf, Error>
     }
 }
 
+/// The server of one repository and its users, files and folders.
+fn site(
+    repo: Repository,
+    users: PathBuf,
+    folders: &[PathBuf],
+    audit: Audit,
+    shares: Shares,
+) -> Result<Arc<App>, Error> {
+    let mut roots = Vec::new();
+    for folder in folders {
+        roots.push(
+            folder.canonicalize().map_err(|e| {
+                Error::new(ErrorKind::NotFound, format!("{}: {e}", folder.display()))
+            })?,
+        );
+    }
+    Users::load(&users)?.need_admin()?;
+    Ok(Arc::new(App {
+        mode: Mode::Web(Box::new(WebState {
+            audit,
+            shares,
+            users_file: users,
+            users: Mutex::new(Loaded {
+                modified: None,
+                users: Users::default(),
+            }),
+            roots,
+            sessions: Mutex::new(HashMap::new()),
+            attempts: tokio::sync::Mutex::new(Attempts::default()),
+            reachable: Mutex::new(HashMap::new()),
+            decoy: hash_password("not the password of anyone")?,
+            oidc: Oidc::new()?,
+        })),
+        repo: Mutex::new(Some(repo)),
+        jobs: Mutex::new(HashMap::new()),
+        next_job: AtomicU64::new(1),
+        memory: None,
+    }))
+}
+
 /// A running web server.
 pub struct Web {
     address: SocketAddr,
@@ -855,45 +923,50 @@ pub struct Web {
 impl Web {
     /// Starts a web server for one repository on a thread of its own.
     pub fn start(options: WebOptions) -> Result<Self, Error> {
-        let io_error = |e: io::Error| Error::new(ErrorKind::Io, e.to_string());
-        let mut roots = Vec::new();
-        for folder in &options.folders {
-            roots.push(folder.canonicalize().map_err(|e| {
-                Error::new(ErrorKind::NotFound, format!("{}: {e}", folder.display()))
-            })?);
+        let app = site(
+            options.repo,
+            options.users,
+            &options.folders,
+            options.audit,
+            options.shares,
+        )?;
+        Web::serve(options.listen, options.tls, crate::router(app))
+    }
+
+    /// Starts a web server for several tenants, each answering at its own
+    /// host (TENANTS.md §3).
+    pub fn start_tenants(
+        listen: SocketAddr,
+        tls: Option<Tls>,
+        tenants: Vec<TenantOptions>,
+    ) -> Result<Self, Error> {
+        if tenants.is_empty() {
+            return Err(invalid(
+                "there are no tenants; add one with `apeiron web tenant add`",
+            ));
         }
-        Users::load(&options.users)?.need_admin()?;
-        let tls = options.tls.as_ref().map(Tls::config).transpose()?;
-        let listener = std::net::TcpListener::bind(options.listen).map_err(|e| {
-            Error::new(
-                ErrorKind::Io,
-                format!("cannot listen on {}: {e}", options.listen),
-            )
-        })?;
+        let mut sites = HashMap::new();
+        for t in tenants {
+            let app = site(t.repo, t.users, &t.folders, t.audit, t.shares)
+                .map_err(|e| Error::new(e.kind, format!("tenant {}: {}", t.name, e.message)))?;
+            if sites
+                .insert(crate::host_name(&t.host), crate::router(app))
+                .is_some()
+            {
+                return Err(invalid(format!("two tenants have the host {}", t.host)));
+            }
+        }
+        Web::serve(listen, tls, crate::by_host(sites))
+    }
+
+    fn serve(listen: SocketAddr, tls: Option<Tls>, router: axum::Router) -> Result<Self, Error> {
+        let io_error = |e: io::Error| Error::new(ErrorKind::Io, e.to_string());
+        let tls = tls.as_ref().map(Tls::config).transpose()?;
+        let listener = std::net::TcpListener::bind(listen)
+            .map_err(|e| Error::new(ErrorKind::Io, format!("cannot listen on {listen}: {e}")))?;
         listener.set_nonblocking(true).map_err(io_error)?;
         let address = listener.local_addr().map_err(io_error)?;
-        let app = Arc::new(App {
-            mode: Mode::Web(Box::new(WebState {
-                audit: options.audit,
-                shares: options.shares,
-                users_file: options.users,
-                users: Mutex::new(Loaded {
-                    modified: None,
-                    users: Users::default(),
-                }),
-                roots,
-                sessions: Mutex::new(HashMap::new()),
-                attempts: tokio::sync::Mutex::new(Attempts::default()),
-                reachable: Mutex::new(HashMap::new()),
-                decoy: hash_password("not the password of anyone")?,
-                oidc: Oidc::new()?,
-            })),
-            repo: Mutex::new(Some(options.repo)),
-            jobs: Mutex::new(HashMap::new()),
-            next_job: AtomicU64::new(1),
-            memory: None,
-        });
-        let running = Running::start(listener, app, tls).map_err(io_error)?;
+        let running = Running::start(listener, router, tls).map_err(io_error)?;
         Ok(Web { address, running })
     }
 

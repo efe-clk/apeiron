@@ -108,7 +108,7 @@ Merkezi kimlik önce gelir, çünkü pilot bir kurum her şeyden önce çalışa
 | # | İş | Durum |
 | --- | --- | --- |
 | 1 | Merkezi kimlik ([IDENTITY.tr.md](IDENTITY.tr.md)) | Tamamlandı |
-| 2 | Çok kiracılı kullanım | Planlandı |
+| 2 | Çok kiracılı kullanım ([TENANTS.tr.md](TENANTS.tr.md)) | Tamamlandı |
 | 3 | Replikasyon ve yüksek erişilebilirlik | Planlandı |
 | 4 | Değiştirilemez arşiv | Planlandı |
 | 5 | Uyumluluk raporları | Planlandı |

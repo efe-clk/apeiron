@@ -37,7 +37,7 @@ apeiron web --repo /srv/backup --listen 0.0.0.0:8443 --folder /home/efe
 | `--plain` | Plain HTTP, only behind a proxy that adds TLS | Off |
 | `--folder` | A folder of the server that users may be given (USERS.md §1); can be given more than once | The home folder |
 
-Without `--cert` and `--key`, a self-signed certificate for `localhost` and the listen address is made once and kept in the configuration folder (`web-cert.pem`, `web-key.pem`). Its SHA-256 fingerprint is printed at start; the browser warns about it once, and the fingerprint it shows must be the printed one.
+Without `--cert` and `--key`, a self-signed certificate for `localhost` and the listen address is made once and kept in the configuration folder (`web-cert.pem`, `web-key.pem`, and `web-cert.names` with the names it was made for); it is made again only when a new name is needed, such as a new tenant's host ([TENANTS.md](TENANTS.md) §3). Its SHA-256 fingerprint is printed at start; the browser warns about it once, and the fingerprint it shows must be the printed one.
 
 The users and the Argon2id hashes of their passwords are kept in `web.json` in the configuration folder (`~/.config/apeiron` on Linux), readable only by its owner (USERS.md §2). Without an `admin` the server does not start.
 

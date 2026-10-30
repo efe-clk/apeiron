@@ -39,6 +39,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [029](#adr-029-the-audit-log-is-a-hash-chained-json-lines-file-written-before-anything-happens) | Audit log | JSON lines with a SHA-256 chain, appended under a lock and flushed before the request goes on; a request that cannot be recorded fails | Accepted |
 | [030](#adr-030-sharing-is-by-expiring-links-to-a-fixed-version-kept-only-as-hashes) | Sharing | A random secret in the link, only its SHA-256 kept; a fixed version and path; 1 to 30 days; ends when the owner may no longer share it | Accepted |
 | [031](#adr-031-central-identity-is-openid-connect-with-users-still-listed-in-webjson) | Central identity | OpenID Connect code flow with PKCE; RS256/ES256 tokens checked against the provider's keys; one claim names a user listed in `web.json`; passwords stay possible | Accepted |
+| [032](#adr-032-tenants-are-told-apart-by-host-each-with-its-own-repository-and-files) | Multi-tenant use | One process, one port; the `Host` header picks a tenant with its own repository, users, audit log, share links and sessions; unknown hosts get nothing | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28.
 
@@ -680,3 +681,24 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | A proxy in front that does the sign-in | Needs another program to run and trust, and the audit log would no longer see who signed in |
 
 **Consequences.** The admin registers the server at the provider and keeps the client secret in `web.json`, readable only by its owner. Accounts turned off at the provider keep sessions already open until they end. Only RS256 and ES256 tokens work; a provider set to anything else must be changed. Users are still added one by one with `apeiron web user add --oidc`.
+
+## ADR-032: Tenants are told apart by host, each with its own repository and files
+
+**Status:** Accepted (2026-10-30)
+
+**Context.** Stage 5 work item 2 lets one web server serve several organizations, or teams, that must not see each other ([TENANTS.md](TENANTS.md)). Roles and backup patterns already keep users of one server apart (USERS.md), but one wrong pattern, one bug in a check or one shared encryption key would then expose one organization to another. Running one server program per organization works, but every one needs its own port, certificate and service to look after.
+
+**Decision.** One process listens on one port and serves every tenant listed in `tenants.json`. The `Host` header of each request picks the tenant; a request for no known host is refused with `421` before any tenant sees it. Every tenant is a complete site of its own: its own repository and key, users file, identity provider, folders, audit log, share links, sessions and jobs, built by the same code as a single web server. Nothing is shared between tenants but the program, the port and the certificate.
+
+**Rationale.** Telling tenants apart by host gives each one its own browser origin, so cookies, the pages and the identity provider's redirect address are separated by the browser itself and not only by the server's checks. Giving every tenant its own repository puts the boundary in the storage too: a mistake in a role cannot reach data that is in another repository under another key. Building each tenant as the same site a single server is keeps one code path for both, so every check of USERS.md, AUDIT.md, SHARE.md and IDENTITY.md holds for a tenant unchanged.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| A tenant field on every user in one `web.json` and one repository | Every check would have to remember the tenant, a single forgotten one would leak data, and all tenants would share one encryption key |
+| Tenants told apart by a path such as `/t/acme/` | All tenants would share one origin, so a page of one could read the cookies and call the API of another |
+| One server program per tenant behind a proxy | Works without this work item, but needs a port, a service and a restart per tenant; still possible for whoever prefers it |
+| One shared repository with refs prefixed per tenant | Deduplication across tenants would show whether another tenant holds the same file, and one key would open all of them |
+
+**Consequences.** Every tenant needs a host name that leads to the server and a certificate valid for it; a wildcard certificate covers them all. The self-signed certificate is made again when a tenant with a new host is added, so its fingerprint changes. Tenants cannot share storage, so the same file kept by two tenants is stored twice. The whole server is one process: a restart stops every tenant for a moment, and limits per tenant are not yet possible.

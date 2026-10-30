@@ -37,7 +37,7 @@ apeiron web --repo /srv/backup --listen 0.0.0.0:8443 --folder /home/efe
 | `--plain` | Düz HTTP, yalnızca TLS ekleyen bir vekilin arkasında | Kapalı |
 | `--folder` | Sunucunun kullanıcılara verilebilen bir klasörü (USERS.tr.md §1); birden çok kez verilebilir | Ev klasörü |
 
-`--cert` ve `--key` verilmezse, `localhost` ve dinlenen adres için kendinden imzalı bir sertifika bir kez oluşturulur ve yapılandırma klasöründe tutulur (`web-cert.pem`, `web-key.pem`). SHA-256 parmak izi başlarken yazılır; tarayıcı bir kez uyarır ve gösterdiği parmak izi yazılanla aynı olmalıdır.
+`--cert` ve `--key` verilmezse, `localhost` ve dinlenen adres için kendinden imzalı bir sertifika bir kez oluşturulur ve yapılandırma klasöründe tutulur (`web-cert.pem`, `web-key.pem` ve oluşturulduğu adlarla `web-cert.names`); yalnızca yeni bir kiracının ana makinesi gibi yeni bir ad gerektiğinde yeniden oluşturulur ([TENANTS.tr.md](TENANTS.tr.md) §3). SHA-256 parmak izi başlarken yazılır; tarayıcı bir kez uyarır ve gösterdiği parmak izi yazılanla aynı olmalıdır.
 
 Kullanıcılar ve parolalarının Argon2id özetleri, yapılandırma klasöründeki (Linux'ta `~/.config/apeiron`) `web.json` dosyasında, yalnızca sahibinin okuyabileceği biçimde tutulur (USERS.tr.md §2). Bir `admin` yoksa sunucu başlamaz.
 

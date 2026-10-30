@@ -271,6 +271,8 @@ To give someone without an account a folder or file from a backup, look inside t
 
 In an organization with its own sign-in service (Keycloak, Microsoft Entra ID, Google Workspace and the like), register the server there, run `apeiron web oidc set --issuer <url> --client-id <id> --address https://<server>` and add people with `apeiron web user add <name> --role member --oidc <their e-mail>`. They then press "Sign in with your organization" and need no password of Apeiron ([IDENTITY.md](IDENTITY.md)).
 
+To serve several organizations from one server, each at its own address and with its own repository, users and records, add each with `apeiron web tenant add <name> --host <host> --repo <path>`, give it an admin with `apeiron web user add <name> --role admin --tenant <name>` and start the server with `apeiron web --tenants` ([TENANTS.md](TENANTS.md)).
+
 ## 7. Routine
 
 | How often | Command | Why |

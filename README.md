@@ -126,6 +126,7 @@ Rules for code, commits and format changes: [CONTRIBUTING.md](CONTRIBUTING.md).
 | [Users and permissions](docs/USERS.md) | Several people on one backup server, each with their own backups |
 | [Audit log](docs/AUDIT.md) | A record of who did what in the web interface that cannot be changed unnoticed |
 | [Central identity](docs/IDENTITY.md) | Signing in to the web interface through an organization's OpenID Connect identity provider |
+| [Multi-tenant use](docs/TENANTS.md) | Several organizations on one web server, each at its own address with its own repository, users and records |
 | [Sharing](docs/SHARE.md) | Links that let someone without an account download a version, folder or file of a backup until they end |
 | [User guide](docs/GUIDE.md) | Installation, daily backup, restore and the one-month test |
 | [Glossary](docs/GLOSSARY.md) | Terms with English–Turkish equivalents |

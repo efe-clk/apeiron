@@ -270,6 +270,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tokio-rustls",
+ "tower",
  "url",
 ]
 

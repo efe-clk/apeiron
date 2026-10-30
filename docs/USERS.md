@@ -82,6 +82,7 @@ The pages show the user's name next to Sign out and hide what the role cannot do
 | Separate encryption keys per user | Users share the repository's key; the server holds it |
 | Users in the desktop interface | Not needed: it serves only the user who runs it |
 | Central identity | Stage 5 work item 1 ([IDENTITY.md](IDENTITY.md)) |
+| Several organizations on one server, kept apart | Stage 5 work item 2 ([TENANTS.md](TENANTS.md)) |
 
 ## 6. Crates
 

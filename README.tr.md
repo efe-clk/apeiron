@@ -126,6 +126,7 @@ Kod, commit ve format değişikliği kuralları: [CONTRIBUTING.tr.md](CONTRIBUTI
 | [Kullanıcılar ve izinler](docs/USERS.tr.md) | Tek bir yedek sunucusunda, her biri kendi yedekleriyle birkaç kişi |
 | [Denetim kaydı](docs/AUDIT.tr.md) | Web arayüzünde kimin ne yaptığının, fark edilmeden değiştirilemeyen kaydı |
 | [Merkezi kimlik](docs/IDENTITY.tr.md) | Web arayüzünde bir kurumun OpenID Connect kimlik sağlayıcısı üzerinden oturum açmak |
+| [Çok kiracılı kullanım](docs/TENANTS.tr.md) | Tek bir web sunucusunda, her biri kendi adresinde kendi deposu, kullanıcıları ve kayıtlarıyla birkaç kurum |
 | [Paylaşım](docs/SHARE.tr.md) | Hesabı olmayan birinin, bitene kadar bir yedeğin sürümünü, klasörünü ya da dosyasını indirebildiği bağlantılar |
 | [Kullanım rehberi](docs/GUIDE.tr.md) | Kurulum, günlük yedek, geri yükleme ve bir aylık deneme |
 | [Sözlük](docs/GLOSSARY.tr.md) | Terimler ve İngilizce–Türkçe karşılıkları |

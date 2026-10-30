@@ -100,7 +100,7 @@ pub fn hash_password(password: &str) -> Result<String, Error> {
         .map_err(|e| Error::new(ErrorKind::Internal, format!("password hash: {e}")))
 }
 
-fn valid_name(name: &str) -> bool {
+pub(crate) fn valid_name(name: &str) -> bool {
     (1..=32).contains(&name.len())
         && name
             .bytes()

@@ -251,6 +251,14 @@ enum Command {
         /// A folder users may be given; default the home folder
         #[arg(long = "folder", value_name = "PATH")]
         folders: Vec<PathBuf>,
+        /// Serve every tenant at its own host instead of one repository
+        /// (docs/TENANTS.md)
+        #[arg(long, conflicts_with = "folders")]
+        tenants: bool,
+        /// The tenant whose users, audit log, share links or identity
+        /// provider to manage
+        #[arg(long, global = true, value_name = "NAME")]
+        tenant: Option<String>,
     },
     /// Run scheduled jobs: backups, pushes, checks and restore tests
     Daemon {
@@ -341,6 +349,148 @@ enum WebCommand {
         #[command(subcommand)]
         command: OidcCommand,
     },
+    /// Manage the organizations served, each at its own host (docs/TENANTS.md)
+    Tenant {
+        #[command(subcommand)]
+        command: TenantCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum TenantCommand {
+    /// Add a tenant with its own repository, users, audit log and links
+    Add {
+        name: String,
+        /// The host name browsers reach it at, such as acme.backup.example.com
+        #[arg(long)]
+        host: String,
+        /// Its repository, made with `apeiron init`
+        #[arg(long, value_name = "PATH")]
+        repo: PathBuf,
+        /// A folder its users may be given
+        #[arg(long = "folder", value_name = "PATH")]
+        folders: Vec<PathBuf>,
+        /// Read the password of an encrypted repository from this file
+        #[arg(long, value_name = "PATH")]
+        password_file: Option<PathBuf>,
+    },
+    /// List the tenants
+    List,
+    /// Stop serving a tenant; its repository and files stay
+    Remove { name: String },
+}
+
+/// Where the files of the web server, or of one of its tenants, are
+/// (docs/TENANTS.md §2).
+struct WebFiles {
+    users: PathBuf,
+    audit: apeiron_server::Audit,
+    shares: apeiron_server::Shares,
+}
+
+fn tenants_file() -> Result<PathBuf, Failure> {
+    apeiron_server::Tenants::default_file()
+        .ok_or_else(|| Failure::Usage("no configuration folder".to_owned()))
+}
+
+impl WebFiles {
+    fn of(tenant: Option<&str>) -> Result<WebFiles, Failure> {
+        let Some(name) = tenant else {
+            let config = dirs::config_dir()
+                .ok_or_else(|| Failure::Usage("no configuration folder".to_owned()))?;
+            return Ok(WebFiles {
+                users: config.join("apeiron").join("web.json"),
+                audit: apeiron_server::Audit::default_file()
+                    .map(apeiron_server::Audit::new)
+                    .ok_or_else(|| {
+                        Failure::Usage("no state folder for the audit log".to_owned())
+                    })?,
+                shares: apeiron_server::Shares::default_file()
+                    .map(apeiron_server::Shares::new)
+                    .ok_or_else(|| Failure::Usage("no state folder for share links".to_owned()))?,
+            });
+        };
+        let tenants = apeiron_server::Tenants::load(&tenants_file()?)?;
+        WebFiles::of_tenant(tenants.get(name)?)
+    }
+
+    fn of_tenant(t: &apeiron_server::Tenant) -> Result<WebFiles, Failure> {
+        let (Some(config), Some(state)) = (t.config_dir(), t.state_dir()) else {
+            return Err(Failure::Usage(
+                "no configuration or state folder".to_owned(),
+            ));
+        };
+        Ok(WebFiles {
+            users: config.join("web.json"),
+            audit: apeiron_server::Audit::new(state.join("audit.log")),
+            shares: apeiron_server::Shares::new(state.join("shares.json")),
+        })
+    }
+}
+
+fn web_tenant(command: TenantCommand, out: &Output) -> Result<(), Failure> {
+    let file = tenants_file()?;
+    let mut tenants = apeiron_server::Tenants::load(&file)?;
+    match command {
+        TenantCommand::Add {
+            name,
+            host,
+            repo,
+            folders,
+            password_file,
+        } => {
+            let full = |p: PathBuf| std::path::absolute(&p).unwrap_or(p);
+            let tenant = apeiron_server::Tenant {
+                name,
+                host: host.to_ascii_lowercase(),
+                repo: full(repo),
+                folders: folders.into_iter().map(full).collect(),
+                password_file: password_file.map(full),
+            };
+            tenants.add(tenant.clone())?;
+            tenants.save(&file)?;
+            WebFiles::of_tenant(&tenant)?.audit.record(
+                &apeiron_server::Actor::default(),
+                "tenant_add",
+                serde_json::to_value(&tenant).unwrap_or_default(),
+                "ok",
+            )?;
+            out.result(&tenant, |t| {
+                say!("Added the tenant {} at {}", t.name, t.host);
+                say!(
+                    "Add its first admin with `apeiron web user add <name> --role admin --tenant {}`",
+                    t.name
+                );
+            });
+        }
+        TenantCommand::List => {
+            out.result(&tenants.tenants, |list| {
+                for t in list {
+                    say!("{}  {}  {}", t.name, t.host, t.repo.display());
+                }
+                if list.is_empty() {
+                    say!("No tenants; add one with `apeiron web tenant add`");
+                }
+            });
+        }
+        TenantCommand::Remove { name } => {
+            let removed = tenants.remove(&name)?;
+            tenants.save(&file)?;
+            WebFiles::of_tenant(&removed)?.audit.record(
+                &apeiron_server::Actor::default(),
+                "tenant_remove",
+                serde_json::json!({ "name": removed.name }),
+                "ok",
+            )?;
+            out.result(&removed, |t| {
+                say!(
+                    "Removed the tenant {}; its repository and files stay",
+                    t.name
+                )
+            });
+        }
+    }
+    Ok(())
 }
 
 #[derive(Subcommand)]
@@ -372,7 +522,8 @@ enum OidcCommand {
     Remove,
 }
 
-fn web_oidc(file: &Path, command: OidcCommand, out: &Output) -> Result<(), Failure> {
+fn web_oidc(files: &WebFiles, command: OidcCommand, out: &Output) -> Result<(), Failure> {
+    let file = &files.users;
     let mut users = apeiron_server::Users::load(file)?;
     let not_set =
         || Failure::Usage("no identity provider is set up; use `apeiron web oidc set`".to_owned());
@@ -413,7 +564,9 @@ fn web_oidc(file: &Path, command: OidcCommand, out: &Output) -> Result<(), Failu
             let detail = view(&config);
             users.oidc = Some(config);
             users.save(file)?;
-            audit_log()?.record(&apeiron_server::Actor::default(), "oidc_set", detail, "ok")?;
+            files
+                .audit
+                .record(&apeiron_server::Actor::default(), "oidc_set", detail, "ok")?;
         }
         OidcCommand::Show => {
             let config = users.oidc.as_ref().ok_or_else(not_set)?;
@@ -446,7 +599,7 @@ fn web_oidc(file: &Path, command: OidcCommand, out: &Output) -> Result<(), Failu
         OidcCommand::Remove => {
             users.oidc.take().ok_or_else(not_set)?;
             users.save(file)?;
-            audit_log()?.record(
+            files.audit.record(
                 &apeiron_server::Actor::default(),
                 "oidc_remove",
                 serde_json::Value::Null,
@@ -466,14 +619,8 @@ enum ShareCommand {
     Remove { id: String },
 }
 
-fn share_file() -> Result<apeiron_server::Shares, Failure> {
-    apeiron_server::Shares::default_file()
-        .map(apeiron_server::Shares::new)
-        .ok_or_else(|| Failure::Usage("no state folder for share links".to_owned()))
-}
-
-fn web_share(command: ShareCommand, out: &Output) -> Result<(), Failure> {
-    let shares = share_file()?;
+fn web_share(files: &WebFiles, command: ShareCommand, out: &Output) -> Result<(), Failure> {
+    let shares = &files.shares;
     match command {
         ShareCommand::List => {
             let list: Vec<apeiron_server::Share> = shares
@@ -499,7 +646,7 @@ fn web_share(command: ShareCommand, out: &Output) -> Result<(), Failure> {
         }
         ShareCommand::Remove { id } => {
             let removed = shares.remove(&id, |_| true)?;
-            audit_log()?.record(
+            files.audit.record(
                 &apeiron_server::Actor::default(),
                 "share_remove",
                 serde_json::json!({ "id": removed.id }),
@@ -525,14 +672,8 @@ enum AuditCommand {
     Verify,
 }
 
-fn audit_log() -> Result<apeiron_server::Audit, Failure> {
-    apeiron_server::Audit::default_file()
-        .map(apeiron_server::Audit::new)
-        .ok_or_else(|| Failure::Usage("no state folder for the audit log".to_owned()))
-}
-
-fn web_audit(command: AuditCommand, out: &Output) -> Result<u8, Failure> {
-    let audit = audit_log()?;
+fn web_audit(files: &WebFiles, command: AuditCommand, out: &Output) -> Result<u8, Failure> {
+    let audit = &files.audit;
     match command {
         AuditCommand::Show { user, limit } => {
             let events = audit.read(limit, user.as_deref())?;
@@ -658,9 +799,10 @@ fn new_login_password() -> Result<String, Failure> {
     Ok(apeiron_server::hash_password(&password)?)
 }
 
-fn web_user(file: &Path, command: UserCommand, out: &Output) -> Result<(), Failure> {
+fn web_user(files: &WebFiles, command: UserCommand, out: &Output) -> Result<(), Failure> {
+    let file = &files.users;
     let mut users = apeiron_server::Users::load(file)?;
-    let audit = audit_log()?;
+    let audit = &files.audit;
     // Changes are recorded, never passwords (docs/AUDIT.md §1).
     let record = |event: &str, user: Option<&apeiron_server::User>, name: &str| {
         let detail = match user {
@@ -940,13 +1082,19 @@ fn open(cli_repo: Option<PathBuf>, password_file: Option<&Path>) -> Result<Repos
     let path = cli_repo.ok_or_else(|| {
         Failure::Usage("no repository given; use --repo or set APEIRON_REPO".to_owned())
     })?;
-    let repo = match Repository::open(&path) {
+    unlock(&path, password_file, "Password or recovery key: ")
+}
+
+/// Opens the repository at `path`, asking with `asking` for the password of
+/// an encrypted one unless `password_file` holds it.
+fn unlock(path: &Path, password_file: Option<&Path>, asking: &str) -> Result<Repository, Failure> {
+    let repo = match Repository::open(path) {
         Err(e) if e.kind == ErrorKind::Key => {
             let secret = match password_file {
                 Some(file) => read_password_file(file)?,
-                None => prompt("Password or recovery key: ")?,
+                None => prompt(asking)?,
             };
-            Repository::unlock(&path, &secret)?
+            Repository::unlock(path, &secret)?
         }
         result => result?,
     };
@@ -1448,30 +1596,46 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             key,
             plain,
             folders,
+            tenants,
+            tenant,
             command,
         } => {
             let config = dirs::config_dir()
                 .map(|d| d.join("apeiron"))
                 .ok_or_else(|| Failure::Usage("no configuration folder".to_owned()))?;
-            let users_file = config.join("web.json");
+            let files = || WebFiles::of(tenant.as_deref());
             match command {
                 Some(WebCommand::User { command }) => {
-                    web_user(&users_file, command, out)?;
+                    web_user(&files()?, command, out)?;
                     return Ok(0);
                 }
-                Some(WebCommand::Audit { command }) => return web_audit(command, out),
+                Some(WebCommand::Audit { command }) => return web_audit(&files()?, command, out),
                 Some(WebCommand::Oidc { command }) => {
-                    web_oidc(&users_file, command, out)?;
+                    web_oidc(&files()?, command, out)?;
                     return Ok(0);
                 }
                 Some(WebCommand::Share { command }) => {
-                    web_share(command, out)?;
+                    web_share(&files()?, command, out)?;
+                    return Ok(0);
+                }
+                Some(WebCommand::Tenant { command }) => {
+                    web_tenant(command, out)?;
                     return Ok(0);
                 }
                 None => {}
             }
-            apeiron_server::Users::load(&users_file)?.need_admin()?;
-            let repo = open(cli.repo, password_file)?;
+            if tenant.is_some() {
+                return Err(Failure::Usage(
+                    "--tenant names whose users, audit log, links or provider to manage; \
+                     to serve every tenant use --tenants"
+                        .to_owned(),
+                ));
+            }
+            let listed = if tenants {
+                apeiron_server::Tenants::load(&tenants_file()?)?.tenants
+            } else {
+                Vec::new()
+            };
             let tls = match (cert, key) {
                 _ if plain => None,
                 (Some(cert), Some(key)) => {
@@ -1490,27 +1654,57 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     if !listen.ip().is_unspecified() {
                         names.push(listen.ip().to_string());
                     }
-                    Some(apeiron_server::Tls::kept_in(&config, names)?)
+                    names.extend(listed.iter().map(|t| t.host.clone()));
+                    let dir = if tenants {
+                        config.join("tenants")
+                    } else {
+                        config.clone()
+                    };
+                    Some(apeiron_server::Tls::kept_in(&dir, names)?)
                 }
-            };
-            let folders = if folders.is_empty() {
-                vec![dirs::home_dir().ok_or_else(|| Failure::Usage("no home folder".to_owned()))?]
-            } else {
-                folders
             };
             let fingerprint = tls
                 .as_ref()
                 .map(apeiron_server::Tls::fingerprint)
                 .transpose()?;
-            let server = apeiron_server::Web::start(apeiron_server::WebOptions {
-                repo,
-                listen,
-                tls,
-                users: users_file,
-                folders,
-                audit: audit_log()?,
-                shares: share_file()?,
-            })?;
+            let server = if tenants {
+                let mut options = Vec::new();
+                for t in listed {
+                    let files = WebFiles::of_tenant(&t)?;
+                    let asking = format!("Password or recovery key of {}: ", t.name);
+                    options.push(apeiron_server::TenantOptions {
+                        repo: unlock(&t.repo, t.password_file.as_deref(), &asking)?,
+                        name: t.name,
+                        host: t.host,
+                        users: files.users,
+                        folders: t.folders,
+                        audit: files.audit,
+                        shares: files.shares,
+                    });
+                }
+                apeiron_server::Web::start_tenants(listen, tls, options)?
+            } else {
+                let files = files()?;
+                apeiron_server::Users::load(&files.users)?.need_admin()?;
+                let repo = open(cli.repo, password_file)?;
+                let folders = if folders.is_empty() {
+                    vec![
+                        dirs::home_dir()
+                            .ok_or_else(|| Failure::Usage("no home folder".to_owned()))?,
+                    ]
+                } else {
+                    folders
+                };
+                apeiron_server::Web::start(apeiron_server::WebOptions {
+                    repo,
+                    listen,
+                    tls,
+                    users: files.users,
+                    folders,
+                    audit: files.audit,
+                    shares: files.shares,
+                })?
+            };
             let scheme = if plain { "http" } else { "https" };
             say!(
                 "Serving on {scheme}://{}; press Ctrl+C to stop.",

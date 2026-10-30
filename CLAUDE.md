@@ -76,7 +76,7 @@ Apeiron; sürüm kontrolü, arşivleme, yedekleme, senkronizasyon ve bütünlük
 **Aşama 5 — Kurumsal.** Devam ediyor. İşler `docs/ROADMAP.md` §7'de, sırasıyla:
 
 1. ~~Merkezi kimlik (`docs/IDENTITY.md`).~~ Tamamlandı (2026-10-30).
-2. Çok kiracılı kullanım.
+2. ~~Çok kiracılı kullanım (`docs/TENANTS.md`).~~ Tamamlandı (2026-10-30).
 3. Replikasyon ve yüksek erişilebilirlik.
 4. Değiştirilemez arşiv.
 5. Uyumluluk raporları.

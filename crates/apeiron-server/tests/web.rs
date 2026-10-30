@@ -356,6 +356,15 @@ fn tls_with_a_kept_certificate() {
     // The second start finds the same certificate.
     let again = Tls::kept_in(dir.path(), names).unwrap();
     assert_eq!(tls.fingerprint().unwrap(), again.fingerprint().unwrap());
+    // Fewer names keep it; a new name, such as a tenant's host, makes a
+    // new one, which is kept in turn.
+    let fewer = Tls::kept_in(dir.path(), Vec::new()).unwrap();
+    assert_eq!(tls.fingerprint().unwrap(), fewer.fingerprint().unwrap());
+    let more = vec!["localhost".to_owned(), "acme.test".to_owned()];
+    let tls = Tls::kept_in(dir.path(), more.clone()).unwrap();
+    assert_ne!(tls.fingerprint().unwrap(), again.fingerprint().unwrap());
+    let kept = Tls::kept_in(dir.path(), more).unwrap();
+    assert_eq!(tls.fingerprint().unwrap(), kept.fingerprint().unwrap());
     assert_eq!(tls.fingerprint().unwrap().len(), 32 * 3 - 1);
     #[cfg(unix)]
     {

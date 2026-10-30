@@ -82,6 +82,7 @@ Sayfalar kullanıcının adını Oturumu kapat'ın yanında gösterir ve rolün 
 | Kullanıcı başına ayrı şifreleme anahtarları | Kullanıcılar deponun anahtarını paylaşır; anahtarı sunucu tutar |
 | Masaüstü arayüzünde kullanıcılar | Gerekmez: yalnızca onu çalıştıran kullanıcıya hizmet eder |
 | Merkezi kimlik | Aşama 5'in 1. işi ([IDENTITY.tr.md](IDENTITY.tr.md)) |
+| Bir sunucuda birbirinden ayrı tutulan birkaç kurum | Aşama 5'in 2. işi ([TENANTS.tr.md](TENANTS.tr.md)) |
 
 ## 6. Crate'ler
 

@@ -39,6 +39,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [029](#adr-029-denetim-kaydı-her-şeyden-önce-yazılan-özet-zincirli-bir-json-satırları-dosyasıdır) | Denetim kaydı | SHA-256 zincirli JSON satırları; bir kilit altında eklenir ve istek sürmeden önce diske aktarılır; kaydedilemeyen istek başarısız olur | Kabul edildi |
 | [030](#adr-030-paylaşım-yalnızca-özetleri-tutulan-sabit-bir-sürüme-süreli-bağlantılarladır) | Paylaşım | Bağlantıda rastgele bir gizli kısım, yalnızca SHA-256 özeti tutulur; sabit bir sürüm ve yol; 1 ile 30 gün; sahibi artık paylaşamadığında biter | Kabul edildi |
 | [031](#adr-031-merkezi-kimlik-kullanıcıları-hâlâ-webjson-içinde-listelenen-openid-connecttir) | Merkezi kimlik | PKCE'li OpenID Connect kod akışı; sağlayıcının anahtarlarıyla denetlenen RS256/ES256 belirteçleri; bir alan `web.json` içinde listelenen bir kullanıcıyı adlandırır; parolalar mümkün kalır | Kabul edildi |
+| [032](#adr-032-kiracılar-ana-makineyle-ayrılır-her-birinin-kendi-deposu-ve-dosyaları-vardır) | Çok kiracılı kullanım | Tek süreç, tek port; `Host` başlığı, kendi deposu, kullanıcıları, denetim kaydı, paylaşım bağlantıları ve oturumları olan bir kiracı seçer; bilinmeyen ana makineler hiçbir şey almaz | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
@@ -680,3 +681,24 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Oturum açmayı önde bir vekil sunucuya yaptırmak | Çalıştırılacak ve güvenilecek başka bir program gerekir ve denetim kaydı kimin oturum açtığını artık görmezdi |
 
 **Sonuçlar.** Admin sunucuyu sağlayıcıya kaydeder ve gizli anahtarı, yalnızca sahibinin okuyabildiği `web.json` içinde tutar. Sağlayıcıda kapatılan hesapların zaten açık oturumları bitene kadar sürer. Yalnızca RS256 ve ES256 belirteçleri çalışır; başka bir şeye ayarlanmış bir sağlayıcı değiştirilmelidir. Kullanıcılar hâlâ `apeiron web user add --oidc` ile tek tek eklenir.
+
+## ADR-032: Kiracılar ana makineyle ayrılır, her birinin kendi deposu ve dosyaları vardır
+
+**Durum:** Kabul edildi (2026-10-30)
+
+**Bağlam.** Aşama 5'in 2. işi, tek bir web sunucusunun birbirini görmemesi gereken birkaç kuruma ya da ekibe hizmet etmesini sağlar ([TENANTS.tr.md](TENANTS.tr.md)). Roller ve yedek kalıpları bir sunucunun kullanıcılarını zaten ayrı tutar (USERS.tr.md); ancak o zaman tek bir yanlış kalıp, bir denetimdeki tek bir hata ya da paylaşılan tek bir şifreleme anahtarı bir kurumu diğerine açardı. Her kurum için ayrı bir sunucu programı çalıştırmak işe yarar; ama her birinin bakılacak kendi portu, sertifikası ve hizmeti olur.
+
+**Karar.** Tek bir süreç tek bir portu dinler ve `tenants.json` içinde listelenen her kiracıyı sunar. Her isteğin `Host` başlığı kiracıyı seçer; bilinen hiçbir ana makineye ait olmayan bir istek, herhangi bir kiracı onu görmeden `421` ile reddedilir. Her kiracı, tek bir web sunucusuyla aynı kodla kurulan, kendine ait eksiksiz bir sitedir: kendi deposu ve anahtarı, kullanıcı dosyası, kimlik sağlayıcısı, klasörleri, denetim kaydı, paylaşım bağlantıları, oturumları ve işleri. Kiracılar arasında program, port ve sertifika dışında hiçbir şey paylaşılmaz.
+
+**Gerekçe.** Kiracıları ana makineyle ayırmak, her birine kendi tarayıcı kökenini (origin) verir; böylece çerezler, sayfalar ve kimlik sağlayıcısının geri dönüş adresi yalnızca sunucunun denetimleriyle değil, tarayıcının kendisi tarafından da ayrılır. Her kiracıya kendi deposunu vermek sınırı depolamaya da koyar: bir roldeki hata, başka bir anahtarla başka bir depoda duran veriye ulaşamaz. Her kiracıyı tek bir sunucunun sitesiyle aynı biçimde kurmak ikisi için tek bir kod yolu tutar; böylece USERS.tr.md, AUDIT.tr.md, SHARE.tr.md ve IDENTITY.tr.md'deki her denetim bir kiracı için değişmeden geçerlidir.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Tek bir `web.json` ve tek bir depoda her kullanıcıya bir kiracı alanı | Her denetimin kiracıyı hatırlaması gerekirdi, unutulan tek bir denetim veri sızdırırdı ve tüm kiracılar tek bir şifreleme anahtarını paylaşırdı |
+| Kiracıları `/t/acme/` gibi bir yolla ayırmak | Tüm kiracılar tek bir kökeni paylaşırdı; bu yüzden birinin sayfası diğerinin çerezlerini okuyabilir ve API'sini çağırabilirdi |
+| Bir vekil sunucunun arkasında kiracı başına bir sunucu programı | Bu iş olmadan da çalışır, ama kiracı başına bir port, bir hizmet ve bir yeniden başlatma gerektirir; tercih eden için hâlâ mümkündür |
+| Ref'leri kiracı başına önekli, paylaşılan tek bir depo | Kiracılar arası tekilleştirme, başka bir kiracının aynı dosyayı tutup tutmadığını gösterirdi ve tek bir anahtar hepsini açardı |
+
+**Sonuçlar.** Her kiracının sunucuya ulaşan bir ana makine adına ve onun için geçerli bir sertifikaya ihtiyacı vardır; bir joker (wildcard) sertifika hepsini kapsar. Kendinden imzalı sertifika, yeni bir ana makineli bir kiracı eklenince yeniden oluşturulur; bu yüzden parmak izi değişir. Kiracılar depolamayı paylaşamaz; bu yüzden iki kiracının tuttuğu aynı dosya iki kez saklanır. Sunucunun tamamı tek bir süreçtir: bir yeniden başlatma her kiracıyı bir an durdurur ve kiracı başına sınırlar henüz mümkün değildir.
