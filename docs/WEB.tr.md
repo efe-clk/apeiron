@@ -66,7 +66,7 @@ DESKTOP.tr.md §3'teki istekler şu farklarla kalır:
 | `GET /api/health` | Oturum açmadan izinli: `{"ok", "role": "primary" ya da "standby"}`; depo okunamıyorsa `503` ([REPLICATION.tr.md](REPLICATION.tr.md) §5) |
 | `POST /api/open`, `POST /api/init` | `unsupported` ile reddedilir |
 | `POST /api/call/<operation>` | Yalnızca `info`, `resolve`, `log`, `list`, `diff`, `diff_text`, `refs`, `reflog`; diğerleri `unsupported` ile reddedilir |
-| `POST /api/start/<operation>` | Yalnızca `backup`, `restore`, `verify`, `search`; bir yedeğin `source` alanı ve bir geri yüklemenin `target` alanı bir `--folder` içinde olmalıdır |
+| `POST /api/start/<operation>` | Yalnızca `backup`, `restore`, `verify`, `search`, `report` ([REPORTS.tr.md](REPORTS.tr.md)); bir yedeğin `source` alanı ve bir geri yüklemenin `target` alanı bir `--folder` içinde olmalıdır |
 | `GET /api/folders` | Yalnızca bir `--folder` içinde; yol verilmezse ilki; bir `--folder` üzerinde `parent` boştur |
 
 Geçerli bir oturumu olmayan istek, `invalid_input` türü ve `"sign_in": true` ile 401 durumunu alır; sayfalar oturum açma ekranını gösterir.

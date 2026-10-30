@@ -289,6 +289,7 @@ function showNav(current) {
     item("overview", overview),
     may.backUp() ? item("backup", () => backup()) : null,
     may.verify() ? item("verify", verify) : null,
+    may.verify() ? item("report", report) : null,
     may.share() ? item("shares", shares) : null,
     may.readLog() ? item("activity", activity) : null,
     may.manageUsers() ? item("users", users) : null,
@@ -624,6 +625,66 @@ function verify() {
       : message("good", t("verify_ok", { objects: result.objects_checked.toLocaleString(lang) })));
   } }, t("verify_button"));
   show(h("h1", {}, t("verify_heading")), h("div", { class: "card" }, h("p", { class: "muted" }, t("verify_intro")), h("div", { class: "actions" }, button)), status);
+}
+
+// ---- Compliance report (REPORTS.md) ----
+
+function report() {
+  showNav("report");
+  const verifyBox = h("input", { type: "checkbox" });
+  const remotesBox = h("input", { type: "checkbox" });
+  const status = h("div");
+  const output = h("div");
+  const button = h("button", { type: "button", class: "primary", onclick: async () => {
+    button.disabled = true;
+    output.replaceChildren();
+    const r = await runWithProgress(status, "report", { verify: verifyBox.checked, remotes: remotesBox.checked });
+    button.disabled = false;
+    if (r) output.replaceChildren(...reportView(r));
+  } }, t("report_button"));
+  show(
+    h("h1", {}, t("report_heading")),
+    h("div", { class: "card" },
+      h("p", { class: "muted" }, t("report_intro")),
+      h("label", {}, verifyBox, " ", t("report_verify")),
+      h("label", {}, remotesBox, " ", t("report_remotes")),
+      h("div", { class: "actions" }, button)),
+    status,
+    output,
+  );
+}
+
+function reportView(r) {
+  const table = (heads, rows) => h("div", { class: "card scroll" }, h("table", {},
+    h("thead", {}, h("tr", {}, ...heads.map((k) => h("th", {}, t(k))))),
+    h("tbody", {}, ...rows)));
+  const findings = r.findings.length
+    ? r.findings.map((f) => message(f.level === "problem" ? "bad" : "", f.text))
+    : [message("good", t("report_no_findings"))];
+  const facts = [
+    ["report_encrypted", r.repository.encrypted ? t("yes") : t("no")],
+    ...(r.repository.encrypted ? [["report_passwords", r.repository.passwords], ["report_recovery_keys", r.repository.recovery_keys]] : []),
+    ["report_verified", r.verify
+      ? t("report_verified_result", { objects: r.verify.objects_checked.toLocaleString(lang), damaged: r.verify.damaged_files.length + r.verify.damaged_objects.length })
+      : t("report_not_verified")],
+  ];
+  const refs = r.refs.map((f) => h("tr", {},
+    h("td", {}, f.name, f.stale ? h("span", { class: "bad" }, ` (${t("report_stale")})`) : null),
+    h("td", { class: "muted" }, f.snapshot.slice(0, 12)),
+    h("td", {}, when(f.time)),
+    h("td", { class: "num" }, f.snapshots),
+    h("td", {}, f.retention_days ? t("report_days", { days: f.retention_days }) : "—"),
+    h("td", {}, f.copies?.length ? f.copies.map((c) => `${c.remote}: ${t(`copy_${c.state}`)}`).join(", ") : "—"),
+  ));
+  return [
+    h("h2", {}, t("report_findings")),
+    ...findings,
+    h("h2", {}, t("report_repository")),
+    table(["report_item", "report_value"], facts.map(([k, v]) => h("tr", {}, h("td", {}, t(k)), h("td", {}, String(v))))),
+    h("h2", {}, t("report_backups")),
+    table(["report_ref", "report_snapshot", "report_newest", "report_snapshots", "report_kept", "report_copies"], refs),
+    h("p", { class: "muted" }, t("report_proof")),
+  ];
 }
 
 // ---- Sharing (SHARE.md §5) ----

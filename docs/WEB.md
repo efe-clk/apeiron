@@ -66,7 +66,7 @@ The requests of DESKTOP.md §3 stay, with these differences:
 | `GET /api/health` | Allowed without signing in: `{"ok", "role": "primary" or "standby"}`, `503` when the repository cannot be read ([REPLICATION.md](REPLICATION.md) §5) |
 | `POST /api/open`, `POST /api/init` | Refused with `unsupported` |
 | `POST /api/call/<operation>` | Only `info`, `resolve`, `log`, `list`, `diff`, `diff_text`, `refs`, `reflog`; others are refused with `unsupported` |
-| `POST /api/start/<operation>` | Only `backup`, `restore`, `verify`, `search`; `source` of a backup and `target` of a restore must be inside a `--folder` |
+| `POST /api/start/<operation>` | Only `backup`, `restore`, `verify`, `search`, `report` ([REPORTS.md](REPORTS.md)); `source` of a backup and `target` of a restore must be inside a `--folder` |
 | `GET /api/folders` | Only inside a `--folder`; without a path, the first one; `parent` is empty at a `--folder` |
 
 A request without a valid session has status 401 with the kind `invalid_input` and `"sign_in": true`, and the pages show the sign-in screen.

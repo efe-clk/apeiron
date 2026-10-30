@@ -1047,3 +1047,34 @@ fn an_admin_manages_users_in_the_pages() {
             .all(|e| e.user.as_deref() == Some("root"))
     );
 }
+
+#[test]
+fn an_admin_makes_a_compliance_report() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_server, mut c, home) = start(dir.path());
+    c.sign_in();
+    let backed_up = c.run(
+        "backup",
+        json!({"source": home.join("src"), "ref": "backup/src"}),
+    );
+    assert!(backed_up["error"].is_null(), "{backed_up}");
+    let report = c.run("report", json!({"verify": true}));
+    let result = &report["result"];
+    assert_eq!(result["refs"][0]["name"], "backup/src");
+    assert_eq!(result["verify"]["damaged_objects"], json!([]));
+    assert!(
+        result["findings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|f| f["level"] == "warning")
+    );
+
+    // Only an admin may.
+    c.post(
+        "/api/users",
+        json!({"name": "ayse", "role": "member", "password": PASSWORD, "backups": ["backup/*"]}),
+    );
+    let ayse = c.other("ayse");
+    assert_eq!(ayse.kind("/api/start/report", json!({})).1, "unsupported");
+}

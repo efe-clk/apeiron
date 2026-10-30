@@ -50,7 +50,7 @@ const CALLS: &[&str] = &[
     "refs",
     "reflog",
 ];
-const STARTS: &[&str] = &["backup", "restore", "verify", "search"];
+const STARTS: &[&str] = &["backup", "restore", "verify", "search", "report"];
 
 /// A certificate chain and its private key, as PEM.
 #[derive(Clone)]
@@ -638,7 +638,7 @@ impl WebState {
         }
         let allowed = match operation {
             "backup" | "restore" => user.role != Role::Reader,
-            "verify" => user.role == Role::Admin,
+            "verify" | "report" => user.role == Role::Admin,
             _ => true,
         };
         if !allowed {

@@ -59,18 +59,18 @@ The snapshot ids are the proof: an id fixes every byte under it and all the hist
 | Problem | `--verify` found damaged data; damaged files were found when the repository was opened; a remote did not answer; a ref is behind, missing or different on a remote; the audit log is not whole |
 | Warning | A ref is stale; the repository is not encrypted; it is encrypted without a recovery key; it has no remote, so every backup exists in one place only; the audit log's oldest parts were removed (AUDIT.md §3) |
 
-## 5. In the JSON API and the CLI
+## 5. In the pages, the JSON API and the CLI
 
 | Where | What |
 | --- | --- |
 | `apeiron report` | §2 |
 | `report` (API.md §8) | Long operation with `verify`, `remotes` and `stale_days`; returns a `ComplianceReport` with everything of §3 but the web server's part |
+| The Report page | For an `admin` in the web interface, and in the desktop interface: findings, repository and backups of §3, with the choice to verify and to compare with the remotes; the web server's part comes from `apeiron report --web` |
 
 ## 6. Not part of this work item
 
 | Item | Where |
 | --- | --- |
-| Reports in the web interface | Later; the CLI on the server until then |
 | Reports mapped to the clauses of a given standard | Later, with a pilot that names its standard; the facts of §3 are what such a mapping points to |
 | Signing the report | Later; the snapshot ids and the audit hash it holds can already be checked |
 | Reports across every tenant at once | Later; one report per tenant with `--tenant` until then |

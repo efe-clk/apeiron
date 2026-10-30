@@ -59,18 +59,18 @@ Kanıt snapshot kimlikleridir: bir kimlik, altındaki her baytı ve ondan öncek
 | Sorun | `--verify` bozuk veri buldu; depo açılırken bozuk dosyalar bulundu; bir uzak depo yanıt vermedi; bir ref bir uzak depoda geride, yok ya da farklı; denetim kaydı eksiksiz değil |
 | Uyarı | Bir ref eskimiş; depo şifreli değil; kurtarma anahtarı olmadan şifreli; hiç uzak deposu yok, yani her yedek tek bir yerde duruyor; denetim kaydının en eski parçaları kaldırılmış (AUDIT.tr.md §3) |
 
-## 5. JSON API'de ve CLI'da
+## 5. Sayfalarda, JSON API'de ve CLI'da
 
 | Nerede | Ne |
 | --- | --- |
 | `apeiron report` | §2 |
 | `report` (API.tr.md §8) | `verify`, `remotes` ve `stale_days` ile uzun işlem; web sunucusu bölümü dışında §3'teki her şeyle bir `ComplianceReport` döndürür |
+| Rapor sayfası | Web arayüzünde bir `admin` için ve masaüstü arayüzünde: doğrulama ve uzak depolarla karşılaştırma seçeneğiyle §3'teki bulgular, depo ve yedekler; web sunucusu bölümü `apeiron report --web` ile alınır |
 
 ## 6. Bu işin parçası olmayanlar
 
 | Konu | Nerede |
 | --- | --- |
-| Web arayüzünde raporlar | Sonra; o zamana kadar sunucudaki CLI |
 | Belirli bir standardın maddelerine eşlenmiş raporlar | Sonra, standardını adlandıran bir pilotla; §3'teki gerçekler böyle bir eşlemenin gösterdiği şeylerdir |
 | Raporu imzalamak | Sonra; tuttuğu snapshot kimlikleri ve denetim özeti zaten denetlenebilir |
 | Tüm kiracılar için tek seferde raporlar | Sonra; o zamana kadar `--tenant` ile kiracı başına bir rapor |
