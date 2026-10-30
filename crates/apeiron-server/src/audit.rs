@@ -146,16 +146,24 @@ impl Audit {
             .map_err(|e| io_error(path, e))
     }
 
+    /// The lines of the log, read once no event is being written: the
+    /// writer's lock would make a read fail on Windows and could show half a
+    /// line elsewhere.
     fn lines(&self) -> Result<Vec<Vec<u8>>, Error> {
-        match fs::read(&self.file) {
-            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(Vec::new()),
-            Err(e) => Err(io_error(&self.file, e)),
-            Ok(data) => Ok(data
-                .split(|b| *b == b'\n')
-                .filter(|l| !l.is_empty())
-                .map(<[u8]>::to_vec)
-                .collect()),
-        }
+        let mut file = match fs::File::open(&self.file) {
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(e) => return Err(io_error(&self.file, e)),
+            Ok(file) => file,
+        };
+        let mut data = Vec::new();
+        file.lock_shared()
+            .and_then(|()| file.read_to_end(&mut data))
+            .map_err(|e| io_error(&self.file, e))?;
+        Ok(data
+            .split(|b| *b == b'\n')
+            .filter(|l| !l.is_empty())
+            .map(<[u8]>::to_vec)
+            .collect())
     }
 
     /// The newest `limit` events, of `user` only if given, oldest first.

@@ -171,12 +171,12 @@ fn a_backup_reaches_the_replica_and_the_standby_serves_it() {
     }));
     let audit = Audit::new(primary_dir.join("audit.log"));
     assert!(eventually(|| {
-        // On Windows the log cannot be read while a line is being written.
-        audit.read(100, None).is_ok_and(|events| {
-            events
-                .iter()
-                .any(|e| e.event == "replicate" && e.outcome == "ok" && e.detail["remote"] == "dr")
-        })
+        // Reading waits for a line being written, also on Windows.
+        audit
+            .read(100, None)
+            .unwrap()
+            .iter()
+            .any(|e| e.event == "replicate" && e.outcome == "ok" && e.detail["remote"] == "dr")
     }));
 
     // A standby serves the replica: it can be browsed and restored from,
