@@ -1,28 +1,29 @@
-//! Web mode (WEB.md): one repository served to the network over TLS, to a
-//! browser signed in with a password, with only the operations and folders
-//! the pages need.
+//! Web mode (WEB.md): one repository served to the network over TLS, to
+//! signed-in users, with only the operations, backups and folders their
+//! role and rights allow (USERS.md).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 
-use apeiron::{Error, ErrorKind, Repository};
+use apeiron::{Error, ErrorKind, LogRequest, ObjectId, Repository};
 use argon2::Argon2;
-use argon2::password_hash::{PasswordHasher, PasswordVerifier};
+use argon2::password_hash::PasswordVerifier;
 use axum::body::Bytes;
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use rustls::pki_types::pem::PemObject;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
+use crate::users::{Role, User, Users, hash_password};
 use crate::{App, Failure, Mode, Running, blocking, body, invalid, lock};
 
 const COOKIE: &str = "apeiron_session";
@@ -121,7 +122,7 @@ impl Tls {
 }
 
 /// Writes a file only its owner can read.
-fn write_private(path: &Path, data: &[u8]) -> io::Result<()> {
+pub(crate) fn write_private(path: &Path, data: &[u8]) -> io::Result<()> {
     let mut options = fs::OpenOptions::new();
     options.write(true).create(true).truncate(true);
     #[cfg(unix)]
@@ -129,60 +130,23 @@ fn write_private(path: &Path, data: &[u8]) -> io::Result<()> {
     io::Write::write_all(&mut options.open(path)?, data)
 }
 
-/// Hashes a sign-in password with Argon2id, as a PHC string.
-pub fn hash_password(password: &str) -> Result<String, Error> {
-    Argon2::default()
-        .hash_password(password.as_bytes())
-        .map(|h| h.to_string())
-        .map_err(|e| Error::new(ErrorKind::Internal, format!("password hash: {e}")))
-}
-
-#[derive(Serialize, Deserialize)]
-struct PasswordFile {
-    password: String,
-}
-
-/// The stored hash of the sign-in password, if `file` exists (WEB.md §2).
-pub fn load_password(file: &Path) -> Result<Option<String>, Error> {
-    match fs::read(file) {
-        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(Error::new(
-            ErrorKind::Io,
-            format!("{}: {e}", file.display()),
-        )),
-        Ok(data) => serde_json::from_slice::<PasswordFile>(&data)
-            .map(|f| Some(f.password))
-            .map_err(|e| invalid(format!("{}: {e}", file.display()))),
-    }
-}
-
-/// Stores the hash of the sign-in password in `file`, readable only by its
-/// owner.
-pub fn save_password(file: &Path, hash: &str) -> Result<(), Error> {
-    let data = serde_json::to_vec_pretty(&PasswordFile {
-        password: hash.to_owned(),
-    })
-    .map_err(|e| Error::new(ErrorKind::Internal, e.to_string()))?;
-    file.parent()
-        .map_or(Ok(()), fs::create_dir_all)
-        .and_then(|()| write_private(file, &data))
-        .map_err(|e| Error::new(ErrorKind::Io, format!("{}: {e}", file.display())))
-}
-
-/// What a web server is started with (WEB.md §2).
+/// What a web server is started with (WEB.md §2, USERS.md).
 pub struct WebOptions {
     /// The repository served.
     pub repo: Repository,
     pub listen: SocketAddr,
     /// `None` serves plain HTTP, for use behind a TLS proxy.
     pub tls: Option<Tls>,
-    /// The Argon2id hash of the sign-in password.
-    pub password_hash: String,
-    /// The folders that may be backed up or restored into.
+    /// The users file, read again whenever it changes.
+    pub users: PathBuf,
+    /// The folders users may be given.
     pub folders: Vec<PathBuf>,
 }
 
 struct Session {
+    user: String,
+    /// The password hash at sign-in; a new password ends the session.
+    password: String,
     made: Instant,
     used: Instant,
 }
@@ -193,13 +157,32 @@ struct Attempts {
     paused_until: Option<Instant>,
 }
 
+/// The users file as last read.
+struct Loaded {
+    modified: Option<SystemTime>,
+    users: Users,
+}
+
+/// The signed-in user of a request.
+#[derive(Clone)]
+pub(crate) struct Who(pub(crate) Arc<User>);
+
+/// Ref heads whose reachable snapshots are kept, at most.
+const KEPT_HEADS: usize = 256;
+
 pub(crate) struct WebState {
-    password: String,
-    /// Canonical paths.
-    pub(crate) folders: Vec<PathBuf>,
+    users_file: PathBuf,
+    users: Mutex<Loaded>,
+    /// Canonical `--folder` paths.
+    roots: Vec<PathBuf>,
     sessions: Mutex<HashMap<String, Session>>,
     /// Held while a password is checked, so guesses go one at a time.
     attempts: tokio::sync::Mutex<Attempts>,
+    /// The snapshots reachable from a ref head, by head.
+    reachable: Mutex<HashMap<ObjectId, Arc<HashSet<ObjectId>>>>,
+    /// Checked when the name is unknown, so that takes as long as a wrong
+    /// password.
+    decoy: String,
 }
 
 fn cookie_value(headers: &HeaderMap) -> Option<&str> {
@@ -227,27 +210,57 @@ fn with_cookie(value: Value, cookie: &str) -> Response {
 
 #[derive(Deserialize)]
 struct Login {
+    name: String,
     password: String,
 }
 
+/// The fields of a request that name a snapshot (USERS.md §4).
+const SNAPSHOT_FIELDS: &[&str] = &["spec", "start", "snapshot", "from", "to"];
+
+fn hidden() -> Error {
+    Error::new(ErrorKind::NotFound, "no such snapshot among your backups")
+}
+
 impl WebState {
-    /// Whether the request carries a live session; using it keeps it alive.
-    pub(crate) fn signed_in(&self, headers: &HeaderMap) -> bool {
-        let Some(id) = cookie_value(headers) else {
-            return false;
+    /// The user named `name` in the users file as it is now.
+    fn user(&self, name: &str) -> Option<User> {
+        let modified = fs::metadata(&self.users_file)
+            .and_then(|m| m.modified())
+            .ok();
+        let mut loaded = lock(&self.users);
+        if modified != loaded.modified {
+            // A file being written may not parse; the last good one stays.
+            if let Ok(users) = Users::load(&self.users_file) {
+                *loaded = Loaded { modified, users };
+            }
+        }
+        loaded.users.get(name).cloned()
+    }
+
+    /// The user of the request's live session; using it keeps it alive.
+    pub(crate) fn current(&self, headers: &HeaderMap) -> Option<User> {
+        let id = cookie_value(headers)?;
+        let (name, password) = {
+            let mut sessions = lock(&self.sessions);
+            let now = Instant::now();
+            match sessions.get_mut(id) {
+                Some(s) if now - s.used < IDLE && now - s.made < LIFETIME => {
+                    s.used = now;
+                    (s.user.clone(), s.password.clone())
+                }
+                Some(_) => {
+                    sessions.remove(id);
+                    return None;
+                }
+                None => return None,
+            }
         };
-        let mut sessions = lock(&self.sessions);
-        let now = Instant::now();
-        match sessions.get_mut(id) {
-            Some(s) if now - s.used < IDLE && now - s.made < LIFETIME => {
-                s.used = now;
-                true
+        match self.user(&name) {
+            Some(user) if user.password == password => Some(user),
+            _ => {
+                lock(&self.sessions).remove(id);
+                None
             }
-            Some(_) => {
-                sessions.remove(id);
-                false
-            }
-            None => false,
         }
     }
 
@@ -268,21 +281,28 @@ impl WebState {
                 json!({"code": 7, "kind": "locked", "message": "too many wrong passwords; try again in a minute"}),
             ));
         }
-        let hash = self.password.clone();
-        let right = blocking(move || {
-            Ok(Argon2::default()
-                .verify_password(r.password.as_bytes(), hash.as_str())
-                .is_ok())
+        let user = self.user(&r.name);
+        let decoy = self.decoy.clone();
+        let user = blocking(move || {
+            Ok(match user {
+                Some(user) if user.verify(&r.password) => Some(user),
+                Some(_) => None,
+                None => {
+                    let _ =
+                        Argon2::default().verify_password(r.password.as_bytes(), decoy.as_str());
+                    None
+                }
+            })
         })
         .await?;
-        if !right {
+        let Some(user) = user else {
             attempts.wrong += 1;
             if attempts.wrong >= TRIES {
                 attempts.wrong = 0;
                 attempts.paused_until = Some(Instant::now() + PAUSE);
             }
-            return Err(Error::new(ErrorKind::Key, "wrong password").into());
-        }
+            return Err(Error::new(ErrorKind::Key, "wrong name or password").into());
+        };
         *attempts = Attempts::default();
         let id = random_hex()?;
         let mut sessions = lock(&self.sessions);
@@ -290,6 +310,8 @@ impl WebState {
         sessions.insert(
             id.clone(),
             Session {
+                user: user.name,
+                password: user.password,
                 made: now,
                 used: now,
             },
@@ -310,12 +332,147 @@ impl WebState {
         )
     }
 
-    pub(crate) fn allow_call(&self, operation: &str) -> Result<(), Error> {
-        if CALLS.contains(&operation) {
-            Ok(())
-        } else {
-            Err(not_here(operation))
+    /// The folders `user` may use, canonical (USERS.md §1).
+    pub(crate) fn folders(&self, user: &User) -> Vec<PathBuf> {
+        if user.folders.is_empty() {
+            return match user.role {
+                Role::Admin => self.roots.clone(),
+                _ => Vec::new(),
+            };
         }
+        user.folders
+            .iter()
+            .filter_map(|f| f.canonicalize().ok())
+            .filter(|f| self.roots.iter().any(|r| f.starts_with(r)))
+            .collect()
+    }
+
+    /// Checks an operation and its request for `user` (WEB.md §4, USERS.md
+    /// §4). Snapshots and paths are replaced by what they resolve to, so
+    /// what was checked is what is used.
+    pub(crate) fn check(
+        &self,
+        repo: &Repository,
+        user: &User,
+        long: bool,
+        operation: &str,
+        mut request: Value,
+    ) -> Result<Value, Error> {
+        let known = if long { STARTS } else { CALLS };
+        if !known.contains(&operation) {
+            return Err(not_here(operation));
+        }
+        let allowed = match operation {
+            "backup" | "restore" => user.role != Role::Reader,
+            "verify" => user.role == Role::Admin,
+            _ => true,
+        };
+        if !allowed {
+            return Err(Error::new(
+                ErrorKind::Unsupported,
+                format!(
+                    "{operation} is not allowed for the role {}",
+                    user.role.name()
+                ),
+            ));
+        }
+        let text = |request: &Value, field: &str| {
+            request
+                .get(field)
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+        };
+        if user.role != Role::Admin {
+            for field in SNAPSHOT_FIELDS {
+                if let Some(spec) = text(&request, field) {
+                    let id = repo.resolve(&spec).map_err(|e| match e.kind {
+                        ErrorKind::NotFound => hidden(),
+                        _ => e,
+                    })?;
+                    self.visible(repo, user, id)?;
+                    request[*field] = json!(id);
+                }
+            }
+            if operation == "search" && text(&request, "snapshot").is_none() {
+                return Err(invalid("name the snapshot to search"));
+            }
+            if operation == "reflog" && !text(&request, "name").is_some_and(|n| user.owns(&n)) {
+                return Err(hidden());
+            }
+            if operation == "backup" && !text(&request, "ref").is_some_and(|n| user.owns(&n)) {
+                return Err(invalid(format!(
+                    "you may back up only into {}",
+                    user.backups.join(", ")
+                )));
+            }
+        }
+        let field = match operation {
+            "backup" => "source",
+            "restore" => "target",
+            _ => return Ok(request),
+        };
+        let path = text(&request, field).ok_or_else(|| invalid(format!("{field} is missing")))?;
+        let resolved = inside(&self.folders(user), Path::new(&path))?;
+        request[field] = json!(resolved);
+        Ok(request)
+    }
+
+    /// Leaves out of a result what `user` may not see.
+    pub(crate) fn filter(&self, user: &User, operation: &str, result: Value) -> Value {
+        match (operation, result) {
+            ("refs", Value::Array(refs)) => Value::Array(
+                refs.into_iter()
+                    .filter(|r| r["name"].as_str().is_some_and(|n| user.owns(n)))
+                    .collect(),
+            ),
+            (_, result) => result,
+        }
+    }
+
+    /// Whether a snapshot can be reached from one of `user`'s backups
+    /// through its parents (USERS.md §1).
+    fn visible(&self, repo: &Repository, user: &User, id: ObjectId) -> Result<(), Error> {
+        for r in repo.refs()? {
+            if user.owns(&r.name) && self.reachable(repo, r.snapshot)?.contains(&id) {
+                return Ok(());
+            }
+        }
+        Err(hidden())
+    }
+
+    fn reachable(
+        &self,
+        repo: &Repository,
+        head: ObjectId,
+    ) -> Result<Arc<HashSet<ObjectId>>, Error> {
+        if let Some(known) = lock(&self.reachable).get(&head) {
+            return Ok(known.clone());
+        }
+        let mut seen = HashSet::new();
+        let mut todo = vec![head];
+        while let Some(start) = todo.pop() {
+            let mut next = Some(start);
+            'chain: while let Some(from) = next.take() {
+                let page = repo.log(&LogRequest {
+                    start: from.to_string(),
+                    limit: 256,
+                })?;
+                for s in page.snapshots {
+                    if !seen.insert(s.id) {
+                        break 'chain;
+                    }
+                    todo.extend(s.parents.iter().skip(1).copied());
+                }
+                next = page.next;
+            }
+        }
+        let seen = Arc::new(seen);
+        let mut kept = lock(&self.reachable);
+        if kept.len() >= KEPT_HEADS {
+            kept.clear();
+        }
+        kept.insert(head, seen.clone());
+        Ok(seen)
     }
 }
 
@@ -324,31 +481,6 @@ fn not_here(operation: &str) -> Error {
         ErrorKind::Unsupported,
         format!("{operation} is not available in the web interface"),
     )
-}
-
-/// Checks a long operation and the paths in its request (WEB.md §4); the
-/// paths are replaced by their resolved form, so what was checked is what
-/// is used.
-pub(crate) fn allow_start(
-    folders: &[PathBuf],
-    operation: &str,
-    mut request: Value,
-) -> Result<Value, Error> {
-    if !STARTS.contains(&operation) {
-        return Err(not_here(operation));
-    }
-    let field = match operation {
-        "backup" => "source",
-        "restore" => "target",
-        _ => return Ok(request),
-    };
-    let path = request
-        .get(field)
-        .and_then(Value::as_str)
-        .ok_or_else(|| invalid(format!("{field} is missing")))?;
-    let resolved = inside(folders, Path::new(path))?;
-    request[field] = json!(resolved);
-    Ok(request)
 }
 
 /// `path` resolved, if it is inside one of `folders` (canonical paths); a
@@ -398,12 +530,13 @@ impl Web {
     /// Starts a web server for one repository on a thread of its own.
     pub fn start(options: WebOptions) -> Result<Self, Error> {
         let io_error = |e: io::Error| Error::new(ErrorKind::Io, e.to_string());
-        let mut folders = Vec::new();
+        let mut roots = Vec::new();
         for folder in &options.folders {
-            folders.push(folder.canonicalize().map_err(|e| {
+            roots.push(folder.canonicalize().map_err(|e| {
                 Error::new(ErrorKind::NotFound, format!("{}: {e}", folder.display()))
             })?);
         }
+        Users::load(&options.users)?.need_admin()?;
         let tls = options.tls.as_ref().map(Tls::config).transpose()?;
         let listener = std::net::TcpListener::bind(options.listen).map_err(|e| {
             Error::new(
@@ -415,10 +548,16 @@ impl Web {
         let address = listener.local_addr().map_err(io_error)?;
         let app = Arc::new(App {
             mode: Mode::Web(Box::new(WebState {
-                password: options.password_hash,
-                folders,
+                users_file: options.users,
+                users: Mutex::new(Loaded {
+                    modified: None,
+                    users: Users::default(),
+                }),
+                roots,
                 sessions: Mutex::new(HashMap::new()),
                 attempts: tokio::sync::Mutex::new(Attempts::default()),
+                reachable: Mutex::new(HashMap::new()),
+                decoy: hash_password("not the password of anyone")?,
             })),
             repo: Mutex::new(Some(options.repo)),
             jobs: Mutex::new(HashMap::new()),

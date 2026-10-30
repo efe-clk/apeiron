@@ -4,7 +4,7 @@
 
 > **Status: Done.** This is the design of Stage 4 work item 2 ([ROADMAP.md](ROADMAP.md) §6): the pages of the desktop interface ([DESKTOP.md](DESKTOP.md)) served to other computers on the network, for a repository on a home server. The decision behind it is ADR-027 ([DECISIONS.md](DECISIONS.md)).
 
-The person who runs the server signs in from a browser on another computer and backs up, looks at and restores folders of the server. Several users with their own rights are work item 3.
+The person who runs the server signs in from a browser on another computer and backs up, looks at and restores folders of the server. Several users with their own rights are work item 3 ([USERS.md](USERS.md)).
 
 ## 1. How it is built
 
@@ -20,12 +20,12 @@ flowchart LR
 | --- | --- | --- |
 | Pages | The pages of the desktop interface, with a sign-in screen | Done |
 | Web server | `apeiron-server` in web mode: the same JSON API, on an address of the network, over TLS, to a signed-in browser | Done |
-| `apeiron web` | Starts the web server for one repository; `--set-password` sets the sign-in password | Done |
+| `apeiron web` | Starts the web server for one repository; `apeiron web user` manages who may sign in (USERS.md §3) | Done |
 
 ## 2. Starting it
 
 ```text
-apeiron web --set-password
+apeiron web user add efe --role admin
 apeiron web --repo /srv/backup --listen 0.0.0.0:8443 --folder /home/efe
 ```
 
@@ -35,18 +35,17 @@ apeiron web --repo /srv/backup --listen 0.0.0.0:8443 --folder /home/efe
 | `--listen` | Address and port | `0.0.0.0:8443` |
 | `--cert`, `--key` | Certificate chain and private key, PEM files | A self-signed certificate |
 | `--plain` | Plain HTTP, only behind a proxy that adds TLS | Off |
-| `--folder` | A folder of the server that may be backed up or restored into; can be given more than once | The home folder |
-| `--set-password` | Asks for the sign-in password twice and stores it; does not start the server | |
+| `--folder` | A folder of the server that users may be given (USERS.md §1); can be given more than once | The home folder |
 
 Without `--cert` and `--key`, a self-signed certificate for `localhost` and the listen address is made once and kept in the configuration folder (`web-cert.pem`, `web-key.pem`). Its SHA-256 fingerprint is printed at start; the browser warns about it once, and the fingerprint it shows must be the printed one.
 
-The sign-in password is stored only as an Argon2id hash in `web.json` in the configuration folder (`~/.config/apeiron` on Linux), readable only by its owner. Without it the server does not start.
+The users and the Argon2id hashes of their passwords are kept in `web.json` in the configuration folder (`~/.config/apeiron` on Linux), readable only by its owner (USERS.md §2). Without an `admin` the server does not start.
 
 ## 3. What changes from the desktop interface
 
 | Topic | Desktop | Web |
 | --- | --- | --- |
-| Who may call | The holder of the token in the address | A browser signed in with the password |
+| Who may call | The holder of the token in the address | A browser signed in as a user (USERS.md) |
 | Address | `127.0.0.1` | Any address given with `--listen` |
 | Repository | Any, chosen on the start screen | Only the one given at start; the start screen and Close are not shown |
 | Folders | All folders of the user | Only folders inside `--folder` |
@@ -60,7 +59,7 @@ The requests of DESKTOP.md §3 stay, with these differences:
 | Request | In web mode |
 | --- | --- |
 | `GET /api/session` | Allowed without signing in: `{"mode": "local" or "web", "signed_in"}` |
-| `POST /api/login` `{"password"}` | Signs in; sets the cookie `apeiron_session` |
+| `POST /api/login` `{"name", "password"}` | Signs in; sets the cookie `apeiron_session` |
 | `POST /api/logout` | Signs out and forgets the session |
 | `POST /api/open`, `POST /api/init` | Refused with `unsupported` |
 | `POST /api/call/<operation>` | Only `info`, `resolve`, `log`, `list`, `diff`, `diff_text`, `refs`, `reflog`; others are refused with `unsupported` |
@@ -82,13 +81,13 @@ A request without a valid session has status 401 with the kind `invalid_input` a
 | Only the operations of §4 | Remotes, keys, export and plugins, which reach further, stay with the CLI |
 | The headers of DESKTOP.md §4 (CSP, `no-store`, `nosniff`) | The same pages, the same rules |
 
-Whoever signs in can read every backup of the repository and write into the `--folder` folders with the rights of the user that runs the server. The server should therefore run as an ordinary user, never as root.
+An `admin` can read every backup of the repository and write into the `--folder` folders with the rights of the user that runs the server; other roles reach less (USERS.md §1). The server should therefore run as an ordinary user, never as root.
 
 ## 6. Not part of this work item
 
 | Item | Where |
 | --- | --- |
-| Several users, roles and rights per backup | Work item 3 |
+| Several users, roles and rights per backup | Work item 3 ([USERS.md](USERS.md)) |
 | A record of who did what | Work item 4 (audit log) |
 | Certificates from Let's Encrypt | Later; a proxy such as Caddy does this today with `--plain` |
 | Remotes, sync, keys and plugins in the pages | Later |

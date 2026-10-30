@@ -55,7 +55,7 @@ Her katman yalnızca hemen altındaki katmanı kullanır. Ayrıntılar: [docs/AR
 | CLI | `apeiron-cli` | `apeiron` komutu ([docs/CLI.tr.md](docs/CLI.tr.md)) | Devam ediyor |
 | Arka plan hizmeti | `apeiron-daemon` | Zamanlanmış işler ve geri yükleme testi ([docs/DAEMON.tr.md](docs/DAEMON.tr.md)) | Tamamlandı |
 | Masaüstü arayüzü | `apeiron-server`, `apeiron-desktop` | Komut satırı olmadan yedeklemek ve geri yüklemek için sayfalar, yerel bir sunucu ve bir pencere ([docs/DESKTOP.tr.md](docs/DESKTOP.tr.md)) | Tamamlandı |
-| Web arayüzü | `apeiron-server`, `apeiron-cli` | Aynı sayfaların başka bilgisayarlara oturum açma parolası ve TLS ile sunulması ([docs/WEB.tr.md](docs/WEB.tr.md)) | Tamamlandı |
+| Web arayüzü | `apeiron-server`, `apeiron-cli` | Aynı sayfaların başka bilgisayarlara TLS ile, rolleri ve kendi yedekleri olan kullanıcılara sunulması ([docs/WEB.tr.md](docs/WEB.tr.md), [docs/USERS.tr.md](docs/USERS.tr.md)) | Tamamlandı |
 | Git | `apeiron-git` | Git depolarını aynı commit kimlikleriyle içe ve dışa aktarma ([docs/GIT.tr.md](docs/GIT.tr.md)) | Tamamlandı |
 | Eklentiler | `apeiron-plugin` | WebAssembly eklenti ortamı; tür sürücüleri dosyaları birleştirir ([docs/PLUGIN.tr.md](docs/PLUGIN.tr.md)) | Tamamlandı |
 
@@ -123,6 +123,7 @@ Kod, commit ve format değişikliği kuralları: [CONTRIBUTING.tr.md](CONTRIBUTI
 | [Metin eklentisi](docs/TEXT.tr.md) | Metin dosyalarını satır satır birleştirmek ve farklarını göstermek |
 | [Masaüstü arayüzü](docs/DESKTOP.tr.md) | Komut satırı olmadan, bir pencerede yedekleme ve geri yükleme |
 | [Web arayüzü](docs/WEB.tr.md) | Bir yedek sunucusunu başka bir bilgisayardaki tarayıcıdan kullanmak |
+| [Kullanıcılar ve izinler](docs/USERS.tr.md) | Tek bir yedek sunucusunda, her biri kendi yedekleriyle birkaç kişi |
 | [Kullanım rehberi](docs/GUIDE.tr.md) | Kurulum, günlük yedek, geri yükleme ve bir aylık deneme |
 | [Sözlük](docs/GLOSSARY.tr.md) | Terimler ve İngilizce–Türkçe karşılıkları |
 | [Katkı](CONTRIBUTING.tr.md) | Geliştirme ortamı ve kurallar |

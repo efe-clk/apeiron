@@ -11,7 +11,7 @@ use std::time::Duration;
 use apeiron::Repository;
 use rustls::pki_types::pem::PemObject;
 
-use apeiron_server::{Tls, Web, WebOptions, hash_password, load_password, save_password};
+use apeiron_server::{Role, Tls, User, Users, Web, WebOptions, hash_password};
 use serde_json::{Value, json};
 
 const PASSWORD: &str = "correct horse";
@@ -21,6 +21,23 @@ fn hash() -> String {
     static HASH: OnceLock<String> = OnceLock::new();
     HASH.get_or_init(|| hash_password(PASSWORD).unwrap())
         .clone()
+}
+
+/// A users file in `dir` with the admin `root`.
+fn users_file(dir: &Path) -> PathBuf {
+    let file = dir.join("config/web.json");
+    let mut users = Users::default();
+    users
+        .add(User {
+            name: "root".to_owned(),
+            password: hash(),
+            role: Role::Admin,
+            backups: Vec::new(),
+            folders: Vec::new(),
+        })
+        .unwrap();
+    users.save(&file).unwrap();
+    file
 }
 
 struct Reply {
@@ -105,9 +122,30 @@ impl Client {
     }
 
     fn sign_in(&mut self) {
-        let reply = self.post("/api/login", json!({"password": PASSWORD}));
+        self.sign_in_as("root");
+    }
+
+    fn sign_in_as(&mut self, name: &str) {
+        let reply = self.post("/api/login", json!({"name": name, "password": PASSWORD}));
         assert_eq!(reply.status, 200, "{}", reply.body);
         self.cookie = reply.cookie();
+    }
+
+    /// Another browser, signed in as `name`.
+    fn other(&self, name: &str) -> Client {
+        let mut c = Client {
+            address: self.address,
+            tls: self.tls.clone(),
+            cookie: None,
+        };
+        c.sign_in_as(name);
+        c
+    }
+
+    fn kind(&self, path: &str, body: Value) -> (u16, String) {
+        let reply = self.post(path, body);
+        let kind = reply.json()["kind"].as_str().unwrap_or("").to_owned();
+        (reply.status, kind)
     }
 
     fn run(&self, operation: &str, body: Value) -> Value {
@@ -133,7 +171,7 @@ fn start(dir: &Path) -> (Web, Client, PathBuf) {
         repo: Repository::init(dir.join("repo")).unwrap(),
         listen: "127.0.0.1:0".parse().unwrap(),
         tls: None,
-        password_hash: hash(),
+        users: users_file(dir),
         folders: vec![home.clone()],
     })
     .unwrap();
@@ -165,7 +203,7 @@ fn nothing_without_signing_in() {
     c.cookie = Some("apeiron_session=00".to_owned());
     assert_eq!(c.get("/api/state").status, 401);
 
-    let wrong = c.post("/api/login", json!({"password": "nope"}));
+    let wrong = c.post("/api/login", json!({"name": "root", "password": "nope"}));
     assert_eq!(
         (wrong.status, wrong.json()["kind"].as_str()),
         (401, Some("key"))
@@ -173,7 +211,7 @@ fn nothing_without_signing_in() {
     assert_eq!(wrong.cookie(), None);
 
     c.sign_in();
-    let reply = c.post("/api/login", json!({"password": PASSWORD}));
+    let reply = c.post("/api/login", json!({"name": "root", "password": PASSWORD}));
     let set = reply.headers.lines().find(|l| l.starts_with("set-cookie:"));
     let set = set.unwrap();
     for part in ["httponly", "secure", "samesite=strict", "path=/"] {
@@ -201,18 +239,19 @@ fn guessing_pauses_sign_ins() {
     let (_server, mut c, _) = start(dir.path());
     for _ in 0..5 {
         assert_eq!(
-            c.post("/api/login", json!({"password": "guess"})).status,
+            c.post("/api/login", json!({"name": "root", "password": "guess"}))
+                .status,
             401
         );
     }
     // Even the right password waits now.
-    let paused = c.post("/api/login", json!({"password": PASSWORD}));
+    let paused = c.post("/api/login", json!({"name": "root", "password": PASSWORD}));
     assert_eq!(
         (paused.status, paused.json()["kind"].as_str()),
         (429, Some("locked"))
     );
     assert!(
-        c.post("/api/login", json!({"password": PASSWORD}))
+        c.post("/api/login", json!({"name": "root", "password": PASSWORD}))
             .cookie()
             .is_none()
     );
@@ -329,7 +368,7 @@ fn tls_with_a_kept_certificate() {
         repo: Repository::init(dir.path().join("repo")).unwrap(),
         listen: "127.0.0.1:0".parse().unwrap(),
         tls: Some(tls.clone()),
-        password_hash: hash(),
+        users: users_file(dir.path()),
         folders: vec![dir.path().to_path_buf()],
     })
     .unwrap();
@@ -361,19 +400,243 @@ fn tls_with_a_kept_certificate() {
 }
 
 #[test]
-fn the_password_file() {
+fn the_users_file() {
     let dir = tempfile::tempdir().unwrap();
     let file = dir.path().join("config/web.json");
-    assert_eq!(load_password(&file).unwrap(), None);
-    save_password(&file, &hash()).unwrap();
-    assert_eq!(load_password(&file).unwrap(), Some(hash()));
-    assert!(hash().starts_with("$argon2id$"));
+    assert_eq!(Users::load(&file).unwrap(), Users::default());
+    assert!(Users::default().need_admin().is_err());
+    assert_eq!(users_file(dir.path()), file);
+    let mut users = Users::load(&file).unwrap();
+    assert!(
+        users
+            .get("root")
+            .unwrap()
+            .password
+            .starts_with("$argon2id$")
+    );
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         let mode = fs::metadata(&file).unwrap().permissions().mode();
         assert_eq!(mode & 0o777, 0o600);
     }
+
+    // Names are checked and unique, and the last admin stays.
+    let user = |name: &str| User {
+        name: name.to_owned(),
+        password: hash(),
+        role: Role::Member,
+        backups: vec!["backup/a-*".to_owned()],
+        folders: Vec::new(),
+    };
+    assert!(users.add(user("Bad Name")).is_err());
+    assert!(users.add(user("root")).is_err());
+    users.add(user("ayse")).unwrap();
+    assert!(users.remove("root").is_err());
+    assert!(users.remove("nobody").is_err());
+    users.remove("ayse").unwrap();
+    assert!(hash_password("short").is_err());
+
+    let ayse = user("ayse");
+    assert!(ayse.owns("backup/a-photos"));
+    assert!(!ayse.owns("backup/b"));
+    assert!(ayse.verify(PASSWORD));
+    assert!(!ayse.verify("wrong"));
+
     fs::write(&file, "not json").unwrap();
-    assert!(load_password(&file).is_err());
+    assert!(Users::load(&file).is_err());
+}
+
+#[test]
+fn each_user_sees_and_uses_only_their_own() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_server, mut root, home) = start(dir.path());
+    for folder in ["ayse/docs", "root"] {
+        fs::create_dir_all(home.join(folder)).unwrap();
+        fs::write(home.join(folder).join("f.txt"), folder).unwrap();
+    }
+    let file = dir.path().join("config/web.json");
+    let mut users = Users::load(&file).unwrap();
+    let user = |name: &str, role, backups: &[&str], folders: Vec<PathBuf>| User {
+        name: name.to_owned(),
+        password: hash(),
+        role,
+        backups: backups.iter().map(|b| (*b).to_owned()).collect(),
+        folders,
+    };
+    users
+        .add(user(
+            "ayse",
+            Role::Member,
+            &["backup/ayse-*"],
+            vec![home.join("ayse")],
+        ))
+        .unwrap();
+    users
+        .add(user(
+            "okan",
+            Role::Reader,
+            &["backup/ayse-docs"],
+            Vec::new(),
+        ))
+        .unwrap();
+    users.save(&file).unwrap();
+
+    // The admin backs up both folders, the root one twice.
+    root.sign_in();
+    let backup = |c: &Client, folder: &str, r: &str| {
+        let done = c.run("backup", json!({"source": home.join(folder), "ref": r}));
+        assert!(done["result"]["snapshot"].is_string(), "{done}");
+        done["result"]["snapshot"].as_str().unwrap().to_owned()
+    };
+    backup(&root, "ayse/docs", "backup/ayse-docs");
+    let first_root = backup(&root, "root", "backup/root");
+    fs::write(home.join("root/g.txt"), "more").unwrap();
+    backup(&root, "root", "backup/root");
+
+    let ayse = root.other("ayse");
+    let session = ayse.get("/api/session").json();
+    assert_eq!(session["user"], json!({"name": "ayse", "role": "member"}));
+
+    // Only her backups, by name or by id, also through history.
+    let refs = ayse.post("/api/call/refs", json!({})).json();
+    assert_eq!(refs.as_array().unwrap().len(), 1);
+    assert_eq!(refs[0]["name"], "backup/ayse-docs");
+    assert_eq!(
+        ayse.kind("/api/call/list", json!({"snapshot": "backup/ayse-docs"}))
+            .0,
+        200
+    );
+    for spec in [
+        "backup/root",
+        first_root.as_str(),
+        "backup/root~1",
+        "nothing",
+    ] {
+        assert_eq!(
+            ayse.kind("/api/call/list", json!({"snapshot": spec})),
+            (404, "not_found".to_owned()),
+            "{spec}"
+        );
+    }
+    assert_eq!(
+        ayse.kind(
+            "/api/call/diff",
+            json!({"from": first_root, "to": "backup/ayse-docs"})
+        )
+        .0,
+        404
+    );
+    assert_eq!(
+        ayse.kind("/api/call/reflog", json!({"name": "backup/root"}))
+            .0,
+        404
+    );
+    assert_eq!(
+        ayse.kind("/api/start/search", json!({"pattern": "*"})).0,
+        400
+    );
+    assert_eq!(
+        ayse.kind(
+            "/api/start/search",
+            json!({"snapshot": "backup/root", "pattern": "*"})
+        )
+        .0,
+        404
+    );
+    let found = ayse.run(
+        "search",
+        json!({"snapshot": "backup/ayse-docs", "pattern": "*"}),
+    );
+    assert!(found["result"]["hits"].is_array(), "{found}");
+
+    // She backs up and restores only within her backups and folders.
+    assert_eq!(
+        ayse.kind(
+            "/api/start/backup",
+            json!({"source": home.join("ayse/docs"), "ref": "backup/root"})
+        ),
+        (400, "invalid_input".to_owned())
+    );
+    assert_eq!(
+        ayse.kind(
+            "/api/start/backup",
+            json!({"source": home.join("root"), "ref": "backup/ayse-root"})
+        ),
+        (400, "invalid_input".to_owned())
+    );
+    backup(&ayse, "ayse/docs", "backup/ayse-copy");
+    assert_eq!(
+        ayse.kind(
+            "/api/start/restore",
+            json!({"snapshot": "backup/ayse-docs", "target": home.join("root/out")})
+        ),
+        (400, "invalid_input".to_owned())
+    );
+    let restored = ayse.run(
+        "restore",
+        json!({"snapshot": "backup/ayse-docs", "target": home.join("ayse/out")}),
+    );
+    assert_eq!(restored["result"]["files"], 1, "{restored}");
+    assert_eq!(
+        ayse.kind("/api/start/verify", json!({})),
+        (400, "unsupported".to_owned())
+    );
+    assert_eq!(
+        ayse.get("/api/folders").json()["path"],
+        json!(home.join("ayse"))
+    );
+
+    // Nobody follows another user's job.
+    let started = root.post("/api/start/verify", json!({}));
+    let id = started.json()["job"].as_u64().unwrap();
+    assert_eq!(ayse.get(&format!("/api/jobs/{id}")).status, 404);
+    assert_eq!(
+        ayse.post(&format!("/api/jobs/{id}/cancel"), json!({}))
+            .status,
+        404
+    );
+
+    // A reader only looks.
+    let okan = root.other("okan");
+    let refs = okan.post("/api/call/refs", json!({})).json();
+    assert_eq!(refs.as_array().unwrap().len(), 1);
+    assert_eq!(
+        okan.kind("/api/call/list", json!({"snapshot": "backup/ayse-docs"}))
+            .0,
+        200
+    );
+    for (operation, body) in [
+        (
+            "backup",
+            json!({"source": home.join("ayse/docs"), "ref": "backup/ayse-docs"}),
+        ),
+        (
+            "restore",
+            json!({"snapshot": "backup/ayse-docs", "target": home.join("x")}),
+        ),
+    ] {
+        assert_eq!(
+            okan.kind(&format!("/api/start/{operation}"), body),
+            (400, "unsupported".to_owned())
+        );
+    }
+    assert_eq!(okan.get("/api/folders").status, 400);
+
+    // An unknown name fails like a wrong password.
+    let unknown = root.post(
+        "/api/login",
+        json!({"name": "nobody", "password": PASSWORD}),
+    );
+    assert_eq!(unknown.status, 401);
+
+    // Changes to the file count at once: a new password and a removal end
+    // the sessions.
+    let mut users = Users::load(&file).unwrap();
+    users.get_mut("okan").unwrap().password = hash_password("another password").unwrap();
+    users.remove("ayse").unwrap();
+    users.save(&file).unwrap();
+    assert_eq!(okan.get("/api/state").status, 401);
+    assert_eq!(ayse.get("/api/state").status, 401);
+    assert_eq!(root.get("/api/state").status, 200);
 }

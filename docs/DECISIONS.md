@@ -35,6 +35,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [025](#adr-025-plugins-run-with-nothing-granted-type-drivers-come-first) | Plugins | Per-user components with no permissions, time and memory limits; type drivers merge before a conflict copy; Rust 1.97 | Accepted |
 | [026](#adr-026-one-set-of-web-pages-served-locally-shown-in-a-native-window) | Desktop interface | HTML pages without a build step, a JSON API on `127.0.0.1` with a token, a `wry` window | Accepted |
 | [027](#adr-027-the-web-interface-serves-one-repository-over-tls-to-a-password-sign-in) | Web interface | One repository fixed at start; password sign-in with a cookie session; `rustls` with a self-signed certificate by default; allowed operations and folders | Accepted |
+| [028](#adr-028-users-with-three-roles-backups-by-ref-name-and-visibility-through-parents) | Users and permissions | `admin`, `member`, `reader`; backups as ref names with a prefix; a snapshot is visible when reachable from the user's refs | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28.
 
@@ -588,3 +589,25 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | A session store on disk | Restarting the server signing everyone out is acceptable and leaves nothing to steal |
 
 **Consequences.** Someone who keeps guessing can keep the owner from signing in, a minute at a time. Whoever signs in has the rights of the user that runs the server inside the allowed folders. The browser warns about a self-signed certificate once per browser. Users and roles (work item 3) will replace the single password.
+
+## ADR-028: Users with three roles, backups by ref name and visibility through parents
+
+**Status:** Accepted (2026-10-30)
+
+**Context.** Stage 4 work item 3 lets several people share one backup server ([USERS.md](USERS.md)). Each must see and restore only their own backups and folders, and one must look after the whole server. The repository has one encryption key, and snapshots are found by ids as well as by ref names, so hiding a ref is not enough.
+
+**Decision.** The users file `web.json` replaces the single password of ADR-027 with users that have a name, an Argon2id password hash, one of three fixed roles (`admin`, `member`, `reader`), a list of ref names with `*` for a prefix, and folders inside the `--folder` folders. A snapshot is visible to a user when it is reachable through parents from the head of one of the user's refs; every snapshot a request names is resolved, checked and replaced by its id. The server reads the file again when it changes, and a session holds the password hash it began with. Jobs belong to the user who started them. Users are managed with `apeiron web user`.
+
+**Rationale.** Three fixed roles cover a family or a small office without a rule language to learn. Ref names are already how backups are named, so a prefix such as `backup/ayse-*` gives a person every new backup of theirs without editing the file. Reachability is the only check that an id cannot get around, and the sets are kept per ref head, so it costs one walk of a history until the next backup. Reading the file again lets the CLI change users without restarting the server, and holding the password hash in the session ends stolen sessions when the password changes.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| Permissions per operation, freely combined | More to understand and to get wrong than three roles |
+| Checking only ref names in requests | Snapshot ids and specs such as `backup/x~1` would pass |
+| A key per user with separate encryption | Deduplication across users would stop, and the server needs every key for checks anyway |
+| A database for users | One small JSON file is enough for a home server and is read by people |
+| Managing users in the pages now | The CLI covers it; the pages can follow once the audit log records changes |
+
+**Consequences.** Everyone who can sign in relies on the server holding the repository's key, so users are protected from each other by the server, not by cryptography. A snapshot merged into a user's backup becomes visible to that user. A `member` or `reader` must name a snapshot to search. The `--set-password` option of ADR-027 is gone.

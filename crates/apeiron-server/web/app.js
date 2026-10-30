@@ -15,6 +15,13 @@ if (fragment.get("token")) {
 const token = sessionStorage.getItem("apeiron-token") || "";
 // "local" with a token, or "web" with a sign-in cookie.
 let mode = "local";
+// The signed-in user in web mode: {name, role} (USERS.md §4).
+let user = null;
+const may = {
+  backUp: () => user?.role !== "reader",
+  restore: () => user?.role !== "reader",
+  verify: () => !user || user.role === "admin",
+};
 
 const main = document.getElementById("main");
 const nav = document.getElementById("nav");
@@ -272,10 +279,10 @@ function showNav(current) {
   nav.hidden = false;
   nav.replaceChildren(
     item("overview", overview),
-    item("backup", () => backup()),
-    item("verify", verify),
+    may.backUp() ? item("backup", () => backup()) : null,
+    may.verify() ? item("verify", verify) : null,
     mode === "web" ? item("sign_out", signOut) : item("close", () => start()),
-    h("span", { class: "path" }, repoPath),
+    h("span", { class: "path" }, user ? `${user.name} · ${repoPath}` : repoPath),
   );
 }
 
@@ -384,7 +391,7 @@ async function overview() {
         h("h1", {}, t("overview_heading")),
         h("div", { class: "card" },
           h("p", {}, t("overview_empty")),
-          h("div", { class: "actions" }, h("button", { type: "button", class: "primary", onclick: () => backup() }, t("nav_backup"))),
+          may.backUp() ? h("div", { class: "actions" }, h("button", { type: "button", class: "primary", onclick: () => backup() }, t("nav_backup"))) : null,
         ),
       );
       return;
@@ -398,7 +405,7 @@ async function overview() {
         h("td", {}, when(newest?.time)),
         h("td", {}, h("div", { class: "actions" },
           h("button", { type: "button", onclick: () => historyOf(r.name) }, t("history")),
-          source ? h("button", { type: "button", onclick: () => backup(source, r.name) }, t("back_up_again")) : null,
+          source && may.backUp() ? h("button", { type: "button", onclick: () => backup(source, r.name) }, t("back_up_again")) : null,
         )),
       );
     }));
@@ -472,7 +479,7 @@ async function historyOf(ref, from = ref) {
         h("td", {}, h("div", { class: "actions" },
           h("button", { type: "button", onclick: () => browse(s, "") }, t("browse")),
           h("button", { type: "button", onclick: () => compare(s) }, t("compare")),
-          h("button", { type: "button", onclick: () => restore(s, "") }, t("restore")),
+          may.restore() ? h("button", { type: "button", onclick: () => restore(s, "") }, t("restore")) : null,
         )),
       ),
     );
@@ -510,7 +517,7 @@ async function browse(snapshot, path) {
         h("td", {}, name),
         h("td", { class: "num" }, e.size === null ? "" : bytes(e.size)),
         h("td", {}, when(e.mtime)),
-        h("td", {}, h("button", { type: "button", onclick: () => restore(snapshot, full) }, t("restore_this"))),
+        h("td", {}, may.restore() ? h("button", { type: "button", onclick: () => restore(snapshot, full) }, t("restore_this")) : null),
       );
     });
     show(
@@ -608,13 +615,14 @@ function verify() {
 
 function signIn() {
   nav.hidden = true;
+  const name = h("input", { type: "text", autocomplete: "username", autocapitalize: "none", spellcheck: "false", required: true });
   const password = h("input", { type: "password", autocomplete: "current-password", required: true });
   const status = h("div");
   const form = h("form", { onsubmit: async (e) => {
     e.preventDefault();
     status.replaceChildren();
     try {
-      await api("POST", "/api/login", { password: password.value });
+      await api("POST", "/api/login", { name: name.value.trim(), password: password.value });
       begin();
     } catch (err) {
       const text = err.kind === "key" ? t("wrong_password") : err.kind === "locked" ? t("too_many_tries") : null;
@@ -622,11 +630,12 @@ function signIn() {
       password.select();
     }
   } },
+    ...field(t("user_name"), name),
     ...field(t("password"), password),
     h("div", { class: "actions" }, h("button", { type: "submit", class: "primary" }, t("sign_in_button"))),
   );
   show(h("h1", {}, t("sign_in_heading")), h("div", { class: "card" }, h("p", { class: "muted" }, t("sign_in_intro")), form), status);
-  password.focus();
+  name.focus();
 }
 
 async function signOut() {
@@ -639,6 +648,7 @@ async function signOut() {
 async function begin() {
   const session = await api("GET", "/api/session").catch(() => null);
   mode = session?.mode || "local";
+  user = session?.user || null;
   if (!session?.signed_in) return signIn();
   const state = await api("GET", "/api/state").catch(() => null);
   if (state?.open) opened(state.open.path);

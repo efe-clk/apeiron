@@ -69,6 +69,6 @@ Apeiron; sürüm kontrolü, arşivleme, yedekleme, senkronizasyon ve bütünlük
 
 1. ~~Masaüstü arayüzü (`docs/DESKTOP.md`).~~ Tamamlandı (2026-10-30).
 2. ~~Web arayüzü (`docs/WEB.md`).~~ Tamamlandı (2026-10-30).
-3. Kullanıcılar ve izinler.
+3. ~~Kullanıcılar ve izinler (`docs/USERS.md`).~~ Tamamlandı (2026-10-30).
 4. Denetim kaydı.
 5. Paylaşım.

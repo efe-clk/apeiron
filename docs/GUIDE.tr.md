@@ -254,14 +254,16 @@ Masaüstü uygulamasının derlenemediği yerde `apeiron ui` aynı sayfaları ta
 
 ### 6.10 Başka bir bilgisayardan
 
-Bir ev sunucusunda `apeiron web`, aynı sayfaları ağınızdaki başka bir bilgisayarın tarayıcısına gösterir ([WEB.tr.md](WEB.tr.md)). Bir kez oturum açma parolası belirleyin, sonra depoyla ve kullanabileceği klasörlerle başlatın:
+Bir ev sunucusunda `apeiron web`, aynı sayfaları ağınızdaki başka bir bilgisayarın tarayıcısına gösterir ([WEB.tr.md](WEB.tr.md)). Kendinizi bir kez ilk kullanıcısı olarak ekleyin, sonra depoyla ve kullanabileceği klasörlerle başlatın:
 
 ```bash
-apeiron web --set-password
+apeiron web user add efe --role admin
 apeiron web --repo /srv/backup --folder /home/efe
 ```
 
 Öbür bilgisayarda `https://<sunucu adresi>:8443` adresini açın. Tarayıcı ilk seferde sertifika için uyarır; yalnızca gösterdiği parmak izi sunucunun yazdığıyla aynıysa kabul edin. Sunucuyu root olarak değil, sıradan bir kullanıcı olarak çalıştırın.
+
+Evdeki diğer kişiler kendi adlarını, yedeklerini ve klasörlerini alır, örneğin `apeiron web user add ayse --role member --backup "backup/ayse-*" --folder /home/ayse`; yalnızca kendi yedeklerini görürler ([USERS.tr.md](USERS.tr.md)).
 
 ## 7. Düzen
 

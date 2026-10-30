@@ -95,7 +95,7 @@ The desktop interface comes first, because it alone meets the exit criterion; th
 | --- | --- | --- |
 | 1 | Desktop interface ([DESKTOP.md](DESKTOP.md)) | Done |
 | 2 | Web interface ([WEB.md](WEB.md)) | Done |
-| 3 | Users and permissions | Planned |
+| 3 | Users and permissions ([USERS.md](USERS.md)) | Done |
 | 4 | Audit log | Planned |
 | 5 | Sharing | Planned |
 

@@ -35,6 +35,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [025](#adr-025-eklentiler-hiçbir-şey-verilmeden-çalışır-önce-tür-sürücüleri-gelir) | Eklentiler | İzinsiz, süre ve bellek sınırlı, kullanıcı başına bileşenler; tür sürücüleri çatışma kopyasından önce birleştirir; Rust 1.97 | Kabul edildi |
 | [026](#adr-026-yerelde-sunulan-ve-yerel-bir-pencerede-gösterilen-tek-bir-web-sayfaları-takımı) | Masaüstü arayüzü | Derleme adımı olmayan HTML sayfaları, `127.0.0.1` üzerinde jetonlu bir JSON API, bir `wry` penceresi | Kabul edildi |
 | [027](#adr-027-web-arayüzü-tek-bir-depoyu-tls-üzerinden-parolayla-oturum-açana-sunar) | Web arayüzü | Başlarken sabitlenen tek depo; çerezli oturumla parola girişi; varsayılan olarak kendinden imzalı sertifikayla `rustls`; izinli işlemler ve klasörler | Kabul edildi |
+| [028](#adr-028-üç-rollü-kullanıcılar-ref-adıyla-yedekler-ve-üst-sürümler-yoluyla-görünürlük) | Kullanıcılar ve izinler | `admin`, `member`, `reader`; önekli ref adları olarak yedekler; kullanıcının ref'lerinden ulaşılabilen snapshot görünür | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
 
@@ -588,3 +589,25 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Diskte bir oturum deposu | Sunucu yeniden başlayınca herkesin oturumunun kapanması kabul edilebilir ve çalınacak bir şey bırakmaz |
 
 **Sonuçlar.** Durmadan tahmin eden biri, sahibinin oturum açmasını birer dakikalık sürelerle engelleyebilir. Oturum açan herkes, izinli klasörlerin içinde sunucuyu çalıştıran kullanıcının haklarına sahiptir. Tarayıcı kendinden imzalı bir sertifika için tarayıcı başına bir kez uyarır. Kullanıcılar ve roller (3. iş) tek parolanın yerini alacak.
+
+## ADR-028: Üç rollü kullanıcılar, ref adıyla yedekler ve üst sürümler yoluyla görünürlük
+
+**Durum:** Kabul edildi (2026-10-30)
+
+**Bağlam.** Aşama 4'ün 3. işi, birkaç kişinin tek bir yedek sunucusunu paylaşmasını sağlar ([USERS.tr.md](USERS.tr.md)). Her biri yalnızca kendi yedeklerini ve klasörlerini görmeli ve geri yükleyebilmeli; biri de bütün sunucuyla ilgilenmelidir. Deponun tek bir şifreleme anahtarı vardır ve snapshot'lar ref adlarının yanında kimlikleriyle de bulunur; bu yüzden bir ref'i gizlemek yetmez.
+
+**Karar.** `web.json` kullanıcılar dosyası, ADR-027'deki tek parolanın yerine adı, Argon2id parola özeti, üç sabit rolden biri (`admin`, `member`, `reader`), önek için `*` kullanılan bir ref adları listesi ve `--folder` klasörlerinin içinde klasörleri olan kullanıcılar koyar. Bir snapshot, kullanıcının ref'lerinden birinin en yeni sürümünden üst sürümler yoluyla ulaşılabiliyorsa o kullanıcıya görünürdür; bir isteğin adlandırdığı her snapshot çözülür, denetlenir ve kimliğiyle değiştirilir. Sunucu dosya değişince onu yeniden okur ve bir oturum başladığı andaki parola özetini tutar. İşler onları başlatan kullanıcıya aittir. Kullanıcılar `apeiron web user` ile yönetilir.
+
+**Gerekçe.** Üç sabit rol, öğrenilecek bir kural dili olmadan bir aileyi ya da küçük bir ofisi karşılar. Ref adları yedeklerin zaten adlandırıldığı yoldur; böylece `backup/ayse-*` gibi bir önek, dosyayı düzenlemeden bir kişiye kendisinin her yeni yedeğini verir. Ulaşılabilirlik, bir kimliğin atlatamayacağı tek denetimdir ve kümeler ref başı başına tutulur; böylece bir sonraki yedeğe kadar bir geçmişin bir kez gezilmesine mal olur. Dosyayı yeniden okumak, CLI'nın sunucuyu yeniden başlatmadan kullanıcıları değiştirmesini sağlar; parola özetini oturumda tutmak da parola değişince çalınmış oturumları bitirir.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Serbestçe birleştirilen işlem başına izinler | Üç rolden daha çok anlaşılacak ve yanlış yapılacak şey |
+| İsteklerde yalnızca ref adlarını denetlemek | Snapshot kimlikleri ve `backup/x~1` gibi belirtimler geçerdi |
+| Ayrı şifrelemeyle kullanıcı başına bir anahtar | Kullanıcılar arasında tekilleştirme durur, sunucu denetimler için yine her anahtara ihtiyaç duyar |
+| Kullanıcılar için bir veritabanı | Bir ev sunucusu için küçük bir JSON dosyası yeter ve insanlar tarafından okunur |
+| Kullanıcıları şimdi sayfalarda yönetmek | CLI bunu karşılar; denetim kaydı değişiklikleri kaydettiğinde sayfalar gelebilir |
+
+**Sonuçlar.** Oturum açabilen herkes, deponun anahtarını sunucunun tutmasına güvenir; yani kullanıcılar birbirlerinden kriptografiyle değil sunucuyla korunur. Bir kullanıcının yedeğine birleştirilen bir snapshot o kullanıcıya görünür olur. Bir `member` ya da `reader` aramak için bir snapshot belirtmelidir. ADR-027'deki `--set-password` seçeneği kaldırıldı.

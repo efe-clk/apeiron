@@ -6,6 +6,7 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 
+mod users;
 mod web;
 
 use std::collections::HashMap;
@@ -18,18 +19,19 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use web::WebState;
-pub use web::{Tls, Web, WebOptions, hash_password, load_password, save_password};
+pub use users::{MIN_PASSWORD, Role, User, Users, hash_password};
+pub use web::{Tls, Web, WebOptions};
+use web::{WebState, Who};
 
 use apeiron::json::{self, JsonJob};
 use apeiron::{Error, ErrorKind, Repository};
-use axum::Router;
 use axum::body::Bytes;
 use axum::extract::{Path as UrlPath, Query, Request, State};
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
+use axum::{Extension, Router};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -71,10 +73,13 @@ enum Mode {
     Web(Box<WebState>),
 }
 
+/// Running jobs by id, with the user who started each in web mode.
+type Jobs = HashMap<u64, (Option<String>, Box<dyn JsonJob>)>;
+
 struct App {
     mode: Mode,
     repo: Mutex<Option<Repository>>,
-    jobs: Mutex<HashMap<u64, Box<dyn JsonJob>>>,
+    jobs: Mutex<Jobs>,
     next_job: AtomicU64,
     /// Where the last repository opened is remembered.
     memory: Option<PathBuf>,
@@ -175,7 +180,7 @@ fn refused(status: StatusCode, message: &str) -> Response {
 }
 
 /// Refuses requests from elsewhere than the pages (DESKTOP.md §4, WEB.md §5).
-async fn guard(State(app): State<Arc<App>>, request: Request, next: Next) -> Response {
+async fn guard(State(app): State<Arc<App>>, mut request: Request, next: Next) -> Response {
     let headers = request.headers();
     let header = |name| headers.get(name).and_then(|v| v.to_str().ok());
     let api = request.uri().path().starts_with("/api/");
@@ -204,12 +209,18 @@ async fn guard(State(app): State<Arc<App>>, request: Request, next: Next) -> Res
                 }
             }
             let open = matches!(request.uri().path(), "/api/session" | "/api/login");
-            if api && !open && !web.signed_in(headers) {
-                return Failure(
-                    StatusCode::UNAUTHORIZED,
-                    json!({"code": 4, "kind": "invalid_input", "message": "sign in first", "sign_in": true}),
-                )
-                .into_response();
+            match web.current(headers) {
+                Some(user) => {
+                    request.extensions_mut().insert(Who(Arc::new(user)));
+                }
+                None if api && !open => {
+                    return Failure(
+                        StatusCode::UNAUTHORIZED,
+                        json!({"code": 4, "kind": "invalid_input", "message": "sign in first", "sign_in": true}),
+                    )
+                    .into_response();
+                }
+                None => {}
             }
         }
     }
@@ -295,48 +306,98 @@ async fn state(State(app): State<Arc<App>>) -> Answer {
     ))
 }
 
+/// The signed-in user in web mode, `None` in local mode.
+fn who(app: &App, who: Option<Extension<Who>>) -> Result<Option<Arc<crate::User>>, Error> {
+    match (&app.mode, who) {
+        (Mode::Local { .. }, _) => Ok(None),
+        (Mode::Web(_), Some(Extension(Who(user)))) => Ok(Some(user)),
+        (Mode::Web(_), None) => Err(invalid("sign in first")),
+    }
+}
+
+/// Runs `f` with the repository and, in web mode, the request after the
+/// user's checks (USERS.md §4).
+async fn checked<T: Send + 'static>(
+    app: &Arc<App>,
+    user: Option<Arc<crate::User>>,
+    long: bool,
+    operation: String,
+    request: Value,
+    f: impl FnOnce(&Repository, &str, Value) -> Result<T, Error> + Send + 'static,
+) -> Result<T, Error> {
+    let repo = app.repo()?;
+    let app = app.clone();
+    blocking(move || {
+        let request = match (&app.mode, &user) {
+            (Mode::Web(web), Some(user)) => web.check(&repo, user, long, &operation, request)?,
+            _ => request,
+        };
+        f(&repo, &operation, request)
+    })
+    .await
+}
+
 async fn call(
     State(app): State<Arc<App>>,
     UrlPath(operation): UrlPath<String>,
+    user: Option<Extension<Who>>,
     bytes: Bytes,
 ) -> Answer {
     let request = body(&bytes)?;
-    if let Mode::Web(web) = &app.mode {
-        web.allow_call(&operation)?;
-    }
-    let repo = app.repo()?;
-    Ok(axum::Json(
-        blocking(move || json::call(&repo, &operation, request)).await?,
-    ))
+    let user = who(&app, user)?;
+    let result = checked(
+        &app,
+        user.clone(),
+        false,
+        operation.clone(),
+        request,
+        json::call,
+    )
+    .await?;
+    Ok(axum::Json(match (&app.mode, &user) {
+        (Mode::Web(web), Some(user)) => web.filter(user, &operation, result),
+        _ => result,
+    }))
 }
 
 async fn start(
     State(app): State<Arc<App>>,
     UrlPath(operation): UrlPath<String>,
+    user: Option<Extension<Who>>,
     bytes: Bytes,
 ) -> Answer {
-    let mut request = body(&bytes)?;
-    if let Mode::Web(web) = &app.mode {
-        let web_request = request;
-        request = blocking({
-            let folders = web.folders.clone();
-            let operation = operation.clone();
-            move || web::allow_start(&folders, &operation, web_request)
-        })
-        .await?;
-    }
-    let repo = app.repo()?;
-    let job = blocking(move || json::start(&repo, &operation, request)).await?;
+    let request = body(&bytes)?;
+    let user = who(&app, user)?;
+    let owner = user.as_ref().map(|u| u.name.clone());
+    let job = checked(&app, user, true, operation, request, |repo, op, r| {
+        json::start(repo, op, r)
+    })
+    .await?;
     let id = app.next_job.fetch_add(1, Ordering::Relaxed);
-    lock(&app.jobs).insert(id, job);
+    lock(&app.jobs).insert(id, (owner, job));
     Ok(axum::Json(json!({ "job": id })))
 }
 
-async fn job(State(app): State<Arc<App>>, UrlPath(id): UrlPath<u64>) -> Answer {
+/// A job of the user, or of anyone in local mode.
+fn own_job<'a>(
+    jobs: &'a mut Jobs,
+    id: u64,
+    user: Option<&Arc<crate::User>>,
+) -> Result<&'a mut Box<dyn JsonJob>, Error> {
+    match jobs.get_mut(&id) {
+        Some((owner, job)) if owner.as_deref() == user.map(|u| u.name.as_str()) => Ok(job),
+        _ => Err(Error::new(ErrorKind::NotFound, format!("job {id}"))),
+    }
+}
+
+async fn job(
+    State(app): State<Arc<App>>,
+    UrlPath(id): UrlPath<u64>,
+    user: Option<Extension<Who>>,
+) -> Answer {
+    let user = who(&app, user)?;
     let mut jobs = lock(&app.jobs);
-    let job = jobs
-        .get_mut(&id)
-        .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("job {id}")))?;
+    let job = own_job(&mut jobs, id, user.as_ref())?;
     let progress = job.progress();
     let answer = match job.wait(Some(Duration::ZERO)) {
         None => json!({"progress": progress, "done": false}),
@@ -351,12 +412,14 @@ async fn job(State(app): State<Arc<App>>, UrlPath(id): UrlPath<u64>) -> Answer {
     Ok(axum::Json(answer))
 }
 
-async fn cancel(State(app): State<Arc<App>>, UrlPath(id): UrlPath<u64>) -> Answer {
-    let jobs = lock(&app.jobs);
-    let job = jobs
-        .get(&id)
-        .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("job {id}")))?;
-    job.cancel();
+async fn cancel(
+    State(app): State<Arc<App>>,
+    UrlPath(id): UrlPath<u64>,
+    user: Option<Extension<Who>>,
+) -> Answer {
+    let user = who(&app, user)?;
+    let mut jobs = lock(&app.jobs);
+    own_job(&mut jobs, id, user.as_ref())?.cancel();
     Ok(axum::Json(json!({})))
 }
 
@@ -368,19 +431,24 @@ struct FolderQuery {
 
 /// The folders inside a folder, for choosing one (DESKTOP.md §3); in web
 /// mode only inside the allowed folders (WEB.md §4).
-async fn folders(State(app): State<Arc<App>>, Query(q): Query<FolderQuery>) -> Answer {
-    let roots = match &app.mode {
-        Mode::Local { .. } => None,
-        Mode::Web(web) => Some(web.folders.clone()),
-    };
+async fn folders(
+    State(app): State<Arc<App>>,
+    user: Option<Extension<Who>>,
+    Query(q): Query<FolderQuery>,
+) -> Answer {
+    let user = who(&app, user)?;
     let answer = blocking(move || {
+        let roots = match (&app.mode, &user) {
+            (Mode::Web(web), Some(user)) => Some(web.folders(user)),
+            _ => None,
+        };
         let path = match (q.path.filter(|p| !p.as_os_str().is_empty()), &roots) {
             (Some(p), None) => p,
             (Some(p), Some(roots)) => web::inside(roots, &p)?,
             (None, Some(roots)) => roots
                 .first()
                 .cloned()
-                .ok_or_else(|| invalid("no folder is allowed"))?,
+                .ok_or_else(|| invalid("you have no folders of this server"))?,
             (None, None) => dirs::home_dir().ok_or_else(|| invalid("no home folder"))?,
         };
         let parent = match &roots {
@@ -432,10 +500,15 @@ impl Options {
     }
 }
 
-async fn session(State(app): State<Arc<App>>, request: Request) -> Answer {
-    Ok(axum::Json(match &app.mode {
-        Mode::Local { .. } => json!({"mode": "local", "signed_in": true}),
-        Mode::Web(web) => json!({"mode": "web", "signed_in": web.signed_in(request.headers())}),
+async fn session(State(app): State<Arc<App>>, user: Option<Extension<Who>>) -> Answer {
+    Ok(axum::Json(match (&app.mode, user) {
+        (Mode::Local { .. }, _) => json!({"mode": "local", "signed_in": true}),
+        (Mode::Web(_), None) => json!({"mode": "web", "signed_in": false}),
+        (Mode::Web(_), Some(Extension(Who(user)))) => json!({
+            "mode": "web",
+            "signed_in": true,
+            "user": {"name": user.name, "role": user.role},
+        }),
     }))
 }
 

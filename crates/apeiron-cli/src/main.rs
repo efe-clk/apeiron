@@ -232,7 +232,10 @@ enum Command {
         no_browser: bool,
     },
     /// Serve the interface to other computers, with sign-in and TLS (docs/WEB.md)
+    #[command(args_conflicts_with_subcommands = true)]
     Web {
+        #[command(subcommand)]
+        command: Option<WebCommand>,
         /// Address and port to listen on
         #[arg(long, default_value = "0.0.0.0:8443", value_name = "ADDRESS")]
         listen: std::net::SocketAddr,
@@ -245,12 +248,9 @@ enum Command {
         /// Plain HTTP, only behind a proxy that adds TLS
         #[arg(long, conflicts_with = "cert")]
         plain: bool,
-        /// A folder that may be backed up or restored into; default the home folder
+        /// A folder users may be given; default the home folder
         #[arg(long = "folder", value_name = "PATH")]
         folders: Vec<PathBuf>,
-        /// Set the sign-in password and exit
-        #[arg(long)]
-        set_password: bool,
     },
     /// Run scheduled jobs: backups, pushes, checks and restore tests
     Daemon {
@@ -317,6 +317,179 @@ enum RefCommand {
     },
     /// Delete a ref; its reflog keeps the history until garbage collection
     Delete { name: String },
+}
+
+#[derive(Subcommand)]
+enum WebCommand {
+    /// Manage the users who may sign in (docs/USERS.md)
+    User {
+        #[command(subcommand)]
+        command: UserCommand,
+    },
+}
+
+#[derive(Subcommand)]
+enum UserCommand {
+    /// Add a user; asks for the password
+    Add {
+        name: String,
+        #[arg(long, value_enum)]
+        role: RoleArg,
+        /// A backup (ref) the user may use; `*` at the end for a prefix
+        #[arg(long = "backup", value_name = "REF")]
+        backups: Vec<String>,
+        /// A folder of the server the user may use
+        #[arg(long = "folder", value_name = "PATH")]
+        folders: Vec<PathBuf>,
+    },
+    /// Replace the role, backups or folders of a user
+    Change {
+        name: String,
+        #[arg(long, value_enum)]
+        role: Option<RoleArg>,
+        #[arg(long = "backup", value_name = "REF")]
+        backups: Vec<String>,
+        #[arg(long = "folder", value_name = "PATH")]
+        folders: Vec<PathBuf>,
+    },
+    /// Set a new password for a user; ends the user's sessions
+    Password { name: String },
+    /// Remove a user
+    Remove { name: String },
+    /// List the users
+    List,
+}
+
+#[derive(Clone, Copy, clap::ValueEnum)]
+enum RoleArg {
+    Admin,
+    Member,
+    Reader,
+}
+
+impl From<RoleArg> for apeiron_server::Role {
+    fn from(r: RoleArg) -> Self {
+        match r {
+            RoleArg::Admin => apeiron_server::Role::Admin,
+            RoleArg::Member => apeiron_server::Role::Member,
+            RoleArg::Reader => apeiron_server::Role::Reader,
+        }
+    }
+}
+
+/// A user as listed, without the password hash.
+#[derive(Serialize)]
+struct UserView {
+    name: String,
+    role: apeiron_server::Role,
+    backups: Vec<String>,
+    folders: Vec<PathBuf>,
+}
+
+/// Asks twice for a new sign-in password and hashes it.
+fn new_login_password() -> Result<String, Failure> {
+    let password = prompt("New sign-in password: ")?;
+    if prompt("Again: ")? != password {
+        return Err(Failure::Usage("the two passwords differ".to_owned()));
+    }
+    Ok(apeiron_server::hash_password(&password)?)
+}
+
+fn web_user(file: &Path, command: UserCommand, out: &Output) -> Result<(), Failure> {
+    let mut users = apeiron_server::Users::load(file)?;
+    match command {
+        UserCommand::List => {
+            let list: Vec<UserView> = users
+                .users
+                .into_iter()
+                .map(|u| UserView {
+                    name: u.name,
+                    role: u.role,
+                    backups: u.backups,
+                    folders: u.folders,
+                })
+                .collect();
+            out.result(&list, |list| {
+                for u in list {
+                    let folders: Vec<String> =
+                        u.folders.iter().map(|f| f.display().to_string()).collect();
+                    say!(
+                        "{}  {}  backups: {}  folders: {}",
+                        u.name,
+                        u.role.name(),
+                        if u.role == apeiron_server::Role::Admin {
+                            "all".to_owned()
+                        } else {
+                            u.backups.join(" ")
+                        },
+                        folders.join(" ")
+                    );
+                }
+                if list.is_empty() {
+                    say!("No users; add one with `apeiron web user add <name> --role admin`");
+                }
+            });
+            return Ok(());
+        }
+        UserCommand::Add {
+            name,
+            role,
+            backups,
+            folders,
+        } => {
+            if users.get(&name).is_some() {
+                return Err(Error::new(
+                    ErrorKind::AlreadyExists,
+                    format!("a user named {name} already exists"),
+                )
+                .into());
+            }
+            let password = new_login_password()?;
+            users.add(apeiron_server::User {
+                name: name.clone(),
+                password,
+                role: role.into(),
+                backups,
+                folders,
+            })?;
+            users.need_admin()?;
+            users.save(file)?;
+            say!("Added {name}");
+        }
+        UserCommand::Change {
+            name,
+            role,
+            backups,
+            folders,
+        } => {
+            let user = users.get_mut(&name)?;
+            if let Some(role) = role {
+                user.role = role.into();
+            }
+            if !backups.is_empty() {
+                user.backups = backups;
+            }
+            if !folders.is_empty() {
+                user.folders = folders;
+            }
+            users.need_admin()?;
+            users.save(file)?;
+            say!("Changed {name}");
+        }
+        UserCommand::Password { name } => {
+            users.get_mut(&name)?;
+            let password = new_login_password()?;
+            users.get_mut(&name)?.password = password;
+            users.save(file)?;
+            say!("Set a new password for {name}");
+        }
+        UserCommand::Remove { name } => {
+            users.remove(&name)?;
+            users.save(file)?;
+            say!("Removed {name}");
+        }
+    }
+    Ok(())
 }
 
 #[derive(Subcommand)]
@@ -973,34 +1146,17 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             key,
             plain,
             folders,
-            set_password,
+            command,
         } => {
             let config = dirs::config_dir()
                 .map(|d| d.join("apeiron"))
                 .ok_or_else(|| Failure::Usage("no configuration folder".to_owned()))?;
-            let login_file = config.join("web.json");
-            if set_password {
-                let password = prompt("New sign-in password: ")?;
-                if password.chars().count() < 8 {
-                    return Err(Failure::Usage(
-                        "the sign-in password needs at least 8 characters".to_owned(),
-                    ));
-                }
-                if prompt("Again: ")? != password {
-                    return Err(Failure::Usage("the two passwords differ".to_owned()));
-                }
-                apeiron_server::save_password(
-                    &login_file,
-                    &apeiron_server::hash_password(&password)?,
-                )?;
-                say!("Saved the sign-in password in {}", login_file.display());
+            let users_file = config.join("web.json");
+            if let Some(WebCommand::User { command }) = command {
+                web_user(&users_file, command, out)?;
                 return Ok(0);
             }
-            let password_hash = apeiron_server::load_password(&login_file)?.ok_or_else(|| {
-                Failure::Usage(
-                    "no sign-in password; set one with `apeiron web --set-password`".to_owned(),
-                )
-            })?;
+            apeiron_server::Users::load(&users_file)?.need_admin()?;
             let repo = open(cli.repo, password_file)?;
             let tls = match (cert, key) {
                 _ if plain => None,
@@ -1036,7 +1192,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                 repo,
                 listen,
                 tls,
-                password_hash,
+                users: users_file,
                 folders,
             })?;
             let scheme = if plain { "http" } else { "https" };

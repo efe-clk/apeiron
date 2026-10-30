@@ -254,14 +254,16 @@ Where the desktop app cannot be built, `apeiron ui` shows the same pages in your
 
 ### 6.10 From another computer
 
-On a home server, `apeiron web` shows the same pages to a browser on another computer of your network ([WEB.md](WEB.md)). Set a sign-in password once, then start it with the repository and the folders it may use:
+On a home server, `apeiron web` shows the same pages to a browser on another computer of your network ([WEB.md](WEB.md)). Add yourself as its first user once, then start it with the repository and the folders it may use:
 
 ```bash
-apeiron web --set-password
+apeiron web user add efe --role admin
 apeiron web --repo /srv/backup --folder /home/efe
 ```
 
 Open `https://<server address>:8443` on the other computer. The browser warns about the certificate the first time; accept it only if the fingerprint it shows is the one the server printed. Run it as an ordinary user, never as root.
+
+Other people of the house get their own name, backups and folders, for example `apeiron web user add ayse --role member --backup "backup/ayse-*" --folder /home/ayse`; they see only their own backups ([USERS.md](USERS.md)).
 
 ## 7. Routine
 
