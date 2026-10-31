@@ -10,6 +10,7 @@ publish = false
 
 [dependencies]
 apeiron = { path = "../apeiron" }
+apeiron-daemon = { path = "../apeiron-daemon" }
 argon2 = "0.6.0"
 aws-lc-rs = "1.19.0"
 axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "query", "tokio"] }

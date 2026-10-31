@@ -250,6 +250,7 @@ name = "apeiron-server"
 version = "0.0.0"
 dependencies = [
  "apeiron",
+ "apeiron-daemon",
  "argon2",
  "aws-lc-rs",
  "axum",

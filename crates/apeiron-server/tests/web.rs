@@ -272,8 +272,8 @@ fn only_the_pages_operations_and_folders() {
 
     // The repository is fixed.
     let other = dir.path().join("other");
-    for path in ["/api/open", "/api/init"] {
-        let reply = c.post(path, json!({"path": other}));
+    for path in ["/api/open", "/api/init", "/api/schedule"] {
+        let reply = c.post(path, json!({"path": other, "text": ""}));
         assert_eq!(
             (reply.status, reply.json()["kind"].as_str()),
             (400, Some("unsupported"))

@@ -101,6 +101,8 @@ struct App {
     next_job: AtomicU64,
     /// Where the last repository opened is remembered.
     memory: Option<PathBuf>,
+    /// The background service's jobs file and state, in local mode.
+    schedule: Option<apeiron_daemon::Paths>,
 }
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -344,6 +346,58 @@ async fn init(State(app): State<Arc<App>>, bytes: Bytes) -> Answer {
     Ok(axum::Json(
         json!({"info": info, "recovery_key": recovery_key}),
     ))
+}
+
+#[derive(Deserialize)]
+struct ScheduleText {
+    text: String,
+}
+
+/// The background service's jobs file, its jobs and their last and next
+/// runs (DESKTOP.md §3); an invalid file comes with its error.
+fn schedule_view(paths: &apeiron_daemon::Paths) -> Result<Value, Error> {
+    let text = match fs::read_to_string(&paths.jobs) {
+        Ok(text) => text,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(Error::new(ErrorKind::Io, e.to_string())),
+    };
+    let (jobs, error) = match apeiron_daemon::status(paths) {
+        Ok(jobs) => (jobs, None),
+        Err(e) => (Vec::new(), Some(e.to_string())),
+    };
+    Ok(json!({"file": paths.jobs, "text": text, "jobs": jobs, "error": error}))
+}
+
+fn schedule_paths(app: &App) -> Result<apeiron_daemon::Paths, Error> {
+    not_in_web(app, "the background service")?;
+    app.schedule.clone().ok_or_else(|| {
+        Error::new(
+            ErrorKind::Unsupported,
+            "the background service's folders are not known",
+        )
+    })
+}
+
+async fn schedule(State(app): State<Arc<App>>) -> Answer {
+    let paths = schedule_paths(&app)?;
+    Ok(axum::Json(blocking(move || schedule_view(&paths)).await?))
+}
+
+/// Saves a new jobs file once it is valid; the running service reads it
+/// again within a minute (DAEMON.md §3).
+async fn schedule_save(State(app): State<Arc<App>>, bytes: Bytes) -> Answer {
+    let paths = schedule_paths(&app)?;
+    let r: ScheduleText =
+        serde_json::from_value(body(&bytes)?).map_err(|e| invalid(e.to_string()))?;
+    let view = blocking(move || {
+        apeiron_daemon::save_jobs(&paths.jobs, &r.text).map_err(|e| match e {
+            apeiron_daemon::Error::Jobs { .. } => invalid(e.to_string()),
+            e => Error::new(ErrorKind::Io, e.to_string()),
+        })?;
+        schedule_view(&paths)
+    })
+    .await?;
+    Ok(axum::Json(view))
 }
 
 async fn state(State(app): State<Arc<App>>) -> Answer {
@@ -632,6 +686,9 @@ pub struct Options {
     /// Where the last repository opened is remembered; `None` remembers
     /// nothing.
     pub memory: Option<PathBuf>,
+    /// The background service's jobs file and state (DAEMON.md §3, §6);
+    /// `None` hides them.
+    pub schedule: Option<apeiron_daemon::Paths>,
 }
 
 impl Options {
@@ -640,6 +697,7 @@ impl Options {
         Options {
             repo: None,
             memory: dirs::config_dir().map(|d| d.join("apeiron").join("desktop.json")),
+            schedule: apeiron_daemon::Paths::system().ok(),
         }
     }
 }
@@ -991,6 +1049,7 @@ fn router(app: Arc<App>) -> Router {
         .route("/api/jobs/{id}", get(job))
         .route("/api/jobs/{id}/cancel", post(cancel))
         .route("/api/folders", get(folders))
+        .route("/api/schedule", get(schedule).post(schedule_save))
         .route("/api/audit", get(audit))
         .route("/api/users", get(accounts::list).post(accounts::add))
         .route("/api/users/{name}", post(accounts::change))
@@ -1162,6 +1221,7 @@ impl Local {
             jobs: Mutex::new(HashMap::new()),
             next_job: AtomicU64::new(1),
             memory: options.memory,
+            schedule: options.schedule,
         });
         let running = Running::start(listener, router(app), None)?;
         Ok(Local { url, running })

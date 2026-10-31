@@ -135,6 +135,7 @@ td.bad { color: var(--bad); }
 .message.good { border-color: var(--good); color: var(--good); }
 .message.bad { border-color: var(--bad); color: var(--bad); }
 .message.key { font-family: ui-monospace, monospace; font-size: 1.1rem; letter-spacing: 0.05em; color: var(--text); overflow-wrap: anywhere; }
+textarea.code { font-family: ui-monospace, monospace; font-size: 0.9rem; }
 
 progress { width: 100%; height: 12px; margin: 8px 0; }
 

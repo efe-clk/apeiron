@@ -70,7 +70,7 @@ every = "week"
 | `at` | `day` ve `week` için: günün en erken yerel saati, `HH:MM` |
 | `sample_mb` | `restore-test` için: ne kadarının geri yükleneceği, varsayılan 100 |
 
-Bir yolun başındaki `~` ev klasörüdür. Bir iş adı, `/` içermeyen ref adı kurallarına uyar. Geçersiz bir dosya, `daemon run` ve `daemon once` komutlarını satırı belirten bir hatayla durdurur; daemon dosya değişince onu yeniden okur ve yeni dosya geçersizse eski işleri korur.
+Bir yolun başındaki `~` ev klasörüdür. Bir iş adı, `/` içermeyen ref adı kurallarına uyar. Geçersiz bir dosya, `daemon run` ve `daemon once` komutlarını satırı belirten bir hatayla durdurur; daemon dosya değişince onu yeniden okur ve yeni dosya geçersizse eski işleri korur. Masaüstü arayüzünün Zamanlama sayfası işleri gösterir ve bu dosyayı düzenler; yalnızca geçerli bir dosyayı kaydeder (DESKTOP.tr.md §2).
 
 ## 4. Bir iş ne zaman çalışır
 

@@ -293,6 +293,7 @@ function showNav(current) {
     may.verify() ? item("retention", retention) : null,
     mode === "local" ? item("sync", () => sync()) : null,
     mode === "local" ? item("plugins", plugins) : null,
+    mode === "local" ? item("schedule", schedule) : null,
     may.share() ? item("shares", shares) : null,
     may.readLog() ? item("activity", activity) : null,
     may.manageUsers() ? item("users", users) : null,
@@ -886,6 +887,56 @@ async function plugins() {
         h("tbody", {}, ...rows)))
       : h("p", {}, t("plugins_none")),
     h("h2", {}, t("plugins_add")),
+    h("div", { class: "card" }, form),
+    status,
+  );
+}
+
+// ---- Scheduled jobs of the background service (DAEMON.md §3) ----
+
+async function schedule() {
+  showNav("schedule");
+  show(h("p", {}, t("loading")));
+  let view;
+  try {
+    view = await api("GET", "/api/schedule");
+  } catch (err) {
+    show(h("h1", {}, t("schedule_heading")), errorMessage(err));
+    return;
+  }
+  const text = h("textarea", { rows: 16, spellcheck: "false", class: "code" });
+  text.value = view.text || t("schedule_example", { repo: repoPath });
+  const status = h("div");
+  const form = h("form", { onsubmit: async (e) => {
+    e.preventDefault();
+    status.replaceChildren();
+    try {
+      const saved = await api("POST", "/api/schedule", { text: text.value });
+      await schedule();
+      main.append(message("good", t("schedule_saved", { count: saved.jobs.length })));
+    } catch (err) {
+      status.replaceChildren(errorMessage(err));
+    }
+  } },
+    ...field(t("schedule_file"), text, t("schedule_file_hint", { file: view.file })),
+    h("div", { class: "actions" }, h("button", { type: "submit", class: "primary" }, t("schedule_save"))),
+  );
+  const rows = view.jobs.map((j) => h("tr", {},
+    h("td", { class: "nowrap" }, j.name),
+    h("td", {}, t(`schedule_do_${j.do}`)),
+    h("td", {}, j.last
+      ? [until(j.last.last_end), h("div", { class: "muted" }, t(`schedule_result_${j.last.result}`), j.last.message ? ` · ${j.last.message}` : "")]
+      : t("schedule_never")),
+    h("td", { class: "nowrap" }, until(j.next_run))));
+  show(
+    h("h1", {}, t("schedule_heading")),
+    h("p", { class: "muted" }, t("schedule_intro")),
+    view.error ? message("bad", `${t("schedule_invalid")} ${view.error}`) : null,
+    rows.length
+      ? h("div", { class: "card scroll" }, h("table", {},
+        h("thead", {}, h("tr", {}, ...["schedule_name", "schedule_do", "schedule_last", "schedule_next"].map((k) => h("th", {}, t(k))))),
+        h("tbody", {}, ...rows)))
+      : view.error ? null : h("p", {}, t("schedule_none")),
     h("div", { class: "card" }, form),
     status,
   );

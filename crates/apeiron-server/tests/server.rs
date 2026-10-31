@@ -107,6 +107,10 @@ fn start(dir: &std::path::Path) -> (Local, Client) {
     let server = Local::start(Options {
         repo: None,
         memory: Some(dir.join("memory.json")),
+        schedule: Some(apeiron_daemon::Paths {
+            jobs: dir.join("config/jobs.toml"),
+            state_dir: dir.join("state"),
+        }),
     })
     .unwrap();
     let client = Client::new(&server);
@@ -324,4 +328,38 @@ fn plugins_are_listed_through_the_pages() {
         json!({"name": "text", "dir": folder}),
     );
     assert_eq!(missing.json()["kind"], "not_found");
+}
+
+#[test]
+fn the_background_service_jobs_are_shown_and_saved() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_server, c) = start(dir.path());
+    let empty = c.get("/api/schedule").json();
+    assert_eq!(
+        (empty["text"].as_str(), &empty["jobs"]),
+        (Some(""), &json!([]))
+    );
+
+    let text = "[job.check]\nrepo = \"/r\"\ndo = \"verify\"\nevery = \"week\"\n";
+    let saved = c.post("/api/schedule", json!({"text": text}));
+    assert_eq!(saved.status, 200, "{}", saved.body);
+    let saved = saved.json();
+    assert_eq!(saved["text"], text);
+    assert_eq!(saved["jobs"][0]["name"], "check");
+    assert_eq!(saved["jobs"][0]["do"], "verify");
+    assert!(saved["error"].is_null());
+
+    let refused = c.post("/api/schedule", json!({"text": "[job.check]\ndo = 1\n"}));
+    assert_eq!(refused.status, 400);
+    assert_eq!(refused.json()["kind"], "invalid_input");
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("config/jobs.toml")).unwrap(),
+        text
+    );
+
+    // A file broken by hand is shown with its error, so it can be mended.
+    std::fs::write(dir.path().join("config/jobs.toml"), "[job.check\n").unwrap();
+    let broken = c.get("/api/schedule").json();
+    assert_eq!(broken["text"], "[job.check\n");
+    assert!(broken["error"].as_str().unwrap().contains("jobs.toml"));
 }

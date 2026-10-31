@@ -64,7 +64,7 @@ The requests of DESKTOP.md §3 stay, with these differences:
 | `POST /api/login` `{"name", "password"}` | Signs in; sets the cookie `apeiron_session` |
 | `POST /api/logout` | Signs out and forgets the session |
 | `GET /api/health` | Allowed without signing in: `{"ok", "role": "primary" or "standby"}`, `503` when the repository cannot be read ([REPLICATION.md](REPLICATION.md) §5) |
-| `POST /api/open`, `POST /api/init` | Refused with `unsupported` |
+| `POST /api/open`, `POST /api/init`, `/api/schedule` | Refused with `unsupported` |
 | `POST /api/call/<operation>` | Only `info`, `resolve`, `log`, `list`, `diff`, `diff_text`, `refs`, `reflog`, and for an `admin` `retention`, `add_retention` ([ARCHIVE.md](ARCHIVE.md)); others are refused with `unsupported` |
 | `POST /api/start/<operation>` | Only `backup`, `restore`, `verify`, `search`, `report` ([REPORTS.md](REPORTS.md)); `source` of a backup and `target` of a restore must be inside a `--folder` |
 | `GET /api/folders` | Only inside a `--folder`; without a path, the first one; `parent` is empty at a `--folder` |

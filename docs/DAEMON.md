@@ -70,7 +70,7 @@ every = "week"
 | `at` | For `day` and `week`: the earliest local time of day, `HH:MM` |
 | `sample_mb` | For `restore-test`: how much to restore, default 100 |
 
-`~` at the start of a path is the home folder. A job name follows the ref name rules without `/`. An invalid file stops `daemon run` and `daemon once` with an error that names the line; the daemon reads the file again when it changes and keeps the old jobs if the new file is invalid.
+`~` at the start of a path is the home folder. A job name follows the ref name rules without `/`. An invalid file stops `daemon run` and `daemon once` with an error that names the line; the daemon reads the file again when it changes and keeps the old jobs if the new file is invalid. The Schedule page of the desktop interface shows the jobs and edits this file, and saves only a valid one (DESKTOP.md §2).
 
 ## 4. When a job runs
 

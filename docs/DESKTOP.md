@@ -39,6 +39,7 @@ The pages call only the JSON API, and the JSON API calls only the public API (AR
 | Verify | Checks the whole repository and says in plain words whether it is healthy | Done |
 | Sync | Lists, adds and removes remotes, and runs a sync round of a folder with one of them, both ways or one way, or only shows what would change (SYNC.md); lists the changes made and every conflict with its conflict copy; finds the conflict copies in the folder and keeps either version of each with one button (SYNC.md §4) | Done |
 | Plugins | Lists the installed plugins with the files they handle, installs one from a `.wasm` file and removes one, as `apeiron plugin` does (PLUGIN.md §1) | Done |
+| Schedule | Shows the background service's jobs with their last result and next run, and edits the jobs file; a file with an error is not saved, and one broken by hand is shown with its error (DAEMON.md §3) | Done |
 
 Words follow the user, not the format: a ref is shown as a backup, a snapshot as a version, and ids appear only in a details line.
 
@@ -58,6 +59,8 @@ The JSON API is the C ABI (SDK.md §2) over HTTP: the same operations by name an
 | `POST /api/jobs/<id>/cancel` | Asks the job to stop |
 | `GET /api/folders?path=<path>` | The folders inside a folder of this computer, for choosing one; the home folder when no path is given |
 | `GET /api/state` | The open repository, if any, and the last repository used |
+| `GET /api/schedule` | The jobs file's path and text, its jobs as `apeiron daemon status` shows them, and the file's error, if any |
+| `POST /api/schedule` `{"text"}` | Replaces the jobs file atomically once the text is a valid jobs file; an invalid one is the error `invalid_input` |
 
 An error is the error value of API.md §8.6 with status 400 for `invalid_input`, `ambiguous` and `unsupported`, 404 for `not_found`, 409 for `conflict`, `already_exists` and `locked`, 401 for `key`, and 500 otherwise. A missing or wrong token is status 401 with the kind `invalid_input`, so the pages do not take it for a wrong password.
 
@@ -75,7 +78,6 @@ An error is the error value of API.md §8.6 with status 400 for `invalid_input`,
 
 | Item | Where |
 | --- | --- |
-| Changing the background service's jobs | Later; `jobs.toml` (DAEMON.md) until then |
 | Reaching the server from other computers, users and logins | Web interface ([WEB.md](WEB.md)) and users and permissions, work items 2 and 3 |
 | Installers and app icons for each system | With the first release |
 

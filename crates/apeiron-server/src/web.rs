@@ -981,6 +981,7 @@ fn site(site: Site) -> Result<Arc<App>, Error> {
         jobs: Mutex::new(HashMap::new()),
         next_job: AtomicU64::new(1),
         memory: None,
+        schedule: None,
     });
     if let Mode::Web(web) = &app.mode {
         web.replicate_now();

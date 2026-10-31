@@ -1,7 +1,8 @@
 //! The jobs file (DAEMON.md §3).
 
 use std::collections::BTreeMap;
-use std::fs;
+use std::fs::{self, File};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use apeiron::SyncMode;
@@ -111,6 +112,23 @@ pub fn load_jobs(path: &Path) -> Result<Vec<Job>> {
         Err(e) => return Err(e).at(path),
     };
     parse_jobs(path, &text)
+}
+
+/// Replaces the jobs file atomically with `text` once it is a valid jobs
+/// file, and returns its jobs; an invalid text leaves the file as it was.
+pub fn save_jobs(path: &Path, text: &str) -> Result<Vec<Job>> {
+    let jobs = parse_jobs(path, text)?;
+    if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+        fs::create_dir_all(parent).at(parent)?;
+    }
+    let tmp = path.with_extension("toml.tmp");
+    let mut file = File::create(&tmp).at(&tmp)?;
+    file.write_all(text.as_bytes())
+        .and_then(|()| file.sync_all())
+        .at(&tmp)?;
+    drop(file);
+    fs::rename(&tmp, path).at(path)?;
+    Ok(jobs)
 }
 
 fn parse_jobs(path: &Path, text: &str) -> Result<Vec<Job>> {
@@ -318,6 +336,18 @@ mod tests {
 
     fn parse(text: &str) -> std::result::Result<Vec<Job>, String> {
         parse_jobs(Path::new("jobs.toml"), text).map_err(|e| e.to_string())
+    }
+
+    #[test]
+    fn only_a_valid_file_is_saved() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config/jobs.toml");
+        let good = "[job.check]\nrepo = \"/r\"\ndo = \"verify\"\nevery = \"week\"\n";
+        assert_eq!(save_jobs(&path, good).unwrap()[0].name, "check");
+        let bad = save_jobs(&path, "[job.check]\ndo = \"dance\"\n").unwrap_err();
+        assert!(matches!(bad, Error::Jobs { .. }), "{bad}");
+        assert_eq!(fs::read_to_string(&path).unwrap(), good);
+        assert_eq!(load_jobs(&path).unwrap().len(), 1);
     }
 
     #[test]

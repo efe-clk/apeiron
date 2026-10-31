@@ -13,7 +13,7 @@ use std::io;
 use std::path::PathBuf;
 
 pub use daemon::{Daemon, JobStatus, Paths, RunRecord, status};
-pub use jobs::{Action, Every, Job, load_jobs};
+pub use jobs::{Action, Every, Job, load_jobs, save_jobs};
 pub use schedule::next_run;
 pub use state::{JobState, RunResult, State};
 
