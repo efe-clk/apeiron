@@ -38,7 +38,7 @@ use apeiron::json::{self, JsonJob};
 use apeiron::{Error, ErrorKind, ListRequest, Repository};
 use axum::body::Bytes;
 use axum::extract::{ConnectInfo, Path as UrlPath, Query, Request, State};
-use axum::http::{HeaderValue, StatusCode, header};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
@@ -764,6 +764,9 @@ struct NewShare {
     path: String,
     #[serde(default = "default_days")]
     days: u32,
+    /// Asked of whoever opens the link; none when absent or empty.
+    #[serde(default)]
+    password: Option<String>,
 }
 
 fn default_days() -> u32 {
@@ -780,13 +783,15 @@ async fn share_add(
     let repo = app.repo()?;
     let answer = blocking(move || {
         let (web, who) = web_user(&app, who_)?;
-        match web.share(&repo, &who.user, &r.snapshot, &r.path, r.days) {
+        let password = r.password.as_deref();
+        match web.share(&repo, &who.user, &r.snapshot, &r.path, r.days, password) {
             Ok((share, secret)) => {
                 let detail = json!({
                     "id": share.id,
                     "snapshot": share.snapshot,
                     "path": share.path,
                     "expires": share.expires,
+                    "protected": share.protected,
                 });
                 // A link that cannot be recorded does not stay.
                 if let Err(e) = web.audit.record(&who.actor(), "share_add", detail, "ok") {
@@ -856,10 +861,12 @@ struct SharedQuery {
 }
 
 /// Runs `f` for a request through a share link, recorded with the link's
-/// id and the path asked for, without a user (SHARE.md §6).
+/// id and the path asked for, without a user (SHARE.md §6). A link with a
+/// password needs the cookie its password gave (SHARE.md §2).
 async fn through_link<T: Send + 'static>(
     app: Arc<App>,
     secret: String,
+    unlocked: Option<String>,
     from: Option<Extension<ConnectInfo<SocketAddr>>>,
     event: &'static str,
     sub: String,
@@ -878,6 +885,10 @@ async fn through_link<T: Send + 'static>(
         };
         let repo = app.repo()?;
         let (share, result) = match web.shared(&repo, &secret) {
+            Ok(share) if share.protected && unlocked != Some(share.unlock_token(&secret)) => (
+                Some(share),
+                Err(Error::new(ErrorKind::Key, "this link needs its password")),
+            ),
             Ok(share) => {
                 let result = f(web, &repo, &share);
                 (Some(share), result)
@@ -897,12 +908,14 @@ async fn shared_list(
     State(app): State<Arc<App>>,
     UrlPath(secret): UrlPath<String>,
     from: Option<Extension<ConnectInfo<SocketAddr>>>,
+    headers: HeaderMap,
     Query(q): Query<SharedQuery>,
 ) -> Answer {
     let sub = q.path.clone();
     let answer = through_link(
         app,
         secret,
+        web::share_cookie(&headers),
         from,
         "shared:list",
         q.path,
@@ -910,6 +923,28 @@ async fn shared_list(
     )
     .await?;
     Ok(axum::Json(answer))
+}
+
+/// Gives a link's password; the answer sets the cookie that opens it.
+async fn shared_unlock(
+    State(app): State<Arc<App>>,
+    UrlPath(secret): UrlPath<String>,
+    from: Option<Extension<ConnectInfo<SocketAddr>>>,
+    bytes: Bytes,
+) -> Result<Response, Failure> {
+    let Mode::Web(web) = &app.mode else {
+        return Err(Error::new(
+            ErrorKind::Unsupported,
+            "sharing is only for the web interface",
+        )
+        .into());
+    };
+    let actor = Actor {
+        user: None,
+        from: from.map(|c| c.0.0.to_string()),
+    };
+    let repo = app.repo()?;
+    web.unlock_share(&repo, &secret, bytes, &actor).await
 }
 
 /// Writes into a channel, for a body read as it is written.
@@ -933,12 +968,14 @@ async fn shared_file(
     State(app): State<Arc<App>>,
     UrlPath(secret): UrlPath<String>,
     from: Option<Extension<ConnectInfo<SocketAddr>>>,
+    headers: HeaderMap,
     Query(q): Query<SharedQuery>,
 ) -> Result<Response, Failure> {
     let sub = q.path.clone();
     let (repo, snapshot, path, size) = through_link(
         app,
         secret,
+        web::share_cookie(&headers),
         from,
         "shared:read",
         q.path,
@@ -1058,6 +1095,7 @@ fn router(app: Arc<App>) -> Router {
         .route("/api/shares/{id}/remove", post(share_remove))
         .route("/api/shared/{secret}", get(shared_list))
         .route("/api/shared/{secret}/file", get(shared_file))
+        .route("/api/shared/{secret}/unlock", post(shared_unlock))
         .fallback(page)
         .layer(middleware::from_fn_with_state(app.clone(), guard))
         .with_state(app)

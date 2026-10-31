@@ -31,6 +31,8 @@ use crate::users::{Role, User, Users, hash_password};
 use crate::{App, Failure, Mode, Running, blocking, body, invalid, lock};
 
 const COOKIE: &str = "apeiron_session";
+/// Kept once a link's password was given (SHARE.md §2).
+const SHARE_COOKIE: &str = "apeiron_share";
 /// A session ends after this long without a request (WEB.md §5).
 const IDLE: Duration = Duration::from_secs(12 * 60 * 60);
 /// A session ends after this long in any case.
@@ -246,6 +248,8 @@ pub(crate) struct WebState {
     sessions: Mutex<HashMap<String, Session>>,
     /// Held while a password is checked, so guesses go one at a time.
     attempts: tokio::sync::Mutex<Attempts>,
+    /// The same for the passwords of share links.
+    share_attempts: tokio::sync::Mutex<Attempts>,
     /// The snapshots reachable from a ref head, by head.
     reachable: Mutex<HashMap<ObjectId, Arc<HashSet<ObjectId>>>>,
     /// Checked when the name is unknown, so that takes as long as a wrong
@@ -255,6 +259,11 @@ pub(crate) struct WebState {
     /// Pushes to the replicas, if there are any.
     replicator: Option<Replicator>,
     standby: bool,
+}
+
+/// The cookie a link's password gave, if any.
+pub(crate) fn share_cookie(headers: &HeaderMap) -> Option<String> {
+    named_cookie(headers, SHARE_COOKIE).map(str::to_owned)
 }
 
 fn cookie_value(headers: &HeaderMap) -> Option<&str> {
@@ -454,6 +463,71 @@ impl WebState {
         record(Some(&user.name), "ok")?;
         *attempts = Attempts::default();
         Ok(with_cookie(json!({}), &self.new_session(&user)?))
+    }
+
+    /// Checks the password of the link with `secret`; once it is right the
+    /// browser keeps a cookie that opens the link (SHARE.md §2). Wrong
+    /// passwords pause like wrong sign-ins.
+    pub(crate) async fn unlock_share(
+        &self,
+        repo: &Repository,
+        secret: &str,
+        bytes: Bytes,
+        actor: &Actor,
+    ) -> Result<Response, Failure> {
+        #[derive(Deserialize)]
+        struct Unlock {
+            password: String,
+        }
+        let r: Unlock =
+            serde_json::from_value(body(&bytes)?).map_err(|e| invalid(e.to_string()))?;
+        let share = self.shared(repo, secret);
+        let id = share.as_ref().ok().map(|s| s.id.clone());
+        let record = |outcome: &str| {
+            self.audit
+                .record(actor, "shared:unlock", json!({ "id": id }), outcome)
+        };
+        let share = match share {
+            Ok(share) if share.protected => share,
+            Ok(_) => {
+                record("invalid_input")?;
+                return Err(invalid("this link has no password").into());
+            }
+            Err(e) => {
+                record("not_found")?;
+                return Err(e.into());
+            }
+        };
+        let mut attempts = self.share_attempts.lock().await;
+        if attempts
+            .paused_until
+            .is_some_and(|until| Instant::now() < until)
+        {
+            record("locked")?;
+            return Err(Failure(
+                StatusCode::TOO_MANY_REQUESTS,
+                json!({"code": 7, "kind": "locked", "message": "too many wrong passwords; try again in a minute"}),
+            ));
+        }
+        let checked = share.clone();
+        if !blocking(move || Ok(checked.verify(&r.password))).await? {
+            record("key")?;
+            attempts.wrong += 1;
+            if attempts.wrong >= TRIES {
+                attempts.wrong = 0;
+                attempts.paused_until = Some(Instant::now() + PAUSE);
+            }
+            return Err(Error::new(ErrorKind::Key, "wrong password").into());
+        }
+        record("ok")?;
+        *attempts = Attempts::default();
+        let token = share.unlock_token(secret);
+        Ok(with_cookie(
+            json!({}),
+            &format!(
+                "{SHARE_COOKIE}={token}; HttpOnly; Secure; SameSite=Strict; Path=/api/shared/{secret}"
+            ),
+        ))
     }
 
     /// Starts a session of `user`; returns its cookie.
@@ -791,6 +865,7 @@ impl WebState {
         spec: &str,
         path: &str,
         days: u32,
+        password: Option<&str>,
     ) -> Result<(Share, String), Error> {
         if user.role == Role::Reader {
             return Err(Error::new(
@@ -810,7 +885,7 @@ impl WebState {
             return Err(invalid(format!("{path} is not a path inside a backup")));
         }
         entry_at(repo, snapshot, path)?;
-        self.shares.add(&user.name, snapshot, path, days)
+        self.shares.add(&user.name, snapshot, path, days, password)
     }
 
     /// The link whose secret is `secret`, while its owner may still share
@@ -971,6 +1046,7 @@ fn site(site: Site) -> Result<Arc<App>, Error> {
             roots,
             sessions: Mutex::new(HashMap::new()),
             attempts: tokio::sync::Mutex::new(Attempts::default()),
+            share_attempts: tokio::sync::Mutex::new(Attempts::default()),
             reachable: Mutex::new(HashMap::new()),
             decoy,
             oidc,

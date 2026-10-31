@@ -6,9 +6,13 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use apeiron::{Error, ErrorKind, ObjectId};
+use argon2::Argon2;
+use argon2::password_hash::PasswordVerifier;
 use jiff::{SignedDuration, Timestamp};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+
+use crate::users::hash_password;
 
 /// Days a link lasts when none are given, and at most (SHARE.md §2).
 pub const DEFAULT_DAYS: u32 = 7;
@@ -29,6 +33,13 @@ pub struct Share {
     pub path: String,
     pub made: String,
     pub expires: String,
+    /// Whether the link asks for a password (SHARE.md §2).
+    #[serde(default)]
+    pub protected: bool,
+    /// The link's password hashed with Argon2id, as a PHC string; empty for
+    /// a link without one.
+    #[serde(skip_serializing_if = "String::is_empty", default)]
+    pub password: String,
 }
 
 impl Share {
@@ -37,12 +48,32 @@ impl Share {
         self.expires.parse::<Timestamp>().is_ok_and(|t| now < t)
     }
 
-    /// The share without its hash, for showing.
+    /// The share without its hashes, for showing.
     pub fn public(&self) -> Share {
         Share {
             hash: String::new(),
+            password: String::new(),
             ..self.clone()
         }
+    }
+
+    /// Whether `password` is the link's password.
+    pub fn verify(&self, password: &str) -> bool {
+        Argon2::default()
+            .verify_password(password.as_bytes(), self.password.as_str())
+            .is_ok()
+    }
+
+    /// What the browser keeps once the password was given for the link with
+    /// `secret`: only someone who knows both the secret and the password
+    /// (through its salted hash, which never leaves the server) can make it.
+    pub fn unlock_token(&self, secret: &str) -> String {
+        let mut digest = Sha256::new();
+        for part in ["apeiron share unlock", secret, &self.password] {
+            digest.update(part.as_bytes());
+            digest.update([0]);
+        }
+        hex(&digest.finalize())
     }
 }
 
@@ -143,14 +174,16 @@ impl Shares {
         Ok(out)
     }
 
-    /// Makes a link to `path` in `snapshot` for `owner`, lasting `days`;
-    /// returns it with its secret, which is shown only now.
+    /// Makes a link to `path` in `snapshot` for `owner`, lasting `days`,
+    /// asking for `password` if one is given; returns it with its secret,
+    /// which is shown only now.
     pub fn add(
         &self,
         owner: &str,
         snapshot: ObjectId,
         path: &str,
         days: u32,
+        password: Option<&str>,
     ) -> Result<(Share, String), Error> {
         if !(1..=MAX_DAYS).contains(&days) {
             return Err(Error::new(
@@ -158,6 +191,11 @@ impl Shares {
                 format!("a link lasts 1 to {MAX_DAYS} days"),
             ));
         }
+        let password = password
+            .filter(|p| !p.is_empty())
+            .map(hash_password)
+            .transpose()?
+            .unwrap_or_default();
         let mut raw = [0u8; 32];
         getrandom::fill(&mut raw).map_err(|e| Error::new(ErrorKind::Internal, e.to_string()))?;
         let secret = hex(&raw);
@@ -172,6 +210,8 @@ impl Shares {
             path: path.trim_matches('/').to_owned(),
             made: made.to_string(),
             expires: expires.to_string(),
+            protected: !password.is_empty(),
+            password,
         };
         self.change(|shares| {
             shares.push(share.clone());

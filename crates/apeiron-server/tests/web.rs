@@ -1124,3 +1124,104 @@ fn an_admin_adds_and_lists_retention_rules() {
         "unsupported"
     );
 }
+
+#[test]
+fn a_link_with_a_password() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_server, mut root, home) = start(dir.path());
+    fs::create_dir_all(home.join("docs")).unwrap();
+    fs::write(home.join("docs/f.txt"), "first").unwrap();
+    root.sign_in();
+    let done = root.run(
+        "backup",
+        json!({"source": home.join("docs"), "ref": "backup/docs"}),
+    );
+    assert!(done["result"]["snapshot"].is_string(), "{done}");
+
+    let short = root.post(
+        "/api/shares",
+        json!({"snapshot": "backup/docs", "password": "short"}),
+    );
+    assert_eq!(short.json()["kind"], "invalid_input");
+    let made = root
+        .post(
+            "/api/shares",
+            json!({"snapshot": "backup/docs", "password": "a long secret"}),
+        )
+        .json();
+    let secret = made["secret"].as_str().unwrap().to_owned();
+    assert_eq!(made["share"]["protected"], true);
+    assert!(made["share"].get("password").is_none(), "{made}");
+    let open = root
+        .post("/api/shares", json!({"snapshot": "backup/docs"}))
+        .json();
+    assert_eq!(open["share"]["protected"], false);
+
+    // Without the password the link opens nothing, not even the listing.
+    let mut guest = Client {
+        address: root.address,
+        tls: None,
+        cookie: None,
+    };
+    for path in [
+        format!("/api/shared/{secret}"),
+        format!("/api/shared/{secret}/file?path=f.txt"),
+    ] {
+        let reply = guest.get(&path);
+        assert_eq!(
+            (reply.status, reply.json()["kind"].as_str()),
+            (401, Some("key"))
+        );
+    }
+    // A made-up cookie does not open it either.
+    guest.cookie = Some(format!("apeiron_share={}", "0".repeat(64)));
+    assert_eq!(guest.get(&format!("/api/shared/{secret}")).status, 401);
+
+    let unlock = |c: &Client, password: &str| {
+        c.post(
+            &format!("/api/shared/{secret}/unlock"),
+            json!({ "password": password }),
+        )
+    };
+    let wrong = unlock(&guest, "not it");
+    assert_eq!((wrong.status, wrong.cookie()), (401, None));
+    let right = unlock(&guest, "a long secret");
+    assert_eq!(right.status, 200, "{}", right.body);
+    assert!(
+        right
+            .headers
+            .contains(&format!("path=/api/shared/{secret}")),
+        "{}",
+        right.headers
+    );
+    guest.cookie = right.cookie();
+    assert_eq!(guest.get(&format!("/api/shared/{secret}")).status, 200);
+    assert_eq!(
+        guest
+            .get(&format!("/api/shared/{secret}/file?path=f.txt"))
+            .body,
+        "first"
+    );
+    // The cookie of one link opens no other link.
+    let other = root
+        .post(
+            "/api/shares",
+            json!({"snapshot": "backup/docs", "password": "a long secret"}),
+        )
+        .json();
+    let other = other["secret"].as_str().unwrap();
+    assert_eq!(guest.get(&format!("/api/shared/{other}")).status, 401);
+
+    // Wrong guesses pause, even for the right password.
+    for _ in 0..5 {
+        assert_eq!(unlock(&guest, "guess").status, 401);
+    }
+    assert_eq!(unlock(&guest, "a long secret").status, 429);
+
+    // Neither the password nor its cookie is kept in the open.
+    let kept = fs::read_to_string(dir.path().join("shares.json")).unwrap();
+    assert!(!kept.contains("a long secret") && kept.contains("$argon2id$"));
+    let log = fs::read_to_string(dir.path().join("audit.log")).unwrap();
+    assert!(!log.contains("a long secret") && !log.contains(&secret));
+    assert!(log.contains("\"event\":\"shared:unlock\""));
+}

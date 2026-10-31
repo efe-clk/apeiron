@@ -996,16 +996,17 @@ async function retention() {
 function share(snapshot, path) {
   showNav("shares");
   const days = h("select", {}, ...[1, 7, 30].map((n) => h("option", { value: n, selected: n === 7 }, t(`days_${n}`))));
+  const password = h("input", { type: "password", autocomplete: "new-password", minlength: 8 });
   const status = h("div");
   const form = h("form", { onsubmit: async (e) => {
     e.preventDefault();
     status.replaceChildren();
     try {
-      const made = await api("POST", "/api/shares", { snapshot: snapshot.id, path, days: Number(days.value) });
+      const made = await api("POST", "/api/shares", { snapshot: snapshot.id, path, days: Number(days.value), password: password.value });
       const link = h("input", { type: "text", readonly: true, value: `${location.origin}/s/${made.secret}` });
       const copied = h("span", { class: "muted", role: "status" });
       form.replaceChildren(
-        message("good", t("share_made")),
+        message("good", t(made.share.protected ? "share_made_protected" : "share_made")),
         h("div", { class: "row" }, link, h("button", { type: "button", onclick: async () => {
           link.select();
           await navigator.clipboard?.writeText(link.value).catch(() => {});
@@ -1019,6 +1020,7 @@ function share(snapshot, path) {
     }
   } },
     ...field(t("share_days"), days),
+    ...field(t("share_password"), password, t("share_password_hint")),
     h("div", { class: "actions" }, h("button", { type: "submit", class: "primary" }, t("share_button"))),
   );
   const what = path || t("share_what_all");
@@ -1038,7 +1040,7 @@ async function shares() {
     const list = await api("GET", "/api/shares");
     const owners = user?.role === "admin";
     const rows = list.map((s) => h("tr", {},
-      h("td", {}, `${s.snapshot.slice(0, 12)}:/${s.path}`),
+      h("td", {}, `${s.snapshot.slice(0, 12)}:/${s.path}`, s.protected ? h("div", { class: "muted" }, t("shares_protected")) : null),
       owners ? h("td", {}, s.owner) : null,
       h("td", {}, until(s.expires)),
       h("td", {}, h("button", { type: "button", onclick: async (e) => {
@@ -1110,8 +1112,36 @@ async function shared(secret, path = "") {
       h("div", { class: "card" }, body),
     );
   } catch (err) {
+    if (err.kind === "key") return sharedPassword(secret, path);
     show(h("h1", {}, t("shared_heading")), err.kind === "not_found" ? message("bad", t("shared_gone")) : errorMessage(err));
   }
+}
+
+// A link with a password asks for it once; the browser then keeps a cookie
+// for the link (SHARE.md §2).
+function sharedPassword(secret, path) {
+  const password = h("input", { type: "password", autocomplete: "off", required: true });
+  const status = h("div");
+  const form = h("form", { onsubmit: async (e) => {
+    e.preventDefault();
+    status.replaceChildren();
+    try {
+      await api("POST", `/api/shared/${encodeURIComponent(secret)}/unlock`, { password: password.value });
+      shared(secret, path);
+    } catch (err) {
+      status.replaceChildren(err.kind === "key" ? message("bad", t("shared_wrong_password")) : errorMessage(err));
+      password.select();
+    }
+  } },
+    ...field(t("password"), password),
+    h("div", { class: "actions" }, h("button", { type: "submit", class: "primary" }, t("shared_open"))),
+  );
+  show(
+    h("h1", {}, t("shared_heading")),
+    h("div", { class: "card" }, h("p", {}, t("shared_needs_password")), form),
+    status,
+  );
+  password.focus();
 }
 
 // ---- Activity (AUDIT.md §4) ----

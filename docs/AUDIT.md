@@ -18,6 +18,7 @@ When several people share a backup server, the admin must be able to answer "who
 | `cancel` | A request to stop a job | The job number |
 | `share_add`, `share_remove` | Making or removing a share link | The link's id, version, path and end ([SHARE.md](SHARE.md) §6) |
 | `shared:list`, `shared:read` | Every use of a share link, without signing in | The link's id and the path; never the link's secret |
+| `shared:unlock` | Every password given for a share link | The link's id; never the password or the secret |
 | `user_add`, `user_change`, `user_password`, `user_remove` | `apeiron web user`, or an admin on the Users page | The name, role, backups, folders and identity; never the password |
 | `oidc_set`, `oidc_remove` | `apeiron web oidc` | The provider's settings; never the client secret |
 | `replicate` | Each push to a replica by the web server | The remote, refs and objects, the refs left by a conflict, or the error ([REPLICATION.md](REPLICATION.md) §7) |

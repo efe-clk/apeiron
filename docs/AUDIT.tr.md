@@ -18,6 +18,7 @@ Birkaç kişi bir yedek sunucusunu paylaştığında admin, "bu klasörü kim, n
 | `cancel` | Bir işi durdurma isteği | İş numarası |
 | `share_add`, `share_remove` | Bir paylaşım bağlantısı oluşturmak ya da kaldırmak | Bağlantının kimliği, sürümü, yolu ve bitişi ([SHARE.tr.md](SHARE.tr.md) §6) |
 | `shared:list`, `shared:read` | Bir paylaşım bağlantısının oturum açmadan her kullanımı | Bağlantının kimliği ve yol; bağlantının gizli kısmı asla |
+| `shared:unlock` | Bir paylaşım bağlantısı için girilen her parola | Bağlantının kimliği; parola ya da gizli kısım asla |
 | `user_add`, `user_change`, `user_password`, `user_remove` | `apeiron web user` ya da Kullanıcılar sayfasında bir admin | Ad, rol, yedekler, klasörler ve kimlik; parola asla |
 | `oidc_set`, `oidc_remove` | `apeiron web oidc` | Sağlayıcının ayarları; gizli anahtar asla |
 | `replicate` | Web sunucusunun bir replikaya yaptığı her push | Uzak depo, ref'ler ve nesneler, bir çatışmanın bıraktığı ref'ler ya da hata ([REPLICATION.tr.md](REPLICATION.tr.md) §7) |
