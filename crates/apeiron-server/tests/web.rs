@@ -1078,3 +1078,38 @@ fn an_admin_makes_a_compliance_report() {
     let ayse = c.other("ayse");
     assert_eq!(ayse.kind("/api/start/report", json!({})).1, "unsupported");
 }
+
+#[test]
+fn an_admin_adds_and_lists_retention_rules() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_server, mut c, _home) = start(dir.path());
+    c.sign_in();
+    let added = c.post(
+        "/api/call/add_retention",
+        json!({"refs": "backup/*", "days": 30}),
+    );
+    assert_eq!(added.status, 200, "{}", added.body);
+    let rules = c.post("/api/call/retention", json!({})).json();
+    assert_eq!(rules[0]["refs"], "backup/*");
+    assert_eq!(rules[0]["days"], 30);
+    assert_eq!(
+        c.kind("/api/call/add_retention", json!({"refs": "x", "days": 0})),
+        (400, "invalid_input".to_owned())
+    );
+
+    // Only an admin may.
+    c.post(
+        "/api/users",
+        json!({"name": "ayse", "role": "member", "password": PASSWORD, "backups": ["backup/*"]}),
+    );
+    let ayse = c.other("ayse");
+    assert_eq!(ayse.kind("/api/call/retention", json!({})).1, "unsupported");
+    assert_eq!(
+        ayse.kind(
+            "/api/call/add_retention",
+            json!({"refs": "backup/*", "days": 1})
+        )
+        .1,
+        "unsupported"
+    );
+}

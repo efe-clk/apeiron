@@ -58,6 +58,7 @@ Every object Apeiron writes to S3 carries a SHA-256 checksum, which buckets with
 | `apeiron retention add <refs> --days <n>` | Adds a rule; it cannot be undone |
 | `apeiron retention list` | Lists the rules |
 | `retention`, `add_retention` (API.md §8) | The same for programs |
+| The Retention page of the web and desktop interfaces | Lists the rules and adds one after a warning; in the web interface for an `admin` only |
 | Deleting or moving a kept ref back, by any program | Refused with `conflict` and the days left |
 
 ## 6. Not part of this work item
@@ -65,7 +66,6 @@ Every object Apeiron writes to S3 carries a SHA-256 checksum, which buckets with
 | Item | Where |
 | --- | --- |
 | Legal holds that keep a ref beyond its rule until lifted | Later, if a pilot needs one; a lifted hold is exactly what compliance rules forbid, so it needs its own design |
-| Adding rules in the web interface | Later; the CLI until then |
 | Object Lock for SFTP or folder remotes | Not possible in Apeiron; such storage needs its own immutable snapshots, such as those of ZFS or a backup appliance |
 | Deleting single old snapshots from the middle of a kept history | Not planned: a history that can lose its middle is not an archive |
 
@@ -77,3 +77,4 @@ Every object Apeiron writes to S3 carries a SHA-256 checksum, which buckets with
 | `apeiron` | `retention`, `add_retention` | Done |
 | `apeiron-remote` | SHA-256 checksums on every S3 write | Done |
 | `apeiron-cli` | `apeiron retention` | Done |
+| `apeiron-server` | The Retention page | Done |

@@ -14,6 +14,7 @@ Bir aile ya da küçük bir ofis tek bir yedek sunucusunu paylaşır: herkes ken
 | Bir klasörü yedeklemek | Herhangi bir yedeğe | Kendi yedeklerine | Hayır |
 | Geri yüklemek | Evet | Evet | Hayır |
 | Depoyu denetlemek | Evet | Hayır | Hayır |
+| Saklama kurallarını görmek ve eklemek ([ARCHIVE.tr.md](ARCHIVE.tr.md)) | Evet | Hayır | Hayır |
 | Bağlantıyla paylaşmak ([SHARE.tr.md](SHARE.tr.md)) | Her sürümü | Gördüğü sürümleri | Hayır |
 | Sunucunun klasörleri | Kendi klasörleri, hiç yoksa bütün `--folder` klasörleri | Yalnızca kendi klasörleri | Hiçbiri |
 

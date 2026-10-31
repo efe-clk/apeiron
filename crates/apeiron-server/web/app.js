@@ -290,6 +290,7 @@ function showNav(current) {
     may.backUp() ? item("backup", () => backup()) : null,
     may.verify() ? item("verify", verify) : null,
     may.verify() ? item("report", report) : null,
+    may.verify() ? item("retention", retention) : null,
     may.share() ? item("shares", shares) : null,
     may.readLog() ? item("activity", activity) : null,
     may.manageUsers() ? item("users", users) : null,
@@ -685,6 +686,55 @@ function reportView(r) {
     table(["report_ref", "report_snapshot", "report_newest", "report_snapshots", "report_kept", "report_copies"], refs),
     h("p", { class: "muted" }, t("report_proof")),
   ];
+}
+
+// ---- Retention rules (ARCHIVE.md §2) ----
+
+async function retention() {
+  showNav("retention");
+  show(h("p", {}, t("loading")));
+  let rules;
+  try {
+    rules = await call("retention");
+  } catch (err) {
+    show(h("h1", {}, t("retention_heading")), errorMessage(err));
+    return;
+  }
+  const refs = h("input", { type: "text", autocomplete: "off", autocapitalize: "none", spellcheck: "false", required: true });
+  const days = h("input", { type: "number", min: 1, max: 36500, required: true });
+  const status = h("div");
+  const form = h("form", { onsubmit: async (e) => {
+    e.preventDefault();
+    status.replaceChildren();
+    const request = { refs: refs.value.trim(), days: Number(days.value) };
+    if (!confirm(t("retention_ask", request))) return;
+    try {
+      await call("add_retention", request);
+      retention();
+    } catch (err) {
+      status.replaceChildren(errorMessage(err));
+    }
+  } },
+    ...field(t("retention_refs"), refs, t("retention_refs_hint")),
+    ...field(t("retention_days"), days, t("retention_days_hint")),
+    h("div", { class: "actions" }, h("button", { type: "submit", class: "primary" }, t("retention_add"))),
+  );
+  const rows = rules.map((r) => h("tr", {},
+    h("td", { class: "nowrap" }, r.refs),
+    h("td", { class: "num" }, t("report_days", { days: r.days })),
+    h("td", {}, when({ seconds: r.added }))));
+  show(
+    h("h1", {}, t("retention_heading")),
+    h("p", { class: "muted" }, t("retention_intro")),
+    rules.length
+      ? h("div", { class: "card scroll" }, h("table", {},
+        h("thead", {}, h("tr", {}, ...["retention_refs", "retention_days", "retention_added"].map((k) => h("th", {}, t(k))))),
+        h("tbody", {}, ...rows)))
+      : h("p", {}, t("retention_none")),
+    h("h2", {}, t("retention_add")),
+    h("div", { class: "card" }, form),
+    status,
+  );
 }
 
 // ---- Sharing (SHARE.md §5) ----

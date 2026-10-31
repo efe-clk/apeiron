@@ -65,7 +65,7 @@ DESKTOP.tr.md §3'teki istekler şu farklarla kalır:
 | `POST /api/logout` | Oturumu kapatır ve unutur |
 | `GET /api/health` | Oturum açmadan izinli: `{"ok", "role": "primary" ya da "standby"}`; depo okunamıyorsa `503` ([REPLICATION.tr.md](REPLICATION.tr.md) §5) |
 | `POST /api/open`, `POST /api/init` | `unsupported` ile reddedilir |
-| `POST /api/call/<operation>` | Yalnızca `info`, `resolve`, `log`, `list`, `diff`, `diff_text`, `refs`, `reflog`; diğerleri `unsupported` ile reddedilir |
+| `POST /api/call/<operation>` | Yalnızca `info`, `resolve`, `log`, `list`, `diff`, `diff_text`, `refs`, `reflog`, bir `admin` için ayrıca `retention`, `add_retention` ([ARCHIVE.tr.md](ARCHIVE.tr.md)); diğerleri `unsupported` ile reddedilir |
 | `POST /api/start/<operation>` | Yalnızca `backup`, `restore`, `verify`, `search`, `report` ([REPORTS.tr.md](REPORTS.tr.md)); bir yedeğin `source` alanı ve bir geri yüklemenin `target` alanı bir `--folder` içinde olmalıdır |
 | `GET /api/folders` | Yalnızca bir `--folder` içinde; yol verilmezse ilki; bir `--folder` üzerinde `parent` boştur |
 

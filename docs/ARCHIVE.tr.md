@@ -58,6 +58,7 @@ Apeiron'un S3'e yazdığı her nesne, Object Lock'lu kovaların istediği ve ver
 | `apeiron retention add <refs> --days <n>` | Bir kural ekler; geri alınamaz |
 | `apeiron retention list` | Kuralları listeler |
 | `retention`, `add_retention` (API.tr.md §8) | Programlar için aynısı |
+| Web ve masaüstü arayüzlerinin Saklama sayfası | Kuralları listeler ve bir uyarıdan sonra kural ekler; web arayüzünde yalnızca bir `admin` için |
 | Korunan bir ref'i herhangi bir programla silmek ya da geri almak | `conflict` ve kalan gün sayısıyla reddedilir |
 
 ## 6. Bu işin parçası olmayanlar
@@ -65,7 +66,6 @@ Apeiron'un S3'e yazdığı her nesne, Object Lock'lu kovaların istediği ve ver
 | Konu | Nerede |
 | --- | --- |
 | Bir ref'i kaldırılana kadar kuralının ötesinde tutan yasal saklama (legal hold) | Sonra, bir pilot gerektirirse; kaldırılabilen bir saklama tam da uyumluluk kurallarının yasakladığı şeydir, bu yüzden kendi tasarımını ister |
-| Web arayüzünde kural eklemek | Sonra; o zamana kadar CLI |
 | SFTP ya da klasör uzak depoları için Object Lock | Apeiron'da mümkün değil; böyle bir depolamanın ZFS ya da bir yedek cihazınınki gibi kendi değiştirilemez anlık görüntüleri gerekir |
 | Korunan bir geçmişin ortasından tek tek eski snapshot'ları silmek | Planlanmadı: ortası kaybolabilen bir geçmiş arşiv değildir |
 
@@ -77,3 +77,4 @@ Apeiron'un S3'e yazdığı her nesne, Object Lock'lu kovaların istediği ve ver
 | `apeiron` | `retention`, `add_retention` | Tamamlandı |
 | `apeiron-remote` | Her S3 yazmasında SHA-256 sağlama toplamları | Tamamlandı |
 | `apeiron-cli` | `apeiron retention` | Tamamlandı |
+| `apeiron-server` | Saklama sayfası | Tamamlandı |

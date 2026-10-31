@@ -49,6 +49,8 @@ const CALLS: &[&str] = &[
     "diff_text",
     "refs",
     "reflog",
+    "retention",
+    "add_retention",
 ];
 const STARTS: &[&str] = &["backup", "restore", "verify", "search", "report"];
 
@@ -638,7 +640,7 @@ impl WebState {
         }
         let allowed = match operation {
             "backup" | "restore" => user.role != Role::Reader,
-            "verify" | "report" => user.role == Role::Admin,
+            "verify" | "report" | "retention" | "add_retention" => user.role == Role::Admin,
             _ => true,
         };
         if !allowed {
