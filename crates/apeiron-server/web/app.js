@@ -285,18 +285,19 @@ function showNav(current) {
   const item = (key, view) =>
     h("button", { type: "button", "aria-current": current === key ? "page" : false, onclick: view }, t(`nav_${key}`));
   nav.hidden = false;
-  nav.replaceChildren(
+  nav.replaceChildren(...[
     item("overview", overview),
     may.backUp() ? item("backup", () => backup()) : null,
     may.verify() ? item("verify", verify) : null,
     may.verify() ? item("report", report) : null,
     may.verify() ? item("retention", retention) : null,
+    mode === "local" ? item("sync", () => sync()) : null,
     may.share() ? item("shares", shares) : null,
     may.readLog() ? item("activity", activity) : null,
     may.manageUsers() ? item("users", users) : null,
     mode === "web" ? item("sign_out", signOut) : item("close", () => start()),
     h("span", { class: "path" }, user ? `${user.name} · ${repoPath}` : repoPath),
-  );
+  ].filter(Boolean));
 }
 
 // ---- Start ----
@@ -693,6 +694,107 @@ function reportView(r) {
     table(["report_ref", "report_snapshot", "report_newest", "report_snapshots", "report_kept", "report_copies"], refs),
     h("p", { class: "muted" }, t("report_proof")),
   ];
+}
+
+// ---- Remotes and sync (DESKTOP.md §3, SYNC.md) ----
+
+async function sync(folderPath = "") {
+  showNav("sync");
+  show(h("p", {}, t("loading")));
+  let remotes;
+  try {
+    remotes = await call("remotes");
+  } catch (err) {
+    show(h("h1", {}, t("sync_heading")), errorMessage(err));
+    return;
+  }
+  const remoteRows = remotes.map((r) => h("tr", {},
+    h("td", { class: "nowrap" }, r.name),
+    h("td", {}, r.url),
+    h("td", {}, h("button", { type: "button", onclick: async (e) => {
+      if (!confirm(t("remote_remove_ask", { name: r.name }))) return;
+      e.target.disabled = true;
+      try {
+        await call("remove_remote", { name: r.name });
+        sync(folder.input.value);
+      } catch (err) {
+        main.append(errorMessage(err));
+      }
+    } }, t("remove")))));
+
+  const name = h("input", { type: "text", autocomplete: "off", autocapitalize: "none", spellcheck: "false", required: true });
+  const url = h("input", { type: "text", autocomplete: "off", spellcheck: "false", required: true });
+  const remoteStatus = h("div");
+  const addForm = h("form", { onsubmit: async (e) => {
+    e.preventDefault();
+    remoteStatus.replaceChildren();
+    try {
+      await call("add_remote", { name: name.value.trim(), url: url.value.trim() });
+      sync(folder.input.value);
+    } catch (err) {
+      remoteStatus.replaceChildren(errorMessage(err));
+    }
+  } },
+    ...field(t("remote_name"), name, t("remote_name_hint")),
+    ...field(t("remote_url"), url, t("remote_url_hint")),
+    h("div", { class: "actions" }, h("button", { type: "submit" }, t("remote_add"))),
+  );
+
+  const folder = folderInput(folderPath);
+  folder.input.id = "sync-path";
+  const remote = h("select", {}, ...remotes.map((r) => h("option", { value: r.name }, r.name)));
+  const way = h("select", {}, ...["two-way", "send", "receive"].map((m) => h("option", { value: m }, t(`sync_mode_${m}`))));
+  const dryRun = h("input", { type: "checkbox" });
+  const status = h("div");
+  const button = h("button", { type: "submit", class: "primary", disabled: remotes.length === 0 }, t("sync_button"));
+  const syncForm = h("form", { onsubmit: async (e) => {
+    e.preventDefault();
+    button.disabled = true;
+    const result = await runWithProgress(status, "sync", {
+      folder: folder.input.value, remote: remote.value, mode: way.value, dry_run: dryRun.checked,
+    });
+    button.disabled = false;
+    if (result) status.replaceChildren(...syncView(result, dryRun.checked));
+  } },
+    h("label", { for: "sync-path" }, t("sync_folder")),
+    folder.row,
+    ...field(t("sync_remote"), remote),
+    ...field(t("sync_mode"), way),
+    h("label", {}, dryRun, " ", t("sync_dry_run")),
+    h("div", { class: "actions" }, button),
+  );
+
+  show(
+    h("h1", {}, t("sync_heading")),
+    h("p", { class: "muted" }, t("sync_intro")),
+    remotes.length ? h("div", { class: "card" }, syncForm) : message("", t("sync_no_remote")),
+    status,
+    h("h2", {}, t("remotes_heading")),
+    remotes.length
+      ? h("div", { class: "card scroll" }, h("table", {},
+        h("thead", {}, h("tr", {}, ...["remote_name", "remote_url", ""].map((k) => h("th", {}, k ? t(k) : "")))),
+        h("tbody", {}, ...remoteRows)))
+      : null,
+    h("div", { class: "card" }, addForm),
+    remoteStatus,
+  );
+}
+
+function syncView(r, dryRun) {
+  const out = [message("good", t(dryRun ? "sync_would" : `sync_${r.action}`, { changes: r.changes.length }))];
+  if (r.changes.length) {
+    out.push(h("div", { class: "card scroll" }, h("table", {}, h("tbody", {},
+      ...r.changes.map((c) => h("tr", {}, h("td", { class: "nowrap" }, t(c.kind)), h("td", {}, c.path)))))));
+  }
+  if (r.conflicts.length) {
+    out.push(message("bad", [t("sync_conflicts"), ...r.conflicts.map((c) =>
+      h("div", {}, t(`conflict_${c.kind}`, { path: c.path, copy: c.copy || "" })))]));
+  }
+  if (r.skipped.length) out.push(message("", [t("sync_skipped"), ...r.skipped.map((p) => h("div", {}, p))]));
+  if (r.warnings.length) {
+    out.push(message("bad", [t("warnings"), ...r.warnings.map((w) => h("div", {}, `${w.path}: ${w.message}`))]));
+  }
+  return out;
 }
 
 // ---- Retention rules (ARCHIVE.md §2) ----
