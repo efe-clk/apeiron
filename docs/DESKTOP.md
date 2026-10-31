@@ -38,6 +38,7 @@ The pages call only the JSON API, and the JSON API calls only the public API (AR
 | Compare | What changed between a snapshot and the one before it, with the changed lines of text files when the text plugin is installed (TEXT.md) | Done |
 | Verify | Checks the whole repository and says in plain words whether it is healthy | Done |
 | Sync | Lists, adds and removes remotes, and runs a sync round of a folder with one of them, both ways or one way, or only shows what would change (SYNC.md); lists the changes made and every conflict with its conflict copy; finds the conflict copies in the folder and keeps either version of each with one button (SYNC.md §4) | Done |
+| Plugins | Lists the installed plugins with the files they handle, installs one from a `.wasm` file and removes one, as `apeiron plugin` does (PLUGIN.md §1) | Done |
 
 Words follow the user, not the format: a ref is shown as a backup, a snapshot as a version, and ids appear only in a details line.
 
@@ -74,7 +75,6 @@ An error is the error value of API.md §8.6 with status 400 for `invalid_input`,
 
 | Item | Where |
 | --- | --- |
-| Plugin settings in the window | Later; `apeiron plugin` (PLUGIN.md) until then |
 | Changing the background service's jobs | Later; `jobs.toml` (DAEMON.md) until then |
 | Reaching the server from other computers, users and logins | Web interface ([WEB.md](WEB.md)) and users and permissions, work items 2 and 3 |
 | Installers and app icons for each system | With the first release |

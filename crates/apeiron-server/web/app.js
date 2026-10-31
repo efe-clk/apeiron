@@ -292,6 +292,7 @@ function showNav(current) {
     may.verify() ? item("report", report) : null,
     may.verify() ? item("retention", retention) : null,
     mode === "local" ? item("sync", () => sync()) : null,
+    mode === "local" ? item("plugins", plugins) : null,
     may.share() ? item("shares", shares) : null,
     may.readLog() ? item("activity", activity) : null,
     may.manageUsers() ? item("users", users) : null,
@@ -832,6 +833,62 @@ function syncView(r, dryRun) {
     out.push(message("bad", [t("warnings"), ...r.warnings.map((w) => h("div", {}, `${w.path}: ${w.message}`))]));
   }
   return out;
+}
+
+// ---- Plugins (PLUGIN.md §1) ----
+
+async function plugins() {
+  showNav("plugins");
+  show(h("p", {}, t("loading")));
+  let list;
+  try {
+    list = await call("plugins");
+  } catch (err) {
+    show(h("h1", {}, t("plugins_heading")), errorMessage(err));
+    return;
+  }
+  const file = h("input", { type: "text", autocomplete: "off", spellcheck: "false", required: true });
+  const status = h("div");
+  const form = h("form", { onsubmit: async (e) => {
+    e.preventDefault();
+    status.replaceChildren();
+    try {
+      const added = await call("plugin_add", { file: file.value.trim() });
+      await plugins();
+      main.append(message("good", t(added.replaced ? "plugins_replaced" : "plugins_added", { name: added.info.name })));
+    } catch (err) {
+      status.replaceChildren(errorMessage(err));
+    }
+  } },
+    ...field(t("plugins_file"), file, t("plugins_file_hint")),
+    h("div", { class: "actions" }, h("button", { type: "submit", class: "primary" }, t("plugins_add"))),
+  );
+  const rows = list.map((p) => h("tr", {},
+    h("td", { class: "nowrap" }, p.name, h("div", { class: "muted" }, p.version)),
+    h("td", {}, p.description),
+    h("td", {}, p.patterns.join(", ")),
+    h("td", { class: "nowrap" }, h("button", { type: "button", onclick: async (e) => {
+      if (!confirm(t("plugins_remove_ask", { name: p.name }))) return;
+      e.target.disabled = true;
+      try {
+        await call("plugin_remove", { name: p.name });
+        plugins();
+      } catch (err) {
+        main.append(errorMessage(err));
+      }
+    } }, t("remove")))));
+  show(
+    h("h1", {}, t("plugins_heading")),
+    h("p", { class: "muted" }, t("plugins_intro")),
+    list.length
+      ? h("div", { class: "card scroll" }, h("table", {},
+        h("thead", {}, h("tr", {}, ...["plugins_name", "plugins_description", "plugins_patterns", ""].map((k) => h("th", {}, k ? t(k) : "")))),
+        h("tbody", {}, ...rows)))
+      : h("p", {}, t("plugins_none")),
+    h("h2", {}, t("plugins_add")),
+    h("div", { class: "card" }, form),
+    status,
+  );
 }
 
 // ---- Retention rules (ARCHIVE.md §2) ----

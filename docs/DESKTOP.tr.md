@@ -38,6 +38,7 @@ Sayfalar yalnızca JSON API'yi, JSON API de yalnızca herkese açık API'yi ça�
 | Karşılaştır | Bir snapshot ile bir öncekinin arasında ne değiştiği; metin eklentisi kuruluysa metin dosyalarının değişen satırlarıyla (TEXT.tr.md) | Tamamlandı |
 | Denetle | Tüm depoyu denetler ve sağlam olup olmadığını sade sözcüklerle söyler | Tamamlandı |
 | Senkron | Uzak depoları listeler, ekler ve kaldırır; bir klasörün onlardan biriyle bir senkron turunu iki yönlü ya da tek yönlü çalıştırır ya da yalnızca neyin değişeceğini gösterir (SYNC.tr.md); yapılan değişiklikleri ve her çatışmayı çatışma kopyasıyla listeler; klasördeki çatışma kopyalarını bulur ve her birinin iki sürümünden birini tek düğmeyle tutar (SYNC.tr.md §4) | Tamamlandı |
+| Eklentiler | Kurulu eklentileri işledikleri dosyalarla listeler, bir `.wasm` dosyasından eklenti kurar ve kaldırır; `apeiron plugin` gibi (PLUGIN.tr.md §1) | Tamamlandı |
 
 Sözcükler formatı değil kullanıcıyı izler: bir ref yedek, bir snapshot sürüm olarak gösterilir; kimlikler yalnızca bir ayrıntı satırında görünür.
 
@@ -74,7 +75,6 @@ Bir hata, API.tr.md §8.6'daki hata değeridir; durum kodu `invalid_input`, `amb
 
 | Konu | Nerede |
 | --- | --- |
-| Pencerede eklenti ayarları | Daha sonra; o zamana kadar `apeiron plugin` (PLUGIN.tr.md) |
 | Arka plan hizmetinin işlerini değiştirmek | Daha sonra; o zamana kadar `jobs.toml` (DAEMON.tr.md) |
 | Sunucuya başka bilgisayarlardan ulaşmak, kullanıcılar ve oturum açma | Web arayüzü ([WEB.tr.md](WEB.tr.md)) ve kullanıcılar ve izinler, 2. ve 3. işler |
 | Her sistem için kurulum programları ve uygulama simgeleri | İlk sürümle |

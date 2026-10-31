@@ -158,7 +158,9 @@ pub fn call(repo: &Repository, operation: &str, request: Value) -> Result<Value>
             let r: NewRetention = parse(request)?;
             json(&repo.add_retention(&r.refs, r.days)?)
         }
-        "conflicts" | "resolve_conflict" => call_global(operation, request),
+        "conflicts" | "resolve_conflict" | "plugins" | "plugin_add" | "plugin_remove" => {
+            call_global(operation, request)
+        }
         _ => Err(unknown(operation)),
     }
 }

@@ -56,7 +56,7 @@ The ABI is deliberately small: a handful of functions that never change, while t
 | `apeiron_repo_open(path, &repo)` | Opens a repository |
 | `apeiron_repo_unlock(path, secret, &repo)` | Opens a repository with a password or the recovery key |
 | `apeiron_repo_free(repo)` | Closes a repository handle |
-| `apeiron_call(repo, operation, request_json, &result_json)` | Runs a short operation: `info`, `resolve`, `log`, `list`, `diff`, `diff_text`, `refs`, `reflog`, `create_ref`, `delete_ref`, `merge`, `repair`, `keys`, `add_password`, `add_recovery_key`, `remove_key`, `remotes`, `add_remote`, `remove_remote`, `retention`, `add_retention`; with or without a `repo`: `conflicts`, `resolve_conflict`; with a NULL `repo`: `plugins`, `plugin_add`, `plugin_remove` |
+| `apeiron_call(repo, operation, request_json, &result_json)` | Runs a short operation: `info`, `resolve`, `log`, `list`, `diff`, `diff_text`, `refs`, `reflog`, `create_ref`, `delete_ref`, `merge`, `repair`, `keys`, `add_password`, `add_recovery_key`, `remove_key`, `remotes`, `add_remote`, `remove_remote`, `retention`, `add_retention`; with or without a `repo`: `conflicts`, `resolve_conflict`, `plugins`, `plugin_add`, `plugin_remove` |
 | `apeiron_start(repo, operation, request_json, &job)` | Starts a long operation: `backup`, `restore`, `export`, `verify`, `gc`, `push`, `pull`, `restore_test`, `search`, `sync`, `git_import`, `git_export`, and `clone` with a NULL `repo` |
 | `apeiron_job_progress(job, &progress_json)` | Reads the current progress |
 | `apeiron_job_cancel(job)` | Asks the job to stop |

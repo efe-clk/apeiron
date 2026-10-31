@@ -13,6 +13,7 @@ Bir eklenti, çekirdeği değiştirmeden bir veri türü hakkında bilgi ekler (
 | `apeiron plugin add <file.wasm>` | Bir eklentiyi denetler, neyi işlediğini gösterir ve kurar; aynı adlı bir eklentinin yerini alır | Tamamlandı |
 | `apeiron plugin list` | Kurulu eklentileri sürümleri ve işledikleri dosya adlarıyla listeler | Tamamlandı |
 | `apeiron plugin remove <name>` | Bir eklentiyi kaldırır | Tamamlandı |
+| Masaüstü arayüzünün Eklentiler sayfası (DESKTOP.tr.md §2) | Aynı üç işlem pencerede | Tamamlandı |
 
 Eklentiler tek bir depo için değil kullanıcı için kurulur; arka plan hizmetinin iş dosyasının yanındaki `plugins` klasörüne (DAEMON.tr.md §3): Linux'ta `~/.config/apeiron/plugins`. `APEIRON_PLUGINS` ortam değişkeni başka bir klasörü adlandırır. Her eklenti orada iki dosyadır: bileşen olan `<name>.wasm` ve kurulurken `describe`'ın döndürdüğü `<name>.json`.
 

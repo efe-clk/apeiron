@@ -307,3 +307,21 @@ fn conflict_copies_are_found_and_resolved() {
         json!([])
     );
 }
+
+#[test]
+fn plugins_are_listed_through_the_pages() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_server, c) = start(dir.path());
+    let made = c.post("/api/init", json!({"path": dir.path().join("repo")}));
+    assert_eq!(made.status, 200, "{}", made.body);
+    let folder = dir.path().join("plugins");
+    assert_eq!(
+        c.post("/api/call/plugins", json!({"dir": folder})).json(),
+        json!([])
+    );
+    let missing = c.post(
+        "/api/call/plugin_remove",
+        json!({"name": "text", "dir": folder}),
+    );
+    assert_eq!(missing.json()["kind"], "not_found");
+}

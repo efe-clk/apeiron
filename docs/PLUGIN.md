@@ -13,6 +13,7 @@ A plugin adds knowledge of a kind of data without changing the core (VISION.md).
 | `apeiron plugin add <file.wasm>` | Checks a plugin, shows what it handles and installs it; a plugin of the same name is replaced | Done |
 | `apeiron plugin list` | Lists the installed plugins with their version and the file names they handle | Done |
 | `apeiron plugin remove <name>` | Removes a plugin | Done |
+| The Plugins page of the desktop interface (DESKTOP.md §2) | The same three in the window | Done |
 
 Plugins are installed for the user, not for one repository, in the folder `plugins` beside the jobs file of the background service (DAEMON.md §3): `~/.config/apeiron/plugins` on Linux. The environment variable `APEIRON_PLUGINS` names another folder. Each plugin is two files there: `<name>.wasm`, the component, and `<name>.json`, what `describe` returned when it was installed.
 
