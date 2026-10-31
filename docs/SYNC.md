@@ -74,6 +74,8 @@ The merge compares the base B, L and R path by path, recursing into folders that
 
 Two entries are the same when their kind, content and permission bits are equal; a different modification time alone is not a change. `HOST` is the host of the snapshot that brought the other version and the time is that snapshot's, in UTC; when the name is taken, a number is added before the closing parenthesis. Every conflict is listed in the result of the round and in the message of M, so it can be found in `apeiron log` later.
 
+A conflict is resolved by keeping one version: deleting the copy keeps the file at the path, and moving the copy onto the path keeps the other version. The Sync page of the desktop interface does either with one button (DESKTOP.md §2), and the API's `conflicts` and `resolve_conflict` do the same for programs (API.md §8). The next round takes the choice to the other devices like any other change.
+
 ## 5. Applying a snapshot to the folder
 
 The folder may change while a round runs. Every step is checked against L, the snapshot that recorded the folder in step 1:
@@ -96,7 +98,6 @@ The folder ref moves only after the folder has been applied. An interrupted appl
 | Peer-to-peer sync without a remote | Later; a remote covers Stage 2 |
 | Exclusion rules and selective sync | With the backup service's exclusion rules, Stage 3 |
 | Bandwidth limits | Later |
-| A tool to resolve conflicts | The desktop interface (Stage 4); conflict copies are plain files until then |
 | Operating the daemon from another device (remote API) | The desktop and web interfaces (Stage 4); [DAEMON.md](DAEMON.md) is updated |
 
 ## 8. Crates

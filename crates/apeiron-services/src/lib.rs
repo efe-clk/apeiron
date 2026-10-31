@@ -5,6 +5,7 @@
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 
 mod backup;
+mod conflicts;
 mod control;
 mod diff;
 mod error;
@@ -19,6 +20,7 @@ mod search;
 mod sync;
 
 pub use backup::{BackupOptions, BackupOutcome, backup};
+pub use conflicts::{ConflictCopy, Keep, find_conflicts, original_name, resolve_conflict};
 pub use control::{Control, Phase, Progress, Warning, WarningKind};
 pub use diff::{Change, ChangeKind, diff};
 pub use error::{Error, Result};

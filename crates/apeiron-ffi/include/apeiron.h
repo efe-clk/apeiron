@@ -73,8 +73,8 @@ int32_t apeiron_repo_unlock(const char *path, const char *secret, struct apeiron
 void apeiron_repo_free(struct apeiron_repo *repo);
 
 // Runs a short operation (SDK.md §2.1). `repo` is NULL for `plugins`,
-// `plugin_add` and `plugin_remove`, which need no repository. A NULL
-// request is `{}`.
+// `plugin_add` and `plugin_remove`, which need no repository, and may be
+// NULL for `conflicts` and `resolve_conflict`. A NULL request is `{}`.
 //
 // # Safety
 // `repo` is null or a live handle; `operation` and `request_json` (or

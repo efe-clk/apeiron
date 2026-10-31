@@ -1108,6 +1108,11 @@ fn an_admin_adds_and_lists_retention_rules() {
         "/api/users",
         json!({"name": "ayse", "role": "member", "password": PASSWORD, "backups": ["backup/*"]}),
     );
+    // Conflict copies are files of the desktop's own computer.
+    assert_eq!(
+        c.kind("/api/call/conflicts", json!({"folder": "/"})).1,
+        "unsupported"
+    );
     let ayse = c.other("ayse");
     assert_eq!(ayse.kind("/api/call/retention", json!({})).1, "unsupported");
     assert_eq!(

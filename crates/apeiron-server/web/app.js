@@ -754,14 +754,15 @@ async function sync(folderPath = "") {
       folder: folder.input.value, remote: remote.value, mode: way.value, dry_run: dryRun.checked,
     });
     button.disabled = false;
-    if (result) status.replaceChildren(...syncView(result, dryRun.checked));
+    if (result) status.replaceChildren(...syncView(result, dryRun.checked), conflictList(folder.input.value));
   } },
     h("label", { for: "sync-path" }, t("sync_folder")),
     folder.row,
     ...field(t("sync_remote"), remote),
     ...field(t("sync_mode"), way),
     h("label", {}, dryRun, " ", t("sync_dry_run")),
-    h("div", { class: "actions" }, button),
+    h("div", { class: "actions" }, button,
+      h("button", { type: "button", onclick: () => status.replaceChildren(conflictList(folder.input.value)) }, t("conflicts_find"))),
   );
 
   show(
@@ -778,6 +779,42 @@ async function sync(folderPath = "") {
     h("div", { class: "card" }, addForm),
     remoteStatus,
   );
+}
+
+// The conflict copies in `folder`, each with buttons to keep one version.
+function conflictList(folder) {
+  const box = h("div", {}, h("p", {}, t("loading")));
+  const load = async () => {
+    try {
+      const found = await call("conflicts", { folder });
+      const resolve = (c, keep) => async (e) => {
+        e.target.disabled = true;
+        try {
+          await call("resolve_conflict", { folder, copy: c.copy, keep });
+          load();
+        } catch (err) {
+          box.append(errorMessage(err));
+        }
+      };
+      box.replaceChildren(
+        h("h2", {}, t("conflicts_heading")),
+        found.length
+          ? h("div", { class: "card scroll" }, h("p", { class: "muted" }, t("conflicts_intro")), h("table", {},
+            h("thead", {}, h("tr", {}, ...["conflicts_file", "conflicts_copy", ""].map((k) => h("th", {}, k ? t(k) : "")))),
+            h("tbody", {}, ...found.map((c) => h("tr", {},
+              h("td", {}, c.path, c.exists ? null : h("span", { class: "muted" }, ` (${t("conflicts_missing")})`)),
+              h("td", {}, c.copy),
+              h("td", { class: "nowrap" },
+                h("button", { type: "button", onclick: resolve(c, "this") }, t(c.exists ? "conflicts_keep_this" : "conflicts_keep_none")),
+                h("button", { type: "button", onclick: resolve(c, "copy") }, t("conflicts_keep_copy"))))))))
+          : message("good", t("conflicts_none")),
+      );
+    } catch (err) {
+      box.replaceChildren(errorMessage(err));
+    }
+  };
+  load();
+  return box;
 }
 
 function syncView(r, dryRun) {

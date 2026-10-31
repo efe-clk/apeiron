@@ -78,6 +78,18 @@ struct KeyId {
 }
 
 #[derive(Deserialize)]
+struct Folder {
+    folder: PathBuf,
+}
+
+#[derive(Deserialize)]
+struct Resolve {
+    folder: PathBuf,
+    copy: String,
+    keep: crate::Keep,
+}
+
+#[derive(Deserialize)]
 struct PluginDir {
     #[serde(default)]
     dir: Option<PathBuf>,
@@ -146,6 +158,7 @@ pub fn call(repo: &Repository, operation: &str, request: Value) -> Result<Value>
             let r: NewRetention = parse(request)?;
             json(&repo.add_retention(&r.refs, r.days)?)
         }
+        "conflicts" | "resolve_conflict" => call_global(operation, request),
         _ => Err(unknown(operation)),
     }
 }
@@ -164,6 +177,11 @@ pub fn call_global(operation: &str, request: Value) -> Result<Value> {
         "plugin_remove" => {
             let r: PluginName = parse(request)?;
             json(&crate::remove_plugin(&r.name, r.dir.as_deref())?)
+        }
+        "conflicts" => json(&crate::conflicts(&parse::<Folder>(request)?.folder)?),
+        "resolve_conflict" => {
+            let r: Resolve = parse(request)?;
+            json(&crate::resolve_conflict(&r.folder, &r.copy, r.keep)?)
         }
         _ => Err(invalid(format!(
             "operation {operation:?} needs a repository; repo is NULL"

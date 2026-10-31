@@ -56,7 +56,7 @@ The ABI is deliberately small: a handful of functions that never change, while t
 | `apeiron_repo_open(path, &repo)` | Opens a repository |
 | `apeiron_repo_unlock(path, secret, &repo)` | Opens a repository with a password or the recovery key |
 | `apeiron_repo_free(repo)` | Closes a repository handle |
-| `apeiron_call(repo, operation, request_json, &result_json)` | Runs a short operation: `info`, `resolve`, `log`, `list`, `diff`, `diff_text`, `refs`, `reflog`, `create_ref`, `delete_ref`, `merge`, `repair`, `keys`, `add_password`, `add_recovery_key`, `remove_key`, `remotes`, `add_remote`, `remove_remote`; with a NULL `repo`: `plugins`, `plugin_add`, `plugin_remove` |
+| `apeiron_call(repo, operation, request_json, &result_json)` | Runs a short operation: `info`, `resolve`, `log`, `list`, `diff`, `diff_text`, `refs`, `reflog`, `create_ref`, `delete_ref`, `merge`, `repair`, `keys`, `add_password`, `add_recovery_key`, `remove_key`, `remotes`, `add_remote`, `remove_remote`, `retention`, `add_retention`; with or without a `repo`: `conflicts`, `resolve_conflict`; with a NULL `repo`: `plugins`, `plugin_add`, `plugin_remove` |
 | `apeiron_start(repo, operation, request_json, &job)` | Starts a long operation: `backup`, `restore`, `export`, `verify`, `gc`, `push`, `pull`, `restore_test`, `search`, `sync`, `git_import`, `git_export`, and `clone` with a NULL `repo` |
 | `apeiron_job_progress(job, &progress_json)` | Reads the current progress |
 | `apeiron_job_cancel(job)` | Asks the job to stop |
@@ -65,7 +65,7 @@ The ABI is deliberately small: a handful of functions that never change, while t
 | `apeiron_last_error()` | Error of the last failed call on this thread, as JSON |
 | `apeiron_string_free(s)` | Frees a string returned by the library |
 
-The request of an operation is the request of [API.md](API.md) §8.3 as JSON. Operations that take plain values use these fields: `resolve` `{"spec"}`, `reflog` and `remove_remote` `{"name"}`, `add_password` `{"password"}`, `remove_key` `{"id"}`, `add_remote` `{"name", "url"}`, `plugins` `{"dir"}`, `plugin_add` `{"file", "dir"}`, `plugin_remove` `{"name", "dir"}`, where `dir` may be left out for the user's plugin folder; the others take `{}`. An unknown operation is the error `unsupported`.
+The request of an operation is the request of [API.md](API.md) §8.3 as JSON. Operations that take plain values use these fields: `resolve` `{"spec"}`, `reflog` and `remove_remote` `{"name"}`, `add_password` `{"password"}`, `remove_key` `{"id"}`, `add_remote` `{"name", "url"}`, `plugins` `{"dir"}`, `plugin_add` `{"file", "dir"}`, `plugin_remove` `{"name", "dir"}`, `add_retention` `{"refs", "days"}`, `conflicts` `{"folder"}`, `resolve_conflict` `{"folder", "copy", "keep"}`, where `dir` may be left out for the user's plugin folder; the others take `{}`. An unknown operation is the error `unsupported`.
 
 The header is generated from the Rust code with `cbindgen`; a test fails when the checked-in header differs, so it can never drift from the library.
 

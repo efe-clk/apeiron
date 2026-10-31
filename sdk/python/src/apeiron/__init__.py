@@ -335,6 +335,19 @@ def remove_plugin(name: str, dir: Any = None) -> Record:
     return _call_global("plugin_remove", _drop_none({"name": name, "dir": dir}))
 
 
+def conflicts(folder: Any) -> list:
+    """The conflict copies sync and merge left in ``folder`` (docs/SYNC.md
+    §4), each with ``path``, ``exists`` and ``copy``; read ``copy`` as
+    ``c["copy"]``, since ``c.copy`` is the method of ``dict``."""
+    return _call_global("conflicts", {"folder": folder})
+
+
+def resolve_conflict(folder: Any, copy: str, keep: str) -> Record:
+    """Keeps one version of a conflict copy: ``keep="this"`` deletes the
+    copy, ``keep="copy"`` puts it in place of the file at its path."""
+    return _call_global("resolve_conflict", {"folder": folder, "copy": copy, "keep": keep})
+
+
 class Repository:
     """An open repository. Use it in a ``with`` block or call :meth:`close`."""
 
@@ -479,6 +492,12 @@ class Repository:
 
     def remove_remote(self, name: str) -> None:
         self.call("remove_remote", name=name)
+
+    def retention(self) -> list:
+        return self.call("retention")
+
+    def add_retention(self, refs: str, days: int) -> Record:
+        return self.call("add_retention", refs=refs, days=days)
 
     # Long operations; each returns a Job.
 

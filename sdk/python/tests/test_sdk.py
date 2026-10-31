@@ -78,6 +78,17 @@ class Sdk(unittest.TestCase):
         with self.assertRaises(apeiron.InvalidInputError):
             apeiron.add_plugin(self.root / "src" / "a.txt", folder)
 
+    def test_conflicts_without_a_repository(self):
+        folder = self.root / "synced"
+        folder.mkdir()
+        (folder / "a.txt").write_text("here")
+        (folder / "a (conflict pc 2026-10-31 10-08).txt").write_text("there")
+        found = apeiron.conflicts(folder)
+        self.assertEqual([(c.path, c.exists) for c in found], [("a.txt", True)])
+        apeiron.resolve_conflict(folder, found[0]["copy"], "copy")
+        self.assertEqual((folder / "a.txt").read_text(), "there")
+        self.assertEqual(apeiron.conflicts(folder), [])
+
     def test_clone(self):
         with apeiron.Repository.init(self.root / "repo") as repo:
             repo.backup(self.root / "src").wait()

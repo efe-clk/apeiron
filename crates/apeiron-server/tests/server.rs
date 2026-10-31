@@ -276,3 +276,34 @@ fn folders_can_be_browsed() {
     assert_eq!(listing["parent"], json!(dir.path().parent().unwrap()));
     assert_eq!(c.get("/api/folders?path=%2Fno%2Fsuch%2Ffolder").status, 404);
 }
+
+#[test]
+fn conflict_copies_are_found_and_resolved() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_server, c) = start(dir.path());
+    let made = c.post("/api/init", json!({"path": dir.path().join("repo")}));
+    assert_eq!(made.status, 200, "{}", made.body);
+    let folder = dir.path().join("docs");
+    fs::create_dir(&folder).unwrap();
+    fs::write(folder.join("a.txt"), "here").unwrap();
+    fs::write(folder.join("a (conflict pc 2026-10-31 10-08).txt"), "there").unwrap();
+
+    let found = c
+        .post("/api/call/conflicts", json!({"folder": folder}))
+        .json();
+    assert_eq!(
+        found,
+        json!([{"path": "a.txt", "copy": "a (conflict pc 2026-10-31 10-08).txt", "exists": true}])
+    );
+    let resolved = c.post(
+        "/api/call/resolve_conflict",
+        json!({"folder": folder, "copy": found[0]["copy"], "keep": "copy"}),
+    );
+    assert_eq!(resolved.status, 200, "{}", resolved.body);
+    assert_eq!(fs::read_to_string(folder.join("a.txt")).unwrap(), "there");
+    assert_eq!(
+        c.post("/api/call/conflicts", json!({"folder": folder}))
+            .json(),
+        json!([])
+    );
+}

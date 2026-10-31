@@ -74,6 +74,8 @@ Birleştirme, B'yi, L'yi ve R'yi yol yol karşılaştırır; her tarafta klasör
 
 İki girdi; türleri, içerikleri ve izin bitleri eşitse aynıdır; yalnızca farklı bir değişiklik zamanı bir değişiklik değildir. `HOST`, öteki sürümü getiren snapshot'ın sunucu adıdır ve zaman o snapshot'ın zamanıdır (UTC); ad doluysa kapanan parantezden önce bir sayı eklenir. Her çatışma turun sonucunda ve M'nin mesajında listelenir; böylece daha sonra `apeiron log` ile bulunabilir.
 
+Bir çatışma bir sürümü tutarak çözülür: kopyayı silmek yoldaki dosyayı tutar, kopyayı yolun üzerine taşımak öteki sürümü tutar. Masaüstü arayüzünün Senkron sayfası ikisini de tek düğmeyle yapar (DESKTOP.tr.md §2); API'nin `conflicts` ve `resolve_conflict` işlevleri programlar için aynısını yapar (API.tr.md §8). Bir sonraki tur seçimi, diğer her değişiklik gibi öteki cihazlara götürür.
+
 ## 5. Bir snapshot'ı klasöre uygulama
 
 Klasör, bir tur çalışırken değişebilir. Her adım, klasörü 1. adımda kaydeden snapshot L'ye göre denetlenir:
@@ -96,7 +98,6 @@ Klasör ref'i ancak klasör uygulandıktan sonra taşınır. Yarıda kalan bir u
 | Uzak depo olmadan eşler arası senkron | Daha sonra; Aşama 2 için bir uzak depo yeterlidir |
 | Dışlama kuralları ve seçmeli senkron | Yedek hizmetinin dışlama kurallarıyla, Aşama 3 |
 | Bant genişliği sınırları | Daha sonra |
-| Çatışmaları çözmek için bir araç | Masaüstü arayüzü (Aşama 4); o zamana kadar çatışma kopyaları düz dosyalardır |
 | Daemon'u başka bir cihazdan yönetmek (uzak API) | Masaüstü ve web arayüzleri (Aşama 4); [DAEMON.tr.md](DAEMON.tr.md) güncellenir |
 
 ## 8. Crate'ler
