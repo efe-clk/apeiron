@@ -59,6 +59,8 @@ Kanıt snapshot kimlikleridir: bir kimlik, altındaki her baytı ve ondan öncek
 | Sorun | `--verify` bozuk veri buldu; depo açılırken bozuk dosyalar bulundu; bir uzak depo yanıt vermedi; bir ref bir uzak depoda geride, yok ya da farklı; denetim kaydı eksiksiz değil |
 | Uyarı | Bir ref eskimiş; depo şifreli değil; kurtarma anahtarı olmadan şifreli; hiç uzak deposu yok, yani her yedek tek bir yerde duruyor; denetim kaydının en eski parçaları kaldırılmış (AUDIT.tr.md §3) |
 
+JSON'da her bulgunun bir `level` alanı, İngilizce bir `text` alanı ve bilgileriyle birlikte bir `code` alanı vardır; böylece bir program ya da sayfa bulguyu başka bir dilde söyleyebilir: `damaged` (`files`, `objects`), `damaged_on_open` (`files`), `remote_down` (`remote`, `message`), `copy` (`name`, `remote`, `state`), `stale` (`name`, `days`), `not_encrypted`, `no_recovery_key`, `no_remote`, `audit_trimmed` (`first`), `audit_broken` (`message`).
+
 ## 5. Sayfalarda, JSON API'de ve CLI'da
 
 | Nerede | Ne |

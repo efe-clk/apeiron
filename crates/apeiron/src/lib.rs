@@ -42,8 +42,8 @@ pub use job::Job;
 pub use plugins::{add_plugin, plugin_dir, plugins, remove_plugin};
 pub use repo::Repository;
 pub use report::{
-    ComplianceReport, CopyKind, CopyState, Finding, Level, RefFacts, RemoteFacts, ReportRequest,
-    RepositoryFacts,
+    ComplianceReport, CopyKind, CopyState, Finding, FindingKind, Level, RefFacts, RemoteFacts,
+    ReportRequest, RepositoryFacts,
 };
 pub use types::{
     AddedKey, CloneReport, CloneRequest, ClonedRef, DeleteRefRequest, DiffRequest, ExportRequest,

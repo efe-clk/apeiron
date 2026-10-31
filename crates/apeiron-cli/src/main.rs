@@ -911,30 +911,26 @@ fn web_facts(
     report: &mut apeiron::ComplianceReport,
 ) -> Result<WebFacts, Failure> {
     let users = apeiron_server::Users::load(&files.users)?;
-    let (whole, first, events, last, error) = match files.audit.verify() {
-        Ok(v) => {
-            if v.first > 1 {
-                report.findings.push(apeiron::Finding {
-                    level: apeiron::Level::Warning,
-                    text: format!(
-                        "the audit log starts at event {}; the parts before it were removed",
-                        v.first
-                    ),
-                });
+    let (whole, first, events, last, error) =
+        match files.audit.verify() {
+            Ok(v) => {
+                if v.first > 1 {
+                    report.findings.push(apeiron::Finding::new(
+                        apeiron::FindingKind::AuditTrimmed { first: v.first },
+                    ));
+                }
+                (true, v.first, v.events, Some(v.last), None)
             }
-            (true, v.first, v.events, Some(v.last), None)
-        }
-        Err(e) => {
-            report.findings.insert(
-                0,
-                apeiron::Finding {
-                    level: apeiron::Level::Problem,
-                    text: format!("the audit log is not whole: {}", e.message),
-                },
-            );
-            (false, 0, 0, None, Some(e.message))
-        }
-    };
+            Err(e) => {
+                report.findings.insert(
+                    0,
+                    apeiron::Finding::new(apeiron::FindingKind::AuditBroken {
+                        message: e.message.clone(),
+                    }),
+                );
+                (false, 0, 0, None, Some(e.message))
+            }
+        };
     let recent: Vec<apeiron_server::Event> = files
         .audit
         .read(usize::MAX, None)?

@@ -1069,6 +1069,12 @@ fn an_admin_makes_a_compliance_report() {
             .iter()
             .all(|f| f["level"] == "warning")
     );
+    let no_remote = json!({
+        "level": "warning",
+        "text": "there is no remote: every backup exists in one place only",
+        "code": "no_remote",
+    });
+    assert!(result["findings"].as_array().unwrap().contains(&no_remote));
 
     // Only an admin may.
     c.post(

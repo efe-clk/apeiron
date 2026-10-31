@@ -59,6 +59,8 @@ The snapshot ids are the proof: an id fixes every byte under it and all the hist
 | Problem | `--verify` found damaged data; damaged files were found when the repository was opened; a remote did not answer; a ref is behind, missing or different on a remote; the audit log is not whole |
 | Warning | A ref is stale; the repository is not encrypted; it is encrypted without a recovery key; it has no remote, so every backup exists in one place only; the audit log's oldest parts were removed (AUDIT.md §3) |
 
+In JSON each finding has `level`, an English `text`, and a `code` with its facts, so a program or a page can say it in another language: `damaged` (`files`, `objects`), `damaged_on_open` (`files`), `remote_down` (`remote`, `message`), `copy` (`name`, `remote`, `state`), `stale` (`name`, `days`), `not_encrypted`, `no_recovery_key`, `no_remote`, `audit_trimmed` (`first`), `audit_broken` (`message`).
+
 ## 5. In the pages, the JSON API and the CLI
 
 | Where | What |

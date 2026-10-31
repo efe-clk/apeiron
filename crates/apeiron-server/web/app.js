@@ -655,12 +655,19 @@ function report() {
   );
 }
 
+// A finding in the page's language; `text` is English (REPORTS.md §4).
+function findingText(f) {
+  const key = f.code === "copy" ? `finding_copy_${f.state}` : `finding_${f.code}`;
+  const text = t(key, f);
+  return text === key ? f.text : text;
+}
+
 function reportView(r) {
   const table = (heads, rows) => h("div", { class: "card scroll" }, h("table", {},
     h("thead", {}, h("tr", {}, ...heads.map((k) => h("th", {}, t(k))))),
     h("tbody", {}, ...rows)));
   const findings = r.findings.length
-    ? r.findings.map((f) => message(f.level === "problem" ? "bad" : "", f.text))
+    ? r.findings.map((f) => message(f.level === "problem" ? "bad" : "", findingText(f)))
     : [message("good", t("report_no_findings"))];
   const facts = [
     ["report_encrypted", r.repository.encrypted ? t("yes") : t("no")],

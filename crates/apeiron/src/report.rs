@@ -15,7 +15,7 @@ use crate::{
 
 const SECONDS_PER_DAY: i64 = 24 * 60 * 60;
 
-/// What a report covers (REPORTS.md §2).
+/// FindingKind a report covers (REPORTS.md §2).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReportRequest {
     /// Read and check every stored byte, as `verify` does.
@@ -57,7 +57,7 @@ pub struct ComplianceReport {
     pub verify: Option<VerifyReport>,
     /// Every remote, and with `remotes` whether it answered.
     pub remotes: Vec<RemoteFacts>,
-    /// What needs attention, most serious first.
+    /// FindingKind needs attention, most serious first.
     pub findings: Vec<Finding>,
 }
 
@@ -120,11 +120,115 @@ pub struct RemoteFacts {
     pub error: Option<Error>,
 }
 
-/// Something that needs attention (REPORTS.md §4).
+/// Something that needs attention (REPORTS.md §4): `text` in English, and
+/// `kind` for a program or a page that says it in another language.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Finding {
     pub level: Level,
     pub text: String,
+    #[serde(flatten)]
+    pub kind: FindingKind,
+}
+
+/// FindingKind a finding is about; its `code` and fields in JSON.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "code", rename_all = "snake_case")]
+pub enum FindingKind {
+    /// `verify` found damaged data.
+    Damaged {
+        files: usize,
+        objects: usize,
+    },
+    /// Damaged files were found when the repository was opened.
+    DamagedOnOpen {
+        files: usize,
+    },
+    /// A remote did not answer.
+    RemoteDown {
+        remote: String,
+        message: String,
+    },
+    /// A ref is behind, missing or different on a remote.
+    Copy {
+        name: String,
+        remote: String,
+        state: CopyKind,
+    },
+    /// A ref has had no new snapshot for more than `days` days.
+    Stale {
+        name: String,
+        days: u32,
+    },
+    NotEncrypted,
+    NoRecoveryKey,
+    NoRemote,
+    /// The audit log's parts before event `first` were removed.
+    AuditTrimmed {
+        first: u64,
+    },
+    /// The audit log's chain of hashes is broken.
+    AuditBroken {
+        message: String,
+    },
+}
+
+impl Finding {
+    /// The finding about `kind`, with its level and English text.
+    pub fn new(kind: FindingKind) -> Finding {
+        let (level, text) = match &kind {
+            FindingKind::Damaged { files, objects } => (
+                Level::Problem,
+                format!(
+                    "{files} damaged files and {objects} damaged objects; run `apeiron verify`"
+                ),
+            ),
+            FindingKind::DamagedOnOpen { files } => (
+                Level::Problem,
+                format!("{files} files were found damaged when the repository was opened"),
+            ),
+            FindingKind::RemoteDown { remote, message } => (
+                Level::Problem,
+                format!("the remote {remote} did not answer: {message}"),
+            ),
+            FindingKind::Copy {
+                name,
+                remote,
+                state,
+            } => {
+                let why = match state {
+                    CopyKind::Current => "is current",
+                    CopyKind::Behind => "is behind",
+                    CopyKind::Missing => "is missing",
+                    CopyKind::Other => "has snapshots this copy does not",
+                };
+                (Level::Problem, format!("{name} {why} on {remote}"))
+            }
+            FindingKind::Stale { name, days } => (
+                Level::Warning,
+                format!("{name} has had no new snapshot for more than {days} days"),
+            ),
+            FindingKind::NotEncrypted => {
+                (Level::Warning, "the repository is not encrypted".to_owned())
+            }
+            FindingKind::NoRecoveryKey => (
+                Level::Warning,
+                "there is no recovery key; a forgotten password loses everything".to_owned(),
+            ),
+            FindingKind::NoRemote => (
+                Level::Warning,
+                "there is no remote: every backup exists in one place only".to_owned(),
+            ),
+            FindingKind::AuditTrimmed { first } => (
+                Level::Warning,
+                format!("the audit log starts at event {first}; the parts before it were removed"),
+            ),
+            FindingKind::AuditBroken { message } => (
+                Level::Problem,
+                format!("the audit log is not whole: {message}"),
+            ),
+        };
+        Finding { level, text, kind }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -175,12 +279,7 @@ pub(crate) fn make(
     };
     let retention = repo.retention()?;
     let mut findings = Vec::new();
-    let mut problem = |text: String| {
-        findings.push(Finding {
-            level: Level::Problem,
-            text,
-        })
-    };
+    let mut find = |kind: FindingKind| findings.push(Finding::new(kind));
 
     let mut refs = Vec::new();
     for r in repo.refs()? {
@@ -219,21 +318,19 @@ pub(crate) fn make(
         ctl.update(|p| p.phase = Phase::Verifying);
         let report = repo.view()?.verify()?;
         if !report.is_ok() {
-            problem(format!(
-                "{} damaged files and {} damaged objects; run `apeiron verify`",
-                report.damaged_files.len(),
-                report.damaged_objects.len()
-            ));
+            find(FindingKind::Damaged {
+                files: report.damaged_files.len(),
+                objects: report.damaged_objects.len(),
+            });
         }
         Some(report)
     } else {
         None
     };
     if !repository.damaged_files.is_empty() {
-        problem(format!(
-            "{} files were found damaged when the repository was opened",
-            repository.damaged_files.len()
-        ));
+        find(FindingKind::DamagedOnOpen {
+            files: repository.damaged_files.len(),
+        });
     }
 
     let mut remotes = Vec::new();
@@ -248,10 +345,10 @@ pub(crate) fn make(
             match compare(repo, &remote, &mut refs) {
                 Ok(()) => {}
                 Err(e) => {
-                    problem(format!(
-                        "the remote {} did not answer: {}",
-                        remote.name, e.message
-                    ));
+                    find(FindingKind::RemoteDown {
+                        remote: remote.name.clone(),
+                        message: e.message.clone(),
+                    });
                     facts.error = Some(e);
                 }
             }
@@ -259,36 +356,27 @@ pub(crate) fn make(
         remotes.push(facts);
     }
     for r in &refs {
-        for copy in &r.copies {
-            let why = match copy.state {
-                CopyKind::Current => continue,
-                CopyKind::Behind => "is behind",
-                CopyKind::Missing => "is missing",
-                CopyKind::Other => "has snapshots this copy does not",
-            };
-            problem(format!("{} {why} on {}", r.name, copy.remote));
+        for copy in r.copies.iter().filter(|c| c.state != CopyKind::Current) {
+            find(FindingKind::Copy {
+                name: r.name.clone(),
+                remote: copy.remote.clone(),
+                state: copy.state,
+            });
         }
     }
-
-    let mut warning = |text: String| {
-        findings.push(Finding {
-            level: Level::Warning,
-            text,
-        })
-    };
     for r in refs.iter().filter(|r| r.stale) {
-        warning(format!(
-            "{} has had no new snapshot for more than {} days",
-            r.name, request.stale_days
-        ));
+        find(FindingKind::Stale {
+            name: r.name.clone(),
+            days: request.stale_days,
+        });
     }
     if !repository.encrypted {
-        warning("the repository is not encrypted".to_owned());
+        find(FindingKind::NotEncrypted);
     } else if repository.recovery_keys == 0 {
-        warning("there is no recovery key; a forgotten password loses everything".to_owned());
+        find(FindingKind::NoRecoveryKey);
     }
     if remotes.is_empty() {
-        warning("there is no remote: every backup exists in one place only".to_owned());
+        find(FindingKind::NoRemote);
     }
     findings.sort_by_key(|f| f.level);
     ctl.update(|p| p.phase = Phase::Done);
