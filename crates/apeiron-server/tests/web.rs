@@ -1297,3 +1297,62 @@ fn a_link_with_a_password() {
     assert!(!log.contains("a long secret") && !log.contains(&secret));
     assert!(log.contains("\"event\":\"shared:unlock\""));
 }
+
+#[test]
+fn a_link_ends_after_its_downloads() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_server, mut root, home) = start(dir.path());
+    fs::create_dir_all(home.join("docs")).unwrap();
+    fs::write(home.join("docs/f.txt"), "first").unwrap();
+    root.sign_in();
+    let done = root.run(
+        "backup",
+        json!({"source": home.join("docs"), "ref": "backup/docs"}),
+    );
+    assert!(done["result"]["snapshot"].is_string(), "{done}");
+
+    for downloads in [0, 1001] {
+        let refused = root.post(
+            "/api/shares",
+            json!({"snapshot": "backup/docs", "downloads": downloads}),
+        );
+        assert_eq!(refused.json()["kind"], "invalid_input");
+    }
+    let made = root
+        .post(
+            "/api/shares",
+            json!({"snapshot": "backup/docs", "downloads": 2}),
+        )
+        .json();
+    assert_eq!(made["share"]["max_downloads"], 2);
+    let secret = made["secret"].as_str().unwrap().to_owned();
+    let guest = Client {
+        address: root.address,
+        tls: None,
+        cookie: None,
+    };
+
+    // Looking does not count; each file or zip file does.
+    for _ in 0..3 {
+        let seen = guest.get(&format!("/api/shared/{secret}")).json();
+        assert_eq!(seen["downloads_left"], 2);
+    }
+    let file = guest.get(&format!("/api/shared/{secret}/file?path=f.txt"));
+    assert_eq!((file.status, file.body.as_str()), (200, "first"));
+    // A refused download does not count either.
+    let folder = guest.get(&format!("/api/shared/{secret}/file?path="));
+    assert_eq!(folder.status, 400);
+    let seen = guest.get(&format!("/api/shared/{secret}")).json();
+    assert_eq!(seen["downloads_left"], 1);
+    assert_eq!(guest.get_bytes(&format!("/api/shared/{secret}/zip")).0, 200);
+
+    // Then the link is gone, like one whose time is up.
+    assert_eq!(guest.get(&format!("/api/shared/{secret}")).status, 404);
+    assert_eq!(
+        guest
+            .get(&format!("/api/shared/{secret}/file?path=f.txt"))
+            .status,
+        404
+    );
+    assert_eq!(root.get("/api/shares").json(), json!([]));
+}

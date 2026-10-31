@@ -26,6 +26,7 @@ A link works until the first of these:
 | Its time is up | 1, 7 or 30 days, chosen when it is made; 7 by default, at most 30 |
 | It is removed | By its owner or an `admin`, in the pages or with `apeiron web share remove` |
 | Its owner may no longer share it | The owner was removed, became a `reader`, or no longer sees the version |
+| Its downloads are used up | When a limit of 1 to 1000 downloads was chosen at making: each file or zip file sent through the link counts once it starts, even if it is cut short; looking at folders does not count |
 
 A link can also ask for a password, of at least 8 characters, chosen when it is made; the owner sends it another way than the link. The server keeps only its Argon2id hash. Until the password is given, the link shows nothing but a password field. A right password sets the cookie `apeiron_share` for the link's own path (`HttpOnly`, `Secure`, `SameSite=Strict`, until the browser closes): a SHA-256 of the secret and the stored hash, which no one can make without the password, and which opens no other link. Wrong passwords pause like wrong sign-ins (WEB.md): after 5 in a row, every link's password waits a minute.
 
@@ -65,6 +66,7 @@ Links are kept in `shares.json` in the state folder (`~/.local/state/apeiron` on
 | `snapshot` | The id of the shared version |
 | `path` | The shared path inside it; empty for all of it |
 | `made`, `expires` | UTC times |
+| `max_downloads`, `downloads` | The limit, left out for a link without one, and the downloads counted so far; counted under the same lock, so two downloads cannot both take the last one |
 | `protected`, `password` | Whether the link asks for a password, and its Argon2id hash as a PHC string; `password` is left out for a link without one |
 
 The server and `apeiron web share` change the file under a lock (`shares.lock`) and replace it whole with a new file written and flushed beside it, so a crash leaves the old file or the new one. Ended links are dropped whenever the file changes. A damaged file is reported, never replaced.
@@ -81,10 +83,10 @@ Nothing above or beside the shared path can be reached: a path with `.` or `..` 
 | --- | --- |
 | Share buttons while looking inside a version | Make a link to a file, a folder or the whole version; for an `admin` and a `member` |
 | The Links page | The user's live links with their end; an `admin` sees everyone's; Remove |
-| `POST /api/shares` `{"snapshot", "path", "days", "password"}` | Makes a link, with a password when one is given; answers `{"share", "secret"}` |
+| `POST /api/shares` `{"snapshot", "path", "days", "password", "downloads"}` | Makes a link, with a password and a limit of downloads when they are given; answers `{"share", "secret"}` |
 | `GET /api/shares` | The user's live links, without hashes; all of them for an `admin` |
 | `POST /api/shares/<id>/remove` | Removes a link of the user; any link for an `admin` |
-| `GET /api/shared/<secret>?path=<path>` | Without signing in: the entry at the path below the link, a folder's entries, the version's time and the link's end |
+| `GET /api/shared/<secret>?path=<path>` | Without signing in: the entry at the path below the link, a folder's entries, the version's time, the link's end and the downloads left, if limited |
 | `GET /api/shared/<secret>/file?path=<path>` | Without signing in: the file at the path, as a download |
 | `GET /api/shared/<secret>/zip?path=<path>` | Without signing in: the folder at the path with everything in it, as one zip file; recorded as `shared:read` |
 | `POST /api/shared/<secret>/unlock` `{"password"}` | Without signing in: checks the link's password and sets its cookie; the two requests above answer `key` (401) for a link with a password until then |
@@ -109,7 +111,6 @@ The secret is never recorded ([AUDIT.md](AUDIT.md)).
 | Item | Where |
 | --- | --- |
 | Links that let others upload | Later |
-| Limiting how often a link can be used | Later |
 | Sharing with named users of the server | Not needed: give the user the backup in the users file (USERS.md §2) |
 
 ## 8. Crates

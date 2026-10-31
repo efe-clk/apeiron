@@ -26,6 +26,7 @@ Bir bağlantı, şunlardan ilki olana kadar çalışır:
 | Süresi dolar | Oluşturulurken seçilen 1, 7 ya da 30 gün; varsayılan 7, en çok 30 |
 | Kaldırılır | Sahibi ya da bir `admin` tarafından, sayfalarda ya da `apeiron web share remove` ile |
 | Sahibi artık onu paylaşamaz | Sahibi silinmiş, `reader` olmuş ya da sürümü artık görmüyordur |
+| İndirmeleri tükenir | Oluşturulurken 1 ile 1000 arasında bir indirme sınırı seçildiyse: bağlantı üzerinden gönderilen her dosya ya da zip dosyası başladığı anda sayılır, yarıda kesilse bile; klasörlere bakmak sayılmaz |
 
 Bir bağlantı, oluşturulurken seçilen en az 8 karakterlik bir parola da isteyebilir; sahibi parolayı bağlantıdan başka bir yoldan iletir. Sunucu yalnızca parolanın Argon2id özetini tutar. Parola girilene kadar bağlantı bir parola alanından başka bir şey göstermez. Doğru parola, bağlantının kendi yolu için `apeiron_share` çerezini koyar (`HttpOnly`, `Secure`, `SameSite=Strict`, tarayıcı kapanana kadar): gizli kısmın ve saklanan özetin SHA-256 özeti; bunu parolayı bilmeyen kimse üretemez ve başka hiçbir bağlantıyı açmaz. Yanlış parolalar, yanlış oturum açmalar gibi bekletilir (WEB.tr.md): art arda 5 yanlıştan sonra bütün bağlantıların parolaları bir dakika bekler.
 
@@ -65,6 +66,7 @@ Bağlantılar, durum klasöründeki (Linux'ta `~/.local/state/apeiron`) ve yaln�
 | `snapshot` | Paylaşılan sürümün kimliği |
 | `path` | İçinde paylaşılan yol; tamamı için boş |
 | `made`, `expires` | UTC zamanları |
+| `max_downloads`, `downloads` | Sınır, sınırsız bir bağlantıda yazılmaz, ve şimdiye kadar sayılan indirmeler; aynı kilit altında sayılır, böylece iki indirme sonuncusunu birlikte alamaz |
 | `protected`, `password` | Bağlantının parola isteyip istemediği ve parolanın PHC dizesi olarak Argon2id özeti; parolasız bir bağlantıda `password` yazılmaz |
 
 Sunucu ve `apeiron web share` dosyayı bir kilit (`shares.lock`) altında değiştirir ve onu, yanına yazılıp diske aktarılmış yeni bir dosyayla bütünüyle değiştirir; böylece bir çökme ya eski dosyayı ya yenisini bırakır. Biten bağlantılar dosya her değiştiğinde atılır. Bozuk bir dosya bildirilir, asla yerine yenisi yazılmaz.
@@ -81,10 +83,10 @@ Paylaşılan yolun üstündeki ya da yanındaki hiçbir şeye ulaşılamaz: `.` 
 | --- | --- |
 | Bir sürümün içine bakarken Paylaş düğmeleri | Bir dosyaya, bir klasöre ya da sürümün tamamına bağlantı oluşturur; bir `admin` ve bir `member` için |
 | Bağlantılar sayfası | Kullanıcının çalışan bağlantıları ve bitişleri; bir `admin` herkesinkini görür; Kaldır |
-| `POST /api/shares` `{"snapshot", "path", "days", "password"}` | Bir bağlantı oluşturur, parola verilmişse parolalı; `{"share", "secret"}` ile yanıt verir |
+| `POST /api/shares` `{"snapshot", "path", "days", "password", "downloads"}` | Bir bağlantı oluşturur, verilmişlerse parolalı ve indirme sınırlı; `{"share", "secret"}` ile yanıt verir |
 | `GET /api/shares` | Kullanıcının çalışan bağlantıları, özetler olmadan; bir `admin` için hepsi |
 | `POST /api/shares/<id>/remove` | Kullanıcının bir bağlantısını kaldırır; bir `admin` için herhangi birini |
-| `GET /api/shared/<gizli>?path=<yol>` | Oturum açmadan: bağlantının altındaki yoldaki öğe, bir klasörün içindekiler, sürümün zamanı ve bağlantının bitişi |
+| `GET /api/shared/<gizli>?path=<yol>` | Oturum açmadan: bağlantının altındaki yoldaki öğe, bir klasörün içindekiler, sürümün zamanı, bağlantının bitişi ve sınırlıysa kalan indirmeler |
 | `GET /api/shared/<gizli>/file?path=<yol>` | Oturum açmadan: yoldaki dosya, indirme olarak |
 | `GET /api/shared/<gizli>/zip?path=<yol>` | Oturum açmadan: yoldaki klasör, içindeki her şeyle birlikte tek bir zip dosyası olarak; `shared:read` olarak kaydedilir |
 | `POST /api/shared/<gizli>/unlock` `{"password"}` | Oturum açmadan: bağlantının parolasını denetler ve çerezini koyar; o zamana kadar parolalı bir bağlantı için yukarıdaki iki istek `key` (401) ile yanıt verir |
@@ -109,7 +111,6 @@ Gizli kısım asla kaydedilmez ([AUDIT.tr.md](AUDIT.tr.md)).
 | Konu | Nerede |
 | --- | --- |
 | Başkalarının yükleme yapabildiği bağlantılar | Sonra |
-| Bir bağlantının ne sıklıkla kullanılabileceğini sınırlamak | Sonra |
 | Sunucunun adı belli kullanıcılarıyla paylaşmak | Gerekmez: kullanıcılar dosyasında yedeği kullanıcıya verin (USERS.tr.md §2) |
 
 ## 8. Crate'ler

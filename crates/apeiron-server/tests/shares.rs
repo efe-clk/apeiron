@@ -4,7 +4,7 @@ use std::fs;
 use std::thread;
 
 use apeiron::{ErrorKind, ObjectId};
-use apeiron_server::Shares;
+use apeiron_server::{LinkOptions, Shares};
 
 fn snapshot() -> ObjectId {
     ObjectId::from_hex(&"b".repeat(64)).unwrap()
@@ -21,7 +21,7 @@ fn writers_at_the_same_time_lose_nothing() {
                 (0..5)
                     .map(|_| {
                         shares
-                            .add(&format!("u{n}"), snapshot(), "a", 1, None)
+                            .add(&format!("u{n}"), snapshot(), "a", &LinkOptions::days(1))
                             .unwrap()
                     })
                     .collect::<Vec<_>>()
@@ -66,7 +66,10 @@ fn a_damaged_file_is_reported_not_replaced() {
     let shares = Shares::new(&file);
     assert_eq!(shares.list().unwrap_err().kind, ErrorKind::Corrupt);
     assert_eq!(
-        shares.add("u", snapshot(), "", 1, None).unwrap_err().kind,
+        shares
+            .add("u", snapshot(), "", &LinkOptions::days(1))
+            .unwrap_err()
+            .kind,
         ErrorKind::Corrupt
     );
     assert_eq!(fs::read_to_string(&file).unwrap(), "{\"shares\": [");

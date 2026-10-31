@@ -693,13 +693,16 @@ fn web_share(files: &WebFiles, command: ShareCommand, out: &Output) -> Result<()
             out.result(&list, |list| {
                 for s in list {
                     say!(
-                        "{}  {}  {}:/{}  until {}{}",
+                        "{}  {}  {}:/{}  until {}{}{}",
                         s.id,
                         s.owner,
                         &s.snapshot.to_string()[..12],
                         s.path,
                         s.expires,
-                        if s.protected { "  (password)" } else { "" }
+                        if s.protected { "  (password)" } else { "" },
+                        s.max_downloads
+                            .map(|max| format!("  ({} of {max} downloads)", s.downloads))
+                            .unwrap_or_default()
                     );
                 }
                 if list.is_empty() {

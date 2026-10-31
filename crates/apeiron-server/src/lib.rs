@@ -28,7 +28,7 @@ use std::time::Duration;
 
 pub use audit::{Actor, Audit, Event, Verified};
 pub use oidc::{OidcConfig, Provider, check_provider};
-pub use shares::{DEFAULT_DAYS, MAX_DAYS, Share, Shares};
+pub use shares::{DEFAULT_DAYS, LinkOptions, MAX_DAYS, MAX_DOWNLOADS, Share, Shares};
 pub use tenants::{Tenant, Tenants};
 pub use users::{MIN_PASSWORD, Role, User, Users, hash_password};
 pub use web::{TenantOptions, Tls, Web, WebOptions};
@@ -767,6 +767,9 @@ struct NewShare {
     /// Asked of whoever opens the link; none when absent or empty.
     #[serde(default)]
     password: Option<String>,
+    /// Downloads after which the link ends; none for no limit.
+    #[serde(default)]
+    downloads: Option<u32>,
 }
 
 fn default_days() -> u32 {
@@ -783,8 +786,12 @@ async fn share_add(
     let repo = app.repo()?;
     let answer = blocking(move || {
         let (web, who) = web_user(&app, who_)?;
-        let password = r.password.as_deref();
-        match web.share(&repo, &who.user, &r.snapshot, &r.path, r.days, password) {
+        let options = LinkOptions {
+            days: r.days,
+            password: r.password.clone(),
+            downloads: r.downloads,
+        };
+        match web.share(&repo, &who.user, &r.snapshot, &r.path, &options) {
             Ok((share, secret)) => {
                 let detail = json!({
                     "id": share.id,
@@ -792,6 +799,7 @@ async fn share_add(
                     "path": share.path,
                     "expires": share.expires,
                     "protected": share.protected,
+                    "max_downloads": share.max_downloads,
                 });
                 // A link that cannot be recorded does not stay.
                 if let Err(e) = web.audit.record(&who.actor(), "share_add", detail, "ok") {

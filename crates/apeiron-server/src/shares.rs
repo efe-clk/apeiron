@@ -17,6 +17,31 @@ use crate::users::hash_password;
 /// Days a link lasts when none are given, and at most (SHARE.md §2).
 pub const DEFAULT_DAYS: u32 = 7;
 pub const MAX_DAYS: u32 = 30;
+/// The most downloads a link can be limited to (SHARE.md §2).
+pub const MAX_DOWNLOADS: u32 = 1000;
+
+/// How a new link works (SHARE.md §2).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct LinkOptions {
+    /// Days until it ends, 1 to [`MAX_DAYS`].
+    pub days: u32,
+    /// Asked of whoever opens it; none when absent or empty.
+    pub password: Option<String>,
+    /// Downloads after which it ends, 1 to [`MAX_DOWNLOADS`]; none for no
+    /// limit.
+    pub downloads: Option<u32>,
+}
+
+impl LinkOptions {
+    /// A link for `days`, without a password or a limit.
+    pub fn days(days: u32) -> Self {
+        LinkOptions {
+            days,
+            password: None,
+            downloads: None,
+        }
+    }
+}
 
 /// One link, as kept in the shares file (SHARE.md §3).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -40,12 +65,20 @@ pub struct Share {
     /// a link without one.
     #[serde(skip_serializing_if = "String::is_empty", default)]
     pub password: String,
+    /// Downloads after which the link ends; none for no limit.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub max_downloads: Option<u32>,
+    /// Files and zip files downloaded through the link so far.
+    #[serde(default)]
+    pub downloads: u32,
 }
 
 impl Share {
-    /// Whether the link has not ended by `now`.
+    /// Whether the link has not ended by `now`, by its time or its
+    /// downloads.
     fn live(&self, now: Timestamp) -> bool {
         self.expires.parse::<Timestamp>().is_ok_and(|t| now < t)
+            && self.max_downloads.is_none_or(|max| self.downloads < max)
     }
 
     /// The share without its hashes, for showing.
@@ -174,24 +207,34 @@ impl Shares {
         Ok(out)
     }
 
-    /// Makes a link to `path` in `snapshot` for `owner`, lasting `days`,
-    /// asking for `password` if one is given; returns it with its secret,
-    /// which is shown only now.
+    /// Makes a link to `path` in `snapshot` for `owner` that works as
+    /// `options` say; returns it with its secret, which is shown only now.
     pub fn add(
         &self,
         owner: &str,
         snapshot: ObjectId,
         path: &str,
-        days: u32,
-        password: Option<&str>,
+        options: &LinkOptions,
     ) -> Result<(Share, String), Error> {
+        let days = options.days;
         if !(1..=MAX_DAYS).contains(&days) {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
                 format!("a link lasts 1 to {MAX_DAYS} days"),
             ));
         }
-        let password = password
+        if options
+            .downloads
+            .is_some_and(|n| !(1..=MAX_DOWNLOADS).contains(&n))
+        {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                format!("a link can be limited to 1 to {MAX_DOWNLOADS} downloads"),
+            ));
+        }
+        let password = options
+            .password
+            .as_deref()
             .filter(|p| !p.is_empty())
             .map(hash_password)
             .transpose()?
@@ -212,6 +255,8 @@ impl Shares {
             expires: expires.to_string(),
             protected: !password.is_empty(),
             password,
+            max_downloads: options.downloads,
+            downloads: 0,
         };
         self.change(|shares| {
             shares.push(share.clone());
@@ -235,6 +280,16 @@ impl Shares {
             .into_iter()
             .find(|s| s.hash == hash)
             .ok_or_else(gone)
+    }
+
+    /// Counts one download through the link `id`, once it is known to be
+    /// allowed; a link whose downloads are used up is gone, as if ended.
+    pub fn take_download(&self, id: &str) -> Result<(), Error> {
+        self.change(|shares| {
+            let share = shares.iter_mut().find(|s| s.id == id).ok_or_else(gone)?;
+            share.downloads += 1;
+            Ok(())
+        })
     }
 
     /// Removes the link `id` if `may` allows it; returns it.

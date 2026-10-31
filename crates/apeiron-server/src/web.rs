@@ -26,7 +26,7 @@ use sha2::{Digest, Sha256};
 use crate::audit::{Actor, Audit};
 use crate::oidc::{Oidc, OidcConfig};
 use crate::replicate::Replicator;
-use crate::shares::{Share, Shares, gone};
+use crate::shares::{LinkOptions, Share, Shares, gone};
 use crate::users::{Role, User, Users, hash_password};
 use crate::{App, Failure, Mode, Running, blocking, body, invalid, lock};
 
@@ -864,8 +864,7 @@ impl WebState {
         user: &User,
         spec: &str,
         path: &str,
-        days: u32,
-        password: Option<&str>,
+        options: &LinkOptions,
     ) -> Result<(Share, String), Error> {
         if user.role == Role::Reader {
             return Err(Error::new(
@@ -885,7 +884,7 @@ impl WebState {
             return Err(invalid(format!("{path} is not a path inside a backup")));
         }
         entry_at(repo, snapshot, path)?;
-        self.shares.add(&user.name, snapshot, path, days, password)
+        self.shares.add(&user.name, snapshot, path, options)
     }
 
     /// The link whose secret is `secret`, while its owner may still share
@@ -935,6 +934,7 @@ impl WebState {
             "entries": entries,
             "time": time,
             "expires": share.expires,
+            "downloads_left": share.max_downloads.map(|max| max.saturating_sub(share.downloads)),
         }))
     }
 
@@ -948,7 +948,10 @@ impl WebState {
     ) -> Result<(String, u64), Error> {
         let path = below(share, sub)?;
         match entry_at(repo, share.snapshot, &path).map_err(|_| gone())? {
-            Some(e) if e.kind == apeiron::Kind::File => Ok((path, e.size.unwrap_or(0))),
+            Some(e) if e.kind == apeiron::Kind::File => {
+                self.shares.take_download(&share.id)?;
+                Ok((path, e.size.unwrap_or(0)))
+            }
             _ => Err(invalid("only files can be downloaded")),
         }
     }
@@ -963,10 +966,12 @@ impl WebState {
     ) -> Result<String, Error> {
         let path = below(share, sub)?;
         match entry_at(repo, share.snapshot, &path).map_err(|_| gone())? {
-            None => Ok(path),
-            Some(e) if e.kind == apeiron::Kind::Dir => Ok(path),
-            _ => Err(invalid("only folders are downloaded as an archive")),
+            None => {}
+            Some(e) if e.kind == apeiron::Kind::Dir => {}
+            _ => return Err(invalid("only folders are downloaded as an archive")),
         }
+        self.shares.take_download(&share.id)?;
+        Ok(path)
     }
 }
 

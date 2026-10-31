@@ -997,12 +997,13 @@ function share(snapshot, path) {
   showNav("shares");
   const days = h("select", {}, ...[1, 7, 30].map((n) => h("option", { value: n, selected: n === 7 }, t(`days_${n}`))));
   const password = h("input", { type: "password", autocomplete: "new-password", minlength: 8 });
+  const downloads = h("select", {}, ...["", 1, 3, 10, 100].map((n) => h("option", { value: n }, n ? t("share_downloads_n", { n }) : t("share_downloads_any"))));
   const status = h("div");
   const form = h("form", { onsubmit: async (e) => {
     e.preventDefault();
     status.replaceChildren();
     try {
-      const made = await api("POST", "/api/shares", { snapshot: snapshot.id, path, days: Number(days.value), password: password.value });
+      const made = await api("POST", "/api/shares", { snapshot: snapshot.id, path, days: Number(days.value), password: password.value, downloads: downloads.value ? Number(downloads.value) : null });
       const link = h("input", { type: "text", readonly: true, value: `${location.origin}/s/${made.secret}` });
       const copied = h("span", { class: "muted", role: "status" });
       form.replaceChildren(
@@ -1021,6 +1022,7 @@ function share(snapshot, path) {
   } },
     ...field(t("share_days"), days),
     ...field(t("share_password"), password, t("share_password_hint")),
+    ...field(t("share_downloads"), downloads, t("share_downloads_hint")),
     h("div", { class: "actions" }, h("button", { type: "submit", class: "primary" }, t("share_button"))),
   );
   const what = path || t("share_what_all");
@@ -1040,7 +1042,8 @@ async function shares() {
     const list = await api("GET", "/api/shares");
     const owners = user?.role === "admin";
     const rows = list.map((s) => h("tr", {},
-      h("td", {}, `${s.snapshot.slice(0, 12)}:/${s.path}`, s.protected ? h("div", { class: "muted" }, t("shares_protected")) : null),
+      h("td", {}, `${s.snapshot.slice(0, 12)}:/${s.path}`, s.protected ? h("div", { class: "muted" }, t("shares_protected")) : null,
+        s.max_downloads ? h("div", { class: "muted" }, t("shares_downloads", { n: s.downloads, max: s.max_downloads })) : null),
       owners ? h("td", {}, s.owner) : null,
       h("td", {}, until(s.expires)),
       h("td", {}, h("button", { type: "button", onclick: async (e) => {
@@ -1111,7 +1114,8 @@ async function shared(secret, path = "") {
     }
     show(
       h("h1", {}, t("shared_heading")),
-      h("p", { class: "muted" }, t("shared_intro", { time: when(view.time), until: until(view.expires) })),
+      h("p", { class: "muted" }, t("shared_intro", { time: when(view.time), until: until(view.expires) }),
+        view.downloads_left === null || view.downloads_left === undefined ? "" : ` ${t("shared_downloads_left", { n: view.downloads_left })}`),
       h("div", { class: "card" }, body),
     );
   } catch (err) {
