@@ -1,7 +1,7 @@
 //! Writing a snapshot into a tar, zip or 7z archive.
 
 use std::fs::{self, File};
-use std::io::{self, Read};
+use std::io::{self, Read, Seek, Write};
 use std::path::{Path, PathBuf};
 
 use apeiron_core::{EntryKind, ObjectId, Repository, Time, Tree, TreeEntry};
@@ -89,6 +89,21 @@ pub fn export(
     Ok(out)
 }
 
+/// Writes `path` of `snapshot` as a zip archive into `out` as it is read,
+/// for a download: nothing is written to disk and `out` is never sought.
+pub fn export_zip_to(
+    repo: &Repository,
+    snapshot: &ObjectId,
+    path: &[u8],
+    out: impl Write,
+    ctl: &Control,
+) -> Result<ExportOutcome> {
+    let root = repo.read_snapshot(snapshot)?.tree;
+    let node = lookup(repo, &root, path)?;
+    let sink = ZipSink(zip::ZipWriter::new_stream(out));
+    run_sink(repo, &node, Box::new(sink), Path::new("download"), ctl)
+}
+
 fn write_archive(
     repo: &Repository,
     node: &Node,
@@ -104,6 +119,16 @@ fn write_archive(
             sevenz_rust2::ArchiveWriter::new(file).map_err(|e| archive_error(output, e))?,
         )),
     };
+    run_sink(repo, node, sink, output, ctl)
+}
+
+fn run_sink<'a>(
+    repo: &'a Repository,
+    node: &Node,
+    sink: Box<dyn Sink + 'a>,
+    output: &Path,
+    ctl: &'a Control,
+) -> Result<ExportOutcome> {
     let mut run = Run {
         repo,
         ctl,
@@ -150,7 +175,7 @@ struct Run<'a> {
     repo: &'a Repository,
     ctl: &'a Control,
     output: PathBuf,
-    sink: Box<dyn Sink>,
+    sink: Box<dyn Sink + 'a>,
     out: ExportOutcome,
 }
 
@@ -353,9 +378,26 @@ impl Sink for TarSink {
     }
 }
 
-struct ZipSink(zip::ZipWriter<File>);
+/// Where a zip archive ends: a file made durable, or a stream flushed.
+trait ZipOut: Write + Seek {
+    fn done(self) -> io::Result<()>;
+}
 
-impl ZipSink {
+impl ZipOut for File {
+    fn done(self) -> io::Result<()> {
+        self.sync_all()
+    }
+}
+
+impl<W: Write> ZipOut for zip::write::StreamWriter<W> {
+    fn done(self) -> io::Result<()> {
+        self.into_inner().flush()
+    }
+}
+
+struct ZipSink<W: ZipOut>(zip::ZipWriter<W>);
+
+impl<W: ZipOut> ZipSink<W> {
     fn options(m: &Member<'_>, default_mode: u16) -> zip::write::SimpleFileOptions {
         let mut options = zip::write::SimpleFileOptions::default()
             .compression_method(zip::CompressionMethod::Deflated)
@@ -402,16 +444,16 @@ fn zip_io(e: zip::result::ZipError) -> io::Error {
     }
 }
 
-impl Sink for ZipSink {
+impl<W: ZipOut> Sink for ZipSink<W> {
     fn dir(&mut self, m: &Member<'_>) -> io::Result<()> {
-        let options = ZipSink::options(m, 0o755);
+        let options = Self::options(m, 0o755);
         self.0
             .add_directory(utf8_name(m.name)?, options)
             .map_err(zip_io)
     }
 
     fn file(&mut self, m: &Member<'_>, size: u64, content: &mut dyn Read) -> io::Result<()> {
-        let options = ZipSink::options(m, 0o644).large_file(size >= u64::from(u32::MAX));
+        let options = Self::options(m, 0o644).large_file(size >= u64::from(u32::MAX));
         self.0
             .start_file(utf8_name(m.name)?, options)
             .map_err(zip_io)?;
@@ -422,14 +464,14 @@ impl Sink for ZipSink {
     fn symlink(&mut self, m: &Member<'_>, target: &[u8]) -> io::Result<()> {
         let target = std::str::from_utf8(target)
             .map_err(|_| not_representable("a link target that is not valid UTF-8"))?;
-        let options = ZipSink::options(m, 0o777);
+        let options = Self::options(m, 0o777);
         self.0
             .add_symlink(utf8_name(m.name)?, target, options)
             .map_err(zip_io)
     }
 
     fn finish(self: Box<Self>) -> io::Result<()> {
-        self.0.finish().map_err(zip_io)?.sync_all()
+        self.0.finish().map_err(zip_io)?.done()
     }
 }
 

@@ -71,7 +71,7 @@ Sunucu ve `apeiron web share` dosyayı bir kilit (`shares.lock`) altında deği�
 
 ## 4. Bağlantıyı açan kişinin gördükleri
 
-Bağlantıyı açmak, paylaşılan klasörü, alt klasörlerini ve her dosya için bir İndir düğmesini gösteren bir sayfa açar; paylaşılan bir dosya tek başına gösterilir. Dosyalar okundukça gönderilir, böylece büyük bir dosya sunucunun belleğini doldurmaz. Yedeğin içindeki bağlantılar (symlink) listelenir ama izlenmez.
+Bağlantıyı açmak, paylaşılan klasörü, alt klasörlerini, her dosya için bir İndir düğmesini ve gösterilen klasörü içindeki her şeyle birlikte tek bir zip dosyası olarak indiren bir düğmeyi gösteren bir sayfa açar; paylaşılan bir dosya tek başına gösterilir. Dosyalar ve zip dosyaları, sunucunun diskine bir kopyası yazılmadan, okundukça gönderilir, böylece büyük bir dosya sunucunun belleğini doldurmaz. Yedeğin içindeki bağlantılar (symlink) listelenir ama izlenmez.
 
 Paylaşılan yolun üstündeki ya da yanındaki hiçbir şeye ulaşılamaz: `.` ya da `..` içeren bir yol reddedilir. Bilinmeyen, bitmiş ya da kaldırılmış bir bağlantı ve sahibi artık paylaşamayan bir bağlantı hep aynı "bulunamadı" yanıtını verir. Sayfalar `Referrer-Policy: no-referrer` ile yanıt verir, böylece bağlantı başka bir siteye giden bir istekle dışarı çıkmaz.
 
@@ -86,6 +86,7 @@ Paylaşılan yolun üstündeki ya da yanındaki hiçbir şeye ulaşılamaz: `.` 
 | `POST /api/shares/<id>/remove` | Kullanıcının bir bağlantısını kaldırır; bir `admin` için herhangi birini |
 | `GET /api/shared/<gizli>?path=<yol>` | Oturum açmadan: bağlantının altındaki yoldaki öğe, bir klasörün içindekiler, sürümün zamanı ve bağlantının bitişi |
 | `GET /api/shared/<gizli>/file?path=<yol>` | Oturum açmadan: yoldaki dosya, indirme olarak |
+| `GET /api/shared/<gizli>/zip?path=<yol>` | Oturum açmadan: yoldaki klasör, içindeki her şeyle birlikte tek bir zip dosyası olarak; `shared:read` olarak kaydedilir |
 | `POST /api/shared/<gizli>/unlock` `{"password"}` | Oturum açmadan: bağlantının parolasını denetler ve çerezini koyar; o zamana kadar parolalı bir bağlantı için yukarıdaki iki istek `key` (401) ile yanıt verir |
 | `apeiron web share list` | Bütün kullanıcıların çalışan bağlantıları |
 | `apeiron web share remove <id>` | Bir bağlantıyı kaldırır |
@@ -107,7 +108,6 @@ Gizli kısım asla kaydedilmez ([AUDIT.tr.md](AUDIT.tr.md)).
 
 | Konu | Nerede |
 | --- | --- |
-| Bütün bir klasörü tek bir arşiv olarak indirmek | Sonra; sunucuda `apeiron export` bunu yapar |
 | Başkalarının yükleme yapabildiği bağlantılar | Sonra |
 | Bir bağlantının ne sıklıkla kullanılabileceğini sınırlamak | Sonra |
 | Sunucunun adı belli kullanıcılarıyla paylaşmak | Gerekmez: kullanıcılar dosyasında yedeği kullanıcıya verin (USERS.tr.md §2) |

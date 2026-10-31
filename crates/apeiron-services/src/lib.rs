@@ -24,7 +24,7 @@ pub use conflicts::{ConflictCopy, Keep, find_conflicts, original_name, resolve_c
 pub use control::{Control, Phase, Progress, Warning, WarningKind};
 pub use diff::{Change, ChangeKind, diff};
 pub use error::{Error, Result};
-pub use export::{ArchiveFormat, ExportOutcome, export};
+pub use export::{ArchiveFormat, ExportOutcome, export, export_zip_to};
 pub use list::{EntryInfo, Kind, list, read_path, read_to};
 pub use merge::{
     Conflict, ConflictKind, ContentMerger, MergeAction, MergeOptions, MergeOutcome, Merged,

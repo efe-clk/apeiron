@@ -1104,7 +1104,10 @@ async function shared(secret, path = "") {
           h("td", {}, e.kind === "file" ? download(full) : null),
         );
       });
-      body = [crumbs, rows.length ? h("table", {}, h("tbody", {}, rows)) : h("p", { class: "muted" }, t("empty_folder"))];
+      const zip = rows.length
+        ? h("div", { class: "actions" }, h("a", { class: "button", href: `${base}/zip?path=${encodeURIComponent(path)}`, download: "" }, t("download_zip")))
+        : null;
+      body = [crumbs, rows.length ? h("table", {}, h("tbody", {}, rows)) : h("p", { class: "muted" }, t("empty_folder")), zip];
     }
     show(
       h("h1", {}, t("shared_heading")),

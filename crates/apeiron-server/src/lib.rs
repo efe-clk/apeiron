@@ -986,29 +986,85 @@ async fn shared_file(
     )
     .await?;
     let name = path.rsplit('/').next().unwrap_or("file").to_owned();
+    let request = ListRequest {
+        snapshot: snapshot.to_string(),
+        path: path.as_str().into(),
+    };
+    let body = download(move |out| repo.read_file(&request, out).map(drop));
+    Ok((
+        [
+            (header::CONTENT_TYPE, "application/octet-stream".to_owned()),
+            (header::CONTENT_LENGTH, size.to_string()),
+            (header::CONTENT_DISPOSITION, attachment(&name)),
+        ],
+        body,
+    )
+        .into_response())
+}
+
+/// A body written by `write` on a thread of its own as it is read; an error
+/// after the first bytes can only cut the download short.
+fn download(
+    write: impl FnOnce(&mut dyn io::Write) -> Result<(), Error> + Send + 'static,
+) -> axum::body::Body {
     let (tx, rx) = tokio::sync::mpsc::channel(4);
     tokio::task::spawn_blocking(move || {
         let mut out = io::BufWriter::with_capacity(1 << 18, ToChannel(tx.clone()));
-        let request = ListRequest {
-            snapshot: snapshot.to_string(),
-            path: path.as_str().into(),
-        };
-        // An error after the first bytes can only cut the download short.
-        if let Err(e) = repo.read_file(&request, &mut out) {
-            let _ = tx.blocking_send(Err(io::Error::other(e.to_string())));
+        let result = write(&mut out).and_then(|()| {
+            io::Write::flush(&mut out).map_err(|e| Error::new(ErrorKind::Io, e.to_string()))
+        });
+        if let Err(e) = result {
+            let _ = tx.blocking_send(Err(io::Error::other(e.message)));
         }
     });
     let stream = futures_util::stream::unfold(rx, |mut rx| async move {
         rx.recv().await.map(|item| (item, rx))
     });
-    let disposition = format!("attachment; filename*=UTF-8''{}", percent(&name));
+    axum::body::Body::from_stream(stream)
+}
+
+fn attachment(name: &str) -> String {
+    format!("attachment; filename*=UTF-8''{}", percent(name))
+}
+
+/// A folder below a share link as one zip archive, sent as it is made
+/// (SHARE.md §4).
+async fn shared_zip(
+    State(app): State<Arc<App>>,
+    UrlPath(secret): UrlPath<String>,
+    from: Option<Extension<ConnectInfo<SocketAddr>>>,
+    headers: HeaderMap,
+    Query(q): Query<SharedQuery>,
+) -> Result<Response, Failure> {
+    let sub = q.path.clone();
+    let (repo, snapshot, path) = through_link(
+        app,
+        secret,
+        web::share_cookie(&headers),
+        from,
+        "shared:read",
+        q.path,
+        move |web, repo, share| {
+            let path = web.shared_folder(repo, share, &sub)?;
+            Ok((repo.clone(), share.snapshot, path))
+        },
+    )
+    .await?;
+    let name = match path.rsplit('/').next() {
+        Some(last) if !last.is_empty() => format!("{last}.zip"),
+        _ => format!("{}.zip", &snapshot.to_string()[..12]),
+    };
+    let request = ListRequest {
+        snapshot: snapshot.to_string(),
+        path: path.as_str().into(),
+    };
+    let body = download(move |out| repo.export_zip_to(&request, out).map(drop));
     Ok((
         [
-            (header::CONTENT_TYPE, "application/octet-stream".to_owned()),
-            (header::CONTENT_LENGTH, size.to_string()),
-            (header::CONTENT_DISPOSITION, disposition),
+            (header::CONTENT_TYPE, "application/zip".to_owned()),
+            (header::CONTENT_DISPOSITION, attachment(&name)),
         ],
-        axum::body::Body::from_stream(stream),
+        body,
     )
         .into_response())
 }
@@ -1095,6 +1151,7 @@ fn router(app: Arc<App>) -> Router {
         .route("/api/shares/{id}/remove", post(share_remove))
         .route("/api/shared/{secret}", get(shared_list))
         .route("/api/shared/{secret}/file", get(shared_file))
+        .route("/api/shared/{secret}/zip", get(shared_zip))
         .route("/api/shared/{secret}/unlock", post(shared_unlock))
         .fallback(page)
         .layer(middleware::from_fn_with_state(app.clone(), guard))

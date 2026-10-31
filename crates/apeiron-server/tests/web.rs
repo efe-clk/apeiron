@@ -61,6 +61,32 @@ impl Reply {
     }
 }
 
+/// The status, the lowercase headers and the body of a raw answer, with a
+/// chunked body joined.
+fn split_reply(raw: &[u8]) -> (u16, String, Vec<u8>) {
+    let end = raw.windows(4).position(|w| w == b"\r\n\r\n").unwrap();
+    let headers = String::from_utf8(raw[..end].to_vec())
+        .unwrap()
+        .to_lowercase();
+    let mut body = raw[end + 4..].to_vec();
+    if headers.contains("transfer-encoding: chunked") {
+        let (mut joined, mut rest) = (Vec::new(), &body[..]);
+        loop {
+            let line = rest.windows(2).position(|w| w == b"\r\n").unwrap();
+            let size =
+                usize::from_str_radix(std::str::from_utf8(&rest[..line]).unwrap().trim(), 16)
+                    .unwrap();
+            if size == 0 {
+                break;
+            }
+            joined.extend_from_slice(&rest[line + 2..line + 2 + size]);
+            rest = &rest[line + 2 + size + 2..];
+        }
+        body = joined;
+    }
+    (headers[9..12].parse().unwrap(), headers, body)
+}
+
 struct Client {
     address: SocketAddr,
     tls: Option<Arc<rustls::ClientConfig>>,
@@ -105,13 +131,27 @@ impl Client {
                 let _ = stream.read_to_end(&mut raw);
             }
         }
-        let raw = String::from_utf8(raw).unwrap();
-        let (headers, body) = raw.split_once("\r\n\r\n").unwrap();
+        let (status, headers, body) = split_reply(&raw);
         Reply {
-            status: headers[9..12].parse().unwrap(),
-            headers: headers.to_lowercase(),
-            body: body.to_owned(),
+            status,
+            headers,
+            body: String::from_utf8(body).unwrap(),
         }
+    }
+
+    /// A GET whose answer is bytes, perhaps sent in chunks: the status, the
+    /// body and the headers.
+    fn get_bytes(&self, path: &str) -> (u16, Vec<u8>, String) {
+        let mut tcp = TcpStream::connect(self.address).unwrap();
+        let head = format!(
+            "GET {path} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n",
+            self.address
+        );
+        tcp.write_all(head.as_bytes()).unwrap();
+        let mut raw = Vec::new();
+        tcp.read_to_end(&mut raw).unwrap();
+        let (status, headers, body) = split_reply(&raw);
+        (status, body, headers)
     }
 
     fn post(&self, path: &str, body: Value) -> Reply {
@@ -881,6 +921,37 @@ fn share_links() {
     }
     let folder_file = stranger.get(&format!("/api/shared/{folder}/file?path=sub"));
     assert_eq!(folder_file.status, 400);
+    // A folder comes as one zip archive, made as it is sent.
+    let zipped = |path: &str| {
+        let got = stranger.get_bytes(&format!("/api/shared/{folder}/zip?path={path}"));
+        assert_eq!(got.0, 200);
+        let mut archive = zip::ZipArchive::new(std::io::Cursor::new(got.1)).unwrap();
+        let mut names: Vec<String> = archive.file_names().map(str::to_owned).collect();
+        names.sort();
+        let mut big_back = String::new();
+        if let Ok(mut f) = archive.by_name("sub/big.txt") {
+            std::io::Read::read_to_string(&mut f, &mut big_back).unwrap();
+        }
+        (names, big_back, got.2)
+    };
+    let (names, big_back, headers) = zipped("");
+    assert_eq!(names, ["f.txt", "sub/", "sub/big.txt", "sub/ş ğ.txt"]);
+    assert!(big_back == big);
+    assert!(
+        headers.contains("content-type: application/zip"),
+        "{headers}"
+    );
+    let (names, _, headers) = zipped("sub");
+    assert_eq!(names, ["big.txt", "ş ğ.txt"]);
+    assert!(headers.contains("filename*=utf-8''sub.zip"), "{headers}");
+    let file_zip = stranger.get(&format!("/api/shared/{folder}/zip?path=f.txt"));
+    assert_eq!(file_zip.status, 400);
+    assert_eq!(
+        stranger
+            .get(&format!("/api/shared/{folder}/zip?path=.."))
+            .status,
+        404
+    );
     let single = stranger.get(&format!("/api/shared/{one}")).json();
     assert_eq!(single["entry"]["kind"], "file");
     assert_eq!(single["entries"], json!([]));
@@ -1166,6 +1237,7 @@ fn a_link_with_a_password() {
     for path in [
         format!("/api/shared/{secret}"),
         format!("/api/shared/{secret}/file?path=f.txt"),
+        format!("/api/shared/{secret}/zip"),
     ] {
         let reply = guest.get(&path);
         assert_eq!(

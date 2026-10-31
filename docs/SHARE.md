@@ -71,7 +71,7 @@ The server and `apeiron web share` change the file under a lock (`shares.lock`) 
 
 ## 4. What the link holder sees
 
-Opening the link shows a page with the shared folder, its subfolders and a Download button for each file; a shared file is shown alone. Files are sent as they are read, so a large file does not fill the server's memory. Links inside the backup are listed but not followed.
+Opening the link shows a page with the shared folder, its subfolders and a Download button for each file, and a button to download the folder shown with everything in it as one zip file; a shared file is shown alone. Files and zip files are sent as they are read, without a copy on the server's disk, so a large file does not fill the server's memory. Links inside the backup are listed but not followed.
 
 Nothing above or beside the shared path can be reached: a path with `.` or `..` is refused. An unknown, ended or removed link, and one whose owner may no longer share it, all give the same "not found" answer. Pages answer with `Referrer-Policy: no-referrer`, so the link does not leave with a request to another site.
 
@@ -86,6 +86,7 @@ Nothing above or beside the shared path can be reached: a path with `.` or `..` 
 | `POST /api/shares/<id>/remove` | Removes a link of the user; any link for an `admin` |
 | `GET /api/shared/<secret>?path=<path>` | Without signing in: the entry at the path below the link, a folder's entries, the version's time and the link's end |
 | `GET /api/shared/<secret>/file?path=<path>` | Without signing in: the file at the path, as a download |
+| `GET /api/shared/<secret>/zip?path=<path>` | Without signing in: the folder at the path with everything in it, as one zip file; recorded as `shared:read` |
 | `POST /api/shared/<secret>/unlock` `{"password"}` | Without signing in: checks the link's password and sets its cookie; the two requests above answer `key` (401) for a link with a password until then |
 | `apeiron web share list` | The live links of all users |
 | `apeiron web share remove <id>` | Removes a link |
@@ -107,7 +108,6 @@ The secret is never recorded ([AUDIT.md](AUDIT.md)).
 
 | Item | Where |
 | --- | --- |
-| Downloading a whole folder as one archive | Later; `apeiron export` does it on the server |
 | Links that let others upload | Later |
 | Limiting how often a link can be used | Later |
 | Sharing with named users of the server | Not needed: give the user the backup in the users file (USERS.md §2) |

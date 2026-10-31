@@ -440,6 +440,24 @@ impl Repository {
         )?)
     }
 
+    /// Writes the folder or file at a path as a zip archive into `out`, as
+    /// a stream, for a download; nothing is written to disk.
+    pub fn export_zip_to(
+        &self,
+        request: &ListRequest,
+        out: impl std::io::Write,
+    ) -> Result<ExportReport> {
+        let core = self.view()?;
+        let snapshot = spec::resolve(&core, &request.snapshot)?;
+        Ok(services::export_zip_to(
+            &core,
+            &snapshot,
+            request.path.as_bytes(),
+            out,
+            &services::Control::new(),
+        )?)
+    }
+
     /// Paths added, removed and modified between two snapshots.
     pub fn diff(&self, request: &DiffRequest) -> Result<Vec<Change>> {
         let core = self.view()?;

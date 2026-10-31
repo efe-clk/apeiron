@@ -6,7 +6,9 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use apeiron_core::{ObjectId, Repository};
-use apeiron_services::{ArchiveFormat, BackupOptions, Control, Error, backup, export};
+use apeiron_services::{
+    ArchiveFormat, BackupOptions, Control, Error, backup, export, export_zip_to,
+};
 
 /// Contents of an archive: name → file content, or `None` for a folder.
 type Listing = BTreeMap<String, Option<Vec<u8>>>;
@@ -140,6 +142,37 @@ fn every_format_round_trips() {
         read_7z(&export_to(&s, "a.7z", ArchiveFormat::SevenZ, b"")),
         expected()
     );
+}
+
+/// A writer that cannot seek, like a download.
+struct OnlyWrite(Vec<u8>);
+
+impl std::io::Write for OnlyWrite {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0.extend_from_slice(buf);
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn a_zip_streams_into_a_writer_that_cannot_seek() {
+    let s = setup();
+    let mut out = OnlyWrite(Vec::new());
+    let done = export_zip_to(&s.repo, &s.snapshot, b"", &mut out, &Control::new()).unwrap();
+    assert_eq!((done.files, done.dirs), (4, 3));
+    let path = s.root.join("streamed.zip");
+    fs::write(&path, &out.0).unwrap();
+    assert_eq!(read_zip(&path), expected());
+
+    let mut out = OnlyWrite(Vec::new());
+    export_zip_to(&s.repo, &s.snapshot, b"docs", &mut out, &Control::new()).unwrap();
+    fs::write(&path, &out.0).unwrap();
+    let names: Vec<String> = read_zip(&path).into_keys().collect();
+    assert_eq!(names, ["big.bin", "deep", "deep/note.md"]);
 }
 
 #[test]

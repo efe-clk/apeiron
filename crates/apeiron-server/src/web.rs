@@ -952,6 +952,22 @@ impl WebState {
             _ => Err(invalid("only files can be downloaded")),
         }
     }
+
+    /// The folder at `sub` below a link, to download as one zip archive
+    /// (SHARE.md §4).
+    pub(crate) fn shared_folder(
+        &self,
+        repo: &Repository,
+        share: &Share,
+        sub: &str,
+    ) -> Result<String, Error> {
+        let path = below(share, sub)?;
+        match entry_at(repo, share.snapshot, &path).map_err(|_| gone())? {
+            None => Ok(path),
+            Some(e) if e.kind == apeiron::Kind::Dir => Ok(path),
+            _ => Err(invalid("only folders are downloaded as an archive")),
+        }
+    }
 }
 
 fn not_here(operation: &str) -> Error {
