@@ -35,7 +35,7 @@ Sayfalar yalnızca JSON API'yi, JSON API de yalnızca herkese açık API'yi ça�
 | Geçmiş | Bir yedeğin snapshot'ları, en yeniden başlayarak, zaman ve notla; içine bakmak, karşılaştırmak ve geri yüklemek için düğmeler | Tamamlandı |
 | Göz at | Bir snapshot'ın içindeki klasörler ve dosyalar | Tamamlandı |
 | Geri yükle | Bir snapshot'ın tamamını ya da içindeki bir dosyayı veya klasörü yeni ya da boş bir klasöre; ilerleme ve sonuç | Tamamlandı |
-| Karşılaştır | Bir snapshot ile bir öncekinin arasında ne değiştiği; metin eklentisi kuruluysa metin dosyalarının değişen satırlarıyla (TEXT.tr.md) | Tamamlandı |
+| Karşılaştır | Bir snapshot ile bir öncekinin arasında ne değiştiği; metin eklentisi kuruluysa metin dosyalarının değişen satır ve sözcükleriyle (TEXT.tr.md §3) | Tamamlandı |
 | Denetle | Tüm depoyu denetler ve sağlam olup olmadığını sade sözcüklerle söyler | Tamamlandı |
 | Senkron | Uzak depoları listeler, ekler ve kaldırır; bir klasörün onlardan biriyle bir senkron turunu iki yönlü ya da tek yönlü çalıştırır ya da yalnızca neyin değişeceğini gösterir (SYNC.tr.md); yapılan değişiklikleri ve her çatışmayı çatışma kopyasıyla listeler; klasördeki çatışma kopyalarını bulur ve her birinin iki sürümünden birini tek düğmeyle tutar (SYNC.tr.md §4) | Tamamlandı |
 | Eklentiler | Kurulu eklentileri işledikleri dosyalarla listeler, bir `.wasm` dosyasından eklenti kurar ve kaldırır; `apeiron plugin` gibi (PLUGIN.tr.md §1) | Tamamlandı |

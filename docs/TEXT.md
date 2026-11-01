@@ -36,6 +36,8 @@ A conflict never writes markers such as `<<<<<<<` into a file: the user's file s
 
 `apeiron diff <snapshot> <snapshot> --text` lists the changed paths as `apeiron diff` does and, under each file the plugin handles, the changed lines with three lines around them, as `diff -u` writes them. An added or removed file is compared with an empty one. Files no plugin handles, and files that are not text, are listed without lines.
 
+The Compare page of the desktop and web interfaces shows the same lines and also marks the words that changed: where a run of removed lines is followed by as many added lines, each removed line is paired with the added line in the same place and the words outside their longest common sequence are highlighted. A word is a run of letters, digits and `_`; spaces and other characters count one by one. Very long line pairs are shown without word marks.
+
 ## 4. Files it handles
 
 The plugin handles files by name, ignoring case: plain text and documents (`*.txt`, `*.md`, `*.rst`, `*.tex`, `*.csv`, …), configuration (`*.json`, `*.toml`, `*.yaml`, `*.ini`, `*.xml`, …), web files (`*.html`, `*.css`, `*.js`, `*.ts`, `*.svg`), source code in common languages (`*.rs`, `*.py`, `*.c`, `*.go`, `*.java`, …), subtitles and logs. `apeiron plugin list` shows the whole list.
@@ -45,7 +47,6 @@ The plugin handles files by name, ignoring case: plain text and documents (`*.tx
 | Item | Where |
 | --- | --- |
 | Merging by structure, such as JSON keys or Markdown sections | Later plugins |
-| Word-by-word differences inside a line | Later |
 | A ready-built plugin file to download | With the first release |
 
 ## 6. Parts

@@ -12,6 +12,8 @@
   --bad: #b3261e;
   --add: #e6f4ea;
   --del: #fce8e6;
+  --add-word: #a8dab5;
+  --del-word: #f4b8b2;
   color-scheme: light dark;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 16px;
@@ -31,6 +33,8 @@
     --bad: #f28b82;
     --add: #1e3a2a;
     --del: #42201e;
+    --add-word: #2f6b45;
+    --del-word: #7a2f2a;
   }
 }
 
@@ -148,6 +152,9 @@ pre.diff { margin: 0; padding: 8px 0; overflow-x: auto; background: var(--bg); b
 pre.diff span { display: block; padding: 0 10px; white-space: pre; }
 pre.diff .add { background: var(--add); }
 pre.diff .del { background: var(--del); }
+pre.diff mark { color: inherit; border-radius: 2px; }
+pre.diff .add mark { background: var(--add-word); }
+pre.diff .del mark { background: var(--del-word); }
 pre.diff .hunk { color: var(--muted); }
 
 dialog {

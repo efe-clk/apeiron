@@ -584,11 +584,69 @@ function restore(snapshot, path) {
 
 // ---- Compare ----
 
+// Splits a line into words, runs of spaces and single other characters.
+function words(line) {
+  return line.match(/[\p{L}\p{N}_]+|\s+|./gu) || [];
+}
+
+// Marks which words of two lines are not in their longest common sequence.
+// Long lines are left unmarked, so the work stays small.
+function wordChanges(a, b) {
+  const x = words(a);
+  const y = words(b);
+  if (x.length * y.length > 40000) return null;
+  const len = Array.from({ length: x.length + 1 }, () => new Array(y.length + 1).fill(0));
+  for (let i = x.length - 1; i >= 0; i--) {
+    for (let j = y.length - 1; j >= 0; j--) {
+      len[i][j] = x[i] === y[j] ? len[i + 1][j + 1] + 1 : Math.max(len[i + 1][j], len[i][j + 1]);
+    }
+  }
+  const old = [];
+  const now = [];
+  let i = 0;
+  let j = 0;
+  while (i < x.length || j < y.length) {
+    if (i < x.length && j < y.length && x[i] === y[j]) {
+      old.push([x[i++], false]);
+      now.push([y[j++], false]);
+    } else if (j >= y.length || (i < x.length && len[i + 1][j] >= len[i][j + 1])) {
+      old.push([x[i++], true]);
+    } else {
+      now.push([y[j++], true]);
+    }
+  }
+  return [old, now];
+}
+
+function markedLine(kind, sign, parts) {
+  return h("span", { class: kind }, sign, ...parts.map(([text, changed]) => (changed ? h("mark", {}, text) : text)));
+}
+
+// Shows a unified diff; where removed lines are followed by as many added
+// lines, the words that changed inside each pair are marked.
 function diffLines(text) {
-  return h("pre", { class: "diff" }, text.split("\n").filter((l, i, all) => l || i < all.length - 1).map((line) => {
+  const lines = text.split("\n").filter((l, i, all) => l || i < all.length - 1);
+  const out = [];
+  let i = 0;
+  while (i < lines.length) {
+    let d = i;
+    while (d < lines.length && lines[d].startsWith("-")) d++;
+    let a = d;
+    while (a < lines.length && lines[a].startsWith("+")) a++;
+    if (d > i && a - d === d - i) {
+      const pairs = lines.slice(i, d).map((del, k) => wordChanges(del.slice(1), lines[d + k].slice(1)));
+      if (pairs.every(Boolean)) {
+        pairs.forEach(([old]) => out.push(markedLine("del", "-", old)));
+        pairs.forEach(([, now]) => out.push(markedLine("add", "+", now)));
+        i = a;
+        continue;
+      }
+    }
+    const line = lines[i++];
     const kind = line.startsWith("@@") ? "hunk" : line.startsWith("+") ? "add" : line.startsWith("-") ? "del" : "";
-    return h("span", { class: kind }, line);
-  }));
+    out.push(h("span", { class: kind }, line));
+  }
+  return h("pre", { class: "diff" }, out);
 }
 
 async function compare(snapshot) {

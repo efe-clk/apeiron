@@ -36,6 +36,8 @@ Bir çatışma, bir dosyanın içine asla `<<<<<<<` gibi işaretler yazmaz: kull
 
 `apeiron diff <snapshot> <snapshot> --text`, değişen yolları `apeiron diff` gibi listeler ve eklentinin işlediği her dosyanın altında, değişen satırları çevrelerindeki üçer satırla, `diff -u`'nun yazdığı gibi gösterir. Eklenmiş ya da silinmiş bir dosya boş bir dosyayla karşılaştırılır. Hiçbir eklentinin işlemediği dosyalar ve metin olmayan dosyalar satırsız listelenir.
 
+Masaüstü ve web arayüzlerindeki Karşılaştır sayfası aynı satırları gösterir ve değişen sözcükleri de işaretler: silinen bir satır dizisinin ardından aynı sayıda eklenen satır geliyorsa, her silinen satır aynı sıradaki eklenen satırla eşlenir ve ortak en uzun dizilerinin dışında kalan sözcükler vurgulanır. Sözcük; harf, rakam ve `_` dizisidir; boşluklar ve diğer karakterler tek tek sayılır. Çok uzun satır çiftleri sözcük işareti olmadan gösterilir.
+
 ## 4. İşlediği dosyalar
 
 Eklenti dosyaları büyük/küçük harf ayırmadan ada göre işler: düz metin ve belgeler (`*.txt`, `*.md`, `*.rst`, `*.tex`, `*.csv`, …), yapılandırma (`*.json`, `*.toml`, `*.yaml`, `*.ini`, `*.xml`, …), web dosyaları (`*.html`, `*.css`, `*.js`, `*.ts`, `*.svg`), yaygın dillerde kaynak kod (`*.rs`, `*.py`, `*.c`, `*.go`, `*.java`, …), altyazılar ve günlükler. `apeiron plugin list` listenin tamamını gösterir.
@@ -45,7 +47,6 @@ Eklenti dosyaları büyük/küçük harf ayırmadan ada göre işler: düz metin
 | Konu | Nerede |
 | --- | --- |
 | JSON anahtarları ya da Markdown bölümleri gibi yapıya göre birleştirme | Sonraki eklentiler |
-| Bir satırın içinde sözcük sözcük farklar | Daha sonra |
 | İndirilecek hazır derlenmiş bir eklenti dosyası | İlk sürümle |
 
 ## 6. Parçalar
