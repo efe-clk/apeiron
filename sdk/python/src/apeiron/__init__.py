@@ -495,6 +495,9 @@ class Repository:
     def merge(self, from_: str, into: str = "main", **options: Any) -> Record:
         return self.call("merge", **{"from": from_, "into": into}, **options)
 
+    def cherry_pick(self, from_: str, into: str = "main", **options: Any) -> Record:
+        return self.call("cherry_pick", **{"from": from_, "into": into}, **options)
+
     def repair(self) -> Record:
         return self.call("repair")
 

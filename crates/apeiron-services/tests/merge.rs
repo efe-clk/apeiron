@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use apeiron_core::{EntryKind, ObjectId, Repository};
 use apeiron_services::{
     BackupOptions, ConflictKind, ContentMerger, Control, Error, MergeAction, MergeOptions, Merged,
-    WarningKind, backup, merge,
+    WarningKind, backup, cherry_pick, merge,
 };
 
 struct Setup {
@@ -337,5 +337,81 @@ fn a_type_driver_merges_files_both_sides_changed() {
     assert!(
         message.contains("merged by plugin lines: a.log"),
         "{message}"
+    );
+}
+
+#[test]
+fn a_cherry_pick_brings_one_snapshot_s_changes() {
+    let mut s = setup();
+    let first = s.commit("main", &[("a.txt", "a"), ("b.txt", "b")]);
+    s.repo.update_ref("feature", None, Some(first)).unwrap();
+    let fix = s.commit("feature", &[("a.txt", "a"), ("b.txt", "b fixed")]);
+    s.commit(
+        "feature",
+        &[("a.txt", "a"), ("b.txt", "b fixed"), ("c.txt", "new")],
+    );
+    let main = s.commit("main", &[("a.txt", "a2"), ("b.txt", "b")]);
+
+    let pick = |s: &mut Setup, dry_run: bool| {
+        let options = MergeOptions {
+            from: fix,
+            from_name: "feature~1".to_owned(),
+            into: "main".to_owned(),
+            message: None,
+            author: None,
+            host: None,
+            dry_run,
+        };
+        cherry_pick(&mut s.repo, &options, None).unwrap()
+    };
+    let preview = pick(&mut s, true);
+    assert_eq!(preview.action, MergeAction::Picked);
+    assert_eq!(s.repo.read_ref("main").unwrap(), Some(main));
+
+    let out = pick(&mut s, false);
+    assert_eq!(out.action, MergeAction::Picked);
+    assert_eq!(out.changes.len(), 1);
+    assert!(out.conflicts.is_empty());
+    // Only the fix comes over, not the later c.txt.
+    assert_eq!(
+        s.files("main"),
+        pairs(&[("a.txt", "a2"), ("b.txt", "b fixed")])
+    );
+    let made = s.repo.read_snapshot(&out.snapshot).unwrap();
+    assert_eq!(made.parents, vec![main]);
+    assert!(
+        made.message
+            .unwrap()
+            .starts_with("cherry-pick feature~1 into main")
+    );
+
+    // Picking it again changes nothing.
+    let again = pick(&mut s, false);
+    assert_eq!(again.action, MergeAction::UpToDate);
+    assert_eq!(s.repo.read_ref("main").unwrap(), Some(out.snapshot));
+}
+
+#[test]
+fn a_cherry_pick_keeps_both_versions_of_a_file_changed_on_both_sides() {
+    let mut s = setup();
+    let first = s.commit("main", &[("b.txt", "b")]);
+    s.repo.update_ref("feature", None, Some(first)).unwrap();
+    let theirs = s.commit("feature", &[("b.txt", "theirs")]);
+    s.commit("main", &[("b.txt", "ours")]);
+    let options = MergeOptions {
+        from: theirs,
+        from_name: "feature".to_owned(),
+        into: "main".to_owned(),
+        message: None,
+        author: None,
+        host: None,
+        dry_run: false,
+    };
+    let out = cherry_pick(&mut s.repo, &options, None).unwrap();
+    assert_eq!(out.action, MergeAction::Picked);
+    assert_eq!(out.conflicts.len(), 1);
+    assert_eq!(
+        s.files("main"),
+        pairs(&[("b (conflict feature).txt", "theirs"), ("b.txt", "ours")])
     );
 }

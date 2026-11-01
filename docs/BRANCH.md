@@ -13,6 +13,7 @@ A branch is a ref (FORMAT.md §9.3): a name pointing to a snapshot. Branches, ta
 | `apeiron ref create <name> [<snapshot>]` | Creates a ref pointing to a snapshot (default `main`); fails if the name exists | Done |
 | `apeiron ref delete <name>` | Removes a ref; its reflog keeps the history (FORMAT.md §9.4), so it can be brought back until garbage collection | Done |
 | `apeiron merge <from> [--into <ref>] [--message <text>] [--dry-run]` | Merges the snapshot `<from>` names into the ref `<into>` (default `main`); exit code 3 when there are conflicts | Done |
+| `apeiron cherry-pick <snapshot> [--into <ref>] [--message <text>] [--dry-run]` | Copies the changes one snapshot made into the ref `<into>` (default `main`) as a new snapshot there (section 4); exit code 3 when there are conflicts | Done |
 
 A branch is worked on as any folder is: `apeiron restore feature ~/feature` writes it into a folder, `apeiron backup ~/feature --ref feature` records the changes, and `apeiron merge feature` joins them into `main`. `apeiron diff main feature` shows what a merge would bring.
 
@@ -38,19 +39,30 @@ flowchart TB
 
 A file counts as changed when its kind, content or permission bits changed; times and owners alone do not, as in sync. A folder is compared by what it holds. A merge never looks inside a file: two changes to different lines of the same text file are a conflict. Merging the content of text and other file types is the task of type drivers, which come with the plugin system (VISION.md); the text diff plugin of Stage 3 is the first.
 
-## 4. Not part of this work item
+## 4. Cherry-pick
+
+A cherry-pick brings one fix from a branch without the rest of the branch. For the snapshot P that `<snapshot>` names:
+
+1. Take P's first parent as the base B; a snapshot without parents has an empty base, so all its files are brought.
+2. Merge path by path as in section 2 step 3, with the snapshot O that `<into>` points to as "here" and P as "there". Only what P changed from B differs from the base, so only that comes over; a file both changed differently is kept twice, P's version as `name (conflict <snapshot>).ext`.
+3. If the result equals O, the ref already holds the changes and nothing is written (`up_to_date`).
+4. Otherwise store a snapshot with the single parent O and the message given or `cherry-pick <snapshot> into <into>` followed by P's message, and move `<into>` with compare-and-swap as a merge does (`picked`).
+
+Unlike a merge, the new snapshot does not have P as a parent: the history of `<into>` stays one line, and a later merge of the branch compares the files again, finds the fix already there and does not count it twice.
+
+## 5. Not part of this work item
 
 | Item | Where |
 | --- | --- |
 | Merging inside a file, line by line | The text diff plugin, Stage 3 |
-| Rebase and cherry-pick | Later; a merge keeps both lines of history, which loses nothing |
+| Rebase | Later; a merge keeps both lines of history, which loses nothing, and a cherry-pick brings single snapshots |
 | A working folder that follows a branch (`checkout` or `switch`) | Later; `restore` and `backup` cover it, and sync shows how a folder is changed safely |
 | A tool to resolve conflicts | The desktop interface (Stage 4); conflict copies are plain files until then |
 
-## 5. Crates
+## 6. Crates
 
 | Crate | Role | Status |
 | --- | --- | --- |
-| `apeiron-services` | The merge, shared by sync and `merge` | Done |
-| `apeiron` | `create_ref` and `merge` (API.md §8.3) | Done |
-| `apeiron-cli` | `apeiron ref` and `apeiron merge` | Done |
+| `apeiron-services` | The merge, shared by sync, `merge` and `cherry_pick` | Done |
+| `apeiron` | `create_ref`, `merge` and `cherry_pick` (API.md §8.3) | Done |
+| `apeiron-cli` | `apeiron ref`, `apeiron merge` and `apeiron cherry-pick` | Done |

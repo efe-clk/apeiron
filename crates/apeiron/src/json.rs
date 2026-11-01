@@ -164,6 +164,7 @@ pub fn call(repo: &Repository, operation: &str, request: Value) -> Result<Value>
         "create_ref" => json(&repo.create_ref(&parse(request)?)?),
         "delete_ref" => json(&repo.delete_ref(&parse(request)?)?),
         "merge" => json(&repo.merge(&parse(request)?)?),
+        "cherry_pick" => json(&repo.cherry_pick(&parse(request)?)?),
         "repair" => json(&repo.repair()?),
         "keys" => json(&repo.keys()?),
         "add_password" => json(&repo.add_password(&parse::<Password>(request)?.password)?),

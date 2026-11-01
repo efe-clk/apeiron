@@ -13,6 +13,7 @@ Bir dal bir ref'tir (FORMAT.tr.md §9.3): bir snapshot'a işaret eden bir ad. Ap
 | `apeiron ref create <name> [<snapshot>]` | Bir snapshot'a (varsayılan `main`) işaret eden bir ref oluşturur; ad varsa başarısız olur | Tamamlandı |
 | `apeiron ref delete <name>` | Bir ref'i siler; reflog'u geçmişi tutar (FORMAT.tr.md §9.4), böylece çöp toplamaya kadar geri getirilebilir | Tamamlandı |
 | `apeiron merge <from> [--into <ref>] [--message <text>] [--dry-run]` | `<from>`'un adlandırdığı snapshot'ı `<into>` ref'ine (varsayılan `main`) birleştirir; çatışma varsa çıkış kodu 3'tür | Tamamlandı |
+| `apeiron cherry-pick <snapshot> [--into <ref>] [--message <text>] [--dry-run]` | Bir snapshot'ın yaptığı değişiklikleri `<into>` ref'ine (varsayılan `main`) orada yeni bir snapshot olarak kopyalar (bölüm 4); çatışma varsa çıkış kodu 3'tür | Tamamlandı |
 
 Bir dal üzerinde her klasörde olduğu gibi çalışılır: `apeiron restore feature ~/feature` onu bir klasöre yazar, `apeiron backup ~/feature --ref feature` değişiklikleri kaydeder ve `apeiron merge feature` onları `main`'e birleştirir. `apeiron diff main feature`, bir birleştirmenin ne getireceğini gösterir.
 
@@ -38,19 +39,30 @@ flowchart TB
 
 Bir dosyanın türü, içeriği ya da izin bitleri değiştiyse dosya değişmiş sayılır; senkrondaki gibi yalnızca zamanlar ve sahipler sayılmaz. Bir klasör tuttuklarıyla karşılaştırılır. Bir birleştirme asla bir dosyanın içine bakmaz: aynı metin dosyasının farklı satırlarındaki iki değişiklik bir çatışmadır. Metnin ve diğer dosya türlerinin içeriğini birleştirmek, eklenti sistemiyle gelen tür sürücülerinin işidir (VISION.tr.md); Aşama 3'ün metin diff eklentisi ilkidir.
 
-## 4. Bu işin parçası olmayanlar
+## 4. Cherry-pick
+
+Bir cherry-pick, bir daldan dalın geri kalanı olmadan tek bir düzeltmeyi getirir. `<snapshot>`'ın adlandırdığı P snapshot'ı için:
+
+1. P'nin ilk ebeveynini taban B olarak al; ebeveyni olmayan bir snapshot'ın tabanı boştur, bu yüzden bütün dosyaları gelir.
+2. Bölüm 2 adım 3'teki gibi yol yol birleştir; `<into>`'nun gösterdiği O snapshot'ı "burası", P "orası"dır. Tabandan yalnızca P'nin B'ye göre değiştirdikleri farklıdır, bu yüzden yalnızca onlar gelir; ikisinin de farklı değiştirdiği bir dosya iki kez tutulur, P'nin sürümü `ad (conflict <snapshot>).uzantı` olarak.
+3. Sonuç O'ya eşitse ref değişiklikleri zaten tutar ve hiçbir şey yazılmaz (`up_to_date`).
+4. Aksi hâlde tek ebeveyni O olan, verilen mesajı ya da ardından P'nin mesajı gelen `cherry-pick <snapshot> into <into>` mesajını taşıyan bir snapshot sakla ve `<into>`'yu bir birleştirmenin yaptığı gibi karşılaştır-ve-değiştir ile taşı (`picked`).
+
+Bir birleştirmenin aksine yeni snapshot'ın ebeveynlerinden biri P değildir: `<into>`'nun geçmişi tek çizgi kalır; dalın sonraki bir birleştirmesi dosyaları yeniden karşılaştırır, düzeltmeyi zaten orada bulur ve onu iki kez saymaz.
+
+## 5. Bu işin parçası olmayanlar
 
 | Konu | Nerede |
 | --- | --- |
 | Bir dosyanın içinde, satır satır birleştirme | Metin diff eklentisi, Aşama 3 |
-| Rebase ve cherry-pick | Daha sonra; bir birleştirme iki geçmiş çizgisini de tutar ve hiçbir şey kaybetmez |
+| Rebase | Daha sonra; bir birleştirme iki geçmiş çizgisini de tutar ve hiçbir şey kaybetmez, bir cherry-pick de tek tek snapshot'ları getirir |
 | Bir dalı izleyen çalışma klasörü (`checkout` ya da `switch`) | Daha sonra; `restore` ve `backup` bunu karşılar ve senkron bir klasörün güvenle nasıl değiştirildiğini gösterir |
 | Çatışmaları çözmek için bir araç | Masaüstü arayüzü (Aşama 4); o zamana kadar çatışma kopyaları düz dosyalardır |
 
-## 5. Crate'ler
+## 6. Crate'ler
 
 | Crate | Görev | Durum |
 | --- | --- | --- |
-| `apeiron-services` | Senkron ve `merge` tarafından paylaşılan birleştirme | Tamamlandı |
-| `apeiron` | `create_ref` ve `merge` (API.tr.md §8.3) | Tamamlandı |
-| `apeiron-cli` | `apeiron ref` ve `apeiron merge` | Tamamlandı |
+| `apeiron-services` | Senkron, `merge` ve `cherry_pick` tarafından paylaşılan birleştirme | Tamamlandı |
+| `apeiron` | `create_ref`, `merge` ve `cherry_pick` (API.tr.md §8.3) | Tamamlandı |
+| `apeiron-cli` | `apeiron ref`, `apeiron merge` ve `apeiron cherry-pick` | Tamamlandı |

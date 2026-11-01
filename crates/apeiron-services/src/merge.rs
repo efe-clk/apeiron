@@ -434,6 +434,9 @@ pub enum MergeAction {
     FastForward,
     /// A new snapshot joins both lines of history.
     Merged,
+    /// A new snapshot on the ref holds the changes of one other snapshot
+    /// (BRANCH.md §4).
+    Picked,
 }
 
 /// What to merge into which ref.
@@ -555,6 +558,78 @@ pub fn merge(
     outcome.conflicts = result.conflicts;
     outcome.plugin_merges = result.plugin_merges;
     outcome.warnings = result.warnings;
+    if options.dry_run {
+        return Ok(outcome);
+    }
+    let mut writer = repo.writer();
+    let id = writer.put_snapshot(&snapshot)?;
+    writer.finish()?;
+    repo.update_ref(into, Some(ours), Some(id))?;
+    outcome.snapshot = id;
+    Ok(outcome)
+}
+
+/// Applies the changes `options.from` made to its first parent onto the ref
+/// `options.into`, as a new snapshot whose only parent is the ref's
+/// (BRANCH.md §4). Files both changed are handled as in [`merge`]. When the
+/// ref already holds the changes, nothing is written. The caller holds the
+/// repository lock shared.
+pub fn cherry_pick(
+    repo: &mut Repository,
+    options: &MergeOptions,
+    merger: Option<&dyn ContentMerger>,
+) -> Result<MergeOutcome> {
+    let into = options.into.as_str();
+    let ours = repo
+        .read_ref(into)?
+        .ok_or_else(|| Error::NotFound(format!("ref {into}")))?;
+    let picked = repo.read_snapshot(&options.from)?;
+    let base = picked
+        .parents
+        .first()
+        .map(|p| repo.read_snapshot(p).map(|s| s.tree))
+        .transpose()?;
+    let our_tree = repo.read_snapshot(&ours)?.tree;
+    let suffix = format!(
+        " (conflict {})",
+        options.from_name.replace(['/', '\\'], "-")
+    );
+    let result = Merge::new(repo, &suffix, merger).run(base, our_tree, picked.tree)?;
+    let mut writer = repo.writer();
+    let tree = write_items(&mut writer, result.items)?;
+    writer.finish()?;
+    let mut outcome = MergeOutcome {
+        action: MergeAction::UpToDate,
+        snapshot: ours,
+        previous: ours,
+        changes: Vec::new(),
+        conflicts: result.conflicts,
+        plugin_merges: result.plugin_merges,
+        warnings: result.warnings,
+    };
+    if tree == our_tree {
+        return Ok(outcome);
+    }
+    changes(repo, our_tree, tree, &Name::default(), &mut outcome.changes)?;
+    let mut message = options.message.clone().unwrap_or_else(|| {
+        let mut m = format!("cherry-pick {} into {into}", options.from_name);
+        if let Some(original) = picked.message.as_deref().filter(|t| !t.is_empty()) {
+            m.push_str("\n\n");
+            m.push_str(original);
+        }
+        m
+    });
+    describe(&mut message, &outcome.conflicts, &outcome.plugin_merges);
+    let snapshot = Snapshot {
+        tree,
+        parents: vec![ours],
+        time: crate::os::to_time(SystemTime::now()),
+        author: options.author.clone(),
+        host: options.host.clone(),
+        message: Some(message),
+        meta: Vec::new(),
+    };
+    outcome.action = MergeAction::Picked;
     if options.dry_run {
         return Ok(outcome);
     }

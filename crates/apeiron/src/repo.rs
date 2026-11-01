@@ -588,6 +588,25 @@ impl Repository {
     /// Merges a snapshot into a ref (BRANCH.md §2): nothing to do, a
     /// fast-forward, or a new snapshot with both as parents.
     pub fn merge(&self, request: &MergeRequest) -> Result<MergeReport> {
+        self.merge_with(request, services::merge)
+    }
+
+    /// Applies the changes the snapshot `request.from` made to its parent
+    /// onto the ref `request.into`, as one new snapshot there
+    /// ([BRANCH.md](BRANCH.md) §4).
+    pub fn cherry_pick(&self, request: &MergeRequest) -> Result<MergeReport> {
+        self.merge_with(request, services::cherry_pick)
+    }
+
+    fn merge_with(
+        &self,
+        request: &MergeRequest,
+        run: fn(
+            &mut core::Repository,
+            &services::MergeOptions,
+            Option<&dyn services::ContentMerger>,
+        ) -> services::Result<MergeReport>,
+    ) -> Result<MergeReport> {
         let _writer = self.lock_writer();
         let _lock = core::RepoLock::shared(self.path())?;
         let mut core = self.read().reopen()?;
@@ -604,7 +623,7 @@ impl Repository {
         let merger = plugins
             .as_deref()
             .map(|p| p as &dyn services::ContentMerger);
-        let report = services::merge(&mut core, &options, merger);
+        let report = run(&mut core, &options, merger);
         *self.write() = core;
         Ok(report?)
     }

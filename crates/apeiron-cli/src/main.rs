@@ -253,6 +253,18 @@ enum Command {
         #[command(subcommand)]
         command: PluginCommand,
     },
+    /// Copy the changes one snapshot made into a ref, as a new snapshot there
+    CherryPick {
+        snapshot: String,
+        /// The ref that moves
+        #[arg(long, default_value = "main")]
+        into: String,
+        #[arg(long)]
+        message: Option<String>,
+        /// Only show what the cherry-pick would do
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// Merge a snapshot, usually a branch, into a ref
     Merge {
         from: String,
@@ -2091,56 +2103,31 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             into,
             message,
             dry_run,
-        } => {
-            let repo = open(cli.repo, password_file)?;
-            let mut request = MergeRequest::new(from.clone(), into.clone());
-            request.message = message;
-            request.dry_run = dry_run;
-            let report = repo.merge(&request)?;
-            out.result(&report, |r| {
-                for change in &r.changes {
-                    let mark = match change.kind {
-                        ChangeKind::Added => '+',
-                        ChangeKind::Removed => '-',
-                        ChangeKind::Modified => '~',
-                    };
-                    say!("{mark} {}", change.path);
-                }
-                for m in &r.plugin_merges {
-                    say!("merged by plugin {}: {}", m.plugin, m.path);
-                }
-                for c in &r.conflicts {
-                    match &c.copy {
-                        Some(copy) => {
-                            say!("conflict: {}; the version from {from} is {copy}", c.path)
-                        }
-                        None => say!(
-                            "conflict: {} (deleted on one side, changed on the other; kept)",
-                            c.path
-                        ),
-                    }
-                }
-                let would = if dry_run { "would be " } else { "" };
-                let id = format::short_id(&r.snapshot);
-                match r.action {
-                    MergeAction::UpToDate => say!("{into} already has everything in {from}"),
-                    MergeAction::FastForward => {
-                        say!("{into} {would}moved forward to {from} ({id})")
-                    }
-                    MergeAction::Merged => say!(
-                        "{from} {would}merged into {into} ({}, {})",
-                        format::count(r.changes.len() as u64, "change"),
-                        format::count(r.conflicts.len() as u64, "conflict")
-                    ),
-                }
-            });
-            let warned = warnings_exit(out, &report.warnings);
-            Ok(if report.conflicts.is_empty() {
-                warned
-            } else {
-                EXIT_WARNINGS
-            })
-        }
+        } => merge_command(
+            out,
+            cli.repo,
+            password_file,
+            false,
+            from,
+            into,
+            message,
+            dry_run,
+        ),
+        Command::CherryPick {
+            snapshot,
+            into,
+            message,
+            dry_run,
+        } => merge_command(
+            out,
+            cli.repo,
+            password_file,
+            true,
+            snapshot,
+            into,
+            message,
+            dry_run,
+        ),
         Command::Ui { no_browser } => {
             let mut options = apeiron_server::Options::with_memory();
             if cli.repo.is_some() {
@@ -2695,6 +2682,77 @@ fn parse_size(s: &str) -> std::result::Result<u64, String> {
 }
 
 /// The start of a day `YYYY-MM-DD` in local time.
+/// Runs `merge` or, with `pick`, `cherry-pick`, and prints the result.
+#[allow(clippy::too_many_arguments)]
+fn merge_command(
+    out: &Output,
+    repo_path: Option<PathBuf>,
+    password_file: Option<&Path>,
+    pick: bool,
+    from: String,
+    into: String,
+    message: Option<String>,
+    dry_run: bool,
+) -> Result<u8, Failure> {
+    let repo = open(repo_path, password_file)?;
+    let mut request = MergeRequest::new(from.clone(), into.clone());
+    request.message = message;
+    request.dry_run = dry_run;
+    let report = if pick {
+        repo.cherry_pick(&request)?
+    } else {
+        repo.merge(&request)?
+    };
+    out.result(&report, |r| {
+        for change in &r.changes {
+            let mark = match change.kind {
+                ChangeKind::Added => '+',
+                ChangeKind::Removed => '-',
+                ChangeKind::Modified => '~',
+            };
+            say!("{mark} {}", change.path);
+        }
+        for m in &r.plugin_merges {
+            say!("merged by plugin {}: {}", m.plugin, m.path);
+        }
+        for c in &r.conflicts {
+            match &c.copy {
+                Some(copy) => {
+                    say!("conflict: {}; the version from {from} is {copy}", c.path)
+                }
+                None => say!(
+                    "conflict: {} (deleted on one side, changed on the other; kept)",
+                    c.path
+                ),
+            }
+        }
+        let would = if dry_run { "would be " } else { "" };
+        let id = format::short_id(&r.snapshot);
+        match r.action {
+            MergeAction::UpToDate => say!("{into} already has everything in {from}"),
+            MergeAction::FastForward => {
+                say!("{into} {would}moved forward to {from} ({id})")
+            }
+            MergeAction::Picked => say!(
+                "the changes of {from} {would}copied into {into} ({}, {})",
+                format::count(r.changes.len() as u64, "change"),
+                format::count(r.conflicts.len() as u64, "conflict")
+            ),
+            MergeAction::Merged => say!(
+                "{from} {would}merged into {into} ({}, {})",
+                format::count(r.changes.len() as u64, "change"),
+                format::count(r.conflicts.len() as u64, "conflict")
+            ),
+        }
+    });
+    let warned = warnings_exit(out, &report.warnings);
+    Ok(if report.conflicts.is_empty() {
+        warned
+    } else {
+        EXIT_WARNINGS
+    })
+}
+
 /// A speed such as 500K or 2M, in bytes per second; zero is refused.
 fn parse_rate(s: &str) -> std::result::Result<u64, String> {
     match parse_size(s)? {

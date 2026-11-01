@@ -506,6 +506,22 @@ fn branches_are_created_merged_and_deleted() {
     assert!(text.contains("a (conflict feature).txt"), "{text}");
     assert!(s.ok(&["ls", "main"]).contains("a (conflict feature).txt"));
 
+    // A new file on feature is copied over on its own.
+    fs::write(s.root.join("src/new.txt"), b"picked").unwrap();
+    s.ok(&["backup", &src, "--ref", "feature"]);
+    let doc = s.json(&["cherry-pick", "feature", "--dry-run"]);
+    assert_eq!(doc["action"], "picked");
+    let out = s.ok(&["cherry-pick", "feature"]);
+    assert!(
+        out.contains("+ new.txt") && out.contains("the changes of feature copied into main"),
+        "{out}"
+    );
+    assert!(s.ok(&["ls", "main"]).contains("new.txt"));
+    assert!(
+        s.ok(&["cherry-pick", "feature"])
+            .contains("main already has everything in feature")
+    );
+
     assert!(
         s.ok(&["ref", "delete", "feature"])
             .contains("Deleted feature")

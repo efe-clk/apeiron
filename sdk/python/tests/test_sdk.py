@@ -40,6 +40,7 @@ class Sdk(unittest.TestCase):
             repo.backup(self.root / "src", ref="feature").wait()
             self.assertEqual(repo.diff("main", "feature")[0].kind, "modified")
             self.assertEqual(repo.merge("feature").action, "fast_forward")
+            self.assertEqual(repo.cherry_pick("feature").action, "up_to_date")
             hits = repo.search("*.TXT", history=True).wait().hits
             self.assertEqual([h.path for h in hits], ["a.txt", "a.txt"])
 

@@ -28,7 +28,7 @@ pub use export::{ArchiveFormat, ExportOutcome, export, export_zip_to};
 pub use list::{EntryInfo, Kind, list, read_path, read_to};
 pub use merge::{
     Conflict, ConflictKind, ContentMerger, MergeAction, MergeOptions, MergeOutcome, Merged,
-    PLUGIN_SIZE_LIMIT, PluginMerge, merge,
+    PLUGIN_SIZE_LIMIT, PluginMerge, cherry_pick, merge,
 };
 pub use name::Name;
 pub use restore::{RestoreOutcome, restore};
