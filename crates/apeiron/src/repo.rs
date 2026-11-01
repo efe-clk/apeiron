@@ -18,13 +18,13 @@ use crate::types::{
 };
 use crate::types::{
     CreateRefRequest, DuplicatesRequest, MergeRequest, MirrorReport, MirroredRef, RemoteRequest,
-    SearchRequest, TextDiff,
+    SearchRequest, SwitchRequest, TextDiff,
 };
 use crate::{
     ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo, ExportReport, GcReport,
     GcRequest, GitExportReport, GitImportReport, KeyInfo, ObjectId, Phase, ReflogEntry, Remote,
-    RepairReport, RestoreReport, RestoreTestReport, RetentionRule, SearchReport, SyncReport,
-    TransferReport, VerifyReport,
+    RepairReport, RestoreReport, RestoreTestReport, RetentionRule, SearchReport, SwitchReport,
+    SyncReport, TransferReport, VerifyReport,
 };
 
 /// An open repository. Cloning is cheap; clones share the same state and can
@@ -245,7 +245,7 @@ impl Repository {
         let remote = self.read().remote(&request.remote)?;
         let ref_name = match request.ref_name {
             Some(name) => name,
-            None => default_sync_ref(&request.folder)?,
+            None => format!("sync/{}", folder_name(&request.folder)?),
         };
         let options = services::SyncOptions {
             folder: request.folder,
@@ -266,6 +266,29 @@ impl Repository {
                 .map(|p| p as &dyn services::ContentMerger);
             let report = services::sync(&mut core, &*store, &options, merger, ctl);
             // Refs may have moved even when a later step failed.
+            *repo.write() = core;
+            Ok(report?)
+        })
+    }
+
+    /// Makes a working folder hold a snapshot, usually a branch, recording
+    /// what it held first under `folder/switch/<folder name>` (BRANCH.md
+    /// §6).
+    pub fn switch(&self, request: SwitchRequest) -> Result<Job<SwitchReport>> {
+        let options = services::SwitchOptions {
+            target: self.resolve(&request.snapshot)?,
+            target_name: request.snapshot,
+            name: format!("switch/{}", folder_name(&request.folder)?),
+            folder: request.folder,
+            dry_run: request.dry_run,
+            host: gethostname::gethostname().into_string().ok(),
+        };
+        let repo = self.clone();
+        Job::spawn("switch", move |ctl| {
+            let _writer = repo.lock_writer();
+            let _lock = core::RepoLock::shared(repo.path())?;
+            let mut core = repo.read().reopen()?;
+            let report = services::switch(&mut core, &options, ctl);
             *repo.write() = core;
             Ok(report?)
         })
@@ -809,9 +832,9 @@ impl Repository {
     }
 }
 
-/// `sync/<folder name>`, with the characters a ref name cannot hold
-/// replaced by `-`.
-fn default_sync_ref(folder: &Path) -> Result<String> {
+/// The last part of a folder's path, lowercased, with other characters
+/// than `a-z 0-9 . _ -` replaced by `-`, to name a ref after it.
+fn folder_name(folder: &Path) -> Result<String> {
     let absolute = std::path::absolute(folder).map_err(|e| {
         Error::new(
             ErrorKind::InvalidInput,
@@ -829,8 +852,7 @@ fn default_sync_ref(folder: &Path) -> Result<String> {
         })
         .collect();
     let name = name.trim_start_matches('.').trim_end_matches(".lock");
-    let name = if name.is_empty() { "folder" } else { name };
-    Ok(format!("sync/{name}"))
+    Ok(if name.is_empty() { "folder" } else { name }.to_owned())
 }
 
 /// Reports the commits and tags done and stops once cancelled.

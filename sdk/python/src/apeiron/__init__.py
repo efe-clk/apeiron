@@ -563,6 +563,9 @@ class Repository:
     def sync(self, folder: Any, remote: str, **options: Any) -> Job:
         return self.start("sync", folder=folder, remote=remote, **options)
 
+    def switch(self, snapshot: str, folder: Any, **options: Any) -> Job:
+        return self.start("switch", snapshot=snapshot, folder=folder, **options)
+
     def git_import(self, path: Any, **options: Any) -> Job:
         return self.start("git_import", path=path, **options)
 

@@ -540,6 +540,19 @@ fn branches_are_created_merged_and_deleted() {
             .contains("main moved forward to feature")
     );
 
+    // A working folder follows main, then feature.
+    let work = s.root.join("work");
+    let work_arg = work.to_str().unwrap();
+    assert!(
+        s.ok(&["switch", "main", work_arg])
+            .contains("switched to main")
+    );
+    assert!(work.join("main.txt").exists());
+    fs::write(work.join("draft.txt"), b"not backed up").unwrap();
+    let out = s.ok(&["switch", "feature~1", work_arg]);
+    assert!(out.contains("the folder was recorded first"), "{out}");
+    assert!(!work.join("draft.txt").exists());
+
     assert!(
         s.ok(&["ref", "delete", "feature"])
             .contains("Deleted feature")

@@ -182,6 +182,7 @@ Every operation takes one plain request value and returns one plain result value
 | `git_import` | Git repository path, ref prefix (default `git`) | `GitImportReport`: commits and tags stored, refs moved (Git name, ref, Git id, snapshot, previous), skipped refs with the reason, stale refs ([GIT.md](GIT.md)) | Yes |
 | `git_export` | Git repository path (created bare if missing), ref prefix | `GitExportReport`: commits and tags written, refs updated, skipped refs, Git ids not reproduced | Yes |
 | `sync` | folder, remote name, ref name (default `sync/<folder name>`), mode (`two-way`, `send` or `receive`), dry run, speed limit | `SyncReport`: ref, action (`up_to_date`, `sent`, `received` or `merged`), snapshot, the backup made, what was fetched and pushed, folder changes, conflicts with their copies, files merged by plugins, paths left for the next round, warnings, rounds run ([SYNC.md](SYNC.md)); `conflict` in `send` mode when the remote has snapshots this copy does not | Yes |
+| `switch` | snapshot spec, folder, dry run | `SwitchReport`: the folder ref, the snapshot, the snapshot that recorded the folder first, folder changes, files changed during the switch with their copies, paths left alone, warnings ([BRANCH.md](BRANCH.md) §6) | Yes |
 
 ### 8.4 Naming a snapshot
 

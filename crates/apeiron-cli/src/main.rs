@@ -368,6 +368,15 @@ enum Command {
         #[arg(long, value_parser = parse_rate)]
         rate: Option<u64>,
     },
+    /// Make a working folder hold a branch, recording what it held first
+    Switch {
+        /// The snapshot to switch to, usually a branch
+        snapshot: String,
+        folder: PathBuf,
+        /// Only show what would change
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// Keep a folder equal on several devices through a remote
     Sync {
         folder: PathBuf,
@@ -2556,6 +2565,25 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             });
             Ok(0)
         }
+        Command::Switch {
+            snapshot,
+            folder,
+            dry_run,
+        } => {
+            let repo = open(cli.repo, password_file)?;
+            let request = apeiron::SwitchRequest {
+                snapshot: snapshot.clone(),
+                folder,
+                dry_run,
+            };
+            let report = watch(out, repo.switch(request)?)?;
+            out.result(&report, |r| print_switch(r, &snapshot, dry_run));
+            let attention = !report.conflicts.is_empty() || !report.skipped.is_empty();
+            Ok(match warnings_exit(out, &report.warnings) {
+                0 if attention => EXIT_WARNINGS,
+                code => code,
+            })
+        }
         Command::Sync {
             folder,
             remote,
@@ -2934,6 +2962,41 @@ fn local_time(t: jiff::Timestamp) -> String {
 }
 
 /// One line about a push or pull.
+fn print_switch(r: &apeiron::SwitchReport, snapshot: &str, dry_run: bool) {
+    let would = if dry_run { "would be " } else { "" };
+    if let Some(saved) = &r.saved {
+        say!(
+            "the folder was recorded first as {} in {}",
+            format::short_id(saved),
+            r.ref_name
+        );
+    }
+    for change in &r.changes {
+        let mark = match change.kind {
+            ChangeKind::Added => '+',
+            ChangeKind::Removed => '-',
+            ChangeKind::Modified => '~',
+        };
+        say!("{mark} {}", change.path);
+    }
+    for c in &r.conflicts {
+        if let Some(copy) = &c.copy {
+            say!(
+                "conflict: {} changed during the switch; the version of {snapshot} is {copy}",
+                c.path
+            );
+        }
+    }
+    for path in &r.skipped {
+        say!("left alone, changed during the switch: {path}");
+    }
+    say!(
+        "the folder {would}switched to {snapshot} ({}, {})",
+        format::short_id(&r.snapshot),
+        format::count(r.changes.len() as u64, "change")
+    );
+}
+
 fn print_sync(r: &SyncReport, remote: &str, dry_run: bool) {
     for change in &r.changes {
         let mark = match change.kind {

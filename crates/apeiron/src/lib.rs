@@ -34,8 +34,8 @@ pub use apeiron_services::{
     ArchiveFormat, BackupOptions as BackupRequest, BackupOutcome as BackupReport, Change,
     ChangeKind, Conflict, ConflictCopy, ConflictKind, EntryInfo, ExportOutcome as ExportReport,
     Keep, Kind, Name, Phase, Progress, RestoreOutcome as RestoreReport, RestoreProblem,
-    RestoreTestOutcome as RestoreTestReport, SyncAction, SyncMode, SyncOutcome as SyncReport,
-    Warning, WarningKind,
+    RestoreTestOutcome as RestoreTestReport, SwitchOutcome as SwitchReport, SyncAction, SyncMode,
+    SyncOutcome as SyncReport, Warning, WarningKind,
 };
 pub use apeiron_services::{Duplicate, Query, SearchHit, SearchOutcome as SearchReport, TextLine};
 pub use apeiron_services::{MergeAction, MergeOutcome as MergeReport};
@@ -57,4 +57,6 @@ pub use types::{
     RemoteRequest, RepoInfo, RestoreRequest, RestoreTestRequest, SnapshotInfo, SyncRequest,
     TransferRequest,
 };
-pub use types::{CreateRefRequest, DuplicatesRequest, MergeRequest, SearchRequest, TextDiff};
+pub use types::{
+    CreateRefRequest, DuplicatesRequest, MergeRequest, SearchRequest, SwitchRequest, TextDiff,
+};

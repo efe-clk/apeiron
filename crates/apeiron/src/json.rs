@@ -241,6 +241,7 @@ pub fn start(repo: &Repository, operation: &str, request: Value) -> Result<Box<d
         "restore_test" => boxed(repo.restore_test(parse(request)?)?),
         "search" => boxed(repo.search(parse(request)?)?),
         "sync" => boxed(repo.sync(parse(request)?)?),
+        "switch" => boxed(repo.switch(parse(request)?)?),
         "git_import" => boxed(repo.git_import(parse(request)?)?),
         "git_export" => boxed(repo.git_export(parse(request)?)?),
         _ => return Err(unknown(operation)),

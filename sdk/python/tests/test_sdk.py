@@ -42,6 +42,9 @@ class Sdk(unittest.TestCase):
             self.assertEqual(repo.merge("feature").action, "fast_forward")
             self.assertEqual(repo.cherry_pick("feature").action, "up_to_date")
             self.assertEqual(repo.rebase("feature").action, "up_to_date")
+            work = self.root / "work"
+            self.assertEqual(len(repo.switch("main", work).wait().changes), 1)
+            self.assertEqual((work / "a.txt").read_text(), "second")
             hits = repo.search("*.TXT", history=True).wait().hits
             self.assertEqual([h.path for h in hits], ["a.txt", "a.txt"])
 

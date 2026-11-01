@@ -17,6 +17,7 @@ mod os;
 mod restore;
 mod restore_test;
 mod search;
+mod switch;
 mod sync;
 
 pub use backup::{BackupOptions, BackupOutcome, backup};
@@ -37,4 +38,5 @@ pub use search::{
     Duplicate, Query, SearchHit, SearchOptions, SearchOutcome, TextLine, duplicates, name_matches,
     search,
 };
+pub use switch::{SwitchOptions, SwitchOutcome, switch};
 pub use sync::{SyncAction, SyncMode, SyncOptions, SyncOutcome, folder_ref, sync};

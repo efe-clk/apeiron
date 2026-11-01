@@ -34,6 +34,17 @@ pub struct RestoreRequest {
     pub path: Name,
 }
 
+/// Which snapshot a working folder is to hold (BRANCH.md §6).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SwitchRequest {
+    /// A snapshot spec (API.md §8.4), usually a branch.
+    pub snapshot: String,
+    pub folder: PathBuf,
+    /// Shows what would change without changing the folder or a ref.
+    #[serde(default)]
+    pub dry_run: bool,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExportRequest {
     /// A snapshot spec (API.md §8.4).

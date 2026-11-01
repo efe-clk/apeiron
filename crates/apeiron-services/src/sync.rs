@@ -371,7 +371,7 @@ fn set_shared(repo: &mut Repository, name: &str, id: Option<ObjectId>) -> Result
     Ok(())
 }
 
-fn apply_tree(
+pub(crate) fn apply_tree(
     repo: &Repository,
     options: &SyncOptions,
     from: ObjectId,

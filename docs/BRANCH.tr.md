@@ -15,8 +15,9 @@ Bir dal bir ref'tir (FORMAT.tr.md §9.3): bir snapshot'a işaret eden bir ad. Ap
 | `apeiron merge <from> [--into <ref>] [--message <text>] [--dry-run]` | `<from>`'un adlandırdığı snapshot'ı `<into>` ref'ine (varsayılan `main`) birleştirir; çatışma varsa çıkış kodu 3'tür | Tamamlandı |
 | `apeiron cherry-pick <snapshot> [--into <ref>] [--message <text>] [--dry-run]` | Bir snapshot'ın yaptığı değişiklikleri `<into>` ref'ine (varsayılan `main`) orada yeni bir snapshot olarak kopyalar (bölüm 4); çatışma varsa çıkış kodu 3'tür | Tamamlandı |
 | `apeiron rebase <branch> [--onto <snapshot>] [--dry-run]` | `<branch>`'in, `<onto>`'da (varsayılan `main`) olmayan snapshot'larını onun üstüne kopyalar ve `<branch>`'i oraya taşır (bölüm 5); çatışma varsa çıkış kodu 3'tür | Tamamlandı |
+| `apeiron switch <snapshot> <folder> [--dry-run]` | Bir çalışma klasörünün bir snapshot'ı, çoğunlukla bir dalı tutmasını sağlar; önce klasörün tuttuğunu kaydeder (bölüm 6); geçiş sırasında değişen dosya varsa çıkış kodu 3'tür | Tamamlandı |
 
-Bir dal üzerinde her klasörde olduğu gibi çalışılır: `apeiron restore feature ~/feature` onu bir klasöre yazar, `apeiron backup ~/feature --ref feature` değişiklikleri kaydeder ve `apeiron merge feature` onları `main`'e birleştirir. `apeiron diff main feature`, bir birleştirmenin ne getireceğini gösterir.
+Bir dal üzerinde her klasörde olduğu gibi çalışılır: `apeiron switch feature ~/work` onu bir klasöre yazar, `apeiron backup ~/feature --ref feature` değişiklikleri kaydeder ve `apeiron merge feature` onları `main`'e birleştirir. `apeiron diff main feature`, bir birleştirmenin ne getireceğini gösterir.
 
 ## 2. Bir birleştirme
 
@@ -60,18 +61,29 @@ Bir rebase, bir dalı başka bir dalın en yeni snapshot'ından başlatır; sank
 3. Onları en eskiden başlayarak kopyala; her biri bir öncekinin kopyasının üstüne, `<onto>`'dan başlayarak bir cherry-pick (bölüm 4) gibi yapılır, ama her birinin zamanı, yazarı, makinesi ve mesajı korunur. İki tarafın da farklı değiştirdiği bir dosya iki kez tutulur, dalın sürümü `ad (conflict <branch>).uzantı` olarak; çatışma o kopyanın mesajına eklenir. Değişiklikleri zaten orada olan bir snapshot atlanır.
 4. `<branch>`'i eski snapshot'ından son kopyaya karşılaştır-ve-değiştir ile taşı. Eski snapshot'lar silinmez: `<branch>`'in reflog'u çöp toplamaya kadar onları adlandırmaya devam eder (FORMAT.tr.md §9.4). Bir saklama kuralının tuttuğu ref yalnızca ileri gider (ARCHIVE.tr.md), bu yüzden rebase edilemez.
 
-## 6. Bu işin parçası olmayanlar
+## 6. Bir çalışma klasörü
+
+`apeiron switch <snapshot> <folder>`, `git switch` gibi, bir klasörün dalları birbiri ardına tutmasını sağlar. Apeiron klasörün ne tuttuğunu `folder/switch/<klasör adı>` yerel ref'iyle (ad SYNC.tr.md §2'deki gibi) hatırlar; bu, senkronun klasörleri için tuttuğu ref'le aynı türdendir (SYNC.tr.md §3). Hiçbir zaman push edilmez.
+
+1. Klasörü, bir yedeğin yaptığı gibi, henüz hiçbir ref'i taşımadan bir F ağacı olarak kaydet. Olmayan bir klasör boş sayılır.
+2. Klasörün henüz ref'i yoksa boş olmalı ya da örneğin bir `restore` sonrasında olduğu gibi bir ref'le aynı dosyaları tutmalıdır; başka her durum hata verir ve hiçbir şeyi değiştirmez, böylece ilgisiz dosyalarla dolu bir klasörün yerine yanlışlıkla başka bir şey yazılmaz.
+3. F, klasör ref'inin gösterdiği snapshot'tan farklıysa F'yi, ebeveyni o snapshot olan ve iletisi `switch: the folder before switching to <snapshot>` olan bir snapshot olarak sakla ve klasör ref'ini ona taşı. Böylece yedeklenmemiş iş asla kaybolmaz: sonuç bu snapshot'ı adlandırır ve `apeiron restore` onu geri getirir.
+4. Klasörü, senkronun bir snapshot'ı uyguladığı gibi (SYNC.tr.md §5) F'den snapshot'a değiştir: yalnızca farklı olan yazılır ya da silinir, her dosya geçici bir dosya ve tek bir yeniden adlandırmayla yazılır; geçiş sürerken değişen bir dosyaya dokunulmaz, snapshot'taki sürümü yanına `name (conflict <snapshot>).ext` olarak yazılır.
+5. Klasör ref'ini snapshot'a taşı.
+
+Geçiş klasörü kaydeder ama bir dala yedeklemez: değişiklikler önceki gibi `apeiron backup <folder> --ref <branch>` ile bir dalda tutulur. `--dry-run` 2. adımdan sonra durur ve 4. adımın yapacağı değişiklikleri listeler. Son adı aynı olan iki klasör tek bir klasör ref'ini paylaşır; bunun bedeli yalnızca fazladan kaydedilen bir snapshot'tır, asla bir dosya değil.
+
+## 7. Bu işin parçası olmayanlar
 
 | Konu | Nerede |
 | --- | --- |
 | Bir dosyanın içinde, satır satır birleştirme | Metin diff eklentisi, Aşama 3 |
-| Bir dalı izleyen çalışma klasörü (`checkout` ya da `switch`) | Daha sonra; `restore` ve `backup` bunu karşılar ve senkron bir klasörün güvenle nasıl değiştirildiğini gösterir |
 | Çatışmaları çözmek için bir araç | Masaüstü arayüzü (Aşama 4); o zamana kadar çatışma kopyaları düz dosyalardır |
 
-## 7. Crate'ler
+## 8. Crate'ler
 
 | Crate | Görev | Durum |
 | --- | --- | --- |
-| `apeiron-services` | Senkron, `merge`, `cherry_pick` ve `rebase` tarafından paylaşılan birleştirme | Tamamlandı |
-| `apeiron` | `create_ref`, `merge`, `cherry_pick` ve `rebase` (API.tr.md §8.3) | Tamamlandı |
-| `apeiron-cli` | `apeiron ref`, `apeiron merge`, `apeiron cherry-pick` ve `apeiron rebase` | Tamamlandı |
+| `apeiron-services` | Senkron, `merge`, `cherry_pick` ve `rebase` tarafından paylaşılan birleştirme; `switch` | Tamamlandı |
+| `apeiron` | `create_ref`, `merge`, `cherry_pick`, `rebase` ve `switch` (API.tr.md §8.3) | Tamamlandı |
+| `apeiron-cli` | `apeiron ref`, `apeiron merge`, `apeiron cherry-pick`, `apeiron rebase` ve `apeiron switch` | Tamamlandı |

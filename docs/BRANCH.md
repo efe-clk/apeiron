@@ -15,8 +15,9 @@ A branch is a ref (FORMAT.md §9.3): a name pointing to a snapshot. Branches, ta
 | `apeiron merge <from> [--into <ref>] [--message <text>] [--dry-run]` | Merges the snapshot `<from>` names into the ref `<into>` (default `main`); exit code 3 when there are conflicts | Done |
 | `apeiron cherry-pick <snapshot> [--into <ref>] [--message <text>] [--dry-run]` | Copies the changes one snapshot made into the ref `<into>` (default `main`) as a new snapshot there (section 4); exit code 3 when there are conflicts | Done |
 | `apeiron rebase <branch> [--onto <snapshot>] [--dry-run]` | Copies the snapshots of `<branch>` that `<onto>` (default `main`) lacks on top of it and moves `<branch>` there (section 5); exit code 3 when there are conflicts | Done |
+| `apeiron switch <snapshot> <folder> [--dry-run]` | Makes a working folder hold a snapshot, usually a branch, recording what it held first (section 6); exit code 3 when files changed during the switch | Done |
 
-A branch is worked on as any folder is: `apeiron restore feature ~/feature` writes it into a folder, `apeiron backup ~/feature --ref feature` records the changes, and `apeiron merge feature` joins them into `main`. `apeiron diff main feature` shows what a merge would bring.
+A branch is worked on as any folder is: `apeiron switch feature ~/work` writes it into a folder, `apeiron backup ~/feature --ref feature` records the changes, and `apeiron merge feature` joins them into `main`. `apeiron diff main feature` shows what a merge would bring.
 
 ## 2. A merge
 
@@ -60,18 +61,29 @@ A rebase makes a branch start from the newest snapshot of another, as if its wor
 3. Copy them oldest first, each as a cherry-pick (section 4) onto the copy before it, starting at `<onto>`, but keeping each one's time, author, host and message. A file both sides changed differently is kept twice, the branch's version as `name (conflict <branch>).ext`, and the conflict is added to that copy's message. A snapshot whose changes are already there is left out.
 4. Move `<branch>` from its old snapshot to the last copy with compare-and-swap. The old snapshots are not deleted: the reflog of `<branch>` still names them until garbage collection (FORMAT.md §9.4). A ref kept by a retention rule only moves forward (ARCHIVE.md), so it cannot be rebased.
 
-## 6. Not part of this work item
+## 6. A working folder
+
+`apeiron switch <snapshot> <folder>` makes one folder hold one branch after another, as `git switch` does. Apeiron remembers what the folder holds with the local ref `folder/switch/<folder name>` (the name as in SYNC.md §2), the same kind of ref sync keeps for its folders (SYNC.md §3). It is never pushed.
+
+1. Record the folder as a tree F, as a backup does, without moving any ref yet. A missing folder counts as empty.
+2. If the folder has no ref yet, it must be empty or hold the same files as a ref, for example after `restore`; anything else fails and changes nothing, so a folder of unrelated files is never replaced by mistake.
+3. If F differs from the snapshot the folder ref points to, store F as a snapshot with that one as parent and the message `switch: the folder before switching to <snapshot>`, and move the folder ref to it. Work not backed up is thus never lost: the result names this snapshot, and `apeiron restore` brings it back.
+4. Change the folder from F to the snapshot as sync applies a snapshot (SYNC.md §5): only what differs is written or removed, each file through a temporary file and one rename, and a file changed while the switch runs is left alone with the snapshot's version beside it as `name (conflict <snapshot>).ext`.
+5. Move the folder ref to the snapshot.
+
+The switch records the folder but does not back it up into a branch: changes are kept in a branch with `apeiron backup <folder> --ref <branch>` as before. `--dry-run` stops after step 2 and lists the changes step 4 would make. Two folders with the same last name share one folder ref; that costs only an extra recorded snapshot, never a file.
+
+## 7. Not part of this work item
 
 | Item | Where |
 | --- | --- |
 | Merging inside a file, line by line | The text diff plugin, Stage 3 |
-| A working folder that follows a branch (`checkout` or `switch`) | Later; `restore` and `backup` cover it, and sync shows how a folder is changed safely |
 | A tool to resolve conflicts | The desktop interface (Stage 4); conflict copies are plain files until then |
 
-## 7. Crates
+## 8. Crates
 
 | Crate | Role | Status |
 | --- | --- | --- |
-| `apeiron-services` | The merge, shared by sync, `merge`, `cherry_pick` and `rebase` | Done |
-| `apeiron` | `create_ref`, `merge`, `cherry_pick` and `rebase` (API.md §8.3) | Done |
-| `apeiron-cli` | `apeiron ref`, `apeiron merge`, `apeiron cherry-pick` and `apeiron rebase` | Done |
+| `apeiron-services` | The merge, shared by sync, `merge`, `cherry_pick` and `rebase`; `switch` | Done |
+| `apeiron` | `create_ref`, `merge`, `cherry_pick`, `rebase` and `switch` (API.md §8.3) | Done |
+| `apeiron-cli` | `apeiron ref`, `apeiron merge`, `apeiron cherry-pick`, `apeiron rebase` and `apeiron switch` | Done |
