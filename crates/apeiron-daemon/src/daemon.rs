@@ -276,7 +276,7 @@ fn try_run(job: &Job, stop: &AtomicBool) -> apeiron::Result<(RunResult, String)>
                 result = RunResult::Warnings;
                 text.push_str(&format!("; {} files skipped", report.warnings.len()));
             }
-            match push_to(&repo, Some(ref_name), push, stop) {
+            match push_to(&repo, Some(ref_name), push, job.rate, stop) {
                 Ok((_, pushed)) => text.push_str(&pushed),
                 Err(e) => {
                     text.push_str(&format!("; push failed: {}", e.message));
@@ -286,12 +286,18 @@ fn try_run(job: &Job, stop: &AtomicBool) -> apeiron::Result<(RunResult, String)>
             (result, text)
         }
         Action::Push { ref_name, remotes } => {
-            let (result, pushed) = push_to(&repo, ref_name.as_deref(), remotes, stop)?;
+            let (result, pushed) = push_to(&repo, ref_name.as_deref(), remotes, job.rate, stop)?;
             (result, pushed.trim_start_matches("; ").to_owned())
         }
         Action::Pull { remote, ref_name } => match ref_name {
             Some(name) => {
-                let report = wait(repo.pull(TransferRequest::new(remote, name))?, stop)?;
+                let report = wait(
+                    repo.pull(TransferRequest {
+                        rate: job.rate,
+                        ..TransferRequest::new(remote, name)
+                    })?,
+                    stop,
+                )?;
                 (
                     RunResult::Ok,
                     format!("pulled from {remote}: {} objects", report.objects),
@@ -300,6 +306,7 @@ fn try_run(job: &Job, stop: &AtomicBool) -> apeiron::Result<(RunResult, String)>
             None => {
                 let request = RemoteRequest {
                     remote: remote.clone(),
+                    rate: job.rate,
                 };
                 let report = wait(repo.pull_all(request)?, stop)?;
                 mirrored("pulled from", remote, &report)
@@ -359,6 +366,7 @@ fn try_run(job: &Job, stop: &AtomicBool) -> apeiron::Result<(RunResult, String)>
             let mut request = SyncRequest::new(folder.clone(), remote.clone());
             request.ref_name = ref_name.clone();
             request.mode = *mode;
+            request.rate = job.rate;
             let report = wait(repo.sync(request)?, stop)?;
             let action = match report.action {
                 SyncAction::UpToDate => "up to date",
@@ -411,6 +419,7 @@ fn push_to(
     repo: &Repository,
     ref_name: Option<&str>,
     remotes: &[String],
+    rate: Option<u64>,
     stop: &AtomicBool,
 ) -> apeiron::Result<(RunResult, String)> {
     let mut text = String::new();
@@ -418,7 +427,13 @@ fn push_to(
     for remote in remotes {
         let (r, line) = match ref_name {
             Some(name) => {
-                let report = wait(repo.push(TransferRequest::new(remote, name))?, stop)?;
+                let report = wait(
+                    repo.push(TransferRequest {
+                        rate,
+                        ..TransferRequest::new(remote, name)
+                    })?,
+                    stop,
+                )?;
                 (
                     RunResult::Ok,
                     format!("pushed to {remote}: {} objects", report.objects),
@@ -427,6 +442,7 @@ fn push_to(
             None => {
                 let request = RemoteRequest {
                     remote: remote.clone(),
+                    rate,
                 };
                 let report = wait(repo.push_all(request)?, stop)?;
                 mirrored("pushed to", remote, &report)
@@ -652,6 +668,7 @@ mod tests {
                 url: replica.to_string_lossy().into_owned(),
                 path: root.join("standby"),
                 secret: None,
+                rate: None,
             })
             .unwrap(),
             &stop,
@@ -668,6 +685,7 @@ mod tests {
         wait(
             repo.push_all(RemoteRequest {
                 remote: "replica".to_owned(),
+                rate: None,
             })
             .unwrap(),
             &stop,
@@ -719,6 +737,7 @@ mod tests {
             url: root.join("hub").to_str().unwrap().to_owned(),
             path: root.join("copy"),
             secret: None,
+            rate: None,
         };
         Repository::clone_from(request).unwrap().wait().unwrap();
         fs::create_dir(root.join("other")).unwrap();

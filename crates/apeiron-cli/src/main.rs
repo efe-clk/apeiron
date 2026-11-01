@@ -334,6 +334,9 @@ enum Command {
         url: String,
         /// The new repository; must not exist or be empty
         path: PathBuf,
+        /// Move at most this much per second on average, such as 500K or 2M
+        #[arg(long, value_parser = parse_rate)]
+        rate: Option<u64>,
     },
     /// Keep a folder equal on several devices through a remote
     Sync {
@@ -347,6 +350,9 @@ enum Command {
         /// Only show what would change
         #[arg(long)]
         dry_run: bool,
+        /// Move at most this much per second on average, such as 500K or 2M
+        #[arg(long, value_parser = parse_rate)]
+        rate: Option<u64>,
     },
     /// Copy the snapshots of a ref to a remote and move the ref there
     Push {
@@ -356,6 +362,9 @@ enum Command {
         /// Push every ref, to keep a replica (docs/REPLICATION.md)
         #[arg(long, conflicts_with = "ref_name")]
         all: bool,
+        /// Move at most this much per second on average, such as 500K or 2M
+        #[arg(long, value_parser = parse_rate)]
+        rate: Option<u64>,
     },
     /// Copy the snapshots of a ref from a remote and move the local ref forward
     Pull {
@@ -365,6 +374,9 @@ enum Command {
         /// Pull every ref of the remote, to keep a standby (docs/REPLICATION.md)
         #[arg(long, conflicts_with = "ref_name")]
         all: bool,
+        /// Move at most this much per second on average, such as 500K or 2M
+        #[arg(long, value_parser = parse_rate)]
+        rate: Option<u64>,
     },
 }
 
@@ -2367,11 +2379,12 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             jobs,
             state_dir,
         } => run_daemon(out, command, jobs, state_dir),
-        Command::Clone { url, path } => {
+        Command::Clone { url, path, rate } => {
             let mut request = CloneRequest {
                 url,
                 path,
                 secret: password_file.map(read_password_file).transpose()?,
+                rate,
             };
             let report = match watch(out, Repository::clone_from(request.clone())?) {
                 Err(Failure::Api(e)) if e.kind == ErrorKind::Key && request.secret.is_none() => {
@@ -2398,10 +2411,12 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             ref_name,
             mode,
             dry_run,
+            rate,
         } => {
             let repo = open(cli.repo, password_file)?;
             let mut request = SyncRequest::new(folder, remote.clone());
             request.ref_name = ref_name;
+            request.rate = rate;
             request.mode = mode.into();
             request.dry_run = dry_run;
             let report = watch(out, repo.sync(request)?)?;
@@ -2413,39 +2428,59 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             })
         }
         Command::Push {
-            remote, all: true, ..
+            remote,
+            all: true,
+            rate,
+            ..
         } => {
             let repo = open(cli.repo, password_file)?;
             let request = apeiron::RemoteRequest {
                 remote: remote.clone(),
+                rate,
             };
             let report = watch(out, repo.push_all(request)?)?;
             Ok(mirror_result(out, &report, &remote))
         }
         Command::Pull {
-            remote, all: true, ..
+            remote,
+            all: true,
+            rate,
+            ..
         } => {
             let repo = open(cli.repo, password_file)?;
             let request = apeiron::RemoteRequest {
                 remote: remote.clone(),
+                rate,
             };
             let report = watch(out, repo.pull_all(request)?)?;
             Ok(mirror_result(out, &report, &remote))
         }
         Command::Push {
-            remote, ref_name, ..
+            remote,
+            ref_name,
+            rate,
+            ..
         } => {
             let repo = open(cli.repo, password_file)?;
-            let request = TransferRequest::new(remote.clone(), ref_name.clone());
+            let request = TransferRequest {
+                rate,
+                ..TransferRequest::new(remote.clone(), ref_name.clone())
+            };
             let report = watch(out, repo.push(request)?)?;
             out.result(&report, |r| say!("{}", transferred(r, &ref_name, &remote)));
             Ok(0)
         }
         Command::Pull {
-            remote, ref_name, ..
+            remote,
+            ref_name,
+            rate,
+            ..
         } => {
             let repo = open(cli.repo, password_file)?;
-            let request = TransferRequest::new(remote.clone(), ref_name.clone());
+            let request = TransferRequest {
+                rate,
+                ..TransferRequest::new(remote.clone(), ref_name.clone())
+            };
             let report = watch(out, repo.pull(request)?)?;
             out.result(&report, |r| say!("{}", transferred(r, &ref_name, &remote)));
             Ok(0)
@@ -2625,6 +2660,14 @@ fn parse_size(s: &str) -> std::result::Result<u64, String> {
 }
 
 /// The start of a day `YYYY-MM-DD` in local time.
+/// A speed such as 500K or 2M, in bytes per second; zero is refused.
+fn parse_rate(s: &str) -> std::result::Result<u64, String> {
+    match parse_size(s)? {
+        0 => Err("a speed limit must be more than zero".to_owned()),
+        n => Ok(n),
+    }
+}
+
 fn parse_date(s: &str) -> std::result::Result<Time, String> {
     let start = s
         .parse::<jiff::civil::Date>()

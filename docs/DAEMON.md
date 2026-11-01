@@ -69,6 +69,7 @@ every = "week"
 | `every` | `hour`, `day`, `week`, or a number of minutes, hours or days: `15m`, `6h`, `2d` |
 | `at` | For `day` and `week`: the earliest local time of day, `HH:MM` |
 | `sample_mb` | For `restore-test`: how much to restore, default 100 |
+| `rate_kb` | For `backup`, `push`, `pull` and `sync`: the most kibibytes per second moved to or from remotes, on average ([SYNC.md](SYNC.md) §2); no limit by default |
 
 `~` at the start of a path is the home folder. A job name follows the ref name rules without `/`. An invalid file stops `daemon run` and `daemon once` with an error that names the line; the daemon reads the file again when it changes and keeps the old jobs if the new file is invalid. The Schedule page of the desktop interface shows the jobs and edits this file, and saves only a valid one (DESKTOP.md §2).
 
@@ -112,7 +113,7 @@ A backup is proven only by restoring it (VISION.md). The restore test does this 
 | --- | --- |
 | Operating the daemon from another device (remote API) | The desktop and web interfaces (Stage 4) |
 | Backup triggered by file changes | Later; the schedule covers Stage 2 |
-| CPU, disk and network limits for jobs | Later; jobs run one at a time |
+| CPU and disk limits for jobs | Later; jobs run one at a time, and `rate_kb` limits the network |
 | Desktop notifications on failure | With the desktop interface (Stage 4) |
 
 ## 8. Crates and libraries

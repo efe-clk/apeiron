@@ -439,6 +439,7 @@ fn clone_makes_a_second_copy_that_knows_its_origin() {
         url: disk.to_str().unwrap().to_owned(),
         path: path.clone(),
         secret: None,
+        rate: None,
     };
     let job = Repository::clone_from(request.clone()).unwrap();
     let report = job.wait().unwrap();
@@ -618,6 +619,7 @@ fn a_compliance_report_shows_what_is_kept_and_what_needs_attention() {
     s.repo
         .push_all(RemoteRequest {
             remote: "disk".to_owned(),
+            rate: None,
         })
         .unwrap()
         .wait()

@@ -412,9 +412,11 @@ class Repository:
         return cls(out)
 
     @staticmethod
-    def clone(url: Any, path: Any, secret: Optional[str] = None) -> Job:
-        """Makes a new repository from a remote copy (a job)."""
-        return _start(None, "clone", _drop_none({"url": url, "path": path, "secret": secret}))
+    def clone(url: Any, path: Any, secret: Optional[str] = None, rate: Optional[int] = None) -> Job:
+        """Makes a new repository from a remote copy (a job); ``rate`` limits
+        the speed in bytes per second (docs/SYNC.md §2)."""
+        request = {"url": url, "path": path, "secret": secret, "rate": rate}
+        return _start(None, "clone", _drop_none(request))
 
     def close(self) -> None:
         if self._handle:
@@ -540,11 +542,11 @@ class Repository:
     def gc(self, **options: Any) -> Job:
         return self.start("gc", **options)
 
-    def push(self, remote: str, ref: str = "main") -> Job:
-        return self.start("push", remote=remote, ref=ref)
+    def push(self, remote: str, ref: str = "main", rate: Optional[int] = None) -> Job:
+        return self.start("push", **_drop_none({"remote": remote, "ref": ref, "rate": rate}))
 
-    def pull(self, remote: str, ref: str = "main") -> Job:
-        return self.start("pull", remote=remote, ref=ref)
+    def pull(self, remote: str, ref: str = "main", rate: Optional[int] = None) -> Job:
+        return self.start("pull", **_drop_none({"remote": remote, "ref": ref, "rate": rate}))
 
     def restore_test(self, snapshot: str, **options: Any) -> Job:
         return self.start("restore_test", snapshot=snapshot, **options)

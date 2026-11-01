@@ -111,6 +111,9 @@ class Sdk(unittest.TestCase):
         self.assertEqual(report.refs[0].name, "main")
         with apeiron.Repository.open(self.root / "copy") as copy:
             self.assertEqual(copy.remotes()[0].name, "origin")
+            self.assertEqual(copy.pull("origin", rate=1 << 30).wait().objects, 0)
+            with self.assertRaises(apeiron.InvalidInputError):
+                copy.push("origin", rate=0).wait()
 
 
 if __name__ == "__main__":

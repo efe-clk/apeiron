@@ -229,6 +229,10 @@ pub struct TransferRequest {
     pub remote: String,
     #[serde(rename = "ref", default = "default_ref")]
     pub ref_name: String,
+    /// The most bytes per second moved to or from the remote, on average
+    /// (SYNC.md §2); no limit when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rate: Option<u64>,
 }
 
 fn default_ref() -> String {
@@ -240,6 +244,7 @@ impl TransferRequest {
         TransferRequest {
             remote: remote.into(),
             ref_name: ref_name.into(),
+            rate: None,
         }
     }
 }
@@ -250,6 +255,10 @@ impl TransferRequest {
 pub struct RemoteRequest {
     /// The name of a remote.
     pub remote: String,
+    /// The most bytes per second moved to or from the remote, on average
+    /// (SYNC.md §2); no limit when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rate: Option<u64>,
 }
 
 /// What pushing or pulling every ref did, ref by ref.
@@ -287,6 +296,10 @@ pub struct CloneRequest {
     /// The password or recovery key of an encrypted copy.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub secret: Option<String>,
+    /// The most bytes per second moved to or from the remote, on average
+    /// (SYNC.md §2); no limit when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rate: Option<u64>,
 }
 
 /// What `clone` copied, ref by ref.
@@ -317,6 +330,10 @@ pub struct SyncRequest {
     /// remote.
     #[serde(default)]
     pub dry_run: bool,
+    /// The most bytes per second moved to or from the remote, on average
+    /// (SYNC.md §2); no limit when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rate: Option<u64>,
 }
 
 impl SyncRequest {
@@ -327,6 +344,7 @@ impl SyncRequest {
             ref_name: None,
             mode: SyncMode::TwoWay,
             dry_run: false,
+            rate: None,
         }
     }
 }

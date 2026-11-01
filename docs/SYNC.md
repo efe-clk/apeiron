@@ -25,6 +25,8 @@ Sync keeps the same folder, such as `~/Documents`, equal on several devices. It 
 
 The background service runs sync as a job (`do = "sync"`, [DAEMON.md](DAEMON.md)), for example every 15 minutes. A second device starts with `apeiron clone`, then `apeiron sync`. `--dry-run` stores the folder's new content in the repository, where garbage collection removes it, but moves no ref and changes neither the folder nor the remote.
 
+`--rate <speed>`, such as `500K` or `2M` bytes per second, limits how fast `sync`, `clone`, `push` and `pull` read from and write to the remote, so that a transfer leaves room on a slow line; a job of the background service sets it with `rate_kb` ([DAEMON.md](DAEMON.md) §3). The limit holds on average: after each file the transfer waits until the bytes so far fit the speed, so one large file still moves at full speed and the wait comes after it. Listing files and reading refs are not counted.
+
 ## 3. One sync round
 
 Two local refs belong to a synced folder. The folder ref `folder/<ref>` (for example `folder/sync/documents`) points to the snapshot that equals the folder as of the last finished round; only sync moves it. The shared ref (`sync/documents`) is the one pushed and pulled; it may also arrive by `clone` or `pull`, before the folder holds its files, so it never stands for the folder. A device without a folder ref, such as a new clone, syncs as if its folder were new: nothing in it is deleted, and files that differ from the remote become conflicts.
@@ -97,7 +99,6 @@ The folder ref moves only after the folder has been applied. An interrupted appl
 | --- | --- |
 | Peer-to-peer sync without a remote | Later; a remote covers Stage 2 |
 | Exclusion rules and selective sync | With the backup service's exclusion rules, Stage 3 |
-| Bandwidth limits | Later |
 | Operating the daemon from another device (remote API) | The desktop and web interfaces (Stage 4); [DAEMON.md](DAEMON.md) is updated |
 
 ## 8. Crates

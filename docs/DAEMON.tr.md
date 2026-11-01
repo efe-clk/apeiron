@@ -69,6 +69,7 @@ every = "week"
 | `every` | `hour`, `day`, `week` ya da dakika, saat veya gün sayısı: `15m`, `6h`, `2d` |
 | `at` | `day` ve `week` için: günün en erken yerel saati, `HH:MM` |
 | `sample_mb` | `restore-test` için: ne kadarının geri yükleneceği, varsayılan 100 |
+| `rate_kb` | `backup`, `push`, `pull` ve `sync` için: uzak depolara giden ya da onlardan gelen, saniyede ortalama en çok kibibayt ([SYNC.tr.md](SYNC.tr.md) §2); varsayılan olarak sınır yoktur |
 
 Bir yolun başındaki `~` ev klasörüdür. Bir iş adı, `/` içermeyen ref adı kurallarına uyar. Geçersiz bir dosya, `daemon run` ve `daemon once` komutlarını satırı belirten bir hatayla durdurur; daemon dosya değişince onu yeniden okur ve yeni dosya geçersizse eski işleri korur. Masaüstü arayüzünün Zamanlama sayfası işleri gösterir ve bu dosyayı düzenler; yalnızca geçerli bir dosyayı kaydeder (DESKTOP.tr.md §2).
 
@@ -112,7 +113,7 @@ Bir yedek ancak geri yüklenerek kanıtlanır (VISION.tr.md). Geri yükleme test
 | --- | --- |
 | Daemon'u başka bir cihazdan yönetmek (uzak API) | Masaüstü ve web arayüzleri (Aşama 4) |
 | Dosya değişikliğiyle tetiklenen yedek | Daha sonra; Aşama 2 için zamanlama yeterlidir |
-| İşler için işlemci, disk ve ağ sınırları | Daha sonra; işler birer birer çalışır |
+| İşler için işlemci ve disk sınırları | Daha sonra; işler birer birer çalışır, ağı `rate_kb` sınırlar |
 | Başarısızlıkta masaüstü bildirimi | Masaüstü arayüzüyle (Aşama 4) |
 
 ## 8. Crate'ler ve kütüphaneler

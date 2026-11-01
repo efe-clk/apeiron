@@ -89,6 +89,7 @@ fn run(remotes: &[String], app: &Weak<App>, woken: &Receiver<()>) {
 fn push(repo: &Repository, remote: &str) -> (String, serde_json::Value) {
     let request = RemoteRequest {
         remote: remote.to_owned(),
+        rate: None,
     };
     match repo.push_all(request).and_then(apeiron::Job::wait) {
         Ok(report) => {

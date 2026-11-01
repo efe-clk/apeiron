@@ -71,8 +71,8 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | `apeiron remote add <name> <url>` | Bir uzak depo ekler: harici diskteki gibi bir klasör `sftp://[user@]host[:port]/path` ya da `s3://bucket/path?endpoint=…&region=…` (bölüm 2.2) | Tamamlandı |
 | `apeiron remote list` | Uzak depoları listeler | Tamamlandı |
 | `apeiron remote remove <name>` | Bir uzak depoyu unutur; kopyanın kendisine dokunulmaz | Tamamlandı |
-| `apeiron clone <url> <path>` | Bir uzak kopyadan aynı parolayla yeni bir depo oluşturur, her ref'i pull eder ve uzak depoya `origin` adını verir; ikinci bir cihazı kurmanın yolu | Tamamlandı |
-| `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run]` | Bir klasörü bir uzak depo üzerinden birkaç cihazda eşit tutar: yedekler, pull eder, birleştirir, klasörü değiştirir ve push eder ([SYNC.tr.md](SYNC.tr.md)); eklenen, silinen ve değişen dosyalar için `+`, `-` ve `~`, her çatışma için bir satır yazar | Tamamlandı |
+| `apeiron clone <url> <path> [--rate <hız>]` | Bir uzak kopyadan aynı parolayla yeni bir depo oluşturur, her ref'i pull eder ve uzak depoya `origin` adını verir; ikinci bir cihazı kurmanın yolu | Tamamlandı |
+| `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run] [--rate <hız>]` | Bir klasörü bir uzak depo üzerinden birkaç cihazda eşit tutar: yedekler, pull eder, birleştirir, klasörü değiştirir ve push eder ([SYNC.tr.md](SYNC.tr.md)); eklenen, silinen ve değişen dosyalar için `+`, `-` ve `~`, her çatışma için bir satır yazar | Tamamlandı |
 | `apeiron ref create <name> [<snapshot>]` | Bir snapshot'ta (varsayılan `main`) dal gibi bir ref oluşturur ([BRANCH.tr.md](BRANCH.tr.md)) | Tamamlandı |
 | `apeiron ref delete <name>` | Bir ref'i siler; `apeiron reflog <name>` onun nereye işaret ettiğini yine gösterir | Tamamlandı |
 | `apeiron merge <from> [--into <ref>] [--message <text>] [--dry-run]` | Bir snapshot'ı, genellikle bir dalı, bir ref'e (varsayılan `main`) birleştirir; çatışma varsa çıkış kodu 3'tür | Tamamlandı |
@@ -90,11 +90,11 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | `apeiron plugin remove <name>` | Bir eklentiyi kaldırır | Tamamlandı |
 | `apeiron git import <git-repo> [--prefix <name>]` | Bir Git deposunun her dalını, etiketini ve uzak takip dalını geçmişiyle `git/` altında saklar ([GIT.tr.md](GIT.tr.md)) | Tamamlandı |
 | `apeiron git export <git-repo> [--prefix <name>]` | Onları aynı commit kimlikleriyle bir Git deposuna geri yazar; biri yeniden üretilemezse çıkış kodu 3'tür | Tamamlandı |
-| `apeiron push <remote> [<ref>]` | Bir ref'in (varsayılan `main`) snapshot'larını uzak depoya kopyalar ve ref'i orada taşır | Tamamlandı |
-| `apeiron pull <remote> [<ref>]` | Bir ref'in snapshot'larını uzak depodan kopyalar ve yerel ref'i ileri taşır | Tamamlandı |
+| `apeiron push <remote> [<ref>] [--rate <hız>]` | Bir ref'in (varsayılan `main`) snapshot'larını uzak depoya kopyalar ve ref'i orada taşır | Tamamlandı |
+| `apeiron pull <remote> [<ref>] [--rate <hız>]` | Bir ref'in snapshot'larını uzak depodan kopyalar ve yerel ref'i ileri taşır | Tamamlandı |
 | `apeiron report [--verify] [--remotes] [--stale-days <n>] [--web [--tenant <name>] [--since <date>]]` | Bir uyumluluk raporunu Markdown olarak (ya da `--json` ile JSON olarak) yazdırır: yedekler, bütünlük, kopyalar, koruma, saklama ve `--web` ile kullanıcılar ve denetim kaydı; bir sorun varsa çıkış kodu 3, bozuk veri varsa 4 ([REPORTS.tr.md](REPORTS.tr.md)) | Tamamlandı |
 | `apeiron retention add <refs> --days <n>`, `apeiron retention list` | Bir adın ya da ardından `*` gelen bir önekin eşleştiği ref'leri arşiv olarak tutar: yalnızca ileri giderler ve son değişikliklerinden bu yana gün sayısı geçene kadar silinmezler; bir kural asla kaldırılamaz ([ARCHIVE.tr.md](ARCHIVE.tr.md)) | Tamamlandı |
-| `apeiron push --all <remote>`, `apeiron pull --all <remote>` | Bir replikayı ya da yedek sunucuyu güncel tutmak için her ref'i push ya da pull eder; çatışmalı bir ref bırakılır ve adlandırılır, diğerleri kopyalanır; o zaman çıkış kodu 3'tür ([REPLICATION.tr.md](REPLICATION.tr.md)) | Tamamlandı |
+| `apeiron push --all <remote>`, `apeiron pull --all <remote> [--rate <hız>]` | Bir replikayı ya da yedek sunucuyu güncel tutmak için her ref'i push ya da pull eder; çatışmalı bir ref bırakılır ve adlandırılır, diğerleri kopyalanır; o zaman çıkış kodu 3'tür ([REPLICATION.tr.md](REPLICATION.tr.md)) | Tamamlandı |
 | `apeiron web … [--replicate <remote>]... [--standby]` | Her yedekten sonra her ref'i her replikaya push eder ya da yedek almayan bir yedek sunucu kopyası sunar ([REPLICATION.tr.md](REPLICATION.tr.md)) | Tamamlandı |
 | `apeiron key remove <id>` | Bir parolayı ya da kurtarma anahtarını siler; sonuncusu silinemez | Tamamlandı |
 

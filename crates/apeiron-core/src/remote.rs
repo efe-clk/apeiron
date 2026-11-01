@@ -221,6 +221,95 @@ pub trait Store {
     fn swap_ref(&self, name: &str, expected: Option<ObjectId>, new: ObjectId) -> Result<()>;
 }
 
+/// A store that keeps the average speed of the file contents it reads and
+/// writes under `rate` bytes per second (SYNC.md §2): after each read or
+/// write it waits until the bytes so far fit the rate. One large file still
+/// moves at full speed; the wait comes after it.
+pub struct Limited {
+    inner: Box<dyn Store>,
+    rate: u64,
+    /// When the first byte moved, and the bytes moved since.
+    moved: std::sync::Mutex<Option<(std::time::Instant, u64)>>,
+}
+
+impl Limited {
+    /// `rate` is in bytes per second and must not be zero.
+    pub fn new(inner: Box<dyn Store>, rate: u64) -> Result<Self> {
+        if rate == 0 {
+            return Err(Error::InvalidRemote("a speed limit of zero".to_owned()));
+        }
+        Ok(Limited {
+            inner,
+            rate,
+            moved: std::sync::Mutex::new(None),
+        })
+    }
+
+    fn pace(&self, bytes: u64) {
+        let wait = {
+            let mut moved = self
+                .moved
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let (start, total) = moved.get_or_insert_with(|| (std::time::Instant::now(), 0));
+            *total = total.saturating_add(bytes);
+            let due = std::time::Duration::from_secs_f64(*total as f64 / self.rate as f64);
+            due.saturating_sub(start.elapsed())
+        };
+        if !wait.is_zero() {
+            std::thread::sleep(wait);
+        }
+    }
+}
+
+impl Store for Limited {
+    fn location(&self, path: &str) -> PathBuf {
+        self.inner.location(path)
+    }
+
+    fn read(&self, path: &str) -> Result<Option<Vec<u8>>> {
+        let data = self.inner.read(path)?;
+        self.pace(data.as_ref().map_or(0, |d| d.len() as u64));
+        Ok(data)
+    }
+
+    fn read_range(&self, path: &str, offset: u64, len: u64) -> Result<Vec<u8>> {
+        let data = self.inner.read_range(path, offset, len)?;
+        self.pace(data.len() as u64);
+        Ok(data)
+    }
+
+    fn list(&self, dir: &str) -> Result<Vec<String>> {
+        self.inner.list(dir)
+    }
+
+    fn write_new(&self, path: &str, bytes: &[u8]) -> Result<()> {
+        self.inner.write_new(path, bytes)?;
+        self.pace(bytes.len() as u64);
+        Ok(())
+    }
+
+    fn create_dirs(&self, dirs: &[&str]) -> Result<()> {
+        self.inner.create_dirs(dirs)
+    }
+
+    fn delete(&self, path: &str) -> Result<()> {
+        self.inner.delete(path)
+    }
+
+    fn read_ref(&self, name: &str) -> Result<Option<ObjectId>> {
+        self.inner.read_ref(name)
+    }
+
+    fn list_refs(&self) -> Result<Vec<String>> {
+        self.inner.list_refs()
+    }
+
+    fn swap_ref(&self, name: &str, expected: Option<ObjectId>, new: ObjectId) -> Result<()> {
+        self.inner.swap_ref(name, expected, new)
+    }
+}
+
 /// A remote in a folder, such as one on an external disk. It is a complete
 /// repository that also keeps reflogs.
 #[derive(Debug)]
@@ -326,6 +415,75 @@ impl Store for FolderStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A store in memory, for the speed limit.
+    #[derive(Default)]
+    struct Memory(std::sync::Mutex<BTreeMap<String, Vec<u8>>>);
+
+    impl Store for Memory {
+        fn location(&self, path: &str) -> PathBuf {
+            PathBuf::from(path)
+        }
+        fn read(&self, path: &str) -> Result<Option<Vec<u8>>> {
+            Ok(self.0.lock().unwrap().get(path).cloned())
+        }
+        fn read_range(&self, path: &str, offset: u64, len: u64) -> Result<Vec<u8>> {
+            let data = self
+                .0
+                .lock()
+                .unwrap()
+                .get(path)
+                .cloned()
+                .unwrap_or_default();
+            Ok(data[offset as usize..(offset + len) as usize].to_vec())
+        }
+        fn list(&self, _: &str) -> Result<Vec<String>> {
+            Ok(self.0.lock().unwrap().keys().cloned().collect())
+        }
+        fn write_new(&self, path: &str, bytes: &[u8]) -> Result<()> {
+            self.0
+                .lock()
+                .unwrap()
+                .insert(path.to_owned(), bytes.to_vec());
+            Ok(())
+        }
+        fn create_dirs(&self, _: &[&str]) -> Result<()> {
+            Ok(())
+        }
+        fn delete(&self, path: &str) -> Result<()> {
+            self.0.lock().unwrap().remove(path);
+            Ok(())
+        }
+        fn read_ref(&self, _: &str) -> Result<Option<ObjectId>> {
+            Ok(None)
+        }
+        fn list_refs(&self) -> Result<Vec<String>> {
+            Ok(Vec::new())
+        }
+        fn swap_ref(&self, _: &str, _: Option<ObjectId>, _: ObjectId) -> Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn a_speed_limit_slows_reads_and_writes_down() {
+        assert!(Limited::new(Box::new(Memory::default()), 0).is_err());
+        // 40 KiB at 100 KiB/s take at least 0.4 s.
+        let store = Limited::new(Box::new(Memory::default()), 100 << 10).unwrap();
+        let start = std::time::Instant::now();
+        store.write_new("a", &[1; 10 << 10]).unwrap();
+        store.write_new("b", &[2; 10 << 10]).unwrap();
+        assert_eq!(store.read("a").unwrap().unwrap().len(), 10 << 10);
+        assert_eq!(store.read_range("b", 0, 10 << 10).unwrap().len(), 10 << 10);
+        let took = start.elapsed();
+        assert!(took >= std::time::Duration::from_millis(390), "{took:?}");
+        assert!(took < std::time::Duration::from_secs(5), "{took:?}");
+        // Listing and refs move no file contents and do not wait.
+        let start = std::time::Instant::now();
+        assert_eq!(store.list("").unwrap().len(), 2);
+        assert!(store.read("missing").unwrap().is_none());
+        assert!(start.elapsed() < std::time::Duration::from_millis(100));
+    }
 
     #[test]
     fn remotes_file_round_trips_and_names_are_checked() {

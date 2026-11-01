@@ -394,7 +394,7 @@ pub(crate) fn make(
 
 /// Adds the state of every ref on `remote` to `refs`.
 fn compare(repo: &Repository, remote: &core::Remote, refs: &mut [RefFacts]) -> Result<()> {
-    let store = open_store(remote, repo.info().encrypted)?;
+    let store = open_store(remote, repo.info().encrypted, None)?;
     for r in refs.iter_mut() {
         let state = match store.read_ref(&r.name)? {
             None => CopyKind::Missing,

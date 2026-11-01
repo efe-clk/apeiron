@@ -20,6 +20,9 @@ pub struct Job {
     pub every: Every,
     /// Earliest local time of day `(hour, minute)`; only with [`Every::Days`].
     pub at: Option<(i8, i8)>,
+    /// The most bytes per second moved to or from remotes, on average
+    /// (`rate_kb`, DAEMON.md §3).
+    pub rate: Option<u64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -99,6 +102,7 @@ struct RawJob {
     every: String,
     at: Option<String>,
     sample_mb: Option<u64>,
+    rate_kb: Option<u64>,
     remote: Option<String>,
     mode: Option<String>,
 }
@@ -260,6 +264,17 @@ fn to_job(name: &str, raw: RawJob) -> std::result::Result<Job, String> {
             ));
         }
     };
+    if matches!(
+        action,
+        Action::Verify | Action::Gc | Action::RestoreTest { .. }
+    ) {
+        not_here("rate_kb", raw.rate_kb.is_some())?;
+    }
+    let rate = match raw.rate_kb {
+        Some(0) => return Err("`rate_kb` must be at least 1".to_owned()),
+        Some(kb) => Some(kb.saturating_mul(1024)),
+        None => None,
+    };
     let every = parse_every(&raw.every)?;
     let at = raw.at.as_deref().map(parse_at).transpose()?;
     if at.is_some() && matches!(every, Every::Hours(_) | Every::Minutes(_)) {
@@ -272,6 +287,7 @@ fn to_job(name: &str, raw: RawJob) -> std::result::Result<Job, String> {
         action,
         every,
         at,
+        rate,
     })
 }
 
@@ -493,11 +509,24 @@ mod tests {
                 "`ref = \"*\"` does not apply",
             ),
             ("do = \"gc\"\nevery = \"day\"\ncolour = 1", "unknown field"),
+            (
+                "do = \"gc\"\nevery = \"day\"\nrate_kb = 100",
+                "`rate_kb` does not apply",
+            ),
+            (
+                "do = \"push\"\npush = [\"nas\"]\nevery = \"day\"\nrate_kb = 0",
+                "at least 1",
+            ),
         ];
         for (body, expected) in bad {
             let error = parse(&format!("[job.x]\nrepo = \"/r\"\n{body}")).unwrap_err();
             assert!(error.contains(expected), "{body}: {error}");
         }
+        let jobs = parse(
+            "[job.x]\nrepo = \"/r\"\ndo = \"push\"\npush = [\"nas\"]\nevery = \"day\"\nrate_kb = 512",
+        )
+        .unwrap();
+        assert_eq!(jobs[0].rate, Some(512 * 1024));
         let error = parse("[job.Big]\nrepo = \"/r\"\ndo = \"gc\"\nevery = \"day\"").unwrap_err();
         assert!(error.contains("job \"Big\""), "{error}");
     }

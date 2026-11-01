@@ -171,7 +171,7 @@ Every operation takes one plain request value and returns one plain result value
 | `remotes` | — | `Vec<Remote>`: name and URL, sorted by name | No |
 | `add_remote` | name, URL: a folder path (absolute or relative) `sftp://[user@]host[:port]/path` or `s3://bucket/path?endpoint=…&region=…` | `Remote`, a folder as an absolute path; SFTP and S3 remotes need an encrypted repository | No |
 | `remove_remote` | name | —; the remote copy itself is not touched | No |
-| `push` | remote name, ref name (default `main`) | `TransferReport`: snapshot the remote ref points to now, the one before, objects and stored bytes copied; `conflict` if the remote has snapshots this copy does not | Yes |
+| `push` | remote name, ref name (default `main`), optional speed limit in bytes per second (`rate`, [SYNC.md](SYNC.md) §2; also for `pull`, `push_all`, `pull_all`, `sync` and `clone`) | `TransferReport`: snapshot the remote ref points to now, the one before, objects and stored bytes copied; `conflict` if the remote has snapshots this copy does not | Yes |
 | `pull` | remote name, ref name (default `main`) | `TransferReport`, the same for the local ref; `conflict` if the local ref has snapshots the remote does not | Yes |
 | `retention` | — | `Vec<RetentionRule>`: refs pattern, days, when added; oldest first ([ARCHIVE.md](ARCHIVE.md)) | No |
 | `add_retention` | refs (a name, or a prefix followed by `*`), days (1 to 36500) | `RetentionRule`; it can never be removed or shortened ([FORMAT.md](FORMAT.md) §16). A ref change a rule forbids fails with `conflict` | No |
@@ -179,7 +179,7 @@ Every operation takes one plain request value and returns one plain result value
 | `push_all`, `pull_all` | remote name | `MirrorReport`: per ref its name and either a `TransferReport` or the `conflict` that left it; other errors stop them all ([REPLICATION.md](REPLICATION.md) §2, [FORMAT.md](FORMAT.md) §15.7) | Yes |
 | `git_import` | Git repository path, ref prefix (default `git`) | `GitImportReport`: commits and tags stored, refs moved (Git name, ref, Git id, snapshot, previous), skipped refs with the reason, stale refs ([GIT.md](GIT.md)) | Yes |
 | `git_export` | Git repository path (created bare if missing), ref prefix | `GitExportReport`: commits and tags written, refs updated, skipped refs, Git ids not reproduced | Yes |
-| `sync` | folder, remote name, ref name (default `sync/<folder name>`), mode (`two-way`, `send` or `receive`), dry run | `SyncReport`: ref, action (`up_to_date`, `sent`, `received` or `merged`), snapshot, the backup made, what was fetched and pushed, folder changes, conflicts with their copies, files merged by plugins, paths left for the next round, warnings, rounds run ([SYNC.md](SYNC.md)); `conflict` in `send` mode when the remote has snapshots this copy does not | Yes |
+| `sync` | folder, remote name, ref name (default `sync/<folder name>`), mode (`two-way`, `send` or `receive`), dry run, speed limit | `SyncReport`: ref, action (`up_to_date`, `sent`, `received` or `merged`), snapshot, the backup made, what was fetched and pushed, folder changes, conflicts with their copies, files merged by plugins, paths left for the next round, warnings, rounds run ([SYNC.md](SYNC.md)); `conflict` in `send` mode when the remote has snapshots this copy does not | Yes |
 
 ### 8.4 Naming a snapshot
 

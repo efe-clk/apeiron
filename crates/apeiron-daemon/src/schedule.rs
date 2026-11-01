@@ -76,6 +76,7 @@ mod tests {
             action: Action::Verify,
             every,
             at,
+            rate: None,
         }
     }
 

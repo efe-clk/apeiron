@@ -25,6 +25,8 @@ Senkron, `~/Documents` gibi aynı klasörü birden fazla cihazda eşit tutar. Va
 
 Arka plan hizmeti senkronu bir iş olarak çalıştırır (`do = "sync"`, [DAEMON.tr.md](DAEMON.tr.md)), örneğin 15 dakikada bir. İkinci bir cihaz `apeiron clone`, ardından `apeiron sync` ile başlar. `--dry-run`, klasörün yeni içeriğini depoya kaydeder (çöp toplama onu siler), ama hiçbir ref'i taşımaz; ne klasörü ne de uzak depoyu değiştirir.
 
+`--rate <hız>`, örneğin saniyede `500K` ya da `2M` bayt, `sync`, `clone`, `push` ve `pull` komutlarının uzak depodan ne kadar hızlı okuyup ona ne kadar hızlı yazdığını sınırlar; böylece bir aktarım yavaş bir hatta yer bırakır. Arka plan hizmetinin bir işi bunu `rate_kb` ile ayarlar ([DAEMON.tr.md](DAEMON.tr.md) §3). Sınır ortalamada geçerlidir: her dosyadan sonra aktarım, o ana kadarki baytlar hıza uyana kadar bekler; bu yüzden tek bir büyük dosya yine tam hızla gider ve bekleme ondan sonra gelir. Dosyaları listelemek ve ref okumak sayılmaz.
+
 ## 3. Bir senkron turu
 
 Senkronlanan bir klasörün iki yerel ref'i vardır. Klasör ref'i `folder/<ref>` (örneğin `folder/sync/documents`), son biten turdaki hâliyle klasöre eşit olan snapshot'ı gösterir; onu yalnızca senkron taşır. Ortak ref (`sync/documents`) push ve pull edilendir; klasör dosyalarını almadan önce `clone` ya da `pull` ile de gelebilir, bu yüzden asla klasörün yerine geçmez. Yeni bir klon gibi klasör ref'i olmayan bir cihaz, klasörü yeniymiş gibi senkronlar: içindeki hiçbir şey silinmez ve uzak depodakinden farklı dosyalar çatışma olur.
@@ -97,7 +99,6 @@ Klasör ref'i ancak klasör uygulandıktan sonra taşınır. Yarıda kalan bir u
 | --- | --- |
 | Uzak depo olmadan eşler arası senkron | Daha sonra; Aşama 2 için bir uzak depo yeterlidir |
 | Dışlama kuralları ve seçmeli senkron | Yedek hizmetinin dışlama kurallarıyla, Aşama 3 |
-| Bant genişliği sınırları | Daha sonra |
 | Daemon'u başka bir cihazdan yönetmek (uzak API) | Masaüstü ve web arayüzleri (Aşama 4); [DAEMON.tr.md](DAEMON.tr.md) güncellenir |
 
 ## 8. Crate'ler

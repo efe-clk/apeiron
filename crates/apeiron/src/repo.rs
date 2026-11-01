@@ -108,7 +108,7 @@ impl Repository {
             ctl.update(|p| p.phase = Phase::Copying);
             // The copy is already where the user stored it; whether it is
             // encrypted is known only after reading it.
-            let store = open_store(&remote, true)?;
+            let store = open_store(&remote, true, request.rate)?;
             let (core, reports) = core::Repository::clone_from(
                 &*store,
                 &request.path,
@@ -256,7 +256,7 @@ impl Repository {
         };
         let repo = self.clone();
         Job::spawn("sync", move |ctl| {
-            let store = open_store(&remote, repo.info().encrypted)?;
+            let store = open_store(&remote, repo.info().encrypted, request.rate)?;
             let _writer = repo.lock_writer();
             let _lock = core::RepoLock::shared(repo.path())?;
             let plugins = repo.plugins()?;
@@ -708,7 +708,7 @@ impl Repository {
         let repo = self.clone();
         Job::spawn("push", move |ctl| {
             ctl.update(|p| p.phase = Phase::Copying);
-            let store = open_store(&remote, repo.info().encrypted)?;
+            let store = open_store(&remote, repo.info().encrypted, request.rate)?;
             let report = repo
                 .view()?
                 .push(&*store, &request.ref_name, &mut |r| copied(ctl, r))?;
@@ -725,7 +725,7 @@ impl Repository {
         let repo = self.clone();
         Job::spawn("pull", move |ctl| {
             ctl.update(|p| p.phase = Phase::Copying);
-            let store = open_store(&remote, repo.info().encrypted)?;
+            let store = open_store(&remote, repo.info().encrypted, request.rate)?;
             let _writer = repo.lock_writer();
             let _lock = core::RepoLock::shared(repo.path())?;
             let mut core = repo.read().reopen()?;
@@ -745,7 +745,7 @@ impl Repository {
         let repo = self.clone();
         Job::spawn("push", move |ctl| {
             ctl.update(|p| p.phase = Phase::Copying);
-            let store = open_store(&remote, repo.info().encrypted)?;
+            let store = open_store(&remote, repo.info().encrypted, request.rate)?;
             let outcomes = repo.view()?.push_all(&*store, &mut |r| copied(ctl, r))?;
             ctl.update(|p| p.phase = Phase::Done);
             Ok(mirrored(outcomes))
@@ -761,7 +761,7 @@ impl Repository {
         let repo = self.clone();
         Job::spawn("pull", move |ctl| {
             ctl.update(|p| p.phase = Phase::Copying);
-            let store = open_store(&remote, repo.info().encrypted)?;
+            let store = open_store(&remote, repo.info().encrypted, request.rate)?;
             let _writer = repo.lock_writer();
             let _lock = core::RepoLock::shared(repo.path())?;
             let mut core = repo.read().reopen()?;
@@ -840,7 +840,11 @@ fn absolute_url(url: &str) -> Result<String> {
 
 /// Connects to a remote. Only an encrypted repository is sent over the
 /// network (FORMAT.md §15.1).
-pub(crate) fn open_store(remote: &Remote, encrypted: bool) -> Result<Box<dyn core::Store>> {
+pub(crate) fn open_store(
+    remote: &Remote,
+    encrypted: bool,
+    rate: Option<u64>,
+) -> Result<Box<dyn core::Store>> {
     let network_needs_encryption = || {
         if encrypted {
             return Ok(());
@@ -851,7 +855,7 @@ pub(crate) fn open_store(remote: &Remote, encrypted: bool) -> Result<Box<dyn cor
              create one with `init --encrypt`",
         ))
     };
-    Ok(match core::RemoteUrl::parse(&remote.url)? {
+    let store: Box<dyn core::Store> = match core::RemoteUrl::parse(&remote.url)? {
         core::RemoteUrl::Folder(path) => Box::new(core::FolderStore::open(&path)?),
         core::RemoteUrl::Sftp(url) => {
             network_needs_encryption()?;
@@ -862,6 +866,10 @@ pub(crate) fn open_store(remote: &Remote, encrypted: bool) -> Result<Box<dyn cor
             network_needs_encryption()?;
             Box::new(apeiron_remote::S3Store::connect(&url)?)
         }
+    };
+    Ok(match rate {
+        Some(rate) => Box::new(core::Limited::new(store, rate)?),
+        None => store,
     })
 }
 

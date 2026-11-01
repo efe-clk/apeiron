@@ -71,8 +71,8 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | `apeiron remote add <name> <url>` | Adds a remote: a folder, such as one on an external disk, `sftp://[user@]host[:port]/path` or `s3://bucket/path?endpoint=…&region=…` (section 2.2) | Done |
 | `apeiron remote list` | Lists the remotes | Done |
 | `apeiron remote remove <name>` | Forgets a remote; the copy itself is not touched | Done |
-| `apeiron clone <url> <path>` | Makes a new repository from a remote copy, with the same password, pulls every ref and names the remote `origin`; the way to set up a second device | Done |
-| `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run]` | Keeps a folder equal on several devices through a remote: backs it up, pulls, merges, changes the folder and pushes ([SYNC.md](SYNC.md)); prints `+`, `-` and `~` for added, removed and changed files and one line per conflict | Done |
+| `apeiron clone <url> <path> [--rate <speed>]` | Makes a new repository from a remote copy, with the same password, pulls every ref and names the remote `origin`; the way to set up a second device | Done |
+| `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run] [--rate <speed>]` | Keeps a folder equal on several devices through a remote: backs it up, pulls, merges, changes the folder and pushes ([SYNC.md](SYNC.md)); prints `+`, `-` and `~` for added, removed and changed files and one line per conflict | Done |
 | `apeiron ref create <name> [<snapshot>]` | Creates a ref, such as a branch, at a snapshot (default `main`) ([BRANCH.md](BRANCH.md)) | Done |
 | `apeiron ref delete <name>` | Deletes a ref; `apeiron reflog <name>` still shows where it pointed | Done |
 | `apeiron merge <from> [--into <ref>] [--message <text>] [--dry-run]` | Merges a snapshot, usually a branch, into a ref (default `main`); exit code 3 when there are conflicts | Done |
@@ -90,11 +90,11 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | `apeiron plugin remove <name>` | Removes a plugin | Done |
 | `apeiron git import <git-repo> [--prefix <name>]` | Stores every branch, tag and remote-tracking branch of a Git repository, with its history, under `git/` ([GIT.md](GIT.md)) | Done |
 | `apeiron git export <git-repo> [--prefix <name>]` | Writes them back into a Git repository with the same commit ids; exit code 3 if one could not be reproduced | Done |
-| `apeiron push <remote> [<ref>]` | Copies the snapshots of a ref (default `main`) to a remote and moves the ref there | Done |
-| `apeiron pull <remote> [<ref>]` | Copies the snapshots of a ref from a remote and moves the local ref forward | Done |
+| `apeiron push <remote> [<ref>] [--rate <speed>]` | Copies the snapshots of a ref (default `main`) to a remote and moves the ref there | Done |
+| `apeiron pull <remote> [<ref>] [--rate <speed>]` | Copies the snapshots of a ref from a remote and moves the local ref forward | Done |
 | `apeiron report [--verify] [--remotes] [--stale-days <n>] [--web [--tenant <name>] [--since <date>]]` | Prints a compliance report as Markdown (or JSON with `--json`): backups, integrity, copies, protection, retention and, with `--web`, users and the audit log; exit code 3 with a problem, 4 with damaged data ([REPORTS.md](REPORTS.md)) | Done |
 | `apeiron retention add <refs> --days <n>`, `apeiron retention list` | Keeps the refs a name or a prefix followed by `*` matches as an archive: they only move forward and are not deleted until the days have passed since their last change; a rule can never be removed ([ARCHIVE.md](ARCHIVE.md)) | Done |
-| `apeiron push --all <remote>`, `apeiron pull --all <remote>` | Pushes or pulls every ref, to keep a replica or a standby; a ref with a conflict is left and named, the others are copied; exit code 3 then ([REPLICATION.md](REPLICATION.md)) | Done |
+| `apeiron push --all <remote>`, `apeiron pull --all <remote> [--rate <speed>]` | Pushes or pulls every ref, to keep a replica or a standby; a ref with a conflict is left and named, the others are copied; exit code 3 then ([REPLICATION.md](REPLICATION.md)) | Done |
 | `apeiron web … [--replicate <remote>]... [--standby]` | Pushes every ref to each replica after each backup, or serves a standby copy that takes no backups ([REPLICATION.md](REPLICATION.md)) | Done |
 | `apeiron key remove <id>` | Removes a password or recovery key; the last one cannot be removed | Done |
 
