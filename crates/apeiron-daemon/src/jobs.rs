@@ -23,6 +23,19 @@ pub struct Job {
     /// The most bytes per second moved to or from remotes, on average
     /// (`rate_kb`, DAEMON.md §3).
     pub rate: Option<u64>,
+    /// For `backup` and `sync`: also run once the folder has had no change
+    /// for this long after one (`on_change`, DAEMON.md §4).
+    pub on_change: Option<std::time::Duration>,
+}
+
+impl Job {
+    /// The folder a job reads, for watching it for changes.
+    pub fn folder(&self) -> Option<&Path> {
+        match &self.action {
+            Action::Backup { folder, .. } | Action::Sync { folder, .. } => Some(folder),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -103,6 +116,7 @@ struct RawJob {
     at: Option<String>,
     sample_mb: Option<u64>,
     rate_kb: Option<u64>,
+    on_change: Option<String>,
     remote: Option<String>,
     mode: Option<String>,
 }
@@ -275,6 +289,11 @@ fn to_job(name: &str, raw: RawJob) -> std::result::Result<Job, String> {
         Some(kb) => Some(kb.saturating_mul(1024)),
         None => None,
     };
+    let on_change = match (&raw.on_change, &action) {
+        (None, _) => None,
+        (Some(text), Action::Backup { .. } | Action::Sync { .. }) => Some(parse_quiet(text)?),
+        (Some(_), _) => not_here("on_change", true).map(|()| None)?,
+    };
     let every = parse_every(&raw.every)?;
     let at = raw.at.as_deref().map(parse_at).transpose()?;
     if at.is_some() && matches!(every, Every::Hours(_) | Every::Minutes(_)) {
@@ -288,7 +307,25 @@ fn to_job(name: &str, raw: RawJob) -> std::result::Result<Job, String> {
         every,
         at,
         rate,
+        on_change,
     })
+}
+
+/// A quiet time such as `30s`, `2m` or `1h`: from 5 seconds to a day.
+fn parse_quiet(text: &str) -> std::result::Result<std::time::Duration, String> {
+    let bad = || format!("`on_change = {text:?}`: use a number with s, m or h, from 5s to 24h");
+    let (number, unit) = text.split_at(text.len().saturating_sub(1));
+    let n: u64 = number.parse().map_err(|_| bad())?;
+    let seconds = match unit {
+        "s" => n,
+        "m" => n.saturating_mul(60),
+        "h" => n.saturating_mul(3600),
+        _ => return Err(bad()),
+    };
+    if !(5..=86_400).contains(&seconds) {
+        return Err(bad());
+    }
+    Ok(std::time::Duration::from_secs(seconds))
 }
 
 fn parse_every(text: &str) -> std::result::Result<Every, String> {
@@ -510,6 +547,14 @@ mod tests {
             ),
             ("do = \"gc\"\nevery = \"day\"\ncolour = 1", "unknown field"),
             (
+                "do = \"gc\"\nevery = \"day\"\non_change = \"1m\"",
+                "`on_change` does not apply",
+            ),
+            (
+                "do = \"backup\"\nfolder = \"/f\"\nevery = \"day\"\non_change = \"1s\"",
+                "from 5s to 24h",
+            ),
+            (
                 "do = \"gc\"\nevery = \"day\"\nrate_kb = 100",
                 "`rate_kb` does not apply",
             ),
@@ -527,6 +572,12 @@ mod tests {
         )
         .unwrap();
         assert_eq!(jobs[0].rate, Some(512 * 1024));
+        let jobs = parse(
+            "[job.x]\nrepo = \"/r\"\ndo = \"backup\"\nfolder = \"/f\"\nevery = \"day\"\non_change = \"2m\"",
+        )
+        .unwrap();
+        assert_eq!(jobs[0].on_change, Some(std::time::Duration::from_secs(120)));
+        assert_eq!(jobs[0].folder(), Some(Path::new("/f")));
         let error = parse("[job.Big]\nrepo = \"/r\"\ndo = \"gc\"\nevery = \"day\"").unwrap_err();
         assert!(error.contains("job \"Big\""), "{error}");
     }

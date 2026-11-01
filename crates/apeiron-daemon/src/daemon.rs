@@ -4,7 +4,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, Instant, SystemTime};
 
 use apeiron::{
     BackupRequest, ErrorKind, GcRequest, MirrorReport, RemoteRequest, Repository,
@@ -17,6 +17,7 @@ use serde::Serialize;
 use crate::jobs::{Action, Job, load_jobs};
 use crate::schedule::next_run;
 use crate::state::{JobState, RunResult, State};
+use crate::watch::Watches;
 use crate::{Error, IoContext, Result};
 
 /// The daemon wakes at least this often to notice a changed jobs file or a
@@ -129,33 +130,68 @@ impl Daemon {
             if next_run(job, state.jobs.get(&job.name), start, &tz) > start {
                 continue;
             }
-            let (result, message) = run_job(job, stop);
-            let run = JobState {
-                last_start: start,
-                last_end: Timestamp::now(),
-                result,
-                message,
-            };
-            self.log(&format!(
-                "{} {}: {}",
-                job.name,
-                run.result.name(),
-                run.message
-            ));
-            state.jobs.insert(job.name.clone(), run.clone());
-            state.save(&self.paths.state_file())?;
-            records.push(RunRecord {
-                job: job.name.clone(),
-                run,
-            });
+            records.push(self.run_one(job, &mut state, start, stop)?);
         }
         Ok(records)
+    }
+
+    /// Runs one job now and records the run.
+    fn run_one(
+        &self,
+        job: &Job,
+        state: &mut State,
+        start: Timestamp,
+        stop: &AtomicBool,
+    ) -> Result<RunRecord> {
+        let (result, message) = run_job(job, stop);
+        let run = JobState {
+            last_start: start,
+            last_end: Timestamp::now(),
+            result,
+            message,
+        };
+        self.log(&format!(
+            "{} {}: {}",
+            job.name,
+            run.result.name(),
+            run.message
+        ));
+        state.jobs.insert(job.name.clone(), run.clone());
+        state.save(&self.paths.state_file())?;
+        Ok(RunRecord {
+            job: job.name.clone(),
+            run,
+        })
+    }
+
+    /// Runs the jobs whose folder changed and then stayed quiet (DAEMON.md §4).
+    fn run_changed(&self, jobs: &[Job], watches: &Watches, stop: &AtomicBool) -> Result<()> {
+        for name in watches.take_ready(Instant::now()) {
+            if stop.load(Ordering::Relaxed) {
+                break;
+            }
+            if let Some(job) = jobs.iter().find(|j| j.name == name) {
+                self.log(&format!("{name}: its folder changed"));
+                let mut state = State::load(&self.paths.state_file());
+                self.run_one(job, &mut state, Timestamp::now(), stop)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn watch(&self, jobs: &[Job]) -> Watches {
+        let (watches, failed) = Watches::new(jobs);
+        for (name, reason) in failed {
+            self.log(&format!("{name}: cannot watch its folder: {reason}"));
+        }
+        watches
     }
 
     /// Runs jobs as they become due until `stop` is set. A changed jobs file
     /// is read again; if it is invalid, the previous jobs are kept.
     pub fn run(&self, stop: &AtomicBool) -> Result<()> {
         let mut jobs = load_jobs(&self.paths.jobs)?;
+        let mut watches = self.watch(&jobs);
         let mut seen = modified(&self.paths.jobs);
         self.log(&format!("started with {} jobs", jobs.len()));
         while !stop.load(Ordering::Relaxed) {
@@ -165,12 +201,14 @@ impl Daemon {
                 match load_jobs(&self.paths.jobs) {
                     Ok(new) => {
                         jobs = new;
+                        watches = self.watch(&jobs);
                         self.log(&format!("read the jobs file again: {} jobs", jobs.len()));
                     }
                     Err(e) => self.log(&format!("keeping the previous jobs: {e}")),
                 }
             }
             self.run_due(&jobs, stop)?;
+            self.run_changed(&jobs, &watches, stop)?;
 
             let state = State::load(&self.paths.state_file());
             let (now, tz) = (Timestamp::now(), TimeZone::system());
@@ -180,7 +218,10 @@ impl Daemon {
                 .min()
                 .unwrap_or(Timestamp::MAX);
             let wake = next.min(now.saturating_add(MAX_SLEEP).unwrap_or(now));
-            while !stop.load(Ordering::Relaxed) && Timestamp::now() < wake {
+            while !stop.load(Ordering::Relaxed)
+                && Timestamp::now() < wake
+                && !watches.any_ready(Instant::now())
+            {
                 std::thread::sleep(Duration::from_millis(200));
             }
         }

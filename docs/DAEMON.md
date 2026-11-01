@@ -71,6 +71,7 @@ every = "week"
 | `every` | `hour`, `day`, `week`, or a number of minutes, hours or days: `15m`, `6h`, `2d` |
 | `at` | For `day` and `week`: the earliest local time of day, `HH:MM` |
 | `sample_mb` | For `restore-test`: how much to restore, default 100 |
+| `on_change` | For `backup` and `sync`: also run after a change to the folder, once it has been quiet this long: a number with `s`, `m` or `h`, from `5s` to `24h` (section 4) |
 | `rate_kb` | For `backup`, `push`, `pull` and `sync`: the most kibibytes per second moved to or from remotes, on average ([SYNC.md](SYNC.md) §2); no limit by default |
 
 `~` at the start of a path is the home folder. A job name follows the ref name rules without `/`. An invalid file stops `daemon run` and `daemon once` with an error that names the line; the daemon reads the file again when it changes and keeps the old jobs if the new file is invalid. The Schedule page of the desktop interface shows the jobs and edits this file, and saves only a valid one (DESKTOP.md §2).
@@ -87,6 +88,7 @@ flowchart LR
 ```
 
 - A job is due when `every` has passed since its last start. With `at`, it waits until that time of day on the day it becomes due.
+- A `backup` or `sync` job with `on_change` also runs when its folder changes: once a change is followed by that long without another one, so a burst of saves gives one run. Changes inside the repository, when it lies in the folder, do not count. Only `daemon run` watches folders, from when it starts; a folder that cannot be watched is noted in the log and the job keeps its schedule. Linux limits how many folders one user can watch (`fs.inotify.max_user_watches`); a very large tree may need a higher limit.
 - A run that was missed because the computer was off or asleep is made once at the next chance, not once for every missed period.
 - Jobs run one at a time, in the order of their names. A job that is still running when another becomes due is not interrupted.
 - A job that fails is tried again after one hour, until it succeeds or its next regular run comes. A job that meets a "locked" repository (for example during garbage collection run by hand) is tried again after 10 minutes.
@@ -114,14 +116,13 @@ A backup is proven only by restoring it (VISION.md). The restore test does this 
 | Item | Where |
 | --- | --- |
 | Operating the daemon from another device (remote API) | The desktop and web interfaces (Stage 4) |
-| Backup triggered by file changes | Later; the schedule covers Stage 2 |
 | Desktop notifications on failure | With the desktop interface (Stage 4) |
 
 ## 8. Crates and libraries
 
 | Crate | Role | Status |
 | --- | --- | --- |
-| `apeiron-daemon` | Jobs file, schedule, state, restore test and the run loop; uses only the public `apeiron` crate | Done |
+| `apeiron-daemon` | Jobs file, schedule, state, restore test, the run loop and watching folders; uses the public `apeiron` crate, and `apeiron-sys` to lower its priority | Done |
 | `apeiron-cli` | The `apeiron daemon` commands | Done |
 
 | Need | Proposed library | Reason |
@@ -129,5 +130,6 @@ A backup is proven only by restoring it (VISION.md). The restore test does this 
 | Local time of day and time zones | `jiff` | Correct across daylight saving changes on Linux, macOS and Windows; pure Rust |
 | Configuration and state folders | `dirs` | Small; knows the right folder on each system |
 | Jobs file and state | `toml`, `serde_json` | Already used |
+| Watching folders for `on_change` | `notify` | The common Rust watcher: inotify on Linux, FSEvents on macOS, ReadDirectoryChangesW on Windows; it runs its own thread and needs no Tokio |
 
 The daemon needs no Tokio: one thread sleeps until the next job is due and wakes at least every minute to notice a changed jobs file or a clock that jumped.

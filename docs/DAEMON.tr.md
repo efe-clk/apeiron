@@ -71,6 +71,7 @@ every = "week"
 | `every` | `hour`, `day`, `week` ya da dakika, saat veya gün sayısı: `15m`, `6h`, `2d` |
 | `at` | `day` ve `week` için: günün en erken yerel saati, `HH:MM` |
 | `sample_mb` | `restore-test` için: ne kadarının geri yükleneceği, varsayılan 100 |
+| `on_change` | `backup` ve `sync` için: klasördeki bir değişiklikten sonra, klasör bu kadar süre sessiz kalınca da çalış: `s`, `m` ya da `h` ile bir sayı, `5s` ile `24h` arası (bölüm 4) |
 | `rate_kb` | `backup`, `push`, `pull` ve `sync` için: uzak depolara giden ya da onlardan gelen, saniyede ortalama en çok kibibayt ([SYNC.tr.md](SYNC.tr.md) §2); varsayılan olarak sınır yoktur |
 
 Bir yolun başındaki `~` ev klasörüdür. Bir iş adı, `/` içermeyen ref adı kurallarına uyar. Geçersiz bir dosya, `daemon run` ve `daemon once` komutlarını satırı belirten bir hatayla durdurur; daemon dosya değişince onu yeniden okur ve yeni dosya geçersizse eski işleri korur. Masaüstü arayüzünün Zamanlama sayfası işleri gösterir ve bu dosyayı düzenler; yalnızca geçerli bir dosyayı kaydeder (DESKTOP.tr.md §2).
@@ -87,6 +88,7 @@ flowchart LR
 ```
 
 - Bir işin zamanı, son başlangıcından bu yana `every` kadar süre geçince gelir. `at` varsa, zamanının geldiği gün o saate kadar bekler.
+- `on_change` içeren bir `backup` ya da `sync` işi, klasörü değişince de çalışır: bir değişikliğin ardından o kadar süre başka değişiklik olmayınca; böylece art arda kaydetmeler tek bir çalışma doğurur. Depo klasörün içindeyse depodaki değişiklikler sayılmaz. Klasörleri yalnızca `daemon run` izler, başladığı andan itibaren; izlenemeyen bir klasör günlüğe yazılır ve iş zamanlamasıyla sürer. Linux bir kullanıcının izleyebileceği klasör sayısını sınırlar (`fs.inotify.max_user_watches`); çok büyük bir ağaç daha yüksek bir sınır isteyebilir.
 - Bilgisayar kapalı ya da uykudayken kaçırılan bir çalışma, kaçırılan her dönem için değil, ilk fırsatta bir kez yapılır.
 - İşler adlarının sırasıyla, birer birer çalışır. Başka bir işin zamanı geldiğinde hâlâ çalışan bir iş yarıda kesilmez.
 - Başarısız olan bir iş, başarılı olana ya da sıradaki düzenli çalışması gelene kadar bir saat sonra yeniden denenir. "Kilitli" bir depoya rastlayan bir iş (örneğin elle çalıştırılan çöp toplama sırasında) 10 dakika sonra yeniden denenir.
@@ -114,14 +116,13 @@ Bir yedek ancak geri yüklenerek kanıtlanır (VISION.tr.md). Geri yükleme test
 | Konu | Nerede |
 | --- | --- |
 | Daemon'u başka bir cihazdan yönetmek (uzak API) | Masaüstü ve web arayüzleri (Aşama 4) |
-| Dosya değişikliğiyle tetiklenen yedek | Daha sonra; Aşama 2 için zamanlama yeterlidir |
 | Başarısızlıkta masaüstü bildirimi | Masaüstü arayüzüyle (Aşama 4) |
 
 ## 8. Crate'ler ve kütüphaneler
 
 | Crate | Görev | Durum |
 | --- | --- | --- |
-| `apeiron-daemon` | İş dosyası, zamanlama, durum, geri yükleme testi ve çalışma döngüsü; yalnızca herkese açık `apeiron` crate'ini kullanır | Tamamlandı |
+| `apeiron-daemon` | İş dosyası, zamanlama, durum, geri yükleme testi, çalışma döngüsü ve klasör izleme; herkese açık `apeiron` crate'ini, önceliğini düşürmek için de `apeiron-sys`'i kullanır | Tamamlandı |
 | `apeiron-cli` | `apeiron daemon` komutları | Tamamlandı |
 
 | İhtiyaç | Önerilen kütüphane | Gerekçe |
@@ -129,5 +130,6 @@ Bir yedek ancak geri yüklenerek kanıtlanır (VISION.tr.md). Geri yükleme test
 | Günün yerel saati ve saat dilimleri | `jiff` | Linux, macOS ve Windows'ta yaz saati geçişlerinde doğru; saf Rust |
 | Yapılandırma ve durum klasörleri | `dirs` | Küçük; her sistemde doğru klasörü bilir |
 | İş dosyası ve durum | `toml`, `serde_json` | Zaten kullanılıyor |
+| `on_change` için klasör izleme | `notify` | Rust'ın yaygın izleyicisi: Linux'ta inotify, macOS'ta FSEvents, Windows'ta ReadDirectoryChangesW; kendi iş parçacığında çalışır, Tokio gerektirmez |
 
 Daemon'un Tokio'ya ihtiyacı yoktur: tek bir iş parçacığı sıradaki işin zamanına kadar uyur ve değişen bir iş dosyasını ya da ileri geri atlayan bir saati fark etmek için en az dakikada bir uyanır.

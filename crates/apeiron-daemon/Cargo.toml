@@ -14,6 +14,7 @@ apeiron-sys = { path = "../apeiron-sys" }
 dirs = "6.0.0"
 fs4 = "1.1.0"
 jiff = { version = "0.2.38", features = ["serde"] }
+notify = { version = "8.2.1", default-features = false, features = ["macos_fsevent"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1"
 thiserror = "2.0.21"

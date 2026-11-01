@@ -8,6 +8,7 @@ mod daemon;
 mod jobs;
 mod schedule;
 mod state;
+mod watch;
 
 use std::io;
 use std::path::PathBuf;

@@ -77,6 +77,7 @@ mod tests {
             every,
             at,
             rate: None,
+            on_change: None,
         }
     }
 
