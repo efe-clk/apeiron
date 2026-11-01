@@ -58,6 +58,8 @@ Kiracılar, yapılandırma klasöründeki (Linux'ta `~/.config/apeiron`) `tenant
 | `folders` | Kullanıcılarına verilebilecek klasörlerin tam yolları; boş bırakılırsa hiçbiri |
 | `password_file` | Şifreli bir depo için parolanın okunduğu dosya; boş bırakılırsa sunucu başlarken sorar |
 | `replicas` | Her yedekten sonra her ref'in push edildiği, deposunun uzak depoları ([REPLICATION.tr.md](REPLICATION.tr.md) §4); boş bırakılırsa hiçbiri |
+| `max_bytes` | Deposunun en fazla tutabileceği bayt (§2.1); boş bırakılırsa sınır yok |
+| `max_jobs` | Aynı anda en fazla kaç uzun işlem çalıştırabileceği (§2.1); boş bırakılırsa sınır yok |
 
 Bir kiracının diğer dosyaları adıyla tutulur:
 
@@ -68,6 +70,17 @@ Bir kiracının diğer dosyaları adıyla tutulur:
 | Paylaşım bağlantıları, `shares.json` | `<durum klasörü>/tenants/<ad>/shares.json` |
 
 Bir kiracıyı kaldırmak onu yalnızca listeden çıkarır; deposu ve dosyaları kalır ve aynı adla yeniden eklemek onları geri getirir.
+
+### 2.1 Sınırlar
+
+Bir kiracının sınırları, onun diğerlerinin diskini ya da işlemcilerini almasını önler. Sunucu onları başlarken okur; bir değişiklik sunucu yeniden başlayınca geçerli olur.
+
+| Sınır | Neye bakılır | Ulaşılınca |
+| --- | --- | --- |
+| `max_bytes` | Kiracının depo klasöründeki bütün dosyaların boyutu; bir yedekten, bir senkrondan, bir bağlantı üzerinden yüklemeden (SHARE.tr.md §7) ve bir `git push`'tan (GIT.tr.md §7.1) önce | "Depo … bayt tutuyor, sınırı …" diye reddedilirler; geri yükleme, okuma ve silme sürer, eski sürümler kaldırıldıktan sonra `apeiron gc` yer açar. Sınırın altında başlamış biri sonuna kadar çalışır; bu yüzden bir depo sınırını bir yedek kadar aşabilir |
+| `max_jobs` | Kiracının kullanıcılarının hâlâ çalışan uzun işlemleri (`backup`, `restore`, `verify`, `search`, `report`, `sync`) | Biri bitene kadar yenisi reddedilir (`locked`) |
+
+Bir ret, kiracının denetim kaydına hatasıyla birlikte `start:<operation>` olarak yazılır.
 
 ## 3. Sunmak
 
@@ -89,7 +102,8 @@ Ana makine adları, DNS kayıtları ya da vekil sunucu üzerinden sunucuya ulaş
 
 | Komut | Ne yapar |
 | --- | --- |
-| `apeiron web tenant add <ad> --host <ana makine> --repo <yol> [--folder <yol>]... [--password-file <yol>] [--replicate <uzak>]...` | Bir kiracı ekler ve ilk admin'i için komutu yazar |
+| `apeiron web tenant add <ad> --host <ana makine> --repo <yol> [--folder <yol>]... [--password-file <yol>] [--replicate <uzak>]... [--max-bytes <boyut>] [--max-jobs <n>]` | Bir kiracı ekler ve ilk admin'i için komutu yazar |
+| `apeiron web tenant limit <ad> [--max-bytes <boyut>] [--max-jobs <n>]` | §2.1'deki sınırları koyar, örneğin `--max-bytes 500G`; 0 birini kaldırır |
 | `apeiron web tenant list` | Kiracıları ana makineleri ve depolarıyla listeler |
 | `apeiron web tenant remove <ad>` | Bir kiracıyı sunmayı bırakır; dosyaları kalır |
 | `apeiron web --tenants [--listen <adres>] [--cert <dosya> --key <dosya> \| --plain]` | Her kiracıyı sunar |
@@ -103,13 +117,13 @@ Ana makine adları, DNS kayıtları ya da vekil sunucu üzerinden sunucuya ulaş
 | --- | --- | --- |
 | `tenant_add` | Yeni kiracının kaydı | Adı, ana makinesi, deposu, klasörleri ve parola dosyası |
 | `tenant_remove` | Kaldırılan kiracının kaydı | Adı |
+| `tenant_limit` | Kiracının kaydı | Adı ve sınırları |
 
 ## 6. Bu işin parçası olmayanlar
 
 | Konu | Nerede |
 | --- | --- |
 | Kiracıları ana makine yerine `/t/acme/` gibi bir yolla ayırmak | Planlanmadı: çerezlerini ayrı tutan, kiracı başına bir ana makinedir |
-| Kiracı başına depolama ya da iş sınırları | Sonra, bir pilot gerektirirse |
 | Birkaç kiracının bir depoyu ve onun tekilleştirmesini paylaşması | Planlanmadı: verilerini ayrı tutan, ayrı bir depo ve anahtardır |
 | Kiracıları sayfalarda yönetmek | Sonra; o zamana kadar §4'teki komutlar |
 | Kiracı başına arka plan hizmeti ve senkron | Sonra; işler (DAEMON.tr.md) onları çalıştıran kullanıcı için çalışır |

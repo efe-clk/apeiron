@@ -221,6 +221,32 @@ pub struct TenantOptions {
     pub shares: Shares,
     pub replicas: Vec<String>,
     pub standby: bool,
+    pub limits: Limits,
+}
+
+/// What a tenant may use at most (TENANTS.md §2); `None` is no limit.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Limits {
+    pub max_bytes: Option<u64>,
+    pub max_jobs: Option<u32>,
+}
+
+/// The bytes of every file in `dir` and below it.
+fn folder_size(dir: &Path) -> io::Result<u64> {
+    let mut total = 0;
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        for entry in fs::read_dir(&dir)? {
+            let entry = entry?;
+            let kind = entry.file_type()?;
+            if kind.is_dir() {
+                stack.push(entry.path());
+            } else if kind.is_file() {
+                total += entry.metadata()?.len();
+            }
+        }
+    }
+    Ok(total)
 }
 
 struct Session {
@@ -305,6 +331,7 @@ pub(crate) struct WebState {
     /// Pushes to the replicas, if there are any.
     replicator: Option<Replicator>,
     standby: bool,
+    pub(crate) limits: Limits,
 }
 
 /// The cookie a link's password gave, if any.
@@ -888,6 +915,9 @@ impl WebState {
                 "this server is a standby and takes no backups; back up to the primary",
             ));
         }
+        if matches!(operation, "backup" | "sync") {
+            self.room(repo)?;
+        }
         let allowed = match operation {
             "backup" | "restore" => user.role != Role::Reader,
             _ if ADMIN_ONLY.contains(&operation) => user.role == Role::Admin,
@@ -1219,6 +1249,7 @@ impl WebState {
         if name.is_empty() || name.contains(['/', '\\']) || name == "." || name == ".." {
             return Err(invalid(format!("{name:?} cannot be a file name")));
         }
+        self.room(repo)?;
         self.shares.take_download(&share.id)?;
         repo.add_file(
             &apeiron::AddFileRequest {
@@ -1230,6 +1261,29 @@ impl WebState {
             },
             reader,
         )
+    }
+}
+
+impl WebState {
+    /// Fails when the repository holds `max_bytes` or more (TENANTS.md
+    /// §2.1): nothing new is stored until space is freed.
+    pub(crate) fn room(&self, repo: &Repository) -> Result<(), Error> {
+        let Some(max) = self.limits.max_bytes else {
+            return Ok(());
+        };
+        let path = repo.info().path;
+        let used = folder_size(&path)
+            .map_err(|e| Error::new(ErrorKind::Io, format!("{}: {e}", path.display())))?;
+        if used >= max {
+            return Err(Error::new(
+                ErrorKind::Unsupported,
+                format!(
+                    "the repository holds {used} bytes, its limit is {max}; \
+                     remove old versions or ask for a higher limit"
+                ),
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -1287,6 +1341,7 @@ struct Site {
     shares: Shares,
     replicas: Vec<String>,
     standby: bool,
+    limits: Limits,
 }
 
 /// The server of one repository and its users, files and folders.
@@ -1332,6 +1387,7 @@ fn site(site: Site) -> Result<Arc<App>, Error> {
             oidc,
             replicator: Replicator::start(site.replicas, app.clone()),
             standby: site.standby,
+            limits: site.limits,
         })),
         repo: Mutex::new(Some(site.repo)),
         jobs: Mutex::new(HashMap::new()),
@@ -1362,6 +1418,7 @@ impl Web {
             shares: options.shares,
             replicas: options.replicas,
             standby: options.standby,
+            limits: Limits::default(),
         })?;
         Web::serve(options.listen, options.tls, crate::router(app))
     }
@@ -1388,6 +1445,7 @@ impl Web {
                 shares: t.shares,
                 replicas: t.replicas,
                 standby: t.standby,
+                limits: t.limits,
             })
             .map_err(|e| Error::new(e.kind, format!("tenant {}: {}", t.name, e.message)))?;
             if sites

@@ -9,7 +9,7 @@ use std::thread;
 use std::time::Duration;
 
 use apeiron::Repository;
-use apeiron_server::{Audit, Role, Shares, TenantOptions, User, Users, Web, hash_password};
+use apeiron_server::{Audit, Limits, Role, Shares, TenantOptions, User, Users, Web, hash_password};
 use serde_json::{Value, json};
 
 const PASSWORD: &str = "correct horse";
@@ -87,6 +87,7 @@ fn tenant(dir: &Path, name: &str, host: &str) -> TenantOptions {
         shares: Shares::new(dir.join("shares.json")),
         replicas: Vec::new(),
         standby: false,
+        limits: Limits::default(),
     }
 }
 
@@ -225,4 +226,38 @@ fn tenants_are_checked_at_start() {
         .err()
         .unwrap();
     assert!(e.message.starts_with("tenant lonely: "), "{}", e.message);
+}
+
+/// A tenant whose repository holds its limit takes no new backup
+/// (TENANTS.md §2.1).
+#[test]
+fn a_full_tenant_takes_no_backup() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut acme = tenant(dir.path(), "acme", "acme.test");
+    acme.limits.max_bytes = Some(1);
+    let home = acme.folders[0].canonicalize().unwrap();
+    let server = Web::start_tenants("127.0.0.1:0".parse().unwrap(), None, vec![acme]).unwrap();
+    let a = server.address();
+    let cookie = sign_in(a, "acme.test");
+    let (status, _, refused) = send(
+        a,
+        "acme.test",
+        Some(&cookie),
+        "POST",
+        "/api/start/backup",
+        Some(json!({"source": home, "ref": "backup/acme"})),
+    );
+    assert_eq!(status, 400, "{refused}");
+    assert!(
+        refused["message"]
+            .as_str()
+            .unwrap()
+            .contains("its limit is 1"),
+        "{refused}"
+    );
+    let log = fs::read_to_string(dir.path().join("acme/audit.log")).unwrap();
+    assert!(
+        log.contains("\"start:backup\"") && log.contains("\"unsupported\""),
+        "{log}"
+    );
 }

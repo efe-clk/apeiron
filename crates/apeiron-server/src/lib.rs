@@ -34,7 +34,7 @@ pub use shares::{DEFAULT_DAYS, LinkOptions, MAX_DAYS, MAX_DOWNLOADS, Share, Shar
 pub use tenants::{Tenant, Tenants};
 pub use totp::{code as totp_code, new_secret as new_totp_secret, uri as totp_uri};
 pub use users::{MIN_PASSWORD, Role, User, Users, hash_password};
-pub use web::{TenantOptions, Tls, Web, WebOptions};
+pub use web::{Limits, TenantOptions, Tls, Web, WebOptions};
 use web::{WebState, Who};
 
 use apeiron::json::{self, JsonJob};
@@ -516,6 +516,30 @@ async fn start(
 ) -> Answer {
     let request = body(&bytes)?;
     let who = who(&app, who_)?;
+    if let (Mode::Web(web), Some(who)) = (&app.mode, &who)
+        && let Some(max) = web.limits.max_jobs
+    {
+        let running = lock(&app.jobs)
+            .values_mut()
+            .map(|entry| !entry.job.is_finished())
+            .filter(|running| *running)
+            .count();
+        if running >= max as usize {
+            let e = Error::new(
+                ErrorKind::Locked,
+                format!(
+                    "{running} jobs run, the most this server takes at once; wait for one to end"
+                ),
+            );
+            web.audit.record(
+                &who.actor(),
+                &format!("start:{operation}"),
+                request,
+                &outcome(Err(&e)),
+            )?;
+            return Err(e.into());
+        }
+    }
     let owner = who.as_ref().map(|w| w.user.name.clone());
     let job = checked(&app, who, true, operation.clone(), request, json::start).await?;
     let id = app.next_job.fetch_add(1, Ordering::Relaxed);

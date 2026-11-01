@@ -30,6 +30,12 @@ pub struct Tenant {
     /// §4).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub replicas: Vec<String>,
+    /// The most its repository may hold, in bytes (TENANTS.md §2).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_bytes: Option<u64>,
+    /// The most long operations it may run at once.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_jobs: Option<u32>,
 }
 
 impl Tenant {
@@ -159,6 +165,14 @@ impl Tenants {
     }
 
     /// Removes a tenant from the list; its files stay.
+    /// The tenant named `name`, to change.
+    pub fn get_mut(&mut self, name: &str) -> Result<&mut Tenant, Error> {
+        self.tenants
+            .iter_mut()
+            .find(|t| t.name == name)
+            .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("no tenant {name}")))
+    }
+
     pub fn remove(&mut self, name: &str) -> Result<Tenant, Error> {
         let i = self
             .tenants
@@ -182,6 +196,8 @@ mod tests {
             folders: Vec::new(),
             password_file: None,
             replicas: Vec::new(),
+            max_bytes: None,
+            max_jobs: None,
         }
     }
 

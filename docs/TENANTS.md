@@ -58,6 +58,8 @@ The tenants are listed in `tenants.json` in the configuration folder (`~/.config
 | `folders` | Full paths of folders its users may be given; none if left out |
 | `password_file` | For an encrypted repository: the file its password is read from; the server asks at start if left out |
 | `replicas` | Remotes of its repository every ref is pushed to after each backup ([REPLICATION.md](REPLICATION.md) §4); none if left out |
+| `max_bytes` | The most its repository may hold, in bytes (§2.1); no limit if left out |
+| `max_jobs` | The most long operations it may run at once (§2.1); no limit if left out |
 
 The other files of a tenant are kept by its name:
 
@@ -68,6 +70,17 @@ The other files of a tenant are kept by its name:
 | Share links, `shares.json` | `<state folder>/tenants/<name>/shares.json` |
 
 Removing a tenant takes it off the list only; its repository and files stay, and adding it again with the same name brings them back.
+
+### 2.1 Limits
+
+A tenant's limits keep it from taking the disk or the processors of the others. The server reads them at start, so a change takes effect when it starts again.
+
+| Limit | What is checked | When it is reached |
+| --- | --- | --- |
+| `max_bytes` | The size of every file in the tenant's repository folder, before a backup, a sync, an upload through a link (SHARE.md §7) and a `git push` (GIT.md §7.1) | They are refused with "the repository holds … bytes, its limit is …"; restoring, reading and deleting go on, and `apeiron gc` frees space after old versions are removed. One that started below the limit runs to its end, so a repository can pass its limit by one backup |
+| `max_jobs` | Long operations of the tenant's users still running (`backup`, `restore`, `verify`, `search`, `report`, `sync`) | A new one is refused (`locked`) until one ends |
+
+A refusal is recorded in the tenant's audit log as `start:<operation>` with its error.
 
 ## 3. Serving
 
@@ -89,7 +102,8 @@ The host names must lead to the server, through DNS records or the proxy.
 
 | Command | What it does |
 | --- | --- |
-| `apeiron web tenant add <name> --host <host> --repo <path> [--folder <path>]... [--password-file <path>] [--replicate <remote>]...` | Adds a tenant and prints the command for its first admin |
+| `apeiron web tenant add <name> --host <host> --repo <path> [--folder <path>]... [--password-file <path>] [--replicate <remote>]... [--max-bytes <size>] [--max-jobs <n>]` | Adds a tenant and prints the command for its first admin |
+| `apeiron web tenant limit <name> [--max-bytes <size>] [--max-jobs <n>]` | Sets the limits of §2.1, such as `--max-bytes 500G`; 0 lifts one |
 | `apeiron web tenant list` | Lists the tenants with their hosts and repositories |
 | `apeiron web tenant remove <name>` | Stops serving a tenant; its files stay |
 | `apeiron web --tenants [--listen <address>] [--cert <file> --key <file> \| --plain]` | Serves every tenant |
@@ -103,13 +117,13 @@ Without `--tenants` and `--tenant`, `apeiron web` and its commands work as befor
 | --- | --- | --- |
 | `tenant_add` | The new tenant's log | Its name, host, repository, folders and password file |
 | `tenant_remove` | The removed tenant's log | Its name |
+| `tenant_limit` | The tenant's log | Its name and limits |
 
 ## 6. Not part of this work item
 
 | Item | Where |
 | --- | --- |
 | Tenants told apart by a path, such as `/t/acme/`, instead of a host | Not planned: one host per tenant is what keeps their cookies apart |
-| Limits of storage or jobs per tenant | Later, if a pilot needs them |
 | Several tenants sharing one repository and its deduplication | Not planned: a separate repository and key are what keep their data apart |
 | Managing tenants in the pages | Later; the commands of §4 until then |
 | The background service and sync per tenant | Later; jobs (DAEMON.md) run for the user who runs them |

@@ -26,7 +26,7 @@ When several people share a backup server, the admin must be able to answer "who
 | `user_second_factor_on`, `user_second_factor_off` | `apeiron web user second-factor` | The name; never the secret |
 | `oidc_set`, `oidc_remove` | `apeiron web oidc` | The provider's settings; never the client secret |
 | `replicate` | Each push to a replica by the web server | The remote, refs and objects, the refs left by a conflict, or the error ([REPLICATION.md](REPLICATION.md) §7) |
-| `tenant_add`, `tenant_remove` | `apeiron web tenant`, in that tenant's own log | The tenant's settings ([TENANTS.md](TENANTS.md) §5) |
+| `tenant_add`, `tenant_limit`, `tenant_remove` | `apeiron web tenant`, in that tenant's own log | The tenant's settings ([TENANTS.md](TENANTS.md) §5) |
 
 An operation refused by the checks is recorded with its error, so attempts are visible too. Polling a job, the session state and the folder browser are not recorded. The desktop interface records nothing: it serves only the person who runs it. The CLI's other commands are not recorded; the repository's reflog records every ref change.
 

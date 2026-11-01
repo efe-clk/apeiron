@@ -150,6 +150,11 @@ pub(crate) async fn receive_pack(
     if let Err(response) = may_push(&app, &user) {
         return *response;
     }
+    if let Mode::Web(web) = &app.mode
+        && let Err(e) = web.room(&repo)
+    {
+        return text(StatusCode::INSUFFICIENT_STORAGE, &e.message);
+    }
     let Ok(bytes) = axum::body::to_bytes(request.into_body(), PUSH_LIMIT).await else {
         return text(
             StatusCode::PAYLOAD_TOO_LARGE,

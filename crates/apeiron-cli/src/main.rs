@@ -523,6 +523,22 @@ enum TenantCommand {
         /// change (docs/REPLICATION.md)
         #[arg(long = "replicate", value_name = "REMOTE")]
         replicas: Vec<String>,
+        /// The most its repository may hold, such as 500G
+        #[arg(long, value_parser = parse_size, value_name = "SIZE")]
+        max_bytes: Option<u64>,
+        /// The most long operations it may run at once
+        #[arg(long, value_name = "N")]
+        max_jobs: Option<u32>,
+    },
+    /// Set or lift the limits of a tenant; 0 lifts one
+    Limit {
+        name: String,
+        /// The most its repository may hold, such as 500G
+        #[arg(long, value_parser = parse_size, value_name = "SIZE")]
+        max_bytes: Option<u64>,
+        /// The most long operations it may run at once
+        #[arg(long, value_name = "N")]
+        max_jobs: Option<u32>,
     },
     /// List the tenants
     List,
@@ -601,6 +617,8 @@ fn web_tenant(command: TenantCommand, out: &Output) -> Result<(), Failure> {
             folders,
             password_file,
             replicas,
+            max_bytes,
+            max_jobs,
         } => {
             let full = |p: PathBuf| std::path::absolute(&p).unwrap_or(p);
             let tenant = apeiron_server::Tenant {
@@ -610,6 +628,8 @@ fn web_tenant(command: TenantCommand, out: &Output) -> Result<(), Failure> {
                 folders: folders.into_iter().map(full).collect(),
                 password_file: password_file.map(full),
                 replicas,
+                max_bytes: max_bytes.filter(|&n| n > 0),
+                max_jobs: max_jobs.filter(|&n| n > 0),
             };
             tenants.add(tenant.clone())?;
             tenants.save(&file)?;
@@ -635,6 +655,39 @@ fn web_tenant(command: TenantCommand, out: &Output) -> Result<(), Failure> {
                 if list.is_empty() {
                     say!("No tenants; add one with `apeiron web tenant add`");
                 }
+            });
+        }
+        TenantCommand::Limit {
+            name,
+            max_bytes,
+            max_jobs,
+        } => {
+            let tenant = tenants.get_mut(&name)?;
+            if let Some(n) = max_bytes {
+                tenant.max_bytes = (n > 0).then_some(n);
+            }
+            if let Some(n) = max_jobs {
+                tenant.max_jobs = (n > 0).then_some(n);
+            }
+            let tenant = tenant.clone();
+            tenants.save(&file)?;
+            WebFiles::of_tenant(&tenant)?.audit.record(
+                &apeiron_server::Actor::default(),
+                "tenant_limit",
+                serde_json::json!({
+                    "name": tenant.name,
+                    "max_bytes": tenant.max_bytes,
+                    "max_jobs": tenant.max_jobs,
+                }),
+                "ok",
+            )?;
+            out.result(&tenant, |t| {
+                let bytes = t.max_bytes.map_or("none".to_owned(), format::bytes);
+                let jobs = t.max_jobs.map_or("none".to_owned(), |n| n.to_string());
+                say!(
+                    "Limits of {}: storage {bytes}, jobs at once {jobs}; restart the server to apply them",
+                    t.name
+                );
             });
         }
         TenantCommand::Remove { name } => {
@@ -2500,6 +2553,10 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     let files = WebFiles::of_tenant(&t)?;
                     let asking = format!("Password or recovery key of {}: ", t.name);
                     let audit = copy_audit(files.audit, &audit_syslog, Some(&t.name));
+                    let limits = apeiron_server::Limits {
+                        max_bytes: t.max_bytes,
+                        max_jobs: t.max_jobs,
+                    };
                     options.push(apeiron_server::TenantOptions {
                         repo: unlock(&t.repo, t.password_file.as_deref(), &asking)?,
                         name: t.name,
@@ -2510,6 +2567,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                         shares: files.shares,
                         replicas: t.replicas,
                         standby,
+                        limits,
                     });
                 }
                 apeiron_server::Web::start_tenants(listen, tls, options)?

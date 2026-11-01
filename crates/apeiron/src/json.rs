@@ -21,6 +21,8 @@ pub trait JsonJob: Send {
     fn cancel(&self);
     /// `None` while the job runs; `timeout` `None` waits without limit.
     fn wait(&mut self, timeout: Option<Duration>) -> Option<Result<Value>>;
+    /// Whether the job has ended; its result stays to be collected.
+    fn is_finished(&mut self) -> bool;
 }
 
 impl<T: Serialize + Send + 'static> JsonJob for Job<T> {
@@ -42,6 +44,10 @@ impl<T: Serialize + Send + 'static> JsonJob for Job<T> {
             },
         };
         Some(result.and_then(|v| json(&v)))
+    }
+
+    fn is_finished(&mut self) -> bool {
+        Job::is_finished(self)
     }
 }
 
