@@ -29,6 +29,7 @@ impl Setup {
         Command::new(env!("CARGO_BIN_EXE_apeiron"))
             .args(args)
             .env("APEIRON_REPO", self.repo())
+            .env("APEIRON_SEARCHES", self.root.join("searches.json"))
             .output()
             .unwrap()
     }
@@ -546,6 +547,18 @@ fn search_by_name_text_size_and_history() {
         code(&s.run(&["search", "x", "--before", "29.10.2026"])),
         Some(2)
     );
+
+    assert_eq!(s.ok(&["search", "--list-saved"]), "No saved searches\n");
+    assert_eq!(s.ok(&["search", "*.txt", "--save", "texts"]), "sub/b.txt\n");
+    assert_eq!(s.ok(&["search", "--saved", "texts"]), "sub/b.txt\n");
+    assert_eq!(
+        s.ok(&["search", "--saved", "texts", "--text", "nothing here"]),
+        "No matches in 1 snapshot\n"
+    );
+    assert_eq!(s.ok(&["search", "--list-saved"]), "texts  \"*.txt\"\n");
+    assert_eq!(code(&s.run(&["search", "--saved", "other"])), Some(1));
+    s.ok(&["search", "--forget", "texts"]);
+    assert_eq!(code(&s.run(&["search", "--forget", "texts"])), Some(1));
 }
 
 /// The fixture plugin of apeiron-plugin's tests, built for wasm32-wasip2.

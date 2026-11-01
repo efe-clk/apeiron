@@ -246,8 +246,9 @@ pub unsafe extern "C" fn apeiron_repo_free(repo: *mut apeiron_repo) {
 }
 
 /// Runs a short operation (SDK.md §2.1). `repo` may be NULL for
-/// `plugins`, `plugin_add`, `plugin_remove`, `conflicts` and
-/// `resolve_conflict`, which need no repository. A NULL request is `{}`.
+/// `plugins`, `plugin_add`, `plugin_remove`, `conflicts`,
+/// `resolve_conflict`, `saved_searches`, `save_search` and `forget_search`,
+/// which need no repository. A NULL request is `{}`.
 ///
 /// # Safety
 /// `repo` is null or a live handle; `operation` and `request_json` (or

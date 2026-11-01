@@ -81,6 +81,18 @@ class Sdk(unittest.TestCase):
         with self.assertRaises(apeiron.InvalidInputError):
             apeiron.add_plugin(self.root / "src" / "a.txt", folder)
 
+    def test_saved_searches_without_a_repository(self):
+        file = self.root / "searches.json"
+        self.assertEqual(apeiron.saved_searches(file), [])
+        apeiron.save_search("photos", "*.jpg", file, history=True)
+        found = apeiron.saved_searches(file)
+        self.assertEqual([(s.name, s.pattern, s.history) for s in found], [("photos", "*.jpg", True)])
+        self.assertEqual(apeiron.forget_search("photos", file).name, "photos")
+        with self.assertRaises(apeiron.NotFoundError):
+            apeiron.forget_search("photos", file)
+        with self.assertRaises(apeiron.InvalidInputError):
+            apeiron.save_search("empty", file=file)
+
     def test_conflicts_without_a_repository(self):
         folder = self.root / "synced"
         folder.mkdir()

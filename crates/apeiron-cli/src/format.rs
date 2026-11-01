@@ -138,6 +138,47 @@ pub(crate) fn progress(p: &Progress) -> String {
     line
 }
 
+/// A search's criteria as they would be typed after `apeiron search`.
+pub(crate) fn search(r: &apeiron::SearchRequest) -> String {
+    let q = &r.query;
+    let mut parts = Vec::new();
+    if let Some(p) = &q.pattern {
+        parts.push(format!("{p:?}"));
+    }
+    if let Some(t) = &q.text {
+        parts.push(format!("--text {t:?}"));
+    }
+    if let Some(n) = q.larger {
+        parts.push(format!("--larger {n}"));
+    }
+    if let Some(n) = q.smaller {
+        parts.push(format!("--smaller {n}"));
+    }
+    if let Some(t) = &q.after {
+        parts.push(format!("--after {}", day(t)));
+    }
+    if let Some(t) = &q.before {
+        parts.push(format!("--before {}", day(t)));
+    }
+    if let Some(s) = &r.snapshot {
+        parts.push(format!("--in {s}"));
+    }
+    if r.history {
+        parts.push("--history".to_owned());
+    }
+    if r.limit != 1000 {
+        parts.push(format!("--limit {}", r.limit));
+    }
+    parts.join(" ")
+}
+
+/// The local day a time falls on, as `YYYY-MM-DD`.
+fn day(t: &Time) -> String {
+    jiff::Timestamp::from_second(t.seconds)
+        .map(|ts| ts.to_zoned(jiff::tz::TimeZone::system()).date().to_string())
+        .unwrap_or_else(|_| t.seconds.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

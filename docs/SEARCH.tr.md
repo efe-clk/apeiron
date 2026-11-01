@@ -61,19 +61,31 @@ Bir dosya metin dosyasıysa metin için aranır: içeriği geçerli UTF-8'dir ve
 
 Depo her içeriği zaten bir kez saklar; bu yüzden kopyalar yedekte fazladan yer kaplamaz, kaynak klasörde kaplar. Liste o klasörü temizlemeye yardım eder. Yalnızca klasörleri okur, dosya içeriklerini hiç okumaz; çünkü aynı içerikli dosyalar zaten tek bir blob'u paylaşır (FORMAT.tr.md §6.2).
 
-## 6. Bu işin parçası olmayanlar
+## 6. Kayıtlı aramalar
+
+Sık yapılan bir arama bir adla saklanabilir ve o adla yeniden çalıştırılabilir.
+
+| Komut | Ne yapar |
+| --- | --- |
+| `apeiron search <ölçütler> --save <ad>` | Aramayı, aynı adlı olanın yerine geçerek kaydeder, sonra çalıştırır |
+| `apeiron search --saved <ad> [<ölçütler>]` | Kayıtlı aramayı çalıştırır; onunla verilen ölçütler bu çalıştırma için kayıtlı olanların yerine geçer, `--history` eklenir |
+| `apeiron search --list-saved` | Kayıtlı aramaları ölçütleriyle listeler |
+| `apeiron search --forget <ad>` | Kayıtlı bir aramayı siler |
+
+Bir ad 1 ile 64 karakter arasıdır ve denetim karakteri içermez; çevresindeki boşluklar atılır. Ölçütsüz bir arama kaydedilmez. Kayıtlı aramalar, eklentiler gibi bir depoya değil kullanıcıya aittir: kullanıcının Apeiron yapılandırma klasöründeki `searches.json` dosyasında (Linux'ta `~/.config/apeiron/`) ya da `APEIRON_SEARCHES` ortam değişkeninin adlandırdığı dosyadadır. Dosya bütün olarak geçici bir dosyaya yazılır, diske işlenir ve eskisinin üstüne yeniden adlandırılır; böylece bir elektrik kesintisi eski ya da yeni listeyi bırakır. `--in` içermeyen kayıtlı bir arama, hangi depoda çalıştırılırsa onun `main`'ini, `--history` ile de her ref'ini arar.
+
+## 7. Bu işin parçası olmayanlar
 
 | Konu | Nerede |
 | --- | --- |
 | PDF, ofis ve diğer biçimlerin içindeki metin | Eklenti sisteminin tür sürücüleri, Aşama 3 |
 | Dosyalara etiket | Daha sonra; formatta henüz dosyalara etiket yok |
-| Kayıtlı sorgular | Daha sonra |
 | Kullanıcının göremeyeceği sonuçları gizlemek | Kullanıcılar ve izinler, Aşama 4 |
 
-## 7. Crate'ler
+## 8. Crate'ler
 
 | Crate | Görev | Durum |
 | --- | --- | --- |
 | `apeiron-services` | Arama | Tamamlandı |
-| `apeiron` | `search`, `duplicates` (API.tr.md §8.3) | Tamamlandı |
+| `apeiron` | `search`, `duplicates`, kayıtlı aramalar (API.tr.md §8.3) | Tamamlandı |
 | `apeiron-cli` | `apeiron search`, `apeiron duplicates` | Tamamlandı |

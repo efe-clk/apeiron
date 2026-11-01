@@ -90,6 +90,27 @@ struct Resolve {
 }
 
 #[derive(Deserialize)]
+struct SearchesFile {
+    #[serde(default)]
+    file: Option<PathBuf>,
+}
+
+#[derive(Deserialize)]
+struct SaveSearch {
+    #[serde(flatten)]
+    saved: crate::SavedSearch,
+    #[serde(default)]
+    file: Option<PathBuf>,
+}
+
+#[derive(Deserialize)]
+struct SearchName {
+    name: String,
+    #[serde(default)]
+    file: Option<PathBuf>,
+}
+
+#[derive(Deserialize)]
 struct PluginDir {
     #[serde(default)]
     dir: Option<PathBuf>,
@@ -159,9 +180,8 @@ pub fn call(repo: &Repository, operation: &str, request: Value) -> Result<Value>
             let r: NewRetention = parse(request)?;
             json(&repo.add_retention(&r.refs, r.days)?)
         }
-        "conflicts" | "resolve_conflict" | "plugins" | "plugin_add" | "plugin_remove" => {
-            call_global(operation, request)
-        }
+        "conflicts" | "resolve_conflict" | "plugins" | "plugin_add" | "plugin_remove"
+        | "saved_searches" | "save_search" | "forget_search" => call_global(operation, request),
         _ => Err(unknown(operation)),
     }
 }
@@ -180,6 +200,17 @@ pub fn call_global(operation: &str, request: Value) -> Result<Value> {
         "plugin_remove" => {
             let r: PluginName = parse(request)?;
             json(&crate::remove_plugin(&r.name, r.dir.as_deref())?)
+        }
+        "saved_searches" => json(&crate::saved_searches(
+            parse::<SearchesFile>(request)?.file.as_deref(),
+        )?),
+        "save_search" => {
+            let r: SaveSearch = parse(request)?;
+            json(&crate::save_search(&r.saved, r.file.as_deref())?)
+        }
+        "forget_search" => {
+            let r: SearchName = parse(request)?;
+            json(&crate::forget_search(&r.name, r.file.as_deref())?)
         }
         "conflicts" => json(&crate::conflicts(&parse::<Folder>(request)?.folder)?),
         "resolve_conflict" => {

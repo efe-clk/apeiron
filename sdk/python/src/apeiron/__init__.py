@@ -21,6 +21,9 @@ __all__ = [
     "plugins",
     "add_plugin",
     "remove_plugin",
+    "saved_searches",
+    "save_search",
+    "forget_search",
     "Job",
     "Record",
     "ApeironError",
@@ -346,6 +349,24 @@ def resolve_conflict(folder: Any, copy: str, keep: str) -> Record:
     """Keeps one version of a conflict copy: ``keep="this"`` deletes the
     copy, ``keep="copy"`` puts it in place of the file at its path."""
     return _call_global("resolve_conflict", {"folder": folder, "copy": copy, "keep": keep})
+
+
+def saved_searches(file: Any = None) -> list:
+    """The searches saved under a name (docs/SEARCH.md §6); ``file`` holds
+    them, the user's by default."""
+    return _call_global("saved_searches", _drop_none({"file": file}))
+
+
+def save_search(name: str, pattern: Optional[str] = None, file: Any = None, **options: Any) -> None:
+    """Saves a search under ``name``, replacing one of the same name; the
+    options are those of :meth:`Repository.search`."""
+    request = _drop_none({"name": name, "pattern": pattern, "file": file})
+    return _call_global("save_search", {**request, **options})
+
+
+def forget_search(name: str, file: Any = None) -> Record:
+    """Removes a saved search and returns it."""
+    return _call_global("forget_search", _drop_none({"name": name, "file": file}))
 
 
 class Repository:

@@ -224,9 +224,21 @@ enum Command {
         /// Also search every earlier snapshot; every ref without --in
         #[arg(long)]
         history: bool,
-        /// Show at most this many results
-        #[arg(long, default_value_t = 1000)]
-        limit: usize,
+        /// Show at most this many results (default 1000)
+        #[arg(long)]
+        limit: Option<usize>,
+        /// Run the search saved under this name; options given here change it
+        #[arg(long, value_name = "NAME")]
+        saved: Option<String>,
+        /// Save this search under a name, then run it
+        #[arg(long, value_name = "NAME")]
+        save: Option<String>,
+        /// List the saved searches
+        #[arg(long, conflicts_with_all = ["saved", "save", "forget"])]
+        list_saved: bool,
+        /// Remove the search saved under this name
+        #[arg(long, value_name = "NAME", conflicts_with_all = ["saved", "save"])]
+        forget: Option<String>,
     },
     /// List files whose content is at more than one path in a snapshot
     Duplicates {
@@ -1924,24 +1936,59 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             snapshot,
             history,
             limit,
+            saved,
+            save,
+            list_saved,
+            forget,
         } => {
-            let repo = open(cli.repo, password_file)?;
-            let report = watch(
-                out,
-                repo.search(SearchRequest {
-                    snapshot,
-                    history,
-                    query: Query {
-                        pattern,
-                        text,
-                        larger,
-                        smaller,
-                        after,
-                        before,
+            if list_saved {
+                let searches = apeiron::saved_searches(None)?;
+                out.result(&searches, |searches| {
+                    for s in searches {
+                        say!("{}  {}", s.name, format::search(&s.request));
+                    }
+                    if searches.is_empty() {
+                        say!("No saved searches");
+                    }
+                });
+                return Ok(0);
+            }
+            if let Some(name) = forget {
+                let gone = apeiron::forget_search(&name, None)?;
+                out.result(&gone, |s| say!("Removed the saved search {}", s.name));
+                return Ok(0);
+            }
+            let mut request = match &saved {
+                Some(name) => apeiron::saved_search(name, None)?.request,
+                None => SearchRequest {
+                    snapshot: None,
+                    history: false,
+                    query: Query::default(),
+                    limit: 1000,
+                },
+            };
+            let q = &mut request.query;
+            q.pattern = pattern.or(q.pattern.take());
+            q.text = text.or(q.text.take());
+            q.larger = larger.or(q.larger);
+            q.smaller = smaller.or(q.smaller);
+            q.after = after.or(q.after);
+            q.before = before.or(q.before);
+            request.snapshot = snapshot.or(request.snapshot);
+            request.history |= history;
+            request.limit = limit.unwrap_or(request.limit);
+            if let Some(name) = save {
+                apeiron::save_search(
+                    &apeiron::SavedSearch {
+                        name,
+                        request: request.clone(),
                     },
-                    limit,
-                })?,
-            )?;
+                    None,
+                )?;
+            }
+            let history = request.history;
+            let repo = open(cli.repo, password_file)?;
+            let report = watch(out, repo.search(request)?)?;
             out.result(&report, |r| {
                 for hit in &r.hits {
                     let mut line = hit.path.to_string();

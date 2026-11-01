@@ -61,19 +61,31 @@ A stored index can be added later behind the same command, if measurements show 
 
 The repository already stores each content once, so the copies take no extra room in the backup; they take room in the source folder. The list helps clean the folder up. It reads only folders, never file contents, because files with the same content already share one blob (FORMAT.md §6.2).
 
-## 6. Not part of this work item
+## 6. Saved searches
+
+A search that is run often can be kept under a name and run again by that name.
+
+| Command | What it does |
+| --- | --- |
+| `apeiron search <criteria> --save <name>` | Saves the search, replacing one of the same name, then runs it |
+| `apeiron search --saved <name> [<criteria>]` | Runs the saved search; criteria given with it replace the saved ones for this run, and `--history` is added |
+| `apeiron search --list-saved` | Lists the saved searches with their criteria |
+| `apeiron search --forget <name>` | Removes a saved search |
+
+A name has 1 to 64 characters and no control characters; spaces around it are dropped. A search with no criterion is not saved. Saved searches belong to the user, as plugins do, not to a repository: they are in `searches.json` in the user's Apeiron configuration folder (on Linux `~/.config/apeiron/`), or in the file the environment variable `APEIRON_SEARCHES` names. The file is written whole to a temporary file, synced and renamed over the old one, so a power cut leaves the old or the new list. A saved search with no `--in` searches `main`, or every ref with `--history`, of whichever repository it is run on.
+
+## 7. Not part of this work item
 
 | Item | Where |
 | --- | --- |
 | Text inside PDF, office and other formats | Type drivers of the plugin system, Stage 3 |
 | Tags on files | Later; the format has no tags on files yet |
-| Saved queries | Later |
 | Hiding results a user may not see | Users and permissions, Stage 4 |
 
-## 7. Crates
+## 8. Crates
 
 | Crate | Role | Status |
 | --- | --- | --- |
 | `apeiron-services` | The search | Done |
-| `apeiron` | `search`, `duplicates` (API.md §8.3) | Done |
+| `apeiron` | `search`, `duplicates`, saved searches (API.md §8.3) | Done |
 | `apeiron-cli` | `apeiron search`, `apeiron duplicates` | Done |

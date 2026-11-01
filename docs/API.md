@@ -166,6 +166,7 @@ Every operation takes one plain request value and returns one plain result value
 | `duplicates` | snapshot spec, smallest size (default 0; empty files are always left out) | `Vec<Duplicate>`: size of one copy and two or more paths, the groups whose extra copies take the most room first ([SEARCH.md](SEARCH.md) §5) | No |
 | `plugins`, `add_plugin`, `remove_plugin` (free functions) | plugin folder (default: the user's), file or name | `Vec<PluginInfo>`, `PluginAdded` (info, whether one was replaced), `PluginInfo` ([PLUGIN.md](PLUGIN.md)) | No |
 | `conflicts`, `resolve_conflict` (free functions) | folder; the copy, relative to it, and which version to keep (`this` or `copy`) | `Vec<ConflictCopy>`: path, copy and whether the file at the path exists, sorted by path; `ConflictCopy` of the resolved copy ([SYNC.md](SYNC.md) §4) | No |
+| `saved_searches`, `save_search`, `saved_search`, `forget_search` (free functions) | file (default: the user's); a `SavedSearch` (name and the `search` request) or a name | `Vec<SavedSearch>` sorted by name, nothing, `SavedSearch`, the removed `SavedSearch`; `not_found` for an unknown name ([SEARCH.md](SEARCH.md) §6) | No |
 | `use_plugin_dir` | folder | —; merges and sync of this handle use the plugins there | No |
 | `remotes` | — | `Vec<Remote>`: name and URL, sorted by name | No |
 | `add_remote` | name, URL: a folder path (absolute or relative) `sftp://[user@]host[:port]/path` or `s3://bucket/path?endpoint=…&region=…` | `Remote`, a folder as an absolute path; SFTP and S3 remotes need an encrypted repository | No |

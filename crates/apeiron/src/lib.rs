@@ -13,6 +13,7 @@ pub mod json;
 mod plugins;
 mod repo;
 mod report;
+mod saved;
 mod spec;
 mod types;
 
@@ -46,6 +47,9 @@ pub use repo::Repository;
 pub use report::{
     ComplianceReport, CopyKind, CopyState, Finding, FindingKind, Level, RefFacts, RemoteFacts,
     ReportRequest, RepositoryFacts,
+};
+pub use saved::{
+    SavedSearch, forget_search, save_search, saved_search, saved_searches, searches_file,
 };
 pub use types::{
     AddedKey, CloneReport, CloneRequest, ClonedRef, DeleteRefRequest, DiffRequest, ExportRequest,
