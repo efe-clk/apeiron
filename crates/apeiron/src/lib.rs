@@ -41,6 +41,17 @@ pub use apeiron_services::{
     SyncOutcome as SyncReport, Warning, WarningKind,
 };
 pub use apeiron_services::{Duplicate, Query, SearchHit, SearchOutcome as SearchReport, TextLine};
+
+/// The tags of the file at `path` on disk (FORMAT.md §6.3); Linux only.
+pub fn file_tags(path: impl AsRef<std::path::Path>) -> Result<Vec<String>> {
+    Ok(apeiron_services::file_tags(path.as_ref())?)
+}
+
+/// Sets the tags of the file at `path` on disk; none removes them. The next
+/// backup keeps them (FORMAT.md §6.3); Linux only.
+pub fn set_file_tags(path: impl AsRef<std::path::Path>, tags: &[String]) -> Result<()> {
+    Ok(apeiron_services::set_file_tags(path.as_ref(), tags)?)
+}
 pub use apeiron_services::{MergeAction, MergeOutcome as MergeReport};
 pub use conflicts::{conflicts, resolve_conflict};
 pub use error::{Error, ErrorKind, Result};

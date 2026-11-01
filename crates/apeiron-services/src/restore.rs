@@ -153,6 +153,9 @@ impl Run<'_> {
                 self.out.files += 1;
                 self.out.bytes += size;
                 self.ctl.update(|p| p.items_done += 1);
+                if let Err(e) = crate::tags::write_xattrs(&path, entry) {
+                    self.warn(&child, format!("the tags could not be set: {e}"));
+                }
                 self.finish_attrs(&path, &child, entry, false);
             }
             EntryKind::Directory { tree } => {

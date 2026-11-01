@@ -861,10 +861,46 @@ fn a_signed_report_is_checked() {
     let public = made["public_key"].as_str().unwrap().to_owned();
     let report = s.path("report.md");
     s.ok(&["report", "--out", &report, "--sign", &s.path("report.key")]);
-    assert!(fs::read_to_string(&report).unwrap().starts_with("# Compliance report"));
+    assert!(
+        fs::read_to_string(&report)
+            .unwrap()
+            .starts_with("# Compliance report")
+    );
     s.ok(&["report", "check", &report, "--public-key", &public]);
     let other = s.run(&["report", "check", &report, "--public-key", "00"]);
     assert_eq!(code(&other), Some(4));
     fs::write(&report, "# Compliance report\n\nAll is well.\n").unwrap();
     assert_eq!(code(&s.run(&["report", "check", &report])), Some(4));
+}
+
+/// Tags set on files are kept by backups, found by search and written back
+/// by restore (SEARCH.md §1, FORMAT.md §6.3).
+#[cfg(target_os = "linux")]
+#[test]
+fn tags_are_kept_found_and_restored() {
+    let s = Setup::new();
+    let file = s.path("src/a.txt");
+    let tagged = s.run(&["tag", &file, "--add", "Fatura", "--add", "2026"]);
+    if code(&tagged) != Some(0) {
+        // A file system without user attributes cannot hold tags.
+        eprintln!("skipped: {}", String::from_utf8_lossy(&tagged.stderr));
+        return;
+    }
+    s.ok(&["backup", &s.path("src")]);
+    let found = s.json(&["search", "--tag", "fatura", "--tag", "2026"]);
+    let paths: Vec<&str> = found["hits"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|h| h["path"].as_str().unwrap())
+        .collect();
+    assert_eq!(paths, ["a.txt"]);
+    assert_eq!(found["hits"][0]["entry"]["tags"][0], "Fatura");
+    assert!(s.json(&["search", "--tag", "other"])["hits"].as_array().unwrap().is_empty());
+
+    s.ok(&["restore", "main", &s.path("out")]);
+    let shown = s.json(&["tag", &s.path("out/a.txt")]);
+    assert_eq!(shown[0]["tags"], serde_json::json!(["Fatura", "2026"]));
+    s.ok(&["tag", &file, "--remove", "fatura", "--remove", "2026"]);
+    assert_eq!(s.json(&["tag", &file])[0]["tags"], serde_json::json!([]));
 }

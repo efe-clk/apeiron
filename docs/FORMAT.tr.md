@@ -174,6 +174,7 @@ Her **girdi** bir CBOR haritasıdır:
 
 - Adlar bayt olarak saklanır, çünkü Linux dosya adları geçerli UTF-8 olmak zorunda değildir. Windows'ta adlar WTF-8 olarak kodlanır. Unicode normalleştirmesi (macOS) yapılmaz; ad nasıl okunduysa öyle saklanır.
 - Sürüm 1 sabit bağlantıları (hard link), aygıt dosyalarını ve Windows ACL'lerini saklamaz. Sabit bağlantılı dosyalar ayrı dosyalar olarak saklanır (içerikleri yalnızca bir kez saklanır); aralarındaki bağ korunmaz. Aygıt dosyaları atlanır ve kullanıcıya raporlanır.
+- **Etiketler.** Bir dosyanın etiketleri `xattrs` içinde, Dolphin gibi dosya yöneticilerinin yazdığı freedesktop kuralı olan `user.xdg.tags` özniteliği olarak tutulur: değeri UTF-8 olarak, virgüllerle ayrılmış etiketlerdir; her birinin iki ucunda boşluk yoktur ve hiçbiri boş değildir. Yedekleme bu özniteliği Linux'taki dosyalarda saklar, henüz başka bir özniteliği saklamaz; geri yükleme, dosya sistemi izin veriyorsa onu geri yazar. Etiketleri değiştiren bir program yeni bir sürüm yazar: girişler hiç değişmez. Okuyucular bilmedikleri öznitelikleri yok sayar.
 
 ### 6.4 Snapshot
 

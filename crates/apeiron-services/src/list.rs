@@ -58,6 +58,9 @@ pub struct EntryInfo {
     pub mtime: Option<Time>,
     /// Target of a symbolic link.
     pub target: Option<Name>,
+    /// Tags of a file (FORMAT.md §6.3).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
 }
 
 impl From<&TreeEntry> for EntryInfo {
@@ -74,6 +77,7 @@ impl From<&TreeEntry> for EntryInfo {
             mode: e.mode,
             mtime: e.mtime,
             target,
+            tags: crate::tags::entry_tags(e),
         }
     }
 }

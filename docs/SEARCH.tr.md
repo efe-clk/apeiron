@@ -10,7 +10,7 @@ Bir arama iki soruyu yanıtlar: bir dosya şimdi nerede ve geçmişte neredeydi.
 
 | Komut | Ne yapar | Durum |
 | --- | --- | --- |
-| `apeiron search [<pattern>] [--text <text>] [--larger <size>] [--smaller <size>] [--after <date>] [--before <date>] [--in <snapshot>] [--history] [--limit <n>]` | Verilen her ölçüte uyan dosyaları, klasörleri ve bağlantıları, her birinin bulunduğu snapshot ile listeler | Tamamlandı |
+| `apeiron search [<pattern>] [--text <text>] [--larger <size>] [--smaller <size>] [--after <date>] [--before <date>] [--tag <tag>]... [--in <snapshot>] [--history] [--limit <n>]` | Verilen her ölçüte uyan dosyaları, klasörleri ve bağlantıları, her birinin bulunduğu snapshot ile listeler | Tamamlandı |
 
 | Ölçüt | Neye uyar |
 | --- | --- |
@@ -18,8 +18,20 @@ Bir arama iki soruyu yanıtlar: bir dosya şimdi nerede ve geçmişte neredeydi.
 | `--text <text>` | Metni içeren metin dosyalarına, büyük/küçük harf ayırmadan (bölüm 3); metni içeren ilk satır numarasıyla gösterilir |
 | `--larger <size>`, `--smaller <size>` | En az, ya da daha küçük, boyuttaki dosyalara: bayt sayısı ya da `K`, `M` veya `G` ile (1024'ün kuvvetleri) |
 | `--after <date>`, `--before <date>` | Yerel saatle `YYYY-MM-DD` gününün başında ya da sonrasında, veya öncesinde değiştirilmiş girdilere |
+| `--tag <tag>` | Etikete sahip dosyalara, büyük/küçük harf ayırmadan; birden çok kez verilirse hepsine (§1.1) |
 
 En az bir ölçüt gerekir. `--in` aranan snapshot'ı adlandırır (varsayılan `main`). `--history` ondan önceki her snapshot'ı da arar; `--in` olmadan her ref'in geçmişini arar. En çok `--limit` sonuç (varsayılan 1000) listelenir; daha fazlası varsa çıktı bunu söyler.
+
+### 1.1 Etiketler
+
+Etiket, bir dosyaya konan bir ya da birkaç kelimedir; örneğin `fatura` ya da `Proje X`. Apeiron, Linux'ta Dolphin gibi dosya yöneticilerinin dosyalara koyduğu etiketleri `user.xdg.tags` özniteliğinde tutar ([FORMAT.tr.md](FORMAT.tr.md) §6.3): bir yedek onları her sürümle saklar, `apeiron search --tag` onları bulur, `apeiron ls` ve sonuçlar onları köşeli parantez içinde gösterir ve geri yükleme onları geri yazar.
+
+| Komut | Ne yapar |
+| --- | --- |
+| `apeiron tag <dosya>...` | Diskteki dosyaların etiketlerini gösterir |
+| `apeiron tag <dosya>... --add <etiket>... --remove <etiket>...` | Büyük/küçük harf ayırmadan etiket ekler ya da kaldırır; sonraki yedek onları saklar |
+
+Etiketler dosyaların bir özelliğidir; bu yüzden onları değiştirmek saklanmış sürümleri değil klasörü değiştirir: bir sürüm, oluşturulduğunda dosyalarının sahip olduğu etiketleri tutar. Başka sistemler etiketleri başka yerde tutar (macOS Finder'ın kendi özniteliğinde, Windows hiç tutmaz); bu yüzden oralardaki yedeklerde henüz etiket yoktur ve `apeiron tag` bunu söyler. JSON API'de ölçüt bir liste olan `tags`'tir ve etiketi olan her girişin `tags` alanı vardır.
 
 Snapshot'ların kendileri mesajlarına, yazarlarına, makinelerine ya da üst verilerine göre `apeiron log --grep <metin>` ile bulunur ([CLI.tr.md](CLI.tr.md)).
 
@@ -79,7 +91,7 @@ Bir ad 1 ile 64 karakter arasıdır ve denetim karakteri içermez; çevresindeki
 | Konu | Nerede |
 | --- | --- |
 | PDF, ofis ve diğer biçimlerin içindeki metin | Eklenti sisteminin tür sürücüleri, Aşama 3 |
-| Dosyalara etiket | Daha sonra; formatta henüz dosyalara etiket yok |
+| macOS ve Windows'ta etiketler | Daha sonra; macOS onları Finder'ın kendi özniteliğinde tutar, Windows'ta yoktur |
 | Kullanıcının göremeyeceği sonuçları gizlemek | Kullanıcılar ve izinler, Aşama 4 |
 
 ## 8. Crate'ler

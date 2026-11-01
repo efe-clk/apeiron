@@ -74,6 +74,9 @@ pub(crate) fn entry(e: &EntryInfo) -> String {
     if let Some(target) = &e.target {
         line.push_str(&format!(" -> {target}"));
     }
+    if !e.tags.is_empty() {
+        line.push_str(&format!("  [{}]", e.tags.join(", ")));
+    }
     line
 }
 
@@ -159,6 +162,9 @@ pub(crate) fn search(r: &apeiron::SearchRequest) -> String {
     }
     if let Some(t) = &q.before {
         parts.push(format!("--before {}", day(t)));
+    }
+    for tag in &q.tags {
+        parts.push(format!("--tag {tag:?}"));
     }
     if let Some(s) = &r.snapshot {
         parts.push(format!("--in {s}"));

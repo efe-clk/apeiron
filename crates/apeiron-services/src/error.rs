@@ -21,6 +21,8 @@ pub enum Error {
     AlreadyExists(PathBuf),
     #[error("invalid input: {0}")]
     InvalidInput(String),
+    #[error("{0}")]
+    Unsupported(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

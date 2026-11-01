@@ -36,6 +36,9 @@ pub struct Query {
     /// Modified before this time.
     #[serde(default)]
     pub before: Option<Time>,
+    /// Tags a file must all have, ignoring case (FORMAT.md §6.3).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
 }
 
 impl Query {
@@ -46,11 +49,15 @@ impl Query {
             && self.smaller.is_none()
             && self.after.is_none()
             && self.before.is_none()
+            && self.tags.is_empty()
     }
 
-    /// Only files can match text and size criteria.
+    /// Only files can match text, size and tag criteria.
     fn files_only(&self) -> bool {
-        self.text.is_some() || self.larger.is_some() || self.smaller.is_some()
+        self.text.is_some()
+            || self.larger.is_some()
+            || self.smaller.is_some()
+            || !self.tags.is_empty()
     }
 }
 
@@ -342,6 +349,19 @@ impl Searcher<'_> {
         };
         if q.larger.is_some_and(|l| size < l) || q.smaller.is_some_and(|s| size >= s) {
             return Ok(None);
+        }
+        if !q.tags.is_empty() {
+            let has: Vec<String> = crate::tags::entry_tags(entry)
+                .iter()
+                .map(|t| t.to_lowercase())
+                .collect();
+            if !q
+                .tags
+                .iter()
+                .all(|want| has.contains(&want.trim().to_lowercase()))
+            {
+                return Ok(None);
+            }
         }
         let Some(needle) = &self.text else {
             return Ok(Some(None));

@@ -10,7 +10,7 @@ A search answers two questions: where is a file now, and where was it in the pas
 
 | Command | What it does | Status |
 | --- | --- | --- |
-| `apeiron search [<pattern>] [--text <text>] [--larger <size>] [--smaller <size>] [--after <date>] [--before <date>] [--in <snapshot>] [--history] [--limit <n>]` | Lists the files, folders and links that match every criterion given, with the snapshot each was found in | Done |
+| `apeiron search [<pattern>] [--text <text>] [--larger <size>] [--smaller <size>] [--after <date>] [--before <date>] [--tag <tag>]... [--in <snapshot>] [--history] [--limit <n>]` | Lists the files, folders and links that match every criterion given, with the snapshot each was found in | Done |
 
 | Criterion | Matches |
 | --- | --- |
@@ -18,8 +18,20 @@ A search answers two questions: where is a file now, and where was it in the pas
 | `--text <text>` | Text files holding the text, ignoring case (section 3); the first such line is shown with its number |
 | `--larger <size>`, `--smaller <size>` | Files of at least, or less than, the size: a number of bytes or with `K`, `M` or `G` (powers of 1024) |
 | `--after <date>`, `--before <date>` | Entries modified on or after, or before, the start of the day `YYYY-MM-DD` in local time |
+| `--tag <tag>` | Files that have the tag, ignoring case; given more than once, every one of them (§1.1) |
 
 At least one criterion is needed. `--in` names the snapshot searched (default `main`). `--history` also searches every snapshot before it; without `--in` it searches the history of every ref. At most `--limit` results (default 1000) are listed; when there are more, the output says so.
+
+### 1.1 Tags
+
+A tag is a word or a few words put on a file, such as `invoice` or `Project X`. Apeiron keeps the tags that file managers such as Dolphin put on files on Linux, in the attribute `user.xdg.tags` ([FORMAT.md](FORMAT.md) §6.3): a backup stores them with each version, `apeiron search --tag` finds them, `apeiron ls` and the results show them in brackets, and a restore writes them back.
+
+| Command | What it does |
+| --- | --- |
+| `apeiron tag <file>...` | Shows the tags of files on disk |
+| `apeiron tag <file>... --add <tag>... --remove <tag>...` | Adds or removes tags, ignoring case; the next backup keeps them |
+
+Tags are a property of the files, so changing them changes the folder, not the versions already stored: a version keeps the tags its files had when it was made. Other systems keep tags elsewhere (macOS in Finder's own attribute, Windows not at all), so backups there have no tags yet, and `apeiron tag` says so. In the JSON API the criterion is `tags`, a list, and each entry has `tags` when it has any.
 
 Snapshots themselves are found by their message, author, host or metadata with `apeiron log --grep <text>` ([CLI.md](CLI.md)).
 
@@ -79,7 +91,7 @@ A name has 1 to 64 characters and no control characters; spaces around it are dr
 | Item | Where |
 | --- | --- |
 | Text inside PDF, office and other formats | Type drivers of the plugin system, Stage 3 |
-| Tags on files | Later; the format has no tags on files yet |
+| Tags on macOS and Windows | Later; macOS keeps them in Finder's own attribute, Windows has none |
 | Hiding results a user may not see | Users and permissions, Stage 4 |
 
 ## 8. Crates

@@ -174,6 +174,7 @@ Each **entry** is a CBOR map:
 
 - Names are stored as bytes because Linux file names do not have to be valid UTF-8. On Windows names are encoded as WTF-8. No Unicode normalisation (macOS) is applied; a name is stored exactly as it was read.
 - Version 1 does not store hard links, device files or Windows ACLs. Hard-linked files are stored as separate files (their content is stored only once); the link between them is not kept. Device files are skipped and reported to the user.
+- **Tags.** A file's tags are kept in `xattrs` as the attribute `user.xdg.tags`, the freedesktop convention that file managers such as Dolphin write: its value is the tags in UTF-8, separated by commas, each without spaces at either end and none empty. Backup stores this attribute of files on Linux and no other attribute yet; restore writes it back where the file system allows it. A program that changes tags writes a new snapshot: entries never change. Readers ignore attributes they do not know.
 
 ### 6.4 Snapshot
 

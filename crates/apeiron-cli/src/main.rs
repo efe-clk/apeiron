@@ -220,6 +220,17 @@ enum Command {
         #[command(subcommand)]
         command: RetentionCommand,
     },
+    /// Show or change the tags of files on disk, which backups keep and
+    /// search finds (Linux; docs/SEARCH.md)
+    Tag {
+        files: Vec<PathBuf>,
+        /// A tag to add; give it more than once for several
+        #[arg(long = "add", value_name = "TAG")]
+        add: Vec<String>,
+        /// A tag to remove
+        #[arg(long = "remove", value_name = "TAG")]
+        remove: Vec<String>,
+    },
     /// Place, list and lift legal holds (docs/ARCHIVE.md)
     Hold {
         #[command(subcommand)]
@@ -244,6 +255,9 @@ enum Command {
         /// Modified before this day (YYYY-MM-DD)
         #[arg(long, value_parser = parse_date)]
         before: Option<Time>,
+        /// A tag files must have; give it more than once for several
+        #[arg(long = "tag", value_name = "TAG")]
+        tags: Vec<String>,
         /// The snapshot searched (default main)
         #[arg(long = "in")]
         snapshot: Option<String>,
@@ -2550,6 +2564,38 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             }
             Ok(0)
         }
+        Command::Tag { files, add, remove } => {
+            let mut shown = Vec::new();
+            for file in files {
+                let mut tags = apeiron::file_tags(&file)?;
+                if !add.is_empty() || !remove.is_empty() {
+                    tags.retain(|t| !remove.iter().any(|r| r.trim().eq_ignore_ascii_case(t)));
+                    for tag in &add {
+                        if !tags.iter().any(|t| t.eq_ignore_ascii_case(tag.trim())) {
+                            tags.push(tag.trim().to_owned());
+                        }
+                    }
+                    apeiron::set_file_tags(&file, &tags)?;
+                }
+                shown.push(serde_json::json!({ "file": file, "tags": tags }));
+            }
+            out.result(&shown, |shown| {
+                for s in shown {
+                    let tags: Vec<&str> = s["tags"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter_map(|t| t.as_str())
+                        .collect();
+                    say!(
+                        "{}  [{}]",
+                        s["file"].as_str().unwrap_or_default(),
+                        tags.join(", ")
+                    );
+                }
+            });
+            Ok(0)
+        }
         Command::Hold { command } => {
             let repo = open(cli.repo, password_file)?;
             let when = |seconds: u64| {
@@ -2631,6 +2677,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             smaller,
             after,
             before,
+            tags,
             snapshot,
             history,
             limit,
@@ -2672,6 +2719,9 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             q.smaller = smaller.or(q.smaller);
             q.after = after.or(q.after);
             q.before = before.or(q.before);
+            if !tags.is_empty() {
+                q.tags = tags;
+            }
             request.snapshot = snapshot.or(request.snapshot);
             request.history |= history;
             request.limit = limit.unwrap_or(request.limit);
@@ -2690,6 +2740,9 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             out.result(&report, |r| {
                 for hit in &r.hits {
                     let mut line = hit.path.to_string();
+                    if !hit.entry.tags.is_empty() {
+                        line.push_str(&format!("  [{}]", hit.entry.tags.join(", ")));
+                    }
                     if let Some(text) = &hit.line {
                         line.push_str(&format!(":{}: {}", text.number, text.text));
                     }

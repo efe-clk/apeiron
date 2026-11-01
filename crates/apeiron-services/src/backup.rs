@@ -264,6 +264,11 @@ impl Walk<'_> {
                 continue;
             };
             let attrs = os::attrs(&md);
+            // Files keep their tags (FORMAT.md §6.3).
+            let xattrs = match kind {
+                EntryKind::File { .. } => crate::tags::read_xattrs(&path),
+                _ => Vec::new(),
+            };
             entries.push(TreeEntry {
                 name,
                 kind,
@@ -271,7 +276,7 @@ impl Walk<'_> {
                 mtime: attrs.mtime,
                 uid: attrs.uid,
                 gid: attrs.gid,
-                xattrs: Vec::new(),
+                xattrs,
             });
         }
         // The source folder itself is not counted, as in restore and export.

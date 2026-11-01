@@ -19,6 +19,7 @@ mod restore_test;
 mod search;
 mod switch;
 mod sync;
+mod tags;
 mod upload;
 
 pub use backup::{BackupOptions, BackupOutcome, backup};
@@ -41,4 +42,5 @@ pub use search::{
 };
 pub use switch::{SwitchOptions, SwitchOutcome, switch};
 pub use sync::{SyncAction, SyncMode, SyncOptions, SyncOutcome, folder_ref, sync};
+pub use tags::{entry_tags, file_tags, set_file_tags};
 pub use upload::{AddFileOptions, AddFileOutcome, add_file};

@@ -141,6 +141,7 @@ impl From<apeiron_services::Error> for Error {
             E::NotFound(_) => Error::new(ErrorKind::NotFound, message),
             E::AlreadyExists(path) => Error::new(ErrorKind::AlreadyExists, message).with_path(path),
             E::InvalidInput(_) => Error::new(ErrorKind::InvalidInput, message),
+            E::Unsupported(_) => Error::new(ErrorKind::Unsupported, message),
             _ => Error::new(ErrorKind::Internal, message),
         }
     }
