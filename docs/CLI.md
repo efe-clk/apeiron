@@ -55,7 +55,7 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | --- | --- | --- |
 | `apeiron init <path> [--encrypt]` | Creates an empty repository; `--encrypt` encrypts it with a password (section 2.1) | Done |
 | `apeiron backup <folder> [--ref <name>] [--message <text>]` | Stores the folder as a new snapshot and moves the ref to it (default ref: `main`) | Done |
-| `apeiron log [<ref>]` | Lists the snapshots of a ref, newest first | Done |
+| `apeiron log [<ref>] [--grep <text>]` | Lists the snapshots of a ref, newest first; `--grep` keeps those whose message, author, host or metadata hold the text, ignoring case | Done |
 | `apeiron ls <snapshot> [<path>]` | Lists the files and folders inside a snapshot | Done |
 | `apeiron diff <snapshot> <snapshot> [--text]` | Lists files added, removed and changed between two snapshots; `--text` also shows the changed lines of files a plugin handles ([TEXT.md](TEXT.md)) | Done |
 | `apeiron restore <snapshot> <target> [--path <path>]` | Writes a snapshot (or one path in it) into a new or empty folder | Done |

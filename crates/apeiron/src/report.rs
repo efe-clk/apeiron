@@ -291,6 +291,7 @@ pub(crate) fn make(
             let page = repo.log(&LogRequest {
                 start: from.to_string(),
                 limit: 1024,
+                grep: None,
             })?;
             newest = newest.or_else(|| page.snapshots.first().map(|s| s.time));
             snapshots += page.snapshots.len() as u64;

@@ -51,6 +51,7 @@ fn backup_log_list_diff_restore_verify() {
         .log(&LogRequest {
             start: "main".into(),
             limit: 1,
+            grep: None,
         })
         .unwrap();
     assert_eq!(page.snapshots[0].id, second.snapshot);
@@ -61,10 +62,21 @@ fn backup_log_list_diff_restore_verify() {
         .log(&LogRequest {
             start: "main".into(),
             limit: 10,
+            grep: None,
         })
         .unwrap();
     assert_eq!(all.snapshots.len(), 2);
     assert_eq!(all.next, None);
+    let found = s
+        .repo
+        .log(&LogRequest {
+            start: "main".into(),
+            limit: 10,
+            grep: Some("ONE".into()),
+        })
+        .unwrap();
+    assert_eq!(found.snapshots.len(), 1);
+    assert_eq!(found.snapshots[0].id, first.snapshot);
 
     let entries = s
         .repo

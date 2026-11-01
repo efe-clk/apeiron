@@ -21,6 +21,8 @@ Bir arama iki soruyu yanıtlar: bir dosya şimdi nerede ve geçmişte neredeydi.
 
 En az bir ölçüt gerekir. `--in` aranan snapshot'ı adlandırır (varsayılan `main`). `--history` ondan önceki her snapshot'ı da arar; `--in` olmadan her ref'in geçmişini arar. En çok `--limit` sonuç (varsayılan 1000) listelenir; daha fazlası varsa çıktı bunu söyler.
 
+Snapshot'ların kendileri mesajlarına, yazarlarına, makinelerine ya da üst verilerine göre `apeiron log --grep <metin>` ile bulunur ([CLI.tr.md](CLI.tr.md)).
+
 ## 2. Geçmişte arama
 
 ```mermaid
@@ -61,7 +63,6 @@ Bir dosya metin dosyasıysa metin için aranır: içeriği geçerli UTF-8'dir ve
 | Dosyalara etiket | Daha sonra; formatta henüz dosyalara etiket yok |
 | Kayıtlı sorgular ve kopya dosya tespiti | Daha sonra |
 | Kullanıcının göremeyeceği sonuçları gizlemek | Kullanıcılar ve izinler, Aşama 4 |
-| Snapshot mesajlarında ve üst verisinde arama | `apeiron log` onları gösterir; bir süzgeç daha sonra gelir |
 
 ## 6. Crate'ler
 

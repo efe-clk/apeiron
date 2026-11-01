@@ -55,7 +55,7 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | --- | --- | --- |
 | `apeiron init <path> [--encrypt]` | Boş bir depo oluşturur; `--encrypt` onu bir parolayla şifreler (bölüm 2.1) | Tamamlandı |
 | `apeiron backup <folder> [--ref <name>] [--message <text>]` | Klasörü yeni bir snapshot olarak saklar ve ref'i ona taşır (varsayılan ref: `main`) | Tamamlandı |
-| `apeiron log [<ref>]` | Bir ref'in snapshot'larını en yeniden başlayarak listeler | Tamamlandı |
+| `apeiron log [<ref>] [--grep <metin>]` | Bir ref'in snapshot'larını en yeniden başlayarak listeler; `--grep`, mesajı, yazarı, makinesi ya da üst verisi metni büyük-küçük harf ayırmadan içerenleri bırakır | Tamamlandı |
 | `apeiron ls <snapshot> [<path>]` | Bir snapshot'taki dosya ve klasörleri listeler | Tamamlandı |
 | `apeiron diff <snapshot> <snapshot> [--text]` | İki snapshot arasında eklenen, silinen ve değişen dosyaları listeler; `--text` bir eklentinin işlediği dosyaların değişen satırlarını da gösterir ([TEXT.tr.md](TEXT.tr.md)) | Tamamlandı |
 | `apeiron restore <snapshot> <target> [--path <path>]` | Bir snapshot'ı (ya da içindeki bir yolu) yeni ya da boş bir klasöre yazar | Tamamlandı |

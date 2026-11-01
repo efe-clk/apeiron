@@ -30,6 +30,8 @@ class Sdk(unittest.TestCase):
             self.assertIs(job.wait(), report)
             self.assertEqual(repo.resolve("main"), report.snapshot)
             self.assertEqual(repo.log().snapshots[0].message, "one")
+            self.assertEqual(len(repo.log(grep="ONE").snapshots), 1)
+            self.assertEqual(repo.log(grep="nothing").snapshots, [])
             self.assertEqual([e.name for e in repo.list("main")], ["a.txt"])
 
             repo.create_ref("feature")

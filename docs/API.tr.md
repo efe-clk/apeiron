@@ -145,7 +145,7 @@ Her işlem tek bir düz istek değeri alır ve tek bir düz sonuç değeri dönd
 | `export` | snapshot, çıktı dosyası, biçim (`tar`, `zip` ya da `7z`; verilmezse uzantıdan), isteğe bağlı yol | `ExportReport`: sayılar, uyarılar | Evet |
 | `verify` | — | `VerifyReport`: denetlenen nesneler, bozuk dosyalar ve nesneler | Evet |
 | `restore_test` | snapshot, geri yüklenecek bayt (varsayılan 100 MiB) | `RestoreTestReport`: geri yüklenip denetlenen dosyalar ve baytlar, bozuk dosyalar | Evet |
-| `log` | başlangıç snapshot'ı, en fazla sayı | `LogPage`: en yeniden başlayan snapshot'lar ve sonraki sayfanın başladığı yer | Hayır |
+| `log` | başlangıç snapshot'ı, en fazla sayı, isteğe bağlı olarak mesajın, yazarın, makinenin ya da üst verinin içermesi gereken metin (büyük-küçük harf ayrılmaz; sayı o zaman eşleşenleri sayar) | `LogPage`: en yeniden başlayan snapshot'lar ve sonraki sayfanın başladığı yer | Hayır |
 | `list` | snapshot, yol | `Vec<EntryInfo>`: ad, tür, boyut, izinler, değişiklik zamanı | Hayır |
 | `read_file` | snapshot, bir dosyanın yolu | dosyanın boyutu; içeriği okundukça bir `Write` içine yazılır, bu yüzden JSON API'de yoktur ([SHARE.tr.md](SHARE.tr.md)) | Hayır |
 | `diff` | iki snapshot | `Vec<Change>`: yol ve eklendi, silindi ya da değişti | Hayır |

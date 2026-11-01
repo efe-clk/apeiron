@@ -145,7 +145,7 @@ Every operation takes one plain request value and returns one plain result value
 | `export` | snapshot, output file, format (`tar`, `zip` or `7z`; from the extension when absent), optional path | `ExportReport`: counts, warnings | Yes |
 | `verify` | — | `VerifyReport`: objects checked, damaged files and objects | Yes |
 | `restore_test` | snapshot, bytes to restore (default 100 MiB) | `RestoreTestReport`: files and bytes restored and checked, damaged files | Yes |
-| `log` | start snapshot, maximum count | `LogPage`: snapshots, newest first, and where the next page starts | No |
+| `log` | start snapshot, maximum count, optional text the message, author, host or metadata must hold (ignoring case; the count then counts matches) | `LogPage`: snapshots, newest first, and where the next page starts | No |
 | `list` | snapshot, path | `Vec<EntryInfo>`: name, kind, size, mode, mtime | No |
 | `read_file` | snapshot, path of a file | the file's size; its content is written to a `Write` as it is read, so it is not in the JSON API ([SHARE.md](SHARE.md)) | No |
 | `diff` | two snapshots | `Vec<Change>`: path and added, removed or modified | No |

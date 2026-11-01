@@ -806,6 +806,7 @@ impl WebState {
                 let page = repo.log(&LogRequest {
                     start: from.to_string(),
                     limit: 256,
+                    grep: None,
                 })?;
                 for s in page.snapshots {
                     if !seen.insert(s.id) {
@@ -923,6 +924,7 @@ impl WebState {
             .log(&LogRequest {
                 start: share.snapshot.to_string(),
                 limit: 1,
+                grep: None,
             })?
             .snapshots
             .first()

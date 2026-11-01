@@ -101,6 +101,9 @@ enum Command {
         /// Show at most this many snapshots
         #[arg(short = 'n', long, default_value_t = 50)]
         limit: usize,
+        /// Only snapshots whose message, author, host or metadata hold this text
+        #[arg(long)]
+        grep: Option<String>,
     },
     /// List the files and folders inside a snapshot
     Ls {
@@ -1560,11 +1563,17 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             });
             Ok(warnings_exit(out, &report.warnings))
         }
-        Command::Log { snapshot, limit } => {
+        Command::Log {
+            snapshot,
+            limit,
+            grep,
+        } => {
             let repo = open(cli.repo, password_file)?;
+            let more = grep.as_ref().map(|g| format!(" --grep {g:?}"));
             let page = repo.log(&LogRequest {
                 start: snapshot,
                 limit,
+                grep,
             })?;
             out.result(&page, |page| {
                 for s in &page.snapshots {
@@ -1576,7 +1585,11 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     );
                 }
                 if let Some(next) = page.next {
-                    say!("… more: apeiron log {}", format::short_id(&next));
+                    say!(
+                        "… more: apeiron log {}{}",
+                        format::short_id(&next),
+                        more.as_deref().unwrap_or("")
+                    );
                 }
             });
             Ok(0)

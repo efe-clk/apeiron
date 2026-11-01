@@ -407,6 +407,7 @@ impl Repository {
     pub fn log(&self, request: &LogRequest) -> Result<LogPage> {
         let core = self.view()?;
         let start = spec::resolve(&core, &request.start)?;
+        let needle = request.grep.as_deref().map(str::to_lowercase);
         let mut snapshots = Vec::new();
         let mut next = Some(start);
         while let Some(id) = next {
@@ -415,7 +416,10 @@ impl Repository {
             }
             let snapshot = core.read_snapshot(&id)?;
             next = snapshot.parents.first().copied();
-            snapshots.push(SnapshotInfo::new(id, snapshot));
+            let info = SnapshotInfo::new(id, snapshot);
+            if needle.as_deref().is_none_or(|n| info.mentions(n)) {
+                snapshots.push(info);
+            }
         }
         Ok(LogPage { snapshots, next })
     }

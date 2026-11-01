@@ -55,6 +55,10 @@ pub struct LogRequest {
     /// Maximum number of snapshots in one page.
     #[serde(default = "default_limit")]
     pub limit: usize,
+    /// Only snapshots whose message, author, host or metadata hold this
+    /// text, ignoring case; the limit then counts the matches.
+    #[serde(default)]
+    pub grep: Option<String>,
 }
 
 fn default_limit() -> usize {
@@ -82,6 +86,18 @@ pub struct SnapshotInfo {
 }
 
 impl SnapshotInfo {
+    /// Whether the message, author, host or a metadata key or value holds
+    /// `needle`, which is already in lower case.
+    pub(crate) fn mentions(&self, needle: &str) -> bool {
+        let fields = [&self.message, &self.author, &self.host];
+        fields
+            .into_iter()
+            .flatten()
+            .map(String::as_str)
+            .chain(self.meta.iter().flat_map(|(k, v)| [k.as_str(), v.as_str()]))
+            .any(|text| text.to_lowercase().contains(needle))
+    }
+
     pub(crate) fn new(id: ObjectId, s: Snapshot) -> Self {
         SnapshotInfo {
             id,

@@ -21,6 +21,8 @@ A search answers two questions: where is a file now, and where was it in the pas
 
 At least one criterion is needed. `--in` names the snapshot searched (default `main`). `--history` also searches every snapshot before it; without `--in` it searches the history of every ref. At most `--limit` results (default 1000) are listed; when there are more, the output says so.
 
+Snapshots themselves are found by their message, author, host or metadata with `apeiron log --grep <text>` ([CLI.md](CLI.md)).
+
 ## 2. Searching the history
 
 ```mermaid
@@ -61,7 +63,6 @@ A stored index can be added later behind the same command, if measurements show 
 | Tags on files | Later; the format has no tags on files yet |
 | Saved queries and duplicate file detection | Later |
 | Hiding results a user may not see | Users and permissions, Stage 4 |
-| Searching snapshot messages and metadata | `apeiron log` shows them; a filter comes later |
 
 ## 6. Crates
 

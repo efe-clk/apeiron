@@ -441,8 +441,8 @@ class Repository:
     def resolve(self, spec: str) -> str:
         return self.call("resolve", spec=spec)
 
-    def log(self, start: str = "main", limit: int = 50) -> Record:
-        return self.call("log", start=start, limit=limit)
+    def log(self, start: str = "main", limit: int = 50, grep: Optional[str] = None) -> Record:
+        return self.call("log", start=start, limit=limit, grep=grep)
 
     def list(self, snapshot: str, path: str = "") -> list:
         return self.call("list", snapshot=snapshot, path=path)
