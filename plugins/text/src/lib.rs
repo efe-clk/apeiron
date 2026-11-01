@@ -75,7 +75,9 @@ pub fn merge(base: Option<&[u8]>, ours: &[u8], theirs: &[u8]) -> Option<Vec<u8>>
     let (base, ours, theirs) = (text(base.unwrap_or_default())?, text(ours)?, text(theirs)?);
     match diffy::merge(base, ours, theirs) {
         Ok(merged) => Some(merged.into_bytes()),
-        Err(_) => merge_json(base, ours, theirs).or_else(|| merge_markdown(base, ours, theirs)),
+        Err(_) => merge_json(base, ours, theirs)
+            .or_else(|| merge_yaml(base, ours, theirs))
+            .or_else(|| merge_markdown(base, ours, theirs)),
     }
 }
 
@@ -121,7 +123,60 @@ fn sections(text: &str) -> Option<Vec<(&str, &str)>> {
 /// that side, one changed on both is merged line by line, and a new section
 /// follows the section it follows on its side.
 fn merge_markdown(base: &str, ours: &str, theirs: &str) -> Option<Vec<u8>> {
-    let (b, o, t) = (sections(base)?, sections(ours)?, sections(theirs)?);
+    merge_sections(&sections(base)?, &sections(ours)?, &sections(theirs)?)
+}
+
+/// Splits a YAML text into its top-level keys (TEXT.md §2): the lines
+/// before the first key under `""`, then each key with the lines below it
+/// under the key's name. `None` unless every line that starts at the left
+/// edge is a key, a comment or a document start before the first key, and
+/// no key comes twice.
+fn yaml_blocks(text: &str) -> Option<Vec<(&str, &str)>> {
+    let mut out: Vec<(&str, &str)> = Vec::new();
+    let (mut key, mut start, mut at) = ("", 0, 0);
+    for line in text.split_inclusive('\n') {
+        let first = line.chars().next().unwrap_or(' ');
+        let edge = !matches!(first, ' ' | '\t' | '\r' | '\n' | '#');
+        if edge {
+            let trimmed = line.trim_end();
+            let name = trimmed
+                .split_once(':')
+                .map(|(k, rest)| (k, rest.is_empty() || rest.starts_with(' ')))
+                .filter(|(k, sep)| *sep && !k.is_empty() && !k.starts_with(['-', '[', '{', '?']))
+                .map(|(k, _)| k);
+            match name {
+                Some(name) => {
+                    out.push((key, &text[start..at]));
+                    (key, start) = (name, at);
+                }
+                None if key.is_empty() && trimmed == "---" => {}
+                None => return None,
+            }
+        }
+        at += line.len();
+    }
+    out.push((key, &text[start..]));
+    let mut keys: Vec<&str> = out.iter().map(|(k, _)| *k).collect();
+    keys.sort_unstable();
+    let before = keys.len();
+    keys.dedup();
+    (keys.len() == before).then_some(out)
+}
+
+/// Joins two changed YAML documents key by key when their lines collide
+/// (TEXT.md §2), as Markdown sections are joined.
+fn merge_yaml(base: &str, ours: &str, theirs: &str) -> Option<Vec<u8>> {
+    merge_sections(
+        &yaml_blocks(base)?,
+        &yaml_blocks(ours)?,
+        &yaml_blocks(theirs)?,
+    )
+}
+
+/// Joins texts split into keyed sections: one changed on one side is taken
+/// from that side, one changed on both is merged line by line, and a new
+/// one follows the section it follows on its side.
+fn merge_sections(b: &[(&str, &str)], o: &[(&str, &str)], t: &[(&str, &str)]) -> Option<Vec<u8>> {
     if o.len() < 2 || t.len() < 2 {
         return None;
     }
@@ -129,8 +184,8 @@ fn merge_markdown(base: &str, ours: &str, theirs: &str) -> Option<Vec<u8>> {
         s.iter().find(|(k, _)| *k == key).map(|(_, v)| *v)
     }
     let mut out: Vec<(&str, String)> = Vec::new();
-    for (key, ours_text) in &o {
-        let merged = match (find(&b, key), find(&t, key)) {
+    for (key, ours_text) in o {
+        let merged = match (find(b, key), find(t, key)) {
             (base_text, Some(theirs_text)) => {
                 let base_text = base_text.unwrap_or_default();
                 if ours_text == &theirs_text || base_text == theirs_text {
@@ -149,10 +204,10 @@ fn merge_markdown(base: &str, ours: &str, theirs: &str) -> Option<Vec<u8>> {
         out.push((key, merged));
     }
     for (i, (key, theirs_text)) in t.iter().enumerate() {
-        if find(&o, key).is_some() {
+        if find(o, key).is_some() {
             continue;
         }
-        match find(&b, key) {
+        match find(b, key) {
             // Removed here: fine if unchanged there.
             Some(base_text) if base_text == *theirs_text => {}
             Some(_) => return None,
@@ -448,6 +503,39 @@ mod tests {
         // headings cannot be told apart.
         assert_eq!(sections("```\n# x\n```\n# y\n").map(|s| s.len()), Some(2));
         assert_eq!(sections("# x\na\n# x\n"), None);
+    }
+
+    #[test]
+    fn yaml_keys_changed_on_both_sides_are_joined() {
+        let base = "# settings\nname: app\nports:\n  - 80\nenv:\n  mode: dev\n";
+        // Next to each other, the changes collide line by line.
+        let ours = base.replace("  - 80", "  - 80\n  - 443");
+        let theirs = base.replace("  mode: dev", "  mode: prod");
+        let ours = ours.replace("name: app", "name: shop");
+        let theirs = format!("{theirs}debug: false\n").replace("ports:\n", "ports: # open\n");
+        assert!(diffy::merge(base, &ours, &theirs).is_err());
+        assert_eq!(
+            m(base, &ours, &theirs).as_deref(),
+            Some(
+                "# settings\nname: shop\nports: # open\n  - 80\n  - 443\nenv:\n  mode: prod\ndebug: false\n"
+            )
+        );
+        // The same key changed differently still conflicts.
+        assert_eq!(
+            m(
+                base,
+                &base.replace("dev", "a"),
+                &base.replace("dev", "b").replace("app", "x")
+            ),
+            None
+        );
+        // A text whose left edge holds more than keys is not split as YAML.
+        assert_eq!(yaml_blocks("a: 1\nplain words\n"), None);
+        assert_eq!(
+            yaml_blocks("---\na: 1\nb:\n  c: 2\n").map(|s| s.len()),
+            Some(3)
+        );
+        assert_eq!(yaml_blocks("a: 1\na: 2\n"), None);
     }
 
     #[test]

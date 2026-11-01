@@ -26,7 +26,7 @@ Eklentiye yalnızca iki taraf bir dosyayı farklı değiştirdiğinde sorulur (P
 | --- | --- |
 | Taraflar farklı satırları değiştirdi | İki değişikliği de içeren tek bir dosya |
 | İkisi de aynı değişikliği yaptı | O değişiklik, bir kez |
-| İkisi de aynı satırları ya da yan yana satırları farklı değiştirdi | Bir çatışma: eklenti yokmuş gibi çatışma kopyası; aşağıdaki gibi üç sürüm de JSON ya da Markdown değilse |
+| İkisi de aynı satırları ya da yan yana satırları farklı değiştirdi | Bir çatışma: eklenti yokmuş gibi çatışma kopyası; aşağıdaki gibi üç sürüm de JSON, YAML ya da Markdown değilse |
 | Ortak sürüm yok (dosya iki tarafta da eklendi) | İkisi eşit değilse bir çatışma |
 | Bir dosya metin değil (UTF-8 değil ya da sıfır baytı var) | Eklenti yokmuş gibi bir çatışma |
 
@@ -34,7 +34,9 @@ Bir çatışma, bir dosyanın içine asla `<<<<<<<` gibi işaretler yazmaz: kull
 
 Satırlar çakıştığında ortak sürüm ve iki taraf da JSON belgesiyse, eklenti onları bunun yerine yapıya göre birleştirir: nesneleri, her derinlikte, üye üye; bir tarafta eklenen üye tutulur, bir tarafta silinen üye diğer taraf onu değiştirmediyse silinir; sayı, metin ya da dizi gibi diğer her değer yalnızca bir tarafta ya da iki tarafta aynı biçimde değiştirilmiş olmalıdır, yoksa dosya yine bir çatışmadır. Birleşen belge üyeleri bu tarafın sırasıyla, ardından diğer tarafın yeni üyeleriyle tutar ve bu tarafın girintisiyle (hiç yoksa iki boşluk) yazılır; bu yüzden biçimi iki taraftan da farklı olabilir.
 
-Satırlar çakıştığında dosyalar JSON değil de iki taraf da başlıklı Markdown ise (çitli kod dışında bir ile altı `#` ve bir boşlukla başlayan satırlar), eklenti onları bölüm bölüm birleştirir; bölüm, bir başlık ve bir sonrakine kadarki satırlardır, ilk başlıktan önceki metin de bir bölüm sayılır. Bölümler başlık satırlarıyla eşlenir: bir tarafta değişen bölüm o taraftan alınır, iki tarafta değişen satır satır birleştirilir ve çakışmamalıdır, bir tarafta silinen bölüm diğer taraf onu değiştirmediyse silinir, yeni bölüm de kendi tarafında hangi bölümün ardındaysa onun ardına gelir; aynı yere eklenen iki yeni bölümden önce diğer tarafınki gelir. Bir tarafta iki eş başlık varsa bölümler ayırt edilemediği için dosya bir çatışmadır. Eklenti dosya adlarını görmez; bu yüzden böyle satırlar taşıyan her metin, `# ` yorumlu bir betik de, bu yolla birleştirilebilir.
+Satırlar çakıştığında dosyalar JSON değil de sol kenarında yalnızca üst düzey anahtarlar (`name:` ya da `name: value`), yorumlar ve başta bir `---` bulunan YAML belgeleriyse, eklenti onları anahtar anahtar birleştirir: bir anahtar ve altındaki girintili satırlar bir blok, ilk anahtardan önceki satırlar da bir blok olur ve bloklar, aşağıdaki Markdown bölümleri gibi, anahtarın adıyla eşlenerek birleştirilir. İki kez geçen bir anahtar ya da sol kenardaki başka herhangi bir satır, örneğin bir liste öğesi, dosyayı bir sonraki yola bırakır.
+
+Satırlar çakıştığında dosyalar ne JSON ne de böyle bir YAML olup iki taraf da başlıklı Markdown ise (çitli kod dışında bir ile altı `#` ve bir boşlukla başlayan satırlar), eklenti onları bölüm bölüm birleştirir; bölüm, bir başlık ve bir sonrakine kadarki satırlardır, ilk başlıktan önceki metin de bir bölüm sayılır. Bölümler başlık satırlarıyla eşlenir: bir tarafta değişen bölüm o taraftan alınır, iki tarafta değişen satır satır birleştirilir ve çakışmamalıdır, bir tarafta silinen bölüm diğer taraf onu değiştirmediyse silinir, yeni bölüm de kendi tarafında hangi bölümün ardındaysa onun ardına gelir; aynı yere eklenen iki yeni bölümden önce diğer tarafınki gelir. Bir tarafta iki eş başlık varsa bölümler ayırt edilemediği için dosya bir çatışmadır. Eklenti dosya adlarını görmez; bu yüzden böyle satırlar taşıyan her metin, `# ` yorumlu bir betik de, bu yolla birleştirilebilir.
 
 ## 3. Farkları göstermek
 
@@ -50,7 +52,7 @@ Eklenti dosyaları büyük/küçük harf ayırmadan ada göre işler: düz metin
 
 | Konu | Nerede |
 | --- | --- |
-| YAML anahtarları gibi başka yapılara göre birleştirme | Sonraki eklentiler |
+| XML öğeleri gibi başka yapılara göre birleştirme | Sonraki eklentiler |
 | İndirilecek hazır derlenmiş bir eklenti dosyası | İlk sürümle |
 
 ## 6. Parçalar

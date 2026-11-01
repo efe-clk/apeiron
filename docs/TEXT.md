@@ -26,7 +26,7 @@ The plugin is asked only when both sides changed a file differently (PLUGIN.md Â
 | --- | --- |
 | The sides changed different lines | One file with both changes |
 | Both made the same change | That change, once |
-| Both changed the same lines, or lines next to each other, differently | A conflict: the conflict copy, as without the plugin; unless all three versions are JSON or Markdown, as below |
+| Both changed the same lines, or lines next to each other, differently | A conflict: the conflict copy, as without the plugin; unless all three versions are JSON, YAML or Markdown, as below |
 | No common version (the file was added on both sides) | A conflict, unless both are equal |
 | A file is not text (not UTF-8 or holds a zero byte) | A conflict, as without the plugin |
 
@@ -34,7 +34,9 @@ A conflict never writes markers such as `<<<<<<<` into a file: the user's file s
 
 When the lines collide and the common version and both sides are JSON documents, the plugin merges them by structure instead: objects member by member, at any depth; a member added on one side is kept, one removed on one side is removed if the other side left it unchanged; any other value, such as a number, a text or an array, must be changed on one side only or the same way on both, else the file is still a conflict. The merged document keeps the members in the order of this side, then the new members of the other side, and is written with this side's indentation (two spaces when there is none), so its formatting can differ from both sides.
 
-When the lines collide and the files are not JSON but both sides are Markdown with headings (lines of one to six `#` and a space, outside fenced code), the plugin merges them section by section, a section being a heading and the lines up to the next one, and the text before the first heading being one more. Sections are matched by their heading line: a section changed on one side is taken from that side, one changed on both is merged line by line and must not collide, one removed on one side is removed if the other side left it unchanged, and a new section follows the section it follows on its side; two new sections in the same place keep the other side's first. When one side has two equal headings the file is a conflict, as sections cannot be told apart. The plugin does not see file names, so any text with such lines, a script with `# ` comments too, can be merged this way.
+When the lines collide and the files are not JSON but YAML documents whose left edge holds only top-level keys (`name:` or `name: value`), comments and a `---` at the start, the plugin merges them key by key: a key and the indented lines below it form one block, the lines before the first key one more, and blocks are joined as Markdown sections are below, matched by the key's name. A key that comes twice, or any other line at the left edge, such as a list item, leaves the file to the next way.
+
+When the lines collide and the files are neither JSON nor such YAML but both sides are Markdown with headings (lines of one to six `#` and a space, outside fenced code), the plugin merges them section by section, a section being a heading and the lines up to the next one, and the text before the first heading being one more. Sections are matched by their heading line: a section changed on one side is taken from that side, one changed on both is merged line by line and must not collide, one removed on one side is removed if the other side left it unchanged, and a new section follows the section it follows on its side; two new sections in the same place keep the other side's first. When one side has two equal headings the file is a conflict, as sections cannot be told apart. The plugin does not see file names, so any text with such lines, a script with `# ` comments too, can be merged this way.
 
 ## 3. Showing differences
 
@@ -50,7 +52,7 @@ The plugin handles files by name, ignoring case: plain text and documents (`*.tx
 
 | Item | Where |
 | --- | --- |
-| Merging by other structures, such as YAML keys | Later plugins |
+| Merging by other structures, such as XML elements | Later plugins |
 | A ready-built plugin file to download | With the first release |
 
 ## 6. Parts
