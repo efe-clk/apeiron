@@ -72,9 +72,98 @@ fn text(data: &[u8]) -> Option<&str> {
 /// Joins the changes of both sides since `base` (TEXT.md §2): the merged
 /// text, or `None` when they touch the same lines, or a file is not text.
 pub fn merge(base: Option<&[u8]>, ours: &[u8], theirs: &[u8]) -> Option<Vec<u8>> {
-    let base = text(base.unwrap_or_default())?;
-    let merged = diffy::merge(base, text(ours)?, text(theirs)?).ok()?;
-    Some(merged.into_bytes())
+    let (base, ours, theirs) = (text(base.unwrap_or_default())?, text(ours)?, text(theirs)?);
+    match diffy::merge(base, ours, theirs) {
+        Ok(merged) => Some(merged.into_bytes()),
+        Err(_) => merge_json(base, ours, theirs),
+    }
+}
+
+/// Joins two changed JSON documents key by key when their lines collide
+/// (TEXT.md §2): objects are merged member by member, anything else must be
+/// changed on one side only. The result keeps the members in the order of
+/// `ours`, then the new ones of `theirs`, and the indentation of `ours`.
+fn merge_json(base: &str, ours: &str, theirs: &str) -> Option<Vec<u8>> {
+    use serde_json::Value;
+    let parse = |t: &str| serde_json::from_str::<Value>(t).ok();
+    let base = if base.trim().is_empty() {
+        None
+    } else {
+        Some(parse(base)?)
+    };
+    let merged = merge_values(base.as_ref(), &parse(ours)?, &parse(theirs)?)?;
+    let indent = ours
+        .lines()
+        .nth(1)
+        .map(|l| &l[..l.len() - l.trim_start().len()])
+        .filter(|i| !i.is_empty())
+        .unwrap_or("  ");
+    let mut out = Vec::new();
+    let formatter = serde_json::ser::PrettyFormatter::with_indent(indent.as_bytes());
+    let mut writer = serde_json::Serializer::with_formatter(&mut out, formatter);
+    serde::Serialize::serialize(&merged, &mut writer).ok()?;
+    if ours.ends_with('\n') {
+        out.push(b'\n');
+    }
+    Some(out)
+}
+
+/// A three-way merge of JSON values; `None` when both sides changed the
+/// same value differently.
+fn merge_values(
+    base: Option<&serde_json::Value>,
+    ours: &serde_json::Value,
+    theirs: &serde_json::Value,
+) -> Option<serde_json::Value> {
+    use serde_json::Value;
+    if ours == theirs || base == Some(theirs) {
+        return Some(ours.clone());
+    }
+    if base == Some(ours) {
+        return Some(theirs.clone());
+    }
+    let (Value::Object(o), Value::Object(t)) = (ours, theirs) else {
+        return None;
+    };
+    let b = match base {
+        Some(Value::Object(b)) => Some(b),
+        None => None,
+        Some(_) => return None,
+    };
+    let in_base = |k: &str| b.and_then(|b| b.get(k));
+    let mut out = serde_json::Map::new();
+    for (key, ours_value) in o {
+        match t.get(key) {
+            Some(theirs_value) => {
+                out.insert(
+                    key.clone(),
+                    merge_values(in_base(key), ours_value, theirs_value)?,
+                );
+            }
+            // Removed there: fine if unchanged here, a conflict otherwise.
+            None => match in_base(key) {
+                Some(base_value) if base_value == ours_value => {}
+                Some(_) => return None,
+                None => {
+                    out.insert(key.clone(), ours_value.clone());
+                }
+            },
+        }
+    }
+    for (key, theirs_value) in t {
+        if o.contains_key(key) {
+            continue;
+        }
+        match in_base(key) {
+            // Removed here: fine if unchanged there.
+            Some(base_value) if base_value == theirs_value => {}
+            Some(_) => return None,
+            None => {
+                out.insert(key.clone(), theirs_value.clone());
+            }
+        }
+    }
+    Some(Value::Object(out))
 }
 
 /// The changed lines of a text file with three lines around each change,
@@ -171,6 +260,43 @@ mod tests {
         assert_eq!(m(base, "a\nours\nc\n", "a\ntheirs\nc\n"), None);
         // Without a base, two new files conflict unless they are equal.
         assert_eq!(merge(None, b"x\n", b"y\n"), None);
+    }
+
+    #[test]
+    fn json_members_changed_on_both_sides_are_joined_by_key() {
+        let base = "{\n    \"name\": \"app\",\n    \"port\": 80\n}\n";
+        let ours = "{\n    \"name\": \"app\",\n    \"port\": 8080,\n    \"debug\": true\n}\n";
+        let theirs =
+            "{\n    \"name\": \"web app\",\n    \"port\": 80,\n    \"tls\": {\"on\": true}\n}\n";
+        assert_eq!(
+            m(base, ours, theirs).as_deref(),
+            Some(
+                "{\n    \"name\": \"web app\",\n    \"port\": 8080,\n    \"debug\": true,\n    \"tls\": {\n        \"on\": true\n    }\n}\n"
+            )
+        );
+        // Nested objects merge too; a member removed on one side stays removed.
+        assert_eq!(
+            m(
+                r#"{"a": {"x": 1, "y": 1}, "gone": 1}"#,
+                r#"{"a": {"x": 2, "y": 1}}"#,
+                r#"{"a": {"x": 1, "y": 2}, "gone": 1}"#
+            )
+            .as_deref(),
+            Some("{\n  \"a\": {\n    \"x\": 2,\n    \"y\": 2\n  }\n}")
+        );
+    }
+
+    #[test]
+    fn json_values_changed_differently_still_conflict() {
+        let base = r#"{"port": 80}"#;
+        assert_eq!(m(base, r#"{"port": 1}"#, r#"{"port": 2}"#), None);
+        // Removed on one side, changed on the other.
+        assert_eq!(
+            m(r#"{"a": 1, "b": 1}"#, r#"{"b": 1}"#, r#"{"a": 2, "b": 1}"#),
+            None
+        );
+        // Text that only looks like JSON on one side.
+        assert_eq!(m("a\nb\n", "{}", "x\ny\n"), None);
     }
 
     #[test]

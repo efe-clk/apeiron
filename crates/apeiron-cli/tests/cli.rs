@@ -733,4 +733,25 @@ fn the_text_plugin_merges_lines_and_shows_differences() {
         fs::read_to_string(s.root.join("out/notes.md")).unwrap(),
         "# Notes\n\nONE\ntwo\nthree\nfour\nFIVE\n"
     );
+
+    // Two changes to neighbouring lines of a JSON file join by key.
+    let settings = s.root.join("src/settings.json");
+    fs::write(&settings, "{\n  \"port\": 80,\n  \"name\": \"a\"\n}\n").unwrap();
+    ok(&["backup", &src]);
+    ok(&["ref", "delete", "feature"]);
+    ok(&["ref", "create", "feature"]);
+    fs::write(&settings, "{\n  \"port\": 80,\n  \"name\": \"b\"\n}\n").unwrap();
+    ok(&["backup", &src, "--ref", "feature"]);
+    fs::write(&settings, "{\n  \"port\": 8080,\n  \"name\": \"a\"\n}\n").unwrap();
+    ok(&["backup", &src]);
+    let out = ok(&["merge", "feature"]);
+    assert!(
+        out.contains("merged by plugin text: settings.json"),
+        "{out}"
+    );
+    ok(&["restore", "main", &s.path("out2")]);
+    assert_eq!(
+        fs::read_to_string(s.root.join("out2/settings.json")).unwrap(),
+        "{\n  \"port\": 8080,\n  \"name\": \"b\"\n}\n"
+    );
 }

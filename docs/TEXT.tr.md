@@ -26,11 +26,13 @@ Eklentiye yalnızca iki taraf bir dosyayı farklı değiştirdiğinde sorulur (P
 | --- | --- |
 | Taraflar farklı satırları değiştirdi | İki değişikliği de içeren tek bir dosya |
 | İkisi de aynı değişikliği yaptı | O değişiklik, bir kez |
-| İkisi de aynı satırları ya da yan yana satırları farklı değiştirdi | Bir çatışma: eklenti yokmuş gibi çatışma kopyası |
+| İkisi de aynı satırları ya da yan yana satırları farklı değiştirdi | Bir çatışma: eklenti yokmuş gibi çatışma kopyası; aşağıdaki gibi üç sürüm de JSON değilse |
 | Ortak sürüm yok (dosya iki tarafta da eklendi) | İkisi eşit değilse bir çatışma |
 | Bir dosya metin değil (UTF-8 değil ya da sıfır baytı var) | Eklenti yokmuş gibi bir çatışma |
 
 Bir çatışma, bir dosyanın içine asla `<<<<<<<` gibi işaretler yazmaz: kullanıcının dosyası geçerli bir dosya olarak kalır ve diğer sürüm yanındadır. Satır sonları olduğu gibi tutulur; satır sonu farklı olan bir satır farklıdır.
+
+Satırlar çakıştığında ortak sürüm ve iki taraf da JSON belgesiyse, eklenti onları bunun yerine yapıya göre birleştirir: nesneleri, her derinlikte, üye üye; bir tarafta eklenen üye tutulur, bir tarafta silinen üye diğer taraf onu değiştirmediyse silinir; sayı, metin ya da dizi gibi diğer her değer yalnızca bir tarafta ya da iki tarafta aynı biçimde değiştirilmiş olmalıdır, yoksa dosya yine bir çatışmadır. Birleşen belge üyeleri bu tarafın sırasıyla, ardından diğer tarafın yeni üyeleriyle tutar ve bu tarafın girintisiyle (hiç yoksa iki boşluk) yazılır; bu yüzden biçimi iki taraftan da farklı olabilir.
 
 ## 3. Farkları göstermek
 
@@ -46,7 +48,7 @@ Eklenti dosyaları büyük/küçük harf ayırmadan ada göre işler: düz metin
 
 | Konu | Nerede |
 | --- | --- |
-| JSON anahtarları ya da Markdown bölümleri gibi yapıya göre birleştirme | Sonraki eklentiler |
+| Markdown bölümleri ya da YAML anahtarları gibi başka yapılara göre birleştirme | Sonraki eklentiler |
 | İndirilecek hazır derlenmiş bir eklenti dosyası | İlk sürümle |
 
 ## 6. Parçalar

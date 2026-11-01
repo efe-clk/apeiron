@@ -26,11 +26,13 @@ The plugin is asked only when both sides changed a file differently (PLUGIN.md Â
 | --- | --- |
 | The sides changed different lines | One file with both changes |
 | Both made the same change | That change, once |
-| Both changed the same lines, or lines next to each other, differently | A conflict: the conflict copy, as without the plugin |
+| Both changed the same lines, or lines next to each other, differently | A conflict: the conflict copy, as without the plugin; unless all three versions are JSON, as below |
 | No common version (the file was added on both sides) | A conflict, unless both are equal |
 | A file is not text (not UTF-8 or holds a zero byte) | A conflict, as without the plugin |
 
 A conflict never writes markers such as `<<<<<<<` into a file: the user's file stays a valid file, and the other version is beside it. Line endings are kept as they are; a line differs when its ending differs.
+
+When the lines collide and the common version and both sides are JSON documents, the plugin merges them by structure instead: objects member by member, at any depth; a member added on one side is kept, one removed on one side is removed if the other side left it unchanged; any other value, such as a number, a text or an array, must be changed on one side only or the same way on both, else the file is still a conflict. The merged document keeps the members in the order of this side, then the new members of the other side, and is written with this side's indentation (two spaces when there is none), so its formatting can differ from both sides.
 
 ## 3. Showing differences
 
@@ -46,7 +48,7 @@ The plugin handles files by name, ignoring case: plain text and documents (`*.tx
 
 | Item | Where |
 | --- | --- |
-| Merging by structure, such as JSON keys or Markdown sections | Later plugins |
+| Merging by other structures, such as Markdown sections or YAML keys | Later plugins |
 | A ready-built plugin file to download | With the first release |
 
 ## 6. Parts
