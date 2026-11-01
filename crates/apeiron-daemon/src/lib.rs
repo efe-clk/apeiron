@@ -32,9 +32,18 @@ pub enum Error {
     Locked(PathBuf),
     #[error("cannot find the {0} folder")]
     NoFolder(&'static str),
+    #[error("cannot lower the priority: {0}")]
+    Priority(#[source] io::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
+
+/// Lowers the CPU and disk priority of the jobs (DAEMON.md §2). Call it
+/// before [`Daemon::start`], since on Linux only the threads started
+/// afterwards run lower.
+pub fn lower_priority() -> Result<()> {
+    apeiron_sys::lower_priority().map_err(Error::Priority)
+}
 
 trait IoContext<T> {
     fn at(self, path: &std::path::Path) -> Result<T>;

@@ -26,6 +26,8 @@ Arka plan hizmeti (daemon), yedekleri ve denetimleri kullanıcı olmadan, bir za
 
 Üçü de, olağan dosyalar yerine başkalarını kullanmak için `--jobs <file>` ve `--state-dir <folder>` alır (bölüm 3 ve 6). `apeiron restore-test [<snapshot>] [--sample-mb <n>]`, bölüm 5'teki geri yükleme testini elle çalıştırır.
 
+`run` ve `once` işleri düşük öncelikle çalıştırır; böylece bir yedek kullanıcının yaptığı işe yol verir: Linux'ta 10 `nice` değerinin işlemci önceliği ve olağan sınıfın en düşük disk önceliği, macOS'ta düşük işlemci önceliği ve kısılmış disk erişimi, Windows'ta arka plan kipi. `--priority normal` onları diğer programlar kadar hızlı çalıştırır. Ağ hızı her iş için `rate_kb` ile sınırlanır (bölüm 3).
+
 `apeiron daemon run` komutunu oturum açılınca işletim sistemi başlatır: Linux'ta bir systemd kullanıcı birimi, macOS'ta bir launchd ajanı, Windows'ta bir Görev Zamanlayıcı görevi. Kullanım rehberi her biri için dosyayı verir ([GUIDE.tr.md](GUIDE.tr.md) §8); yönetici yetkisi gerekmez. Her kullanıcı için yalnızca bir daemon çalışır; ikincisi "kilitli" hatasıyla durur.
 
 ## 3. İş dosyası
@@ -113,7 +115,6 @@ Bir yedek ancak geri yüklenerek kanıtlanır (VISION.tr.md). Geri yükleme test
 | --- | --- |
 | Daemon'u başka bir cihazdan yönetmek (uzak API) | Masaüstü ve web arayüzleri (Aşama 4) |
 | Dosya değişikliğiyle tetiklenen yedek | Daha sonra; Aşama 2 için zamanlama yeterlidir |
-| İşler için işlemci ve disk sınırları | Daha sonra; işler birer birer çalışır, ağı `rate_kb` sınırlar |
 | Başarısızlıkta masaüstü bildirimi | Masaüstü arayüzüyle (Aşama 4) |
 
 ## 8. Crate'ler ve kütüphaneler

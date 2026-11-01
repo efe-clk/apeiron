@@ -178,6 +178,7 @@ name = "apeiron-daemon"
 version = "0.0.0"
 dependencies = [
  "apeiron",
+ "apeiron-sys",
  "dirs 6.0.0",
  "fs4",
  "jiff",
@@ -295,6 +296,7 @@ dependencies = [
 name = "apeiron-sys"
 version = "0.0.0"
 dependencies = [
+ "libc",
  "tempfile",
  "windows-sys 0.61.2",
 ]

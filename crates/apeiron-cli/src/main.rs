@@ -327,6 +327,9 @@ enum Command {
         /// Folder for the state and the log instead of the usual one
         #[arg(long, global = true, value_name = "PATH")]
         state_dir: Option<PathBuf>,
+        /// CPU and disk priority of the jobs; low lets other programs go first
+        #[arg(long, global = true, value_enum, default_value = "low")]
+        priority: PriorityArg,
     },
     /// Make a new repository from a remote copy and pull all its refs
     Clone {
@@ -378,6 +381,12 @@ enum Command {
         #[arg(long, value_parser = parse_rate)]
         rate: Option<u64>,
     },
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+enum PriorityArg {
+    Low,
+    Normal,
 }
 
 #[derive(Subcommand)]
@@ -2378,7 +2387,8 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             command,
             jobs,
             state_dir,
-        } => run_daemon(out, command, jobs, state_dir),
+            priority,
+        } => run_daemon(out, command, jobs, state_dir, priority),
         Command::Clone { url, path, rate } => {
             let mut request = CloneRequest {
                 url,
@@ -2522,6 +2532,7 @@ fn run_daemon(
     command: DaemonCommand,
     jobs: Option<PathBuf>,
     state_dir: Option<PathBuf>,
+    priority: PriorityArg,
 ) -> Result<u8, Failure> {
     use apeiron_daemon::{Daemon, Paths, RunResult};
     let daemon_error = |e: apeiron_daemon::Error| {
@@ -2540,6 +2551,10 @@ fn run_daemon(
         paths.state_dir = state_dir;
     }
     let failed = |result: RunResult| result == RunResult::Failed;
+    let runs_jobs = matches!(command, DaemonCommand::Run | DaemonCommand::Once);
+    if runs_jobs && priority == PriorityArg::Low {
+        apeiron_daemon::lower_priority().map_err(daemon_error)?;
+    }
     match command {
         DaemonCommand::Run => {
             let daemon = Daemon::start(paths).map_err(daemon_error)?;

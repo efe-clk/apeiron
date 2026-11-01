@@ -11,5 +11,8 @@ publish = false
 [dev-dependencies]
 tempfile = "3.27.0"
 
+[target."cfg(unix)".dependencies]
+libc = "0.2.191"
+
 [target."cfg(windows)".dependencies]
-windows-sys = { version = "0.61.2", features = ["Win32_Storage_FileSystem"] }
+windows-sys = { version = "0.61.2", features = ["Win32_Storage_FileSystem", "Win32_System_Threading"] }
