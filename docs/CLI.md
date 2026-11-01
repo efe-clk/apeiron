@@ -61,7 +61,7 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | `apeiron restore <snapshot> <target> [--path <path>]` | Writes a snapshot (or one path in it) into a new or empty folder | Done |
 | `apeiron export <snapshot> <file> [--format <format>] [--path <path>]` | Writes a snapshot (or one path in it) into a new `.tar`, `.zip` or `.7z` file; the extension chooses the format unless `--format` is given | Done |
 | `apeiron restore-test [<snapshot>] [--sample-mb <n>]` | Restores a random sample (default 100 MiB) of a snapshot into a temporary folder, checks every file and removes the folder; exit code 4 if a file is damaged | Done |
-| `apeiron daemon run\|once\|status [--priority low\|normal]` | Runs scheduled jobs, at low CPU and disk priority unless `--priority normal`; `run` shows a desktop notification when a job starts failing, unless `--no-notify` ([DAEMON.md](DAEMON.md) §2) | Done |
+| `apeiron daemon run\|once\|status [--priority low\|normal] [--tenant <name>]` | Runs scheduled jobs, at low CPU and disk priority unless `--priority normal`; `run` shows a desktop notification when a job starts failing, unless `--no-notify` ([DAEMON.md](DAEMON.md) §2); `--tenant` runs the jobs of a web server's tenant (§3.1) | Done |
 | `apeiron refs` | Lists all refs and the snapshots they point to | Done |
 | `apeiron verify` | Reads and checks every pack, index and object | Done |
 | `apeiron repair` | Removes stale ref locks, adds lost reflog lines and replaces damaged index files | Done |

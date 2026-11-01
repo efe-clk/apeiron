@@ -370,11 +370,23 @@ fn schedule_view(paths: &apeiron_daemon::Paths) -> Result<Value, Error> {
         Ok(jobs) => (jobs, None),
         Err(e) => (Vec::new(), Some(e.to_string())),
     };
-    Ok(json!({"file": paths.jobs, "text": text, "jobs": jobs, "error": error}))
+    Ok(json!({
+        "file": paths.jobs, "text": text, "jobs": jobs, "error": error,
+        "tenant": paths.scope.is_some(),
+    }))
 }
 
-fn schedule_paths(app: &App) -> Result<apeiron_daemon::Paths, Error> {
-    not_in_web(app, "the background service")?;
+/// The jobs of the background service: the user's in local mode, and in
+/// web mode a tenant's, for its `admin` (DAEMON.md §3.1).
+fn schedule_paths(app: &App, who: Option<&Who>) -> Result<apeiron_daemon::Paths, Error> {
+    if let Mode::Web(_) = app.mode
+        && who.is_none_or(|w| w.user.role != users::Role::Admin)
+    {
+        return Err(Error::new(
+            ErrorKind::Unsupported,
+            "only an admin edits the background service's jobs",
+        ));
+    }
     app.schedule.clone().ok_or_else(|| {
         Error::new(
             ErrorKind::Unsupported,
@@ -383,22 +395,39 @@ fn schedule_paths(app: &App) -> Result<apeiron_daemon::Paths, Error> {
     })
 }
 
-async fn schedule(State(app): State<Arc<App>>) -> Answer {
-    let paths = schedule_paths(&app)?;
+async fn schedule(State(app): State<Arc<App>>, who_: Option<Extension<Who>>) -> Answer {
+    let who = who(&app, who_)?;
+    let paths = schedule_paths(&app, who.as_ref())?;
     Ok(axum::Json(blocking(move || schedule_view(&paths)).await?))
 }
 
 /// Saves a new jobs file once it is valid; the running service reads it
 /// again within a minute (DAEMON.md §3).
-async fn schedule_save(State(app): State<Arc<App>>, bytes: Bytes) -> Answer {
-    let paths = schedule_paths(&app)?;
+async fn schedule_save(
+    State(app): State<Arc<App>>,
+    who_: Option<Extension<Who>>,
+    bytes: Bytes,
+) -> Answer {
+    let who = who(&app, who_)?;
+    let paths = schedule_paths(&app, who.as_ref())?;
     let r: ScheduleText =
         serde_json::from_value(body(&bytes)?).map_err(|e| invalid(e.to_string()))?;
     let view = blocking(move || {
-        apeiron_daemon::save_jobs(&paths.jobs, &r.text).map_err(|e| match e {
-            apeiron_daemon::Error::Jobs { .. } => invalid(e.to_string()),
-            e => Error::new(ErrorKind::Io, e.to_string()),
-        })?;
+        let saved = apeiron_daemon::save_scoped(&paths.jobs, &r.text, paths.scope.as_ref())
+            .map(|jobs| jobs.into_iter().map(|j| j.name).collect::<Vec<_>>())
+            .map_err(|e| match e {
+                apeiron_daemon::Error::Jobs { .. } => invalid(e.to_string()),
+                e => Error::new(ErrorKind::Io, e.to_string()),
+            });
+        if let (Mode::Web(web), Some(who)) = (&app.mode, &who) {
+            web.audit.record(
+                &who.actor(),
+                "schedule_save",
+                json!({ "jobs": saved.as_ref().ok() }),
+                &outcome(saved.as_ref().map(drop)),
+            )?;
+        }
+        saved?;
         schedule_view(&paths)
     })
     .await?;
@@ -749,6 +778,7 @@ async fn session(State(app): State<Arc<App>>, user: Option<Extension<Who>>) -> A
             "user": {"name": who.user.name, "role": who.user.role},
             "operator": who.user.role == users::Role::Admin
                 && web.registry().is_some_and(|r| r.manage.is_some()),
+            "schedule": who.user.role == users::Role::Admin && app.schedule.is_some(),
         }),
     }))
 }

@@ -14,7 +14,7 @@ use jiff::tz::TimeZone;
 use jiff::{SignedDuration, Timestamp};
 use serde::Serialize;
 
-use crate::jobs::{Action, Job, load_jobs};
+use crate::jobs::{Action, Job, Scope, load_scoped};
 use crate::notify;
 use crate::schedule::next_run;
 use crate::state::{JobState, RunResult, State};
@@ -31,6 +31,8 @@ const LOG_LIMIT: u64 = 1024 * 1024;
 pub struct Paths {
     pub jobs: PathBuf,
     pub state_dir: PathBuf,
+    /// For the jobs of a tenant: what they may reach (DAEMON.md §3.1).
+    pub scope: Option<Scope>,
 }
 
 impl Paths {
@@ -43,6 +45,7 @@ impl Paths {
         Ok(Paths {
             jobs: config.join("apeiron").join("jobs.toml"),
             state_dir: state.join("apeiron"),
+            scope: None,
         })
     }
 
@@ -74,7 +77,7 @@ pub struct JobStatus {
 
 /// Every job with its last run and its next run.
 pub fn status(paths: &Paths) -> Result<Vec<JobStatus>> {
-    let jobs = load_jobs(&paths.jobs)?;
+    let jobs = load_scoped(&paths.jobs, paths.scope.as_ref())?;
     let state = State::load(&paths.state_file());
     let (now, tz) = (Timestamp::now(), TimeZone::system());
     Ok(jobs
@@ -207,7 +210,7 @@ impl Daemon {
     /// Runs jobs as they become due until `stop` is set. A changed jobs file
     /// is read again; if it is invalid, the previous jobs are kept.
     pub fn run(&self, stop: &AtomicBool) -> Result<()> {
-        let mut jobs = load_jobs(&self.paths.jobs)?;
+        let mut jobs = load_scoped(&self.paths.jobs, self.paths.scope.as_ref())?;
         let mut watches = self.watch(&jobs);
         let mut seen = modified(&self.paths.jobs);
         self.log(&format!("started with {} jobs", jobs.len()));
@@ -215,7 +218,7 @@ impl Daemon {
             let current = modified(&self.paths.jobs);
             if current != seen {
                 seen = current;
-                match load_jobs(&self.paths.jobs) {
+                match load_scoped(&self.paths.jobs, self.paths.scope.as_ref()) {
                     Ok(new) => {
                         jobs = new;
                         watches = self.watch(&jobs);
@@ -539,6 +542,7 @@ fn mirrored(verb: &str, remote: &str, report: &MirrorReport) -> (RunResult, Stri
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::jobs::load_jobs;
 
     struct Setup {
         dir: tempfile::TempDir,
@@ -556,6 +560,7 @@ mod tests {
         let paths = Paths {
             jobs: root.join("jobs.toml"),
             state_dir: root.join("state"),
+            scope: None,
         };
         Setup { dir, paths }
     }

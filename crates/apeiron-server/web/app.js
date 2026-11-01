@@ -24,6 +24,8 @@ let mode = "local";
 let user = null;
 // Whether the user manages the tenants of the server (TENANTS.md §4.1).
 let operator = false;
+// Whether the user edits a tenant's scheduled jobs (DAEMON.md §3.1).
+let scheduling = false;
 const may = {
   backUp: () => user?.role !== "reader",
   restore: () => user?.role !== "reader",
@@ -301,7 +303,7 @@ function showNav(current) {
     may.manage() ? item("sync", () => sync()) : null,
     may.manage() ? item("keys", keys) : null,
     may.manage() ? item("plugins", plugins) : null,
-    mode === "local" ? item("schedule", schedule) : null,
+    mode === "local" || scheduling ? item("schedule", schedule) : null,
     may.share() ? item("shares", shares) : null,
     may.readLog() ? item("activity", activity) : null,
     may.manageUsers() ? item("users", users) : null,
@@ -1055,7 +1057,7 @@ async function schedule() {
     return;
   }
   const text = h("textarea", { rows: 16, spellcheck: "false", class: "code" });
-  text.value = view.text || t("schedule_example", { repo: repoPath });
+  text.value = view.text || (view.tenant ? t("schedule_example_tenant") : t("schedule_example", { repo: repoPath }));
   const status = h("div");
   const form = h("form", { onsubmit: async (e) => {
     e.preventDefault();
@@ -1692,6 +1694,7 @@ async function begin() {
   mode = session?.mode || "local";
   user = session?.user || null;
   operator = session?.operator === true;
+  scheduling = session?.schedule === true;
   oidc = session?.oidc === true;
   if (!session?.signed_in) return signIn(oidcError);
   const state = await api("GET", "/api/state").catch(() => null);

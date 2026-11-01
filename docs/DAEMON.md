@@ -78,6 +78,14 @@ every = "week"
 
 `~` at the start of a path is the home folder. A job name follows the ref name rules without `/`. An invalid file stops `daemon run` and `daemon once` with an error that names the line; the daemon reads the file again when it changes and keeps the old jobs if the new file is invalid. The Schedule page of the desktop interface shows the jobs and edits this file, and saves only a valid one (DESKTOP.md §2).
 
+### 3.1 Jobs of a tenant
+
+Each tenant of a web server (TENANTS.md) can have jobs of its own, which reach only its repository and its folders. They are in `<configuration folder>/tenants/<name>/jobs.toml`, with their state and log in `<state folder>/tenants/<name>/daemon`, and `apeiron daemon run --tenant <name>` runs them; `once` and `status` take `--tenant` too. Whoever runs the server starts one such daemon per tenant, for example with a systemd unit `apeiron-daemon@.service` whose instance name is the tenant's.
+
+A tenant's jobs file has no `repo` and no `password_file`: every job works on the tenant's repository, opened with the tenant's `password_file` (TENANTS.md §2). The `folder` of a `backup` or `sync` job must be a full path inside one of the tenant's `folders`, without `..`; other jobs are as in section 3, and `sync` keeps a tenant's folder in step with a remote of its repository. A file that breaks these rules is refused as invalid.
+
+An `admin` of the tenant edits its jobs file on the Schedule page of the web interface, which shows each job's last and next run as on the desktop and saves only a valid file. Each save is recorded as `schedule_save` in the tenant's audit log (AUDIT.md §1), with the names of the jobs.
+
 ## 4. When a job runs
 
 ```mermaid

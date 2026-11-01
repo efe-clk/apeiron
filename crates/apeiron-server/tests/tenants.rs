@@ -89,6 +89,7 @@ fn tenant(dir: &Path, name: &str, host: &str) -> TenantOptions {
         standby: false,
         limits: Limits::default(),
         operator: false,
+        jobs: None,
     }
 }
 
@@ -408,4 +409,56 @@ fn the_operator_manages_tenants_in_the_pages() {
     for event in ["tenant_add", "tenant_limit", "tenant_remove"] {
         assert!(log.contains(event), "{event}: {log}");
     }
+}
+
+/// A tenant's admin edits its scheduled jobs, which reach only its
+/// repository and folders (DAEMON.md §3.1).
+#[test]
+fn a_tenants_admin_edits_its_jobs() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut acme = tenant(dir.path(), "acme", "acme.test");
+    let home = acme.folders[0].clone();
+    acme.jobs = Some(apeiron_daemon::Paths {
+        jobs: dir.path().join("acme/jobs.toml"),
+        state_dir: dir.path().join("acme/daemon"),
+        scope: Some(apeiron_daemon::Scope {
+            repo: dir.path().join("acme/repo"),
+            password_file: None,
+            folders: vec![home.clone()],
+        }),
+    });
+    let server =
+        Web::start_tenants("127.0.0.1:0".parse().unwrap(), None, vec![acme], None).unwrap();
+    let a = server.address();
+    let cookie = sign_in(a, "acme.test");
+    let (status, _, session) = send(a, "acme.test", Some(&cookie), "GET", "/api/session", None);
+    assert_eq!((status, &session["schedule"]), (200, &json!(true)));
+    let (status, _, view) = send(a, "acme.test", Some(&cookie), "GET", "/api/schedule", None);
+    assert_eq!((status, &view["tenant"]), (200, &json!(true)), "{view}");
+
+    let job = |folder: &Path| {
+        let folder = folder.to_string_lossy().replace('\\', "/");
+        json!({ "text": format!("[job.home]\ndo = \"backup\"\nfolder = \"{folder}\"\nevery = \"day\"\n") })
+    };
+    let (status, _, refused) = send(
+        a,
+        "acme.test",
+        Some(&cookie),
+        "POST",
+        "/api/schedule",
+        Some(job(dir.path())),
+    );
+    assert_eq!(status, 400, "{refused}");
+    let (status, _, saved) = send(
+        a,
+        "acme.test",
+        Some(&cookie),
+        "POST",
+        "/api/schedule",
+        Some(job(&home.join("docs"))),
+    );
+    assert_eq!(status, 200, "{saved}");
+    assert_eq!(saved["jobs"][0]["name"], "home");
+    let log = fs::read_to_string(dir.path().join("acme/audit.log")).unwrap();
+    assert_eq!(log.matches("\"schedule_save\"").count(), 2, "{log}");
 }

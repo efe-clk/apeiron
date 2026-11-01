@@ -110,6 +110,7 @@ fn start(dir: &std::path::Path) -> (Local, Client) {
         schedule: Some(apeiron_daemon::Paths {
             jobs: dir.join("config/jobs.toml"),
             state_dir: dir.join("state"),
+            scope: None,
         }),
     })
     .unwrap();

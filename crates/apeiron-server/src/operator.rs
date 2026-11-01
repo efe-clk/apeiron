@@ -260,6 +260,7 @@ pub(crate) async fn add(
                     max_bytes: tenant.max_bytes,
                     max_jobs: tenant.max_jobs,
                 },
+                jobs: Some(tenant.jobs(&manage.config, &manage.state)),
             })?;
             tenants.save(&manage.file)?;
             audit.record(&who.actor(), "tenant_add", detail.clone(), "ok")?;

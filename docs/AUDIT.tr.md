@@ -26,6 +26,7 @@ Birkaç kişi bir yedek sunucusunu paylaştığında admin, "bu klasörü kim, n
 | `user_second_factor_on`, `user_second_factor_off` | `apeiron web user second-factor` | Ad; gizli anahtar asla |
 | `oidc_set`, `oidc_remove` | `apeiron web oidc` | Sağlayıcının ayarları; gizli anahtar asla |
 | `replicate` | Web sunucusunun bir replikaya yaptığı her push | Uzak depo, ref'ler ve nesneler, bir çatışmanın bıraktığı ref'ler ya da hata ([REPLICATION.tr.md](REPLICATION.tr.md) §7) |
+| `schedule_save` | Bir kiracının `admin`'inin iş dosyasını kaydetmesi ([DAEMON.tr.md](DAEMON.tr.md) §3.1) | İşlerin adları ya da geçersiz bir dosyanın hatası |
 | `tenant_add`, `tenant_limit`, `tenant_remove` | `apeiron web tenant`, o kiracının kendi kaydında | Kiracının ayarları ([TENANTS.tr.md](TENANTS.tr.md) §5) |
 
 Denetimlerin reddettiği bir işlem hatasıyla kaydedilir; böylece denemeler de görünür. Bir işin durumunu yoklamak, oturum durumu ve klasör seçici kaydedilmez. Masaüstü arayüzü hiçbir şey kaydetmez: yalnızca onu çalıştıran kişiye hizmet eder. CLI'nın diğer komutları kaydedilmez; deponun reflog'u her ref değişikliğini kaydeder.

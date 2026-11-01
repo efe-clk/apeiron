@@ -224,6 +224,9 @@ pub struct TenantOptions {
     pub limits: Limits,
     /// Its admins manage the tenants in the pages (TENANTS.md §4.1).
     pub operator: bool,
+    /// Its background service's jobs, which its admins edit in the pages
+    /// (DAEMON.md §3.1).
+    pub jobs: Option<apeiron_daemon::Paths>,
 }
 
 /// What a tenant may use at most (TENANTS.md §2); `None` is no limit.
@@ -1365,6 +1368,7 @@ pub(crate) struct Site {
     pub(crate) replicas: Vec<String>,
     pub(crate) standby: bool,
     pub(crate) limits: Limits,
+    pub(crate) jobs: Option<apeiron_daemon::Paths>,
 }
 
 /// The server of one repository and its users, files and folders.
@@ -1417,7 +1421,7 @@ pub(crate) fn site(site: Site) -> Result<Arc<App>, Error> {
         jobs: Mutex::new(HashMap::new()),
         next_job: AtomicU64::new(1),
         memory: None,
-        schedule: None,
+        schedule: site.jobs,
     });
     if let Mode::Web(web) = &app.mode {
         web.replicate_now();
@@ -1443,6 +1447,7 @@ impl Web {
             replicas: options.replicas,
             standby: options.standby,
             limits: Limits::default(),
+            jobs: None,
         })?;
         Web::serve(options.listen, options.tls, crate::router(app))
     }
@@ -1477,6 +1482,7 @@ impl Web {
                 replicas: t.replicas,
                 standby: t.standby,
                 limits: t.limits,
+                jobs: t.jobs,
             })
             .map_err(|e| Error::new(e.kind, format!("tenant {}: {}", t.name, e.message)))?;
             if t.operator

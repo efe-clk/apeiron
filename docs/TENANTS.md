@@ -138,7 +138,6 @@ Each change is recorded in the operator tenant's audit log and, as in §5, in th
 | --- | --- |
 | Tenants told apart by a path, such as `/t/acme/`, instead of a host | Not planned: one host per tenant is what keeps their cookies apart |
 | Several tenants sharing one repository and its deduplication | Not planned: a separate repository and key are what keep their data apart |
-| The background service and sync per tenant | Later; jobs (DAEMON.md) run for the user who runs them |
 
 ## 7. Crates
 

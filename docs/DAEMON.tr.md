@@ -78,6 +78,14 @@ every = "week"
 
 Bir yolun başındaki `~` ev klasörüdür. Bir iş adı, `/` içermeyen ref adı kurallarına uyar. Geçersiz bir dosya, `daemon run` ve `daemon once` komutlarını satırı belirten bir hatayla durdurur; daemon dosya değişince onu yeniden okur ve yeni dosya geçersizse eski işleri korur. Masaüstü arayüzünün Zamanlama sayfası işleri gösterir ve bu dosyayı düzenler; yalnızca geçerli bir dosyayı kaydeder (DESKTOP.tr.md §2).
 
+### 3.1 Bir kiracının işleri
+
+Bir web sunucusunun her kiracısının (TENANTS.tr.md) yalnızca kendi deposuna ve klasörlerine ulaşan kendi işleri olabilir. Bunlar `<yapılandırma klasörü>/tenants/<ad>/jobs.toml` içindedir, durumları ve kayıtları `<durum klasörü>/tenants/<ad>/daemon` içinde tutulur ve `apeiron daemon run --tenant <ad>` onları çalıştırır; `once` ve `status` da `--tenant` alır. Sunucuyu çalıştıran kişi her kiracı için böyle bir daemon başlatır, örneğin örnek adı kiracının adı olan bir `apeiron-daemon@.service` systemd birimiyle.
+
+Bir kiracının iş dosyasında `repo` ve `password_file` yoktur: her iş kiracının deposunda, kiracının `password_file`'ıyla açılarak çalışır (TENANTS.tr.md §2). Bir `backup` ya da `sync` işinin `folder`'ı, kiracının `folders`'ından birinin içinde, `..` içermeyen tam bir yol olmalıdır; diğer işler bölüm 3'teki gibidir ve `sync`, bir kiracı klasörünü deposunun bir uzak deposuyla eşit tutar. Bu kurallara uymayan bir dosya geçersiz sayılıp reddedilir.
+
+Kiracının bir `admin`'i iş dosyasını web arayüzünün Zamanlama sayfasında düzenler; sayfa, masaüstündeki gibi her işin son ve sonraki çalışmasını gösterir ve yalnızca geçerli bir dosyayı kaydeder. Her kayıt, işlerin adlarıyla birlikte kiracının denetim kaydına `schedule_save` olarak yazılır (AUDIT.tr.md §1).
+
 ## 4. Bir iş ne zaman çalışır
 
 ```mermaid

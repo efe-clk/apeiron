@@ -65,7 +65,8 @@ DESKTOP.tr.md §3'teki istekler şu farklarla kalır:
 | `POST /api/login` `{"name", "password"}` | Oturum açar; `apeiron_session` çerezini koyar |
 | `POST /api/logout` | Oturumu kapatır ve unutur; bir kimlik sağlayıcısı üzerinden açılmış oturumdan sonra orada da nereden çıkılacağını söyler ([IDENTITY.tr.md](IDENTITY.tr.md) §4) |
 | `GET /api/health` | Oturum açmadan izinli: `{"ok", "role": "primary" ya da "standby"}`; depo okunamıyorsa `503` ([REPLICATION.tr.md](REPLICATION.tr.md) §5) |
-| `POST /api/open`, `POST /api/init`, `/api/schedule` | `unsupported` ile reddedilir |
+| `POST /api/open`, `POST /api/init` | `unsupported` ile reddedilir |
+| `/api/schedule` | Bir kiracının `admin`'i için onun işleri ([DAEMON.tr.md](DAEMON.tr.md) §3.1); diğer durumlarda `unsupported` ile reddedilir |
 | `POST /api/call/<operation>` | Yalnızca `info`, `resolve`, `log`, `list`, `diff`, `diff_text`, `refs`, `reflog`; bir `admin` için ayrıca `retention`, `add_retention` ([ARCHIVE.tr.md](ARCHIVE.tr.md)), `remotes`, `add_remote`, `remove_remote`, `keys`, `add_password`, `add_recovery_key`, `remove_key`, `plugins`, `plugin_add`, `plugin_remove`, `conflicts`, `resolve_conflict`; diğerleri `unsupported` ile reddedilir |
 | `POST /api/start/<operation>` | Yalnızca `backup`, `restore`, `verify`, `search`, `report` ([REPORTS.tr.md](REPORTS.tr.md)), bir `admin` için ayrıca `sync` (yedek sunucuda değil); bir yedeğin `source` alanı, bir geri yüklemenin `target` alanı, bir senkronun ya da çatışma kopyalarının `folder` alanı, bir eklentinin `.wasm` dosyası ve klasör olan bir uzak depo bir `--folder` içinde olmalıdır; eklenti klasörü (`dir`) verilemez |
 | `GET /api/folders` | Yalnızca bir `--folder` içinde; yol verilmezse ilki; bir `--folder` üzerinde `parent` boştur |

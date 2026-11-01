@@ -38,6 +38,25 @@ impl Job {
     }
 }
 
+/// What the jobs of a tenant may reach (DAEMON.md §3.1): its repository
+/// only, and folders inside its folders.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Scope {
+    pub repo: PathBuf,
+    pub password_file: Option<PathBuf>,
+    pub folders: Vec<PathBuf>,
+}
+
+impl Scope {
+    /// Whether `folder` is one of the tenant's folders or inside one.
+    fn holds(&self, folder: &Path) -> bool {
+        let lexical = folder
+            .components()
+            .all(|c| !matches!(c, std::path::Component::ParentDir));
+        lexical && folder.is_absolute() && self.folders.iter().any(|f| folder.starts_with(f))
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Action {
     Backup {
@@ -103,7 +122,7 @@ struct RawFile {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RawJob {
-    repo: String,
+    repo: Option<String>,
     password_file: Option<String>,
     #[serde(rename = "do")]
     action: String,
@@ -124,18 +143,28 @@ struct RawJob {
 /// Reads the jobs file; jobs come sorted by name, the order they run in.
 /// A missing file has no jobs.
 pub fn load_jobs(path: &Path) -> Result<Vec<Job>> {
+    load_scoped(path, None)
+}
+
+/// [`load_jobs`] for the jobs of a tenant, when `scope` is given.
+pub fn load_scoped(path: &Path, scope: Option<&Scope>) -> Result<Vec<Job>> {
     let text = match fs::read_to_string(path) {
         Ok(text) => text,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
         Err(e) => return Err(e).at(path),
     };
-    parse_jobs(path, &text)
+    parse_jobs(path, &text, scope)
 }
 
 /// Replaces the jobs file atomically with `text` once it is a valid jobs
 /// file, and returns its jobs; an invalid text leaves the file as it was.
 pub fn save_jobs(path: &Path, text: &str) -> Result<Vec<Job>> {
-    let jobs = parse_jobs(path, text)?;
+    save_scoped(path, text, None)
+}
+
+/// [`save_jobs`] for the jobs of a tenant, when `scope` is given.
+pub fn save_scoped(path: &Path, text: &str, scope: Option<&Scope>) -> Result<Vec<Job>> {
+    let jobs = parse_jobs(path, text, scope)?;
     if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
         fs::create_dir_all(parent).at(parent)?;
     }
@@ -149,7 +178,7 @@ pub fn save_jobs(path: &Path, text: &str) -> Result<Vec<Job>> {
     Ok(jobs)
 }
 
-fn parse_jobs(path: &Path, text: &str) -> Result<Vec<Job>> {
+fn parse_jobs(path: &Path, text: &str, scope: Option<&Scope>) -> Result<Vec<Job>> {
     let invalid = |message: String| Error::Jobs {
         path: path.to_path_buf(),
         message,
@@ -157,11 +186,13 @@ fn parse_jobs(path: &Path, text: &str) -> Result<Vec<Job>> {
     let raw: RawFile = toml::from_str(text).map_err(|e| invalid(e.to_string()))?;
     raw.job
         .into_iter()
-        .map(|(name, job)| to_job(&name, job).map_err(|e| invalid(format!("job {name:?}: {e}"))))
+        .map(|(name, job)| {
+            to_job(&name, job, scope).map_err(|e| invalid(format!("job {name:?}: {e}")))
+        })
         .collect()
 }
 
-fn to_job(name: &str, raw: RawJob) -> std::result::Result<Job, String> {
+fn to_job(name: &str, raw: RawJob, scope: Option<&Scope>) -> std::result::Result<Job, String> {
     let valid_name = !name.is_empty()
         && !name.starts_with('.')
         && name
@@ -299,10 +330,35 @@ fn to_job(name: &str, raw: RawJob) -> std::result::Result<Job, String> {
     if at.is_some() && matches!(every, Every::Hours(_) | Every::Minutes(_)) {
         return Err("`at` needs `every` in days or weeks".to_owned());
     }
+    let (repo, password_file) = match scope {
+        None => (
+            expand(raw.repo.as_deref().ok_or("`repo` is missing")?),
+            raw.password_file.as_deref().map(expand),
+        ),
+        // A tenant's jobs work on its repository, opened as the server
+        // opens it, and read only its folders.
+        Some(scope) => {
+            if raw.repo.is_some() || raw.password_file.is_some() {
+                return Err(
+                    "a tenant's jobs use its repository; leave out `repo` and `password_file`"
+                        .to_owned(),
+                );
+            }
+            if let Action::Backup { folder, .. } | Action::Sync { folder, .. } = &action
+                && !scope.holds(folder)
+            {
+                return Err(format!(
+                    "{} is not inside a folder of this tenant",
+                    folder.display()
+                ));
+            }
+            (scope.repo.clone(), scope.password_file.clone())
+        }
+    };
     Ok(Job {
         name: name.to_owned(),
-        repo: expand(&raw.repo),
-        password_file: raw.password_file.as_deref().map(expand),
+        repo,
+        password_file,
         action,
         every,
         at,
@@ -388,7 +444,47 @@ mod tests {
     use super::*;
 
     fn parse(text: &str) -> std::result::Result<Vec<Job>, String> {
-        parse_jobs(Path::new("jobs.toml"), text).map_err(|e| e.to_string())
+        parse_jobs(Path::new("jobs.toml"), text, None).map_err(|e| e.to_string())
+    }
+
+    /// A tenant's jobs use its repository and only its folders.
+    #[cfg(unix)]
+    #[test]
+    fn a_tenants_jobs_stay_inside_it() {
+        let scope = Scope {
+            repo: PathBuf::from("/srv/acme"),
+            password_file: Some(PathBuf::from("/etc/acme.key")),
+            folders: vec![PathBuf::from("/data/acme")],
+        };
+        let parse = |text: &str| {
+            parse_jobs(Path::new("jobs.toml"), text, Some(&scope)).map_err(|e| e.to_string())
+        };
+        let jobs = parse(
+            "[job.home]\ndo = \"backup\"\nfolder = \"/data/acme/home\"\nref = \"backup/home\"\nevery = \"day\"",
+        )
+        .unwrap();
+        assert_eq!(jobs[0].repo, Path::new("/srv/acme"));
+        assert_eq!(
+            jobs[0].password_file.as_deref(),
+            Some(Path::new("/etc/acme.key"))
+        );
+        for bad in [
+            "[job.x]\ndo = \"backup\"\nfolder = \"/data/other\"\nevery = \"day\"",
+            "[job.x]\ndo = \"backup\"\nfolder = \"/data/acme/../other\"\nevery = \"day\"",
+            "[job.x]\nrepo = \"/srv/other\"\ndo = \"verify\"\nevery = \"day\"",
+            "[job.x]\npassword_file = \"/p\"\ndo = \"verify\"\nevery = \"day\"",
+        ] {
+            assert!(parse(bad).is_err(), "{bad}");
+        }
+        // Without a scope a job names its repository.
+        assert!(
+            super::parse_jobs(
+                Path::new("j"),
+                "[job.x]\ndo = \"verify\"\nevery = \"day\"",
+                None
+            )
+            .is_err()
+        );
     }
 
     #[test]

@@ -364,6 +364,10 @@ enum Command {
         /// CPU and disk priority of the jobs; low lets other programs go first
         #[arg(long, global = true, value_enum, default_value = "low")]
         priority: PriorityArg,
+        /// Run the jobs of this tenant of the web server, which reach only
+        /// its repository and folders (docs/DAEMON.md)
+        #[arg(long, global = true, value_name = "NAME", conflicts_with_all = ["jobs", "state_dir"])]
+        tenant: Option<String>,
     },
     /// Make a new repository from a remote copy and pull all its refs
     Clone {
@@ -555,6 +559,17 @@ struct WebFiles {
     users: PathBuf,
     audit: apeiron_server::Audit,
     shares: apeiron_server::Shares,
+}
+
+/// The configuration and state folders of Apeiron, such as
+/// `~/.config/apeiron` and `~/.local/state/apeiron`.
+fn web_roots() -> Result<(PathBuf, PathBuf), Failure> {
+    let config =
+        dirs::config_dir().ok_or_else(|| Failure::Usage("no configuration folder".to_owned()))?;
+    let state = dirs::state_dir()
+        .or_else(dirs::data_local_dir)
+        .ok_or_else(|| Failure::Usage("no state folder".to_owned()))?;
+    Ok((config.join("apeiron"), state.join("apeiron")))
 }
 
 fn tenants_file() -> Result<PathBuf, Failure> {
@@ -2554,10 +2569,12 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                 .transpose()?;
             let server = if tenants {
                 let mut options = Vec::new();
+                let roots = web_roots()?;
                 for t in listed {
                     let files = WebFiles::of_tenant(&t)?;
                     let asking = format!("Password or recovery key of {}: ", t.name);
                     let audit = copy_audit(files.audit, &audit_syslog, Some(&t.name));
+                    let jobs = Some(t.jobs(&roots.0, &roots.1));
                     let limits = apeiron_server::Limits {
                         max_bytes: t.max_bytes,
                         max_jobs: t.max_jobs,
@@ -2574,15 +2591,14 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                         standby,
                         limits,
                         operator: t.operator,
+                        jobs,
                     });
                 }
+                let (config, state) = web_roots()?;
                 let manage = apeiron_server::Manage {
                     file: tenants_file()?,
-                    config: config.clone(),
-                    state: dirs::state_dir()
-                        .or_else(dirs::data_local_dir)
-                        .map(|d| d.join("apeiron"))
-                        .ok_or_else(|| Failure::Usage("no state folder".to_owned()))?,
+                    config,
+                    state,
                     standby,
                     syslog: audit_syslog.clone(),
                 };
@@ -2740,7 +2756,8 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             jobs,
             state_dir,
             priority,
-        } => run_daemon(out, command, jobs, state_dir, priority),
+            tenant,
+        } => run_daemon(out, command, jobs, state_dir, priority, tenant),
         Command::Clone { url, path, rate } => {
             let mut request = CloneRequest {
                 url,
@@ -2904,6 +2921,7 @@ fn run_daemon(
     jobs: Option<PathBuf>,
     state_dir: Option<PathBuf>,
     priority: PriorityArg,
+    tenant: Option<String>,
 ) -> Result<u8, Failure> {
     use apeiron_daemon::{Daemon, Paths, RunResult};
     let daemon_error = |e: apeiron_daemon::Error| {
@@ -2915,6 +2933,11 @@ fn run_daemon(
         Failure::Api(Error::new(kind, e.to_string()))
     };
     let mut paths = Paths::system().map_err(daemon_error)?;
+    if let Some(name) = tenant {
+        let tenants = apeiron_server::Tenants::load(&tenants_file()?)?;
+        let (config, state) = web_roots()?;
+        paths = tenants.get(&name)?.jobs(&config, &state);
+    }
     if let Some(jobs) = jobs {
         paths.jobs = jobs;
     }
@@ -2938,7 +2961,8 @@ fn run_daemon(
             Ok(0)
         }
         DaemonCommand::Once => {
-            let jobs = apeiron_daemon::load_jobs(&paths.jobs).map_err(daemon_error)?;
+            let jobs = apeiron_daemon::load_scoped(&paths.jobs, paths.scope.as_ref())
+                .map_err(daemon_error)?;
             let daemon = Daemon::start(paths).map_err(daemon_error)?;
             let runs = daemon
                 .run_due(&jobs, &AtomicBool::new(false))

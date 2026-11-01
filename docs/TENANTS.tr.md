@@ -138,7 +138,6 @@ Her değişiklik yönetici kiracının denetim kaydına ve §5'teki gibi değiş
 | --- | --- |
 | Kiracıları ana makine yerine `/t/acme/` gibi bir yolla ayırmak | Planlanmadı: çerezlerini ayrı tutan, kiracı başına bir ana makinedir |
 | Birkaç kiracının bir depoyu ve onun tekilleştirmesini paylaşması | Planlanmadı: verilerini ayrı tutan, ayrı bir depo ve anahtardır |
-| Kiracı başına arka plan hizmeti ve senkron | Sonra; işler (DAEMON.tr.md) onları çalıştıran kullanıcı için çalışır |
 
 ## 7. Crate'ler
 

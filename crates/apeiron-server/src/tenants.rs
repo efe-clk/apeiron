@@ -47,6 +47,21 @@ impl Tenant {
         dirs::config_dir().map(|d| d.join("apeiron").join("tenants").join(&self.name))
     }
 
+    /// The jobs file and state of the tenant's background service
+    /// (DAEMON.md §3.1), under the configuration and state folders `config`
+    /// and `state`, such as `~/.config/apeiron`.
+    pub fn jobs(&self, config: &Path, state: &Path) -> apeiron_daemon::Paths {
+        apeiron_daemon::Paths {
+            jobs: config.join("tenants").join(&self.name).join("jobs.toml"),
+            state_dir: state.join("tenants").join(&self.name).join("daemon"),
+            scope: Some(apeiron_daemon::Scope {
+                repo: self.repo.clone(),
+                password_file: self.password_file.clone(),
+                folders: self.folders.clone(),
+            }),
+        }
+    }
+
     /// The folder of the tenant's audit log and share links.
     pub fn state_dir(&self) -> Option<PathBuf> {
         dirs::state_dir()

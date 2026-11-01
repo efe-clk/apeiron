@@ -65,7 +65,8 @@ The requests of DESKTOP.md §3 stay, with these differences:
 | `POST /api/login` `{"name", "password"}` | Signs in; sets the cookie `apeiron_session` |
 | `POST /api/logout` | Signs out and forgets the session; after a sign-in through an identity provider, also says where to sign out there ([IDENTITY.md](IDENTITY.md) §4) |
 | `GET /api/health` | Allowed without signing in: `{"ok", "role": "primary" or "standby"}`, `503` when the repository cannot be read ([REPLICATION.md](REPLICATION.md) §5) |
-| `POST /api/open`, `POST /api/init`, `/api/schedule` | Refused with `unsupported` |
+| `POST /api/open`, `POST /api/init` | Refused with `unsupported` |
+| `/api/schedule` | For an `admin` of a tenant, its jobs ([DAEMON.md](DAEMON.md) §3.1); refused with `unsupported` otherwise |
 | `POST /api/call/<operation>` | Only `info`, `resolve`, `log`, `list`, `diff`, `diff_text`, `refs`, `reflog`; for an `admin` also `retention`, `add_retention` ([ARCHIVE.md](ARCHIVE.md)), `remotes`, `add_remote`, `remove_remote`, `keys`, `add_password`, `add_recovery_key`, `remove_key`, `plugins`, `plugin_add`, `plugin_remove`, `conflicts`, `resolve_conflict`; others are refused with `unsupported` |
 | `POST /api/start/<operation>` | Only `backup`, `restore`, `verify`, `search`, `report` ([REPORTS.md](REPORTS.md)), and for an `admin` `sync` (not on a standby); `source` of a backup, `target` of a restore, `folder` of a sync or of conflict copies, the `.wasm` file of a plugin and a remote that is a folder must be inside a `--folder`; a plugin folder (`dir`) cannot be given |
 | `GET /api/folders` | Only inside a `--folder`; without a path, the first one; `parent` is empty at a `--folder` |
