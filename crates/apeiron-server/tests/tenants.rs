@@ -74,6 +74,7 @@ fn tenant(dir: &Path, name: &str, host: &str) -> TenantOptions {
         folders: Vec::new(),
         oidc: None,
         totp: None,
+        from_groups: false,
     })
     .unwrap();
     list.save(&users).unwrap();

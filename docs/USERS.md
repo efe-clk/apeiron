@@ -43,6 +43,7 @@ Users are kept in `web.json` in the configuration folder, readable only by its o
 | `name` | 1 to 32 lowercase letters, digits, `-` and `_` |
 | `password` | Argon2id hash of the password, at least 8 characters long; may be left out for a user with `oidc` |
 | `oidc` | The user's identity at the organization's identity provider ([IDENTITY.md](IDENTITY.md)) |
+| `from_groups` | `true` for a user made from the provider's groups, whose role, backups and folders follow them ([IDENTITY.md](IDENTITY.md) §2.1) |
 | `role` | `admin`, `member` or `reader` |
 | `backups` | Ref names, with `*` at the end for a prefix; ignored for `admin` |
 | `folders` | Folders of the server |

@@ -43,6 +43,7 @@ Kullanıcılar, yapılandırma klasöründeki ve yalnızca sahibinin okuyabildi�
 | `name` | 1 ile 32 arasında küçük harf, rakam, `-` ve `_` |
 | `password` | En az 8 karakterlik parolanın Argon2id özeti; `oidc` alanı olan bir kullanıcı için boş bırakılabilir |
 | `oidc` | Kullanıcının, kurumun kimlik sağlayıcısındaki kimliği ([IDENTITY.tr.md](IDENTITY.tr.md)) |
+| `from_groups` | Sağlayıcının gruplarından oluşturulmuş, rolü, yedekleri ve klasörleri onlara uyan bir kullanıcı için `true` ([IDENTITY.tr.md](IDENTITY.tr.md) §2.1) |
 | `role` | `admin`, `member` ya da `reader` |
 | `backups` | Ref adları, önek için sonda `*` ile; `admin` için kullanılmaz |
 | `folders` | Sunucunun klasörleri |

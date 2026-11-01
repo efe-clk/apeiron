@@ -246,6 +246,7 @@ pub(crate) async fn add(
                     folders: Vec::new(),
                     oidc: None,
                     totp: None,
+                    from_groups: false,
                 })
             })?;
             let served = site(Site {

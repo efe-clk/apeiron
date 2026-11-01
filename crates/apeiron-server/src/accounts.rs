@@ -174,6 +174,7 @@ pub(crate) async fn add(
                 folders: Vec::new(),
                 oidc: None,
                 totp: None,
+                from_groups: false,
             };
             web.apply(&mut user, form)?;
             let detail = detail(&user);

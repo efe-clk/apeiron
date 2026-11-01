@@ -48,6 +48,29 @@ The provider is set in `web.json` beside the users:
 
 The issuer and the address must use `https`, except on this computer (`localhost`, `127.0.0.1`), for trying it out. E-mail addresses are compared without regard to case; other claims exactly.
 
+### 2.1 Users from groups
+
+Instead of listing every person in `web.json`, an admin can let the provider's groups decide who may sign in and with what rights. Each rule names a group and what its members get:
+
+```json
+"oidc": {
+  "groups_claim": "groups",
+  "groups": [
+    {"group": "backup-admins", "role": "admin"},
+    {"group": "staff", "role": "member", "backups": ["backup/{user}-*"],
+     "folders": ["/srv/home/{user}"]}
+  ]
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `groups_claim` | The claim of the ID token that lists the user's groups, `groups` by default; a list of names or one name. The provider must be set to put it into the token |
+| `group` | A group name exactly as the provider sends it |
+| `role`, `backups`, `folders` | As for a user (USERS.md §2); `{user}` is replaced by the user's name |
+
+At a sign-in whose identity matches no user listed by hand, the first rule that names one of the token's groups is used: a user is made with a name from the identity (the part before `@`, in lowercase letters, digits, `-` and `_`, with `-2`, `-3` … when taken), no password, and `"from_groups": true`. At every later sign-in its role, backups and folders are set again from the first matching rule, so a change of group at the provider takes effect at the next sign-in; a user in no named group any more is refused and its open sessions end at their usual time. A user listed by hand (without `from_groups`) never changes by groups, and an admin can turn a made user into such a user by removing `from_groups`.
+
 ## 3. Signing in
 
 ```mermaid
@@ -92,6 +115,7 @@ The session that follows is the same as after a password (WEB.md §5); it ends w
 | `GET /api/oidc/callback` | Where the provider sends it back; on failure to `/#oidc_error=<kind>` |
 | `POST /api/logout` | Ends the session; after a sign-in through the provider the reply holds `provider_sign_out`, the provider's `end_session_endpoint` with the ID token as `id_token_hint`, the client id and `<address>/` as `post_logout_redirect_uri`, and the pages send the browser there, so the user is signed out at the provider too and comes back to the sign-in screen. A provider without that endpoint, or one that cannot be reached, leaves the user signed in there |
 | `apeiron web oidc set --issuer <url> --client-id <id> --address <url> [--claim <claim>] [--client-secret-file <path>]` | Sets the provider; asks for the client secret; prints the redirect address and the address after signing out (`<address>/`) to register at the provider |
+| `apeiron web oidc group <group> --role <role> [--backup <pattern>]... [--folder <path>]...`, `oidc ungroup <group>` | Adds or changes the rule of a group (§2.1), or removes it; `oidc set … [--groups-claim <claim>]` keeps the rules |
 | `apeiron web oidc show`, `check`, `remove` | Shows the settings without the secret; reads the provider's settings and keys to see it answers; turns it off |
 | `apeiron web user add <name> --role <role> --oidc <identity>` | Adds a user who signs in through the provider, without a password |
 | `apeiron web user change <name> [--oidc <identity>] [--no-password]` | Gives a user an identity, or takes its password away |
@@ -104,6 +128,8 @@ The session that follows is the same as after a password (WEB.md §5); it ends w
 | --- | --- |
 | `sign_in` | `"via": "oidc"`, the identity from the token, and on failure the reason; the user when it worked |
 | `oidc_set`, `oidc_remove` | The settings, never the secret |
+| `oidc_group`, `oidc_ungroup` | The rule, or the group whose rule was removed |
+| `user_add`, `user_change` | A user made from a group, or changed at sign-in to follow its rule, with the group; no user is recorded as the one who did it |
 
 ## 6. Not part of this work item
 
@@ -111,7 +137,6 @@ The session that follows is the same as after a password (WEB.md §5); it ends w
 | --- | --- |
 | LDAP and Active Directory directly | Not planned; providers such as Keycloak and Entra ID put a directory behind OpenID Connect |
 | SAML | Later, if a pilot needs it |
-| Creating users and roles from the provider's groups | Later; users are listed in `web.json` until then |
 
 ## 7. Crates
 

@@ -36,6 +36,7 @@ fn users_file(dir: &Path) -> PathBuf {
             folders: Vec::new(),
             oidc: None,
             totp: None,
+            from_groups: false,
         })
         .unwrap();
     users.save(&file).unwrap();
@@ -574,6 +575,7 @@ fn the_users_file() {
         folders: Vec::new(),
         oidc: None,
         totp: None,
+        from_groups: false,
     };
     assert!(users.add(user("Bad Name")).is_err());
     assert!(users.add(user("root")).is_err());
@@ -611,6 +613,7 @@ fn each_user_sees_and_uses_only_their_own() {
         folders,
         oidc: None,
         totp: None,
+        from_groups: false,
     };
     users
         .add(user(
@@ -861,6 +864,7 @@ fn every_request_is_recorded() {
             folders: Vec::new(),
             oidc: None,
             totp: None,
+            from_groups: false,
         })
         .unwrap();
     users.save(&dir.path().join("config/web.json")).unwrap();
@@ -909,6 +913,7 @@ fn share_links() {
                 folders: Vec::new(),
                 oidc: None,
                 totp: None,
+                from_groups: false,
             })
             .unwrap();
     }
@@ -1518,6 +1523,7 @@ fn an_admin_manages_remotes_sync_keys_and_plugins() {
             folders: vec![home.clone()],
             oidc: None,
             totp: None,
+            from_groups: false,
         })
         .unwrap();
     users.save(&file).unwrap();

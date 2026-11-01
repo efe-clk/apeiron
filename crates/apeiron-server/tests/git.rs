@@ -37,6 +37,7 @@ fn user(name: &str, role: Role, backups: &[&str], hash: &str) -> User {
         folders: Vec::new(),
         oidc: None,
         totp: None,
+        from_groups: false,
     }
 }
 

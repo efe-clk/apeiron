@@ -70,6 +70,10 @@ pub struct User {
     /// with the password then also needs its code (IDENTITY.md §4).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub totp: Option<String>,
+    /// Made from the identity provider's groups, which set its role,
+    /// backups and folders at each sign-in (IDENTITY.md §2.1).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub from_groups: bool,
 }
 
 impl User {

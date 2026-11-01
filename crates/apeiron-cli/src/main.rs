@@ -750,7 +750,26 @@ enum OidcCommand {
         /// file means none
         #[arg(long, value_name = "PATH")]
         client_secret_file: Option<PathBuf>,
+        /// The claim of the ID token that lists the user's groups
+        #[arg(long, default_value = "groups")]
+        groups_claim: String,
     },
+    /// Make users from a group of the provider: its members sign in with
+    /// this role, backups and folders; `{user}` is the user's name
+    Group {
+        group: String,
+        #[arg(long, value_enum)]
+        role: RoleArg,
+        /// A backup they may use, such as backup/{user}-*
+        #[arg(long = "backup", value_name = "PATTERN")]
+        backups: Vec<String>,
+        /// A folder of the server they may be given
+        #[arg(long = "folder", value_name = "PATH")]
+        folders: Vec<String>,
+    },
+    /// Stop making users from a group; users it made can no longer sign in
+    /// unless another group's rule covers them
+    Ungroup { group: String },
     /// Show the settings, without the secret
     Show,
     /// Read the provider's settings and keys, to see that it can be reached
@@ -770,6 +789,7 @@ fn web_oidc(files: &WebFiles, command: OidcCommand, out: &Output) -> Result<(), 
         serde_json::json!({
             "issuer": c.issuer, "client_id": c.client_id, "address": c.address,
             "claim": c.claim, "secret": c.client_secret.is_some(),
+            "groups_claim": c.groups_claim, "groups": c.groups,
         })
     };
     match command {
@@ -779,6 +799,7 @@ fn web_oidc(files: &WebFiles, command: OidcCommand, out: &Output) -> Result<(), 
             address,
             claim,
             client_secret_file,
+            groups_claim,
         } => {
             let secret = match client_secret_file {
                 Some(path) => std::fs::read_to_string(&path)
@@ -793,6 +814,13 @@ fn web_oidc(files: &WebFiles, command: OidcCommand, out: &Output) -> Result<(), 
                 client_secret: Some(secret).filter(|s| !s.is_empty()),
                 address,
                 claim,
+                groups_claim,
+                // Setting the provider again keeps the group rules.
+                groups: users
+                    .oidc
+                    .as_ref()
+                    .map(|c| c.groups.clone())
+                    .unwrap_or_default(),
             };
             config.check()?;
             say!(
@@ -809,6 +837,54 @@ fn web_oidc(files: &WebFiles, command: OidcCommand, out: &Output) -> Result<(), 
             files
                 .audit
                 .record(&apeiron_server::Actor::default(), "oidc_set", detail, "ok")?;
+        }
+        OidcCommand::Group {
+            group,
+            role,
+            backups,
+            folders,
+        } => {
+            let config = users.oidc.as_mut().ok_or_else(not_set)?;
+            let rule = apeiron_server::GroupRule {
+                group,
+                role: role.into(),
+                backups,
+                folders,
+            };
+            match config.groups.iter_mut().find(|r| r.group == rule.group) {
+                Some(known) => *known = rule.clone(),
+                None => config.groups.push(rule.clone()),
+            }
+            users.save(file)?;
+            files.audit.record(
+                &apeiron_server::Actor::default(),
+                "oidc_group",
+                serde_json::to_value(&rule).unwrap_or_default(),
+                "ok",
+            )?;
+            out.result(&rule, |r| {
+                say!(
+                    "Members of {} sign in as {} users; rules apply in the order they were added",
+                    r.group,
+                    r.role.name()
+                )
+            });
+        }
+        OidcCommand::Ungroup { group } => {
+            let config = users.oidc.as_mut().ok_or_else(not_set)?;
+            let before = config.groups.len();
+            config.groups.retain(|r| r.group != group);
+            if config.groups.len() == before {
+                return Err(Failure::Usage(format!("no rule for the group {group}")));
+            }
+            users.save(file)?;
+            files.audit.record(
+                &apeiron_server::Actor::default(),
+                "oidc_ungroup",
+                serde_json::json!({ "group": group }),
+                "ok",
+            )?;
+            say!("Members of {group} are no longer made users.");
         }
         OidcCommand::Show => {
             let config = users.oidc.as_ref().ok_or_else(not_set)?;
@@ -827,6 +903,16 @@ fn web_oidc(files: &WebFiles, command: OidcCommand, out: &Output) -> Result<(), 
                 say!("redirect address: {}", config.redirect());
                 say!("address after signing out: {}", config.signed_out());
                 say!("claim: {}", config.claim);
+                say!("groups claim: {}", config.groups_claim);
+                for r in &config.groups {
+                    say!(
+                        "group {}: {}, backups {}, folders {}",
+                        r.group,
+                        r.role.name(),
+                        r.backups.join(" "),
+                        r.folders.join(" ")
+                    );
+                }
             });
         }
         OidcCommand::Check => {
@@ -1473,6 +1559,7 @@ fn web_user(files: &WebFiles, command: UserCommand, out: &Output) -> Result<(), 
                 folders,
                 oidc,
                 totp: None,
+                from_groups: false,
             })?;
             users.need_admin()?;
             users.save(file)?;

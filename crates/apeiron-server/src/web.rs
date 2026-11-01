@@ -236,6 +236,40 @@ pub struct Limits {
     pub max_jobs: Option<u32>,
 }
 
+/// A name for a user made from the identity `value`: the part before `@`,
+/// in lowercase letters, digits, `-` and `_`, with `-2`, `-3` … when taken.
+fn free_name(users: &Users, value: &str) -> String {
+    let local = value
+        .split('@')
+        .next()
+        .unwrap_or(value)
+        .to_ascii_lowercase();
+    let base: String = local
+        .chars()
+        .map(|c| match c {
+            'a'..='z' | '0'..='9' | '_' | '-' => c,
+            _ => '-',
+        })
+        .collect::<String>()
+        .trim_matches('-')
+        .chars()
+        .take(28)
+        .collect();
+    let base = if base.is_empty() {
+        "user".to_owned()
+    } else {
+        base
+    };
+    let taken = |n: &str| users.users.iter().any(|u| u.name == n);
+    if !taken(&base) {
+        return base;
+    }
+    (2..)
+        .map(|n| format!("{base}-{n}"))
+        .find(|n| !taken(n))
+        .unwrap_or(base)
+}
+
 /// The bytes of every file in `dir` and below it.
 fn folder_size(dir: &Path) -> io::Result<u64> {
     let mut total = 0;
@@ -816,16 +850,8 @@ impl WebState {
                 .map_err(|e| (None, e))?;
             let value = signed.value;
             let user = self
-                .users()
-                .users
-                .by_identity(&value)
-                .cloned()
-                .ok_or_else(|| {
-                    (
-                        Some(value.clone()),
-                        Error::new(ErrorKind::Key, format!("no user of this server is {value}")),
-                    )
-                })?;
+                .provider_user(&config, &value, &signed.groups, from.clone())
+                .map_err(|e| (Some(value.clone()), e))?;
             Ok((value, user, signed.id_token))
         }
         .await;
@@ -1272,6 +1298,87 @@ impl WebState {
 }
 
 impl WebState {
+    /// The user the identity provider signed in as `value`, a member of
+    /// `groups` (IDENTITY.md §2.1): one listed by hand, or one made from the
+    /// first group rule that names one of its groups, whose role, backups
+    /// and folders follow the rule at every sign-in.
+    fn provider_user(
+        &self,
+        config: &crate::oidc::OidcConfig,
+        value: &str,
+        groups: &[String],
+        from: Option<String>,
+    ) -> Result<User, Error> {
+        let known = self.users().users.by_identity(value).cloned();
+        if let Some(user) = &known
+            && !user.from_groups
+        {
+            return Ok(user.clone());
+        }
+        let rule = config
+            .groups
+            .iter()
+            .find(|r| groups.iter().any(|g| g == &r.group))
+            .ok_or_else(|| {
+                let why = match known {
+                    Some(_) => format!("{value} is in no group that may use this server"),
+                    None => format!("no user of this server is {value}"),
+                };
+                Error::new(ErrorKind::Key, why)
+            })?;
+        let actor = Actor { user: None, from };
+        let user = Users::update(&self.users_file, |users| {
+            let index = users.users.iter().position(|u| {
+                u.oidc
+                    .as_deref()
+                    .is_some_and(|known| config.same(known, value))
+            });
+            match index {
+                Some(i) => {
+                    let user = &mut users.users[i];
+                    let (backups, folders) = rule.for_user(&user.name);
+                    let changed = (user.role, &user.backups, &user.folders)
+                        != (rule.role, &backups, &folders);
+                    if changed {
+                        user.role = rule.role;
+                        user.backups = backups;
+                        user.folders = folders;
+                    }
+                    Ok((user.clone(), changed.then_some("user_change")))
+                }
+                None => {
+                    let name = free_name(users, value);
+                    let (backups, folders) = rule.for_user(&name);
+                    let user = User {
+                        name,
+                        password: String::new(),
+                        role: rule.role,
+                        backups,
+                        folders,
+                        oidc: Some(value.to_owned()),
+                        totp: None,
+                        from_groups: true,
+                    };
+                    users.add(user.clone())?;
+                    Ok((user, Some("user_add")))
+                }
+            }
+        });
+        let (user, event) = user?;
+        if let Some(event) = event {
+            self.audit.record(
+                &actor,
+                event,
+                json!({
+                    "name": user.name, "role": user.role, "backups": user.backups,
+                    "folders": user.folders, "oidc": user.oidc, "group": rule.group,
+                }),
+                "ok",
+            )?;
+        }
+        Ok(user)
+    }
+
     pub(crate) fn limits(&self) -> Limits {
         *self
             .limits

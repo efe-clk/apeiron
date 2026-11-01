@@ -71,6 +71,7 @@ fn serve(dir: &Path, repo: Repository, replicas: &[&str], standby: bool) -> (Web
         folders: Vec::new(),
         oidc: None,
         totp: None,
+        from_groups: false,
     })
     .unwrap();
     list.save(&users).unwrap();

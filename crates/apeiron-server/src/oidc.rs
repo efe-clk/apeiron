@@ -3,6 +3,7 @@
 //! token checked against the provider's published keys.
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -44,10 +45,49 @@ pub struct OidcConfig {
     /// The claim of the ID token that names the user.
     #[serde(default = "default_claim")]
     pub claim: String,
+    /// The claim that lists the user's groups (IDENTITY.md §2.1).
+    #[serde(default = "default_groups_claim")]
+    pub groups_claim: String,
+    /// Users made from the provider's groups: the first rule whose group
+    /// the user is in gives the role, backups and folders.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub groups: Vec<GroupRule>,
 }
 
 fn default_claim() -> String {
     "email".to_owned()
+}
+
+fn default_groups_claim() -> String {
+    "groups".to_owned()
+}
+
+/// What members of a group of the provider get (IDENTITY.md §2.1).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GroupRule {
+    pub group: String,
+    pub role: crate::users::Role,
+    /// Ref names, with `*` at the end for a prefix; `{user}` is the
+    /// user's name.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub backups: Vec<String>,
+    /// Folders of the server; `{user}` is the user's name.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub folders: Vec<String>,
+}
+
+impl GroupRule {
+    /// The backups and folders of the user `name`.
+    pub(crate) fn for_user(&self, name: &str) -> (Vec<String>, Vec<PathBuf>) {
+        let fill = |s: &String| s.replace("{user}", name);
+        (
+            self.backups.iter().map(fill).collect(),
+            self.folders
+                .iter()
+                .map(|f| PathBuf::from(fill(f)))
+                .collect(),
+        )
+    }
 }
 
 /// `https`, or `http` to this computer only, for tests and a provider on
@@ -104,6 +144,8 @@ impl OidcConfig {
 pub(crate) struct SignedIn {
     pub(crate) value: String,
     pub(crate) id_token: String,
+    /// The groups the token names in the groups claim.
+    pub(crate) groups: Vec<String>,
 }
 
 /// What the provider publishes about itself.
@@ -283,9 +325,20 @@ impl Oidc {
                 "the identity provider has not verified this e-mail address",
             ));
         }
+        // A list of names, or one name.
+        let groups = match claims.get(&config.groups_claim) {
+            Some(Value::Array(items)) => items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .collect(),
+            Some(Value::String(one)) => vec![one.clone()],
+            _ => Vec::new(),
+        };
         Ok(SignedIn {
             value: value.to_owned(),
             id_token: token,
+            groups,
         })
     }
 

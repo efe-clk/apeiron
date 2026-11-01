@@ -238,6 +238,8 @@ fn start(dir: &Path, idp: &Shared) -> (Web, SocketAddr, std::path::PathBuf) {
             client_secret: Some(SECRET.to_owned()),
             address: "https://backup.example.com/".to_owned(),
             claim: "email".to_owned(),
+            groups_claim: "groups".to_owned(),
+            groups: Vec::new(),
         }),
         users: vec![
             User {
@@ -248,6 +250,7 @@ fn start(dir: &Path, idp: &Shared) -> (Web, SocketAddr, std::path::PathBuf) {
                 folders: Vec::new(),
                 oidc: None,
                 totp: None,
+                from_groups: false,
             },
             User {
                 name: "ayse".to_owned(),
@@ -257,6 +260,7 @@ fn start(dir: &Path, idp: &Shared) -> (Web, SocketAddr, std::path::PathBuf) {
                 folders: Vec::new(),
                 oidc: Some("Ayse@Example.com".to_owned()),
                 totp: None,
+                from_groups: false,
             },
         ],
     };
@@ -517,6 +521,8 @@ fn settings_that_cannot_work_are_refused() {
         client_secret: None,
         address: address.to_owned(),
         claim: "email".to_owned(),
+        groups_claim: "groups".to_owned(),
+        groups: Vec::new(),
     };
     let ok = "https://login.example.com";
     assert!(config(ok, "https://backup.example.com").check().is_ok());
@@ -545,6 +551,7 @@ fn settings_that_cannot_work_are_refused() {
         folders: Vec::new(),
         oidc: Some(id.to_owned()),
         totp: None,
+        from_groups: false,
     };
     let users = Users {
         oidc: Some(config(ok, "https://backup.example.com")),
@@ -552,4 +559,46 @@ fn settings_that_cannot_work_are_refused() {
     };
     let dir = tempfile::tempdir().unwrap();
     assert!(users.save(&dir.path().join("web.json")).is_err());
+}
+
+/// Members of a group named in a rule become users at their first sign-in,
+/// and their role follows the rule (IDENTITY.md §2.1).
+#[test]
+fn users_are_made_from_groups() {
+    let dir = tempfile::tempdir().unwrap();
+    let idp = provider();
+    let (_server, address, file) = start(dir.path(), &idp);
+    let mut users = Users::load(&file).unwrap();
+    users.oidc.as_mut().unwrap().groups = vec![apeiron_server::GroupRule {
+        group: "backup-users".to_owned(),
+        role: Role::Member,
+        backups: vec!["backup/{user}-*".to_owned()],
+        folders: Vec::new(),
+    }];
+    users.save(&file).unwrap();
+    let okan = json!({"email": "Okan.Y@example.com", "groups": ["staff", "backup-users"]});
+
+    let reply = sign_in(address, &idp, |i, _| i.next = okan.clone());
+    assert!(session_cookie(&reply).is_some(), "{}", reply.body);
+    let made = Users::load(&file).unwrap();
+    let user = made.get("okan-y").unwrap();
+    assert_eq!(user.role, Role::Member);
+    assert_eq!(user.backups, ["backup/okan-y-*"]);
+    assert!(user.from_groups && user.password.is_empty());
+
+    // Out of the group, the user can no longer sign in; a user listed by
+    // hand needs no group.
+    let reply = sign_in(address, &idp, |i, _| {
+        i.next = json!({"email": "okan.y@example.com", "groups": "staff"});
+    });
+    assert!(session_cookie(&reply).is_none());
+    let reply = sign_in(address, &idp, |_, _| {});
+    assert!(session_cookie(&reply).is_some());
+
+    let log = fs::read_to_string(dir.path().join("audit.log")).unwrap();
+    assert!(
+        log.contains("\"user_add\"") && log.contains("backup-users"),
+        "{log}"
+    );
+    assert!(log.contains("is in no group"), "{log}");
 }

@@ -24,7 +24,7 @@ Birkaç kişi bir yedek sunucusunu paylaştığında admin, "bu klasörü kim, n
 | `shared:unlock` | Bir paylaşım bağlantısı için girilen her parola | Bağlantının kimliği; parola ya da gizli kısım asla |
 | `user_add`, `user_change`, `user_password`, `user_remove` | `apeiron web user` ya da Kullanıcılar sayfasında bir admin | Ad, rol, yedekler, klasörler ve kimlik; parola asla |
 | `user_second_factor_on`, `user_second_factor_off` | `apeiron web user second-factor` | Ad; gizli anahtar asla |
-| `oidc_set`, `oidc_remove` | `apeiron web oidc` | Sağlayıcının ayarları; gizli anahtar asla |
+| `oidc_set`, `oidc_remove`, `oidc_group`, `oidc_ungroup` | `apeiron web oidc` | Sağlayıcının ayarları; gizli anahtar asla |
 | `replicate` | Web sunucusunun bir replikaya yaptığı her push | Uzak depo, ref'ler ve nesneler, bir çatışmanın bıraktığı ref'ler ya da hata ([REPLICATION.tr.md](REPLICATION.tr.md) §7) |
 | `schedule_save` | Bir kiracının `admin`'inin iş dosyasını kaydetmesi ([DAEMON.tr.md](DAEMON.tr.md) §3.1) | İşlerin adları ya da geçersiz bir dosyanın hatası |
 | `tenant_add`, `tenant_limit`, `tenant_remove` | `apeiron web tenant`, o kiracının kendi kaydında | Kiracının ayarları ([TENANTS.tr.md](TENANTS.tr.md) §5) |
