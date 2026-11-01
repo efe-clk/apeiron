@@ -190,6 +190,9 @@ enum Command {
         /// The tenant whose web server files to report on
         #[arg(long, requires = "web", value_name = "NAME")]
         tenant: Option<String>,
+        /// One report for each tenant, on its own repository and files
+        #[arg(long, conflicts_with = "tenant")]
+        all_tenants: bool,
         /// Count audit events from this day on (YYYY-MM-DD); default 30 days ago
         #[arg(long, requires = "web", value_parser = parse_date)]
         since: Option<Time>,
@@ -940,6 +943,9 @@ struct UserView {
 /// (docs/REPORTS.md §3).
 #[derive(Serialize)]
 struct FullReport {
+    /// The tenant reported on, with `--all-tenants`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tenant: Option<String>,
     #[serde(flatten)]
     report: apeiron::ComplianceReport,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1052,13 +1058,43 @@ fn web_facts(
 }
 
 /// Prints a report as Markdown, ready to keep as a document.
+/// A compliance report of `repo`, with the web server's part from `since`
+/// on when it is given; `tenant` names whose web files are read.
+fn make_report(
+    out: &Output,
+    repo: &Repository,
+    request: apeiron::ReportRequest,
+    since: Option<jiff::Timestamp>,
+    tenant: Option<String>,
+) -> Result<FullReport, Failure> {
+    let mut report = watch(out, repo.report(request)?)?;
+    let web = match since {
+        Some(since) => Some(web_facts(
+            &WebFiles::of(tenant.as_deref())?,
+            since,
+            &mut report,
+        )?),
+        None => None,
+    };
+    Ok(FullReport {
+        tenant,
+        report,
+        web,
+    })
+}
+
 fn print_report(full: &FullReport) {
     let r = &full.report;
     let yes = |b: bool| if b { "yes" } else { "no" };
     say!("# Compliance report");
     say!("");
+    let of = full
+        .tenant
+        .as_deref()
+        .map(|t| format!(" of the tenant `{t}`"))
+        .unwrap_or_default();
     say!(
-        "Made {} for the repository `{}`.",
+        "Made {} for the repository `{}`{of}.",
         format::time(&r.time),
         r.repository.path.display()
     );
@@ -1932,38 +1968,59 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             stale_days,
             web,
             tenant,
+            all_tenants,
             since,
         } => {
-            let repo = open(cli.repo, password_file)?;
             let request = apeiron::ReportRequest {
                 verify,
                 remotes,
                 stale_days,
             };
-            let mut report = watch(out, repo.report(request)?)?;
-            let web = if web {
-                let since = since.map_or_else(
+            let since = web.then(|| {
+                since.map_or_else(
                     || jiff::Timestamp::now() - jiff::SignedDuration::from_hours(30 * 24),
                     |t| jiff::Timestamp::from_second(t.seconds).unwrap_or_default(),
-                );
-                Some(web_facts(
-                    &WebFiles::of(tenant.as_deref())?,
-                    since,
-                    &mut report,
-                )?)
-            } else {
-                None
+                )
+            });
+            let exit = |full: &FullReport| {
+                if full.report.verify.as_ref().is_some_and(|v| !v.is_ok()) {
+                    EXIT_DAMAGED
+                } else if full.report.has_problems() {
+                    EXIT_WARNINGS
+                } else {
+                    0
+                }
             };
-            let full = FullReport { report, web };
-            out.result(&full, print_report);
-            let damaged = full.report.verify.as_ref().is_some_and(|v| !v.is_ok());
-            Ok(if damaged {
-                EXIT_DAMAGED
-            } else if full.report.has_problems() {
-                EXIT_WARNINGS
-            } else {
-                0
-            })
+            if !all_tenants {
+                let repo = open(cli.repo, password_file)?;
+                let full = make_report(out, &repo, request, since, tenant)?;
+                out.result(&full, print_report);
+                return Ok(exit(&full));
+            }
+            // One report per tenant (docs/REPORTS.md §2).
+            let tenants = apeiron_server::Tenants::load(&tenants_file()?)?;
+            if tenants.tenants.is_empty() {
+                return Err(Failure::Usage(
+                    "there are no tenants; see docs/TENANTS.md".to_owned(),
+                ));
+            }
+            let mut reports = Vec::new();
+            for t in &tenants.tenants {
+                let repo = open(Some(t.repo.clone()), t.password_file.as_deref())?;
+                let full = make_report(out, &repo, request.clone(), since, Some(t.name.clone()))?;
+                reports.push(full);
+            }
+            out.result(&reports, |reports| {
+                for (i, full) in reports.iter().enumerate() {
+                    if i > 0 {
+                        say!("");
+                        say!("---");
+                        say!("");
+                    }
+                    print_report(full);
+                }
+            });
+            Ok(reports.iter().map(exit).max().unwrap_or(0))
         }
         Command::Retention { command } => {
             let repo = open(cli.repo, password_file)?;

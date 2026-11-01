@@ -31,6 +31,7 @@ apeiron --json report --verify --remotes --web > rapor-2026-10.json
 | `--stale-days <n>` | Bir ref'in eskimiş sayılması için yeni snapshot'sız geçen gün sayısı; 0 hiçbir şey denetlemez | 7 |
 | `--web` | Web sunucusunun bölümünü ekler | Kapalı |
 | `--tenant <ad>` | `--web` ile: dosyaları raporlanacak kiracı ([TENANTS.tr.md](TENANTS.tr.md)) | Yok |
+| `--all-tenants` | Her kiracı için bir rapor; her biri kiracının kendi deposunda (parola dosyasıyla açılır) ve `--web` ile kendi dosyalarında. Raporlar `---` ile ayrılarak art arda gelir ya da her birinde `tenant` alanı olan bir JSON dizisi oluşturur. Çıkış kodu, içlerindeki en kötüsüdür | Kapalı |
 | `--since <YYYY-AA-GG>` | `--web` ile: denetim olaylarını o günden itibaren sayar | 30 gün önce |
 
 Rapor yalnızca okur; hiçbir şeyi değiştirmez. Metin biçimi, saklanmaya ya da PDF'e dönüştürülmeye hazır Markdown'dır; `--json` aynı içeriği başka programlar için verir. Zamanlanmış bir iş her ay bir tane oluşturabilir ([DAEMON.tr.md](DAEMON.tr.md) komutları yalnızca kendi işleriyle çalıştırır; bunun için sistemin zamanlayıcısını kullanın).
@@ -75,7 +76,6 @@ JSON'da her bulgunun bir `level` alanı, İngilizce bir `text` alanı ve bilgile
 | --- | --- |
 | Belirli bir standardın maddelerine eşlenmiş raporlar | Sonra, standardını adlandıran bir pilotla; §3'teki gerçekler böyle bir eşlemenin gösterdiği şeylerdir |
 | Raporu imzalamak | Sonra; tuttuğu snapshot kimlikleri ve denetim özeti zaten denetlenebilir |
-| Tüm kiracılar için tek seferde raporlar | Sonra; o zamana kadar `--tenant` ile kiracı başına bir rapor |
 
 ## 7. Crate'ler
 

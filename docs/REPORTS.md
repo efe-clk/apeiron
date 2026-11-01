@@ -31,6 +31,7 @@ apeiron --json report --verify --remotes --web > report-2026-10.json
 | `--stale-days <n>` | Days without a new snapshot after which a ref is stale; 0 checks nothing | 7 |
 | `--web` | Add the web server's part | Off |
 | `--tenant <name>` | With `--web`: the tenant whose files to report on ([TENANTS.md](TENANTS.md)) | None |
+| `--all-tenants` | One report for each tenant, each on the tenant's own repository (opened with its password file) and, with `--web`, its own files; the reports follow one another, separated by `---`, or form a JSON array with a `tenant` field each. The exit code is the worst of them | Off |
 | `--since <YYYY-MM-DD>` | With `--web`: count audit events from that day | 30 days ago |
 
 The report reads only; it changes nothing. Its text form is Markdown, ready to keep or turn into a PDF; `--json` gives the same content for other programs. A scheduled job can make one every month ([DAEMON.md](DAEMON.md) runs commands only through its own jobs, so use the system's scheduler for this).
@@ -75,7 +76,6 @@ In JSON each finding has `level`, an English `text`, and a `code` with its facts
 | --- | --- |
 | Reports mapped to the clauses of a given standard | Later, with a pilot that names its standard; the facts of §3 are what such a mapping points to |
 | Signing the report | Later; the snapshot ids and the audit hash it holds can already be checked |
-| Reports across every tenant at once | Later; one report per tenant with `--tenant` until then |
 
 ## 7. Crates
 
