@@ -75,8 +75,102 @@ pub fn merge(base: Option<&[u8]>, ours: &[u8], theirs: &[u8]) -> Option<Vec<u8>>
     let (base, ours, theirs) = (text(base.unwrap_or_default())?, text(ours)?, text(theirs)?);
     match diffy::merge(base, ours, theirs) {
         Ok(merged) => Some(merged.into_bytes()),
-        Err(_) => merge_json(base, ours, theirs),
+        Err(_) => merge_json(base, ours, theirs).or_else(|| merge_markdown(base, ours, theirs)),
     }
+}
+
+/// Splits a Markdown text at its headings (lines of one to six `#` and a
+/// space, outside fenced code): the text before the first heading under the
+/// key `""`, then each section under its heading line. `None` when two
+/// headings are the same, so sections cannot be told apart.
+fn sections(text: &str) -> Option<Vec<(&str, &str)>> {
+    let mut out: Vec<(&str, &str)> = Vec::new();
+    let (mut key, mut start, mut at) = ("", 0, 0);
+    let mut fence: Option<&str> = None;
+    for line in text.split_inclusive('\n') {
+        let trimmed = line.trim_end();
+        let marker = ["```", "~~~"]
+            .into_iter()
+            .find(|m| trimmed.trim_start().starts_with(m));
+        match (fence, marker) {
+            (None, Some(m)) => fence = Some(m),
+            (Some(f), Some(m)) if f == m => fence = None,
+            _ => {}
+        }
+        let hashes = trimmed.len() - trimmed.trim_start_matches('#').len();
+        let heading = fence.is_none()
+            && marker.is_none()
+            && (1..=6).contains(&hashes)
+            && (trimmed.len() == hashes || trimmed[hashes..].starts_with(' '));
+        if heading {
+            out.push((key, &text[start..at]));
+            (key, start) = (trimmed, at);
+        }
+        at += line.len();
+    }
+    out.push((key, &text[start..]));
+    let mut keys: Vec<&str> = out.iter().map(|(k, _)| *k).collect();
+    keys.sort_unstable();
+    let before = keys.len();
+    keys.dedup();
+    (keys.len() == before).then_some(out)
+}
+
+/// Joins two changed Markdown texts section by section when their lines
+/// collide (TEXT.md §2): a section changed on one side only is taken from
+/// that side, one changed on both is merged line by line, and a new section
+/// follows the section it follows on its side.
+fn merge_markdown(base: &str, ours: &str, theirs: &str) -> Option<Vec<u8>> {
+    let (b, o, t) = (sections(base)?, sections(ours)?, sections(theirs)?);
+    if o.len() < 2 || t.len() < 2 {
+        return None;
+    }
+    fn find<'a>(s: &[(&str, &'a str)], key: &str) -> Option<&'a str> {
+        s.iter().find(|(k, _)| *k == key).map(|(_, v)| *v)
+    }
+    let mut out: Vec<(&str, String)> = Vec::new();
+    for (key, ours_text) in &o {
+        let merged = match (find(&b, key), find(&t, key)) {
+            (base_text, Some(theirs_text)) => {
+                let base_text = base_text.unwrap_or_default();
+                if ours_text == &theirs_text || base_text == theirs_text {
+                    ours_text.to_string()
+                } else if base_text == *ours_text {
+                    theirs_text.to_owned()
+                } else {
+                    diffy::merge(base_text, ours_text, theirs_text).ok()?
+                }
+            }
+            // Removed there: fine if unchanged here.
+            (Some(base_text), None) if base_text == *ours_text => continue,
+            (Some(_), None) => return None,
+            (None, None) => ours_text.to_string(),
+        };
+        out.push((key, merged));
+    }
+    for (i, (key, theirs_text)) in t.iter().enumerate() {
+        if find(&o, key).is_some() {
+            continue;
+        }
+        match find(&b, key) {
+            // Removed here: fine if unchanged there.
+            Some(base_text) if base_text == *theirs_text => {}
+            Some(_) => return None,
+            None => {
+                let after = out.iter().position(|(k, _)| *k == t[i - 1].0);
+                let at = after.map_or(out.len(), |p| p + 1);
+                out.insert(at, (key, theirs_text.to_string()));
+            }
+        }
+    }
+    let mut text = String::new();
+    for (_, section) in out {
+        if !text.is_empty() && !text.ends_with('\n') {
+            text.push('\n');
+        }
+        text.push_str(&section);
+    }
+    Some(text.into_bytes())
 }
 
 /// Joins two changed JSON documents key by key when their lines collide
@@ -297,6 +391,63 @@ mod tests {
         );
         // Text that only looks like JSON on one side.
         assert_eq!(m("a\nb\n", "{}", "x\ny\n"), None);
+    }
+
+    #[test]
+    fn markdown_sections_changed_on_both_sides_are_joined() {
+        let base = "# Notes\n\n## Todo\n- milk\n## Done\n- bread\n";
+        // Sections added at the same place on both sides are both kept, the
+        // other side's first, and a section changed on both sides is merged
+        // line by line.
+        let ours = format!("{base}## Ideas\n- a\n").replace("- milk", "- oat milk");
+        let theirs = format!("{base}## Later\n- b").replace("- bread", "- rye bread");
+        assert!(diffy::merge(base, &ours, &theirs).is_err());
+        assert_eq!(
+            m(base, &ours, &theirs).as_deref(),
+            Some(
+                "# Notes\n\n## Todo\n- oat milk\n## Done\n- rye bread\n## Later\n- b\n## Ideas\n- a\n"
+            )
+        );
+        let ours = format!("{base}## Ideas\n- a\n");
+        let theirs = format!("{base}## Later\n- b\n").replace("# Notes\n\n", "# Notes\nshop\n\n");
+        assert_eq!(
+            m(base, &ours, &theirs).as_deref(),
+            Some(
+                "# Notes\nshop\n\n## Todo\n- milk\n## Done\n- bread\n## Later\n- b\n## Ideas\n- a\n"
+            )
+        );
+        // A section removed on one side and left alone on the other is gone.
+        assert_eq!(
+            m(
+                base,
+                "# Notes\n\n## Todo\n- milk\n",
+                &format!("{base}## Later\n")
+            )
+            .as_deref(),
+            Some("# Notes\n\n## Todo\n- milk\n## Later\n")
+        );
+    }
+
+    #[test]
+    fn markdown_sections_changed_differently_still_conflict() {
+        let base = "# A\none\n# B\ntwo\n";
+        assert_eq!(
+            m(
+                base,
+                "# A\nours\n# B\ntwo\n# C\n",
+                "# A\ntheirs\n# B\ntwo\n# D\n"
+            ),
+            None
+        );
+        // Removed on one side, changed on the other.
+        assert_eq!(
+            m(base, "# A\none\n# C\n", "# A\none\n# B\nnew\n# D\n"),
+            None
+        );
+        // A `#` line inside fenced code is not a heading, and two equal
+        // headings cannot be told apart.
+        assert_eq!(sections("```\n# x\n```\n# y\n").map(|s| s.len()), Some(2));
+        assert_eq!(sections("# x\na\n# x\n"), None);
     }
 
     #[test]
