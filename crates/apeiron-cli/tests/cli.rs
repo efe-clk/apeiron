@@ -315,6 +315,14 @@ fn push_and_pull_with_a_folder_remote() {
     assert!(String::from_utf8_lossy(&disk.stdout).contains("a.txt"));
     assert!(s.ok(&["pull", "disk"]).contains("up to date"));
 
+    // The disk is cleaned from here; it holds nothing dead.
+    let out = s.ok(&["gc", "--remote", "disk", "--dry-run"]);
+    assert!(out.contains("Would remove 0 objects"), "{out}");
+    assert!(
+        s.ok(&["gc", "--remote", "disk"])
+            .contains("Removed 0 objects")
+    );
+
     // A second device starts from the disk.
     let doc = s.json(&["clone", &s.path("disk"), &s.path("copy")]);
     assert_eq!(doc["refs"][0]["name"], "main");

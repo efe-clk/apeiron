@@ -34,6 +34,16 @@ pub struct RestoreRequest {
     pub path: Name,
 }
 
+/// Which remote to clean (FORMAT.md §15.8).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RemoteGcRequest {
+    /// The name of a remote this repository alone writes to.
+    pub remote: String,
+    /// Only reports what would be removed.
+    #[serde(default)]
+    pub dry_run: bool,
+}
+
 /// Which snapshot a working folder is to hold (BRANCH.md §6).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SwitchRequest {

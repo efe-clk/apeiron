@@ -18,8 +18,8 @@ use crate::types::{
     RestoreTestRequest, SnapshotInfo, SyncRequest, TransferRequest,
 };
 use crate::types::{
-    CreateRefRequest, DuplicatesRequest, MergeRequest, MirrorReport, MirroredRef, RemoteRequest,
-    SearchRequest, SwitchRequest, TextDiff,
+    CreateRefRequest, DuplicatesRequest, MergeRequest, MirrorReport, MirroredRef, RemoteGcRequest,
+    RemoteRequest, SearchRequest, SwitchRequest, TextDiff,
 };
 use crate::{
     AddFileReport, AddFileRequest, ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo,
@@ -411,6 +411,27 @@ impl Repository {
         out: &mut dyn Write,
     ) -> Result<u64> {
         Ok(apeiron_git::write_pack(path, wants, common, out)?)
+    }
+
+    /// Removes from a remote the objects its refs cannot reach and rewrites
+    /// its partly dead packs, from here (FORMAT.md §15.8). Only for a remote
+    /// this repository alone writes to, such as a replica. Fails with
+    /// [`ErrorKind::Locked`] while any other operation uses this repository
+    /// or another cleanup runs on the remote.
+    pub fn gc_remote(&self, request: RemoteGcRequest) -> Result<Job<GcReport>> {
+        let remote = self.read().remote(&request.remote)?;
+        let repo = self.clone();
+        Job::spawn("gc-remote", move |ctl| {
+            let _writer = repo.lock_writer();
+            ctl.update(|p| p.phase = crate::Phase::Finishing);
+            let store = open_store(&remote, repo.info().encrypted, None)?;
+            let host = gethostname::gethostname().into_string().ok();
+            let report = repo
+                .read()
+                .gc_remote(&*store, request.dry_run, host.as_deref())?;
+            ctl.update(|p| p.phase = crate::Phase::Done);
+            Ok(report)
+        })
     }
 
     /// Removes objects no ref and no recent reflog line can reach. Fails with

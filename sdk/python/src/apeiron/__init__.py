@@ -548,6 +548,9 @@ class Repository:
     def gc(self, **options: Any) -> Job:
         return self.start("gc", **options)
 
+    def gc_remote(self, remote: str, **options: Any) -> Job:
+        return self.start("gc_remote", remote=remote, **options)
+
     def push(self, remote: str, ref: str = "main", rate: Optional[int] = None) -> Job:
         return self.start("push", **_drop_none({"remote": remote, "ref": ref, "rate": rate}))
 

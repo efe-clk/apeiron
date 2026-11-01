@@ -60,5 +60,6 @@ pub use types::{
     TransferRequest,
 };
 pub use types::{
-    CreateRefRequest, DuplicatesRequest, MergeRequest, SearchRequest, SwitchRequest, TextDiff,
+    CreateRefRequest, DuplicatesRequest, MergeRequest, RemoteGcRequest, SearchRequest,
+    SwitchRequest, TextDiff,
 };

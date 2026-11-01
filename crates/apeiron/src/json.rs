@@ -233,6 +233,7 @@ pub fn start(repo: &Repository, operation: &str, request: Value) -> Result<Box<d
         "export" => boxed(repo.export(parse(request)?)?),
         "verify" => boxed(repo.verify()?),
         "gc" => boxed(repo.gc(parse(request)?)?),
+        "gc_remote" => boxed(repo.gc_remote(parse(request)?)?),
         "push" => boxed(repo.push(parse(request)?)?),
         "pull" => boxed(repo.pull(parse(request)?)?),
         "push_all" => boxed(repo.push_all(parse(request)?)?),

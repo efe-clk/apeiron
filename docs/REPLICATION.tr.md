@@ -110,6 +110,7 @@ Eski birincil geri geldiğinde, yeni birincilin ilerlediği bir ref'i push etmes
 | `jobs.toml` içinde `do = "pull"`, `ref = "*"` | §3 |
 | `push_all`, `pull_all` (API.tr.md §8) | §2; bir `MirrorReport` döndürür: ref başına `TransferReport` ya da çatışma |
 | `GET /api/health` | §5 |
+| `apeiron gc --remote <remote> [--dry-run]`, `gc_remote` (API.tr.md §8) | Bir replikayı, replikanın makinesinde oturum açmadan birincilden temizler ([FORMAT.tr.md](FORMAT.tr.md) §15.8): replikanın ref'lerinin ulaşamadığını siler. Yalnızca başka hiçbir şeyin yazmadığı bir replika için; çalışırken push'lar bekler |
 | Denetim olayı `replicate` | Uzak depo, ref ve nesne sayısı ve bir çatışmanın bıraktığı ref'ler ya da hata; sonuç `ok`, `conflict` ya da hatanın türü |
 
 ## 8. Bu işin parçası olmayanlar
@@ -120,7 +121,6 @@ Eski birincil geri geldiğinde, yeni birincilin ilerlediği bir ref'i push etmes
 | Aynı anda yedek alan iki birincil | Planlanmadı; iki yazar için araç cihazlar arası senkrondur (SYNC.tr.md) |
 | Denetim kaydını ve paylaşım bağlantılarını yedek sunucuya kopyalamak | Sonra, bir pilot gerektirirse |
 | Birincilde silinen ref'leri replikada silmek | Replikanın admin'ine bırakılır (§2) |
-| Bir replikanın çöp toplamasını birincilden yapmak | Sonra; `apeiron gc` replikanın makinesinde çalıştırılır |
 
 ## 9. Crate'ler
 

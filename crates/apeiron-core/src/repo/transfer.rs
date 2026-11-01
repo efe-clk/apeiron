@@ -82,6 +82,7 @@ impl Repository {
         secret: Option<&str>,
         on_copy: OnCopy<'_>,
     ) -> Result<(Repository, Vec<(String, TransferReport)>)> {
+        super::remote_gc::check_gc_lock(store)?;
         let bytes = store
             .read(CONFIG)?
             .ok_or_else(|| Error::InvalidRepository {
@@ -293,6 +294,9 @@ impl Repository {
         }
         // Listed on the remote now, so the next ref need not copy them.
         have.extend(copied);
+        // A cleanup that began meanwhile may delete objects this push
+        // counted on; the ref stays (FORMAT.md §15.8).
+        super::remote_gc::check_gc_lock(store)?;
         store.swap_ref(name, previous, local)?;
         Ok(report)
     }
@@ -402,6 +406,7 @@ impl Repository {
     /// Checks that `store` holds a copy of this repository and reads its
     /// index files.
     fn open_remote(&self, store: &dyn Store) -> Result<HashMap<ObjectId, Location>> {
+        super::remote_gc::check_gc_lock(store)?;
         match store.read(CONFIG)? {
             Some(bytes) => self.check_remote_config(store, &bytes)?,
             None => {
@@ -472,6 +477,7 @@ impl Repository {
     /// Checks the remote `config`, or makes `store` a new copy of this
     /// repository; then makes its key files equal to the local ones.
     fn prepare_remote(&self, store: &dyn Store) -> Result<()> {
+        super::remote_gc::check_gc_lock(store)?;
         match store.read(CONFIG)? {
             Some(bytes) => self.check_remote_config(store, &bytes)?,
             None => {
@@ -529,7 +535,7 @@ impl Repository {
         Ok(())
     }
 
-    fn check_remote_config(&self, store: &dyn Store, bytes: &[u8]) -> Result<()> {
+    pub(super) fn check_remote_config(&self, store: &dyn Store, bytes: &[u8]) -> Result<()> {
         let path = store.location(CONFIG);
         let text = String::from_utf8(bytes.to_vec()).map_err(|_| Error::InvalidRepository {
             path: path.clone(),
@@ -600,7 +606,7 @@ fn prepare_clone(
 
 /// The objects listed by the healthy index files of a remote. Damaged
 /// index files are skipped; their objects are copied again.
-fn remote_index(store: &dyn Store, keys: &Keys) -> Result<HashMap<ObjectId, Location>> {
+pub(super) fn remote_index(store: &dyn Store, keys: &Keys) -> Result<HashMap<ObjectId, Location>> {
     let mut have = HashMap::new();
     for name in store.list(INDEX)? {
         if !name.ends_with(".idx") {
@@ -624,7 +630,7 @@ fn remote_index(store: &dyn Store, keys: &Keys) -> Result<HashMap<ObjectId, Loca
 }
 
 /// Reads a snapshot, tree or blob from a remote.
-fn read_remote(
+pub(super) fn read_remote(
     store: &dyn Store,
     have: &HashMap<ObjectId, Location>,
     keys: &Keys,
@@ -639,12 +645,15 @@ fn read_remote(
     pack::decode_stored(&store.location(&path), entry, keys, &stored)
 }
 
-fn pack_file(name: &FileHash) -> String {
+pub(super) fn pack_file(name: &FileHash) -> String {
     let hex = to_hex(name);
     format!("{PACKS}/{}/{hex}.pack", &hex[..2])
 }
 
-fn write_pack(store: &dyn Store, writer: PackWriter) -> Result<(FileHash, Vec<PackEntry>)> {
+pub(super) fn write_pack(
+    store: &dyn Store,
+    writer: PackWriter,
+) -> Result<(FileHash, Vec<PackEntry>)> {
     let (name, entries, bytes) = writer.finish_to_bytes()?;
     store.write_new(&pack_file(&name), &bytes)?;
     Ok((name, entries))
@@ -684,7 +693,7 @@ fn is_ancestor(
 /// have, with their expected types. An object the target has is not
 /// entered: everything it reaches is there too (FORMAT.md §15.5). `read`
 /// returns the content of a snapshot, tree or blob.
-fn missing_objects(
+pub(super) fn missing_objects(
     start: ObjectId,
     has: impl Fn(&ObjectId) -> bool,
     read: impl Fn(&ObjectId, ObjectType) -> Result<Vec<u8>>,
@@ -730,6 +739,7 @@ mod tests {
     use super::*;
     use crate::chunker::ChunkerParams;
     use crate::chunker::tests::noise;
+    use crate::config::utc_datetime;
     use crate::object::{Time, TreeEntry};
     use crate::remote::FolderStore;
 
@@ -1208,5 +1218,89 @@ mod tests {
         copy.repair().unwrap();
         assert_eq!(content(&copy, &second), b"more");
         assert_eq!(content(&copy, &s.first), noise(300 * 1024, 1));
+    }
+
+    #[test]
+    fn a_remote_copy_is_cleaned_from_here() {
+        for encrypted in [false, true] {
+            a_remote_copy_is_cleaned_from_here_with(encrypted);
+        }
+    }
+
+    fn a_remote_copy_is_cleaned_from_here_with(encrypted: bool) {
+        let mut s = setup(encrypted);
+        let remote = s.root.join("remote");
+        push(&s.a, &remote).unwrap();
+        let second = commit(&mut s.a, &noise(300 * 1024, 2), Some(s.first));
+        push(&s.a, &remote).unwrap();
+        // `side` shares the tree of `second` but not the snapshot.
+        let tree = s.a.read_snapshot(&second).unwrap().tree;
+        let mut w = s.a.writer();
+        let side = w
+            .put_snapshot(&Snapshot {
+                tree,
+                parents: vec![s.first],
+                time: Time {
+                    seconds: 1_700_000_100,
+                    nanos: 0,
+                },
+                author: None,
+                host: None,
+                message: Some("side".to_owned()),
+                meta: vec![],
+            })
+            .unwrap();
+        w.finish().unwrap();
+        s.a.update_ref("side", None, Some(side)).unwrap();
+        let store = FolderStore::open(&remote).unwrap();
+        s.a.push(&store, "side", &mut |_| Ok(())).unwrap();
+        // The remote's main goes back: `second` itself is dead there, its
+        // files are not.
+        store.swap_ref("main", Some(second), s.first).unwrap();
+
+        let dry = s.a.gc_remote(&store, true, Some("here")).unwrap();
+        assert_eq!((dry.removed_objects, dry.removed_packs), (1, 1), "{dry:?}");
+        let indexes = |store: &FolderStore| store.list(INDEX).unwrap().len();
+        assert_eq!(indexes(&store), 3);
+
+        let done = s.a.gc_remote(&store, false, Some("here")).unwrap();
+        assert_eq!(
+            (done.removed_objects, done.written_packs),
+            (1, 1),
+            "{done:?}"
+        );
+        assert_eq!(indexes(&store), 1);
+        assert_eq!(store.read("locks/gc").unwrap(), None);
+        // Nothing left to do the second time.
+        let again = s.a.gc_remote(&store, false, None).unwrap();
+        assert_eq!((again.removed_objects, again.written_packs), (0, 0));
+
+        // A clone of the cleaned copy has both refs and all their files.
+        let secret = encrypted.then_some(PASSWORD);
+        let (b, _) =
+            Repository::clone_from(&store, &s.root.join("b"), secret, &mut |_| Ok(())).unwrap();
+        assert_eq!(b.read_ref("main").unwrap(), Some(s.first));
+        assert_eq!(content(&b, &side), noise(300 * 1024, 2));
+        assert!(matches!(
+            b.read_snapshot(&second),
+            Err(Error::ObjectNotFound(_))
+        ));
+
+        // A cleanup in progress stops pushes; one left a day ago does not.
+        let lock = |time: &str| {
+            let _ = store.delete("locks/gc");
+            store
+                .write_new("locks/gc", format!("{time} there\n").as_bytes())
+                .unwrap();
+        };
+        lock(&utc_datetime(std::time::SystemTime::now()).to_string());
+        assert!(matches!(push(&s.a, &remote), Err(Error::RemoteCleaning(_))));
+        assert!(matches!(
+            s.a.gc_remote(&store, false, None),
+            Err(Error::RemoteCleaning(_))
+        ));
+        lock("2000-01-01T00:00:00Z");
+        s.a.gc_remote(&store, false, None).unwrap();
+        assert_eq!(store.read("locks/gc").unwrap(), None);
     }
 }

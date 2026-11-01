@@ -66,6 +66,7 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | `apeiron verify` | Reads and checks every pack, index and object | Done |
 | `apeiron repair` | Removes stale ref locks, adds lost reflog lines and replaces damaged index files | Done |
 | `apeiron gc [--keep-days <days>] [--dry-run]` | Deletes data no ref and no reflog line of the last 90 days (or `--keep-days`) can reach; `--dry-run` only reports | Done |
+| `apeiron gc --remote <remote> [--dry-run]` | Deletes from a remote the data its refs cannot reach, such as on a replica; only for a remote this repository alone writes to ([FORMAT.md](FORMAT.md) §15.8) | Done |
 | `apeiron key list` | Lists the passwords and recovery keys of an encrypted repository | Done |
 | `apeiron key add [--recovery] [--new-password-file <file>]` | Adds a password (asked twice, or read from the file), or with `--recovery` a new recovery key, printed once | Done |
 | `apeiron remote add <name> <url>` | Adds a remote: a folder, such as one on an external disk, `sftp://[user@]host[:port]/path` or `s3://bucket/path?endpoint=…&region=…` (section 2.2) | Done |

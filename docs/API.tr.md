@@ -156,6 +156,7 @@ Her işlem tek bir düz istek değeri alır ve tek bir düz sonuç değeri dönd
 | `delete_ref` | ref adı, beklenen snapshot | — | Hayır |
 | `repair` | — | `RepairReport`: kaldırılan kilitler, onarılan reflog'lar, yeniden indekslenen paketler, silinen bozuk indeksler | Hayır |
 | `gc` | saklanacak reflog günü (varsayılan 90), deneme çalıştırması | `GcReport`: canlı nesneler; silinen nesneler, baytlar ve paketler; yazılan paketler | Evet |
+| `gc_remote` | uzak depo adı, deneme çalıştırması | Uzak depo için `GcReport` ([FORMAT.tr.md](FORMAT.tr.md) §15.8); orada başka bir temizlik çalışırken `locked` | Evet |
 | `keys` | — | `Vec<KeyInfo>`: kimlik, tür (`password` ya da `recovery`), eklendiği zaman, depoyu onun açıp açmadığı | Hayır |
 | `add_password` | yeni parola | `AddedKey`: kimlik | Hayır |
 | `add_recovery_key` | — | `AddedKey`: kimlik ve kullanıcıya bir kez gösterilen yeni kurtarma anahtarı | Hayır |

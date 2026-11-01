@@ -21,6 +21,7 @@ use crate::refs::{self, RefStore, ReflogEntry, RepairReport};
 use crate::retention;
 
 mod gc;
+mod remote_gc;
 mod transfer;
 
 pub use gc::{GcOptions, GcReport};

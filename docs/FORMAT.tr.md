@@ -564,7 +564,7 @@ Pull, push'un adımlarını ters yönde, hedef olarak yerel depoyla çalıştır
 - Uzaktaki bir ref, ancak ulaştığı her nesne uzak depoya yazıldıktan sonra değiştirilir (bölüm 9.2'deki gibi).
 - Aynı ref'i aynı anda push eden iki program: koşullu değiştirme birinin kazanmasını sağlar; öteki bir çatışmayla durur ve hiçbir şeyi değiştirmez.
 - Yarıda kalan bir push ya da pull yeniden çalıştırılır; hâlâ listelenmemiş nesneleri kopyalar. Kesintinin indekssiz bıraktığı paketler, o kopyanın çöp toplaması onları silene kadar yer kaplar.
-- Bir uzak kopyanın çöp toplaması ve çift yönlü senkron sonraki işlere bırakılmıştır ([ROADMAP.tr.md](ROADMAP.tr.md) §4).
+- Bir uzak kopyanın çöp toplaması 15.8'dedir.
 
 ### 15.6 Klon
 
@@ -585,6 +585,20 @@ Her ref'i push ya da pull etmek bir replikayı güncel tutar ([REPLICATION.tr.md
 2. Öbür tarafta bu kopyada olmayan snapshot'lar olduğu için reddedilen bir ref (15.3 adım 4, 15.4 adım 4) ref'le birlikte bildirilir ve sonraki ref kopyalanır. Başka her hata, tek bir ref'teki gibi hepsini durdurur.
 
 Push yerel ref'leri gönderir; pull uzak deponun listelediği ref'leri alır. İkisi de öbür tarafta olan bir ref'i silmez. 15.5'teki her kural her ref için geçerlidir; böylece bir kesinti her ref'i ya olduğu yerde ya da kopyalandığı yerde bırakır.
+
+
+### 15.8 Bir uzak kopyanın çöp toplaması
+
+Yalnızca bu deponun yazdığı bir uzak depo, örneğin bir replika ([REPLICATION.tr.md](REPLICATION.tr.md)), onu tutan makinede oturum açmadan bu depodan temizlenebilir.
+
+1. Yerel depo kilidini özel olarak al (bölüm 12); böylece bu kopyanın hiçbir push ya da pull'u bu arada çalışmaz. Uzak `config` dosyasında yerel `id`'nin olduğunu denetle.
+2. Uzak depoya, RFC 3339 biçiminde UTC zamanı ve makine adını tutan `locks/gc` dosyasını yeni bir dosya olarak yaz. Dosya varsa ve 24 saatten yeniyse "locked" ile dur; daha eskisi kesilmiş bir çalışmadan kalmıştır ve yenisiyle değiştirilir.
+3. Canlı nesneleri işaretle: uzak ref'lerin ulaştığı her şey, uzak depodan okunarak. Uzak reflog'lar kök değildir. Ulaşılabilen eksik ya da bozuk bir nesne, hiçbir şey silmeden çalışmayı durdurur.
+4. Uzak indeks dosyalarının listelediği paketleri 13.2'nin 3. adımındaki gibi ayır. Hiçbir indeksin listelemediği pakete dokunulmaz: başka bir yazar onu yazmakla indeksini yazmak arasında olabilir.
+5. Kısmen ölü paketlerin canlı nesnelerini saklanan baytlar olarak uzak depoda yeni paketlere kopyala, sonra tutulan ve yeni her paketi listeleyen tek bir yeni indeks dosyası yaz.
+6. Diğer her indeks dosyasını, sonra ölü paketleri, sonra `locks/gc`'yi sil.
+
+Bir deneme çalışması 1., 3. ve 4. adımları yapar ve hiçbir şey yazmaz. 24 saatten yeni bir `locks/gc` varken push, pull ve clone "locked" ile durur; bir push da uzak ref'i değiştirmeden hemen önce yeniden bakar, böylece çalışmadan önce başlamış bir push, çalışmanın silebileceği nesnelerin üstüne bir ref taşımaz. Daha eski bir sürümün programı `locks/gc`'yi bilmez; böyle bir program ya da başka herhangi bir depo, uzak depo temizlenirken ona yazmamalıdır. Kesintiler 13.3'teki durumları ve ayrıca kilidi bırakır; kilidi bir sonraki çalışma 24 saat sonra değiştirir ya da elle silinebilir.
 
 ## 16. Saklama kuralları (`retention/`)
 

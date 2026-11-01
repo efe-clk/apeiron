@@ -161,6 +161,9 @@ enum Command {
         /// Only show what would be deleted
         #[arg(long)]
         dry_run: bool,
+        /// Clean this remote instead, one only this repository writes to, such as a replica
+        #[arg(long, value_name = "NAME")]
+        remote: Option<String>,
     },
     /// Manage the passwords and recovery keys of an encrypted repository
     Key {
@@ -1924,15 +1927,20 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             });
             Ok(if report.is_ok() { 0 } else { EXIT_DAMAGED })
         }
-        Command::Gc { keep_days, dry_run } => {
+        Command::Gc {
+            keep_days,
+            dry_run,
+            remote,
+        } => {
             let repo = open(cli.repo, password_file)?;
-            let report = watch(
-                out,
-                repo.gc(GcRequest {
+            let job = match remote {
+                Some(remote) => repo.gc_remote(apeiron::RemoteGcRequest { remote, dry_run })?,
+                None => repo.gc(GcRequest {
                     keep_reflog_days: keep_days,
                     dry_run,
                 })?,
-            )?;
+            };
+            let report = watch(out, job)?;
             out.result(&report, |r| {
                 let verb = if r.dry_run { "Would remove" } else { "Removed" };
                 say!(

@@ -564,7 +564,7 @@ Pull runs the steps of push in the other direction, with the local repository as
 - A remote ref is replaced only after every object it reaches is written on the remote, as in section 9.2.
 - Two programs pushing the same ref at once: the conditional replace lets one win; the other stops with a conflict and changes nothing.
 - An interrupted push or pull is simply run again; it copies the objects that are still not listed. Packs the interruption left without an index take up space until garbage collection of that copy removes them.
-- Garbage collection of a remote copy and two-way sync are left for later work items ([ROADMAP.md](ROADMAP.md) §4).
+- Garbage collection of a remote copy is in 15.8.
 
 ### 15.6 Clone
 
@@ -585,6 +585,19 @@ Pushing or pulling every ref keeps a replica ([REPLICATION.md](REPLICATION.md)).
 2. A ref refused because the other side has snapshots this copy does not (15.3 step 4, 15.4 step 4) is reported with the ref and the next ref is copied. Any other error stops them all, as for one ref.
 
 Push sends the local refs; pull takes the refs the remote lists. Neither deletes a ref the other side has. Every rule of 15.5 holds for each ref, so an interruption leaves each ref either where it was or where it was copied to.
+
+### 15.8 Garbage collection of a remote copy
+
+A remote that only this repository writes to, such as a replica ([REPLICATION.md](REPLICATION.md)), can be cleaned from this repository, without signing in to the machine that holds it.
+
+1. Take the local repository lock exclusive (section 12), so no push or pull of this copy runs meanwhile. Check that the remote `config` has the local `id`.
+2. Write `locks/gc` on the remote as a new file holding the UTC time in RFC 3339 and the host. If it exists and is younger than 24 hours, stop with "locked"; an older one was left by an interrupted run and is replaced.
+3. Mark the live objects: everything the remote refs reach, read from the remote. Remote reflogs are not roots. A missing or damaged reachable object stops the run without deleting anything.
+4. Sort the packs the remote index files list as in 13.2 step 3. A pack no index lists is left alone: another writer may be between writing it and its index.
+5. Copy the live objects of partly dead packs, as stored bytes, into new packs on the remote, then write one new index file that lists every kept and every new pack.
+6. Delete every other index file, then the dead packs, then `locks/gc`.
+
+A dry run does steps 1, 3 and 4 and writes nothing. Push, pull and clone stop with "locked" while a `locks/gc` younger than 24 hours exists, and a push checks again just before it replaces the remote ref, so one that began before the run does not move a ref onto objects the run may delete. A program of an older version does not know `locks/gc`; such a program, or any other repository, must not write to the remote while it is cleaned. Interruptions leave the states of 13.3, plus the lock, which the next run replaces after 24 hours or which can be deleted by hand.
 
 ## 16. Retention rules (`retention/`)
 

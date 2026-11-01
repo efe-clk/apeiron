@@ -110,6 +110,7 @@ When the old primary comes back, its pushes of a ref the new primary has moved p
 | `do = "pull"`, `ref = "*"` in `jobs.toml` | §3 |
 | `push_all`, `pull_all` (API.md §8) | §2, returning a `MirrorReport`: per ref the `TransferReport` or the conflict |
 | `GET /api/health` | §5 |
+| `apeiron gc --remote <remote> [--dry-run]`, `gc_remote` (API.md §8) | Cleans a replica from the primary, without signing in to the replica's machine ([FORMAT.md](FORMAT.md) §15.8): removes what the replica's refs cannot reach. Only for a replica nothing else writes to; pushes wait while it runs |
 | Audit event `replicate` | The remote, the number of refs and objects and the refs left by a conflict, or the error; outcome `ok`, `conflict` or the error's kind |
 
 ## 8. Not part of this work item
@@ -120,7 +121,6 @@ When the old primary comes back, its pushes of a ref the new primary has moved p
 | Two primaries taking backups at once | Not planned; sync between devices (SYNC.md) is the tool for two writers |
 | Copying the audit log and share links to the standby | Later, if a pilot needs it |
 | Deleting refs on the replica that were deleted on the primary | Left to the admin of the replica (§2) |
-| Garbage collection of a replica from the primary | Later; run `apeiron gc` on the replica's machine |
 
 ## 9. Crates
 

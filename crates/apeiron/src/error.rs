@@ -104,7 +104,7 @@ impl From<apeiron_core::Error> for Error {
             }
             E::KeyRequired(path) => Error::new(ErrorKind::Key, message).with_path(path),
             E::WrongKey => Error::new(ErrorKind::Key, message),
-            E::RefLocked { lock, .. } | E::RepoLocked(lock) => {
+            E::RefLocked { lock, .. } | E::RepoLocked(lock) | E::RemoteCleaning(lock) => {
                 Error::new(ErrorKind::Locked, message).with_path(lock)
             }
             E::RefConflict { .. }

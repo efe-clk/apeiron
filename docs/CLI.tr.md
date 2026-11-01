@@ -66,6 +66,7 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | `apeiron verify` | Her paketi, indeksi ve nesneyi okuyup denetler | Tamamlandı |
 | `apeiron repair` | Bayat ref kilitlerini kaldırır, kaybolan reflog satırlarını ekler ve bozuk indeks dosyalarını yeniler | Tamamlandı |
 | `apeiron gc [--keep-days <days>] [--dry-run]` | Hiçbir ref'in ve son 90 günün (ya da `--keep-days`) hiçbir reflog satırının ulaşamadığı veriyi siler; `--dry-run` yalnızca raporlar | Tamamlandı |
+| `apeiron gc --remote <remote> [--dry-run]` | Bir uzak depodan, örneğin bir replikadan, ref'lerinin ulaşamadığı veriyi siler; yalnızca bu deponun tek başına yazdığı bir uzak depo için ([FORMAT.tr.md](FORMAT.tr.md) §15.8) | Tamamlandı |
 | `apeiron key list` | Şifreli bir deponun parolalarını ve kurtarma anahtarlarını listeler | Tamamlandı |
 | `apeiron key add [--recovery] [--new-password-file <file>]` | Bir parola ekler (iki kez sorulur ya da dosyadan okunur); `--recovery` ile bir kez yazdırılan yeni bir kurtarma anahtarı ekler | Tamamlandı |
 | `apeiron remote add <name> <url>` | Bir uzak depo ekler: harici diskteki gibi bir klasör `sftp://[user@]host[:port]/path` ya da `s3://bucket/path?endpoint=…&region=…` (bölüm 2.2) | Tamamlandı |

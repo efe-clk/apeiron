@@ -156,6 +156,7 @@ Every operation takes one plain request value and returns one plain result value
 | `delete_ref` | ref name, expected snapshot | — | No |
 | `repair` | — | `RepairReport`: removed locks, repaired reflogs, packs indexed anew, damaged indexes removed | No |
 | `gc` | days of reflog to keep (default 90), dry run | `GcReport`: live objects, removed objects, bytes and packs, packs written | Yes |
+| `gc_remote` | remote name, dry run | `GcReport` for the remote ([FORMAT.md](FORMAT.md) §15.8); `locked` while another cleanup runs there | Yes |
 | `keys` | — | `Vec<KeyInfo>`: id, kind (`password` or `recovery`), when it was added, whether it opened the repository | No |
 | `add_password` | new password | `AddedKey`: id | No |
 | `add_recovery_key` | — | `AddedKey`: id and the new recovery key, shown to the user once | No |
