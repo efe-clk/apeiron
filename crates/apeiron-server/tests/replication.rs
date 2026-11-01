@@ -197,7 +197,14 @@ fn a_backup_reaches_the_replica_and_the_standby_serves_it() {
         "/api/call/refs",
         Some(json!({})),
     );
-    assert_eq!(refs[0]["snapshot"], json!(snapshot));
+    let home = |refs: &Value| {
+        refs.as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["name"] == "backup/home")
+            .map(|r| r["snapshot"].clone())
+    };
+    assert_eq!(home(&refs), Some(json!(snapshot)), "{refs}");
     let refused = backup(b, &on_standby, &standby_dir.join("home"));
     assert_eq!(refused["kind"], "unsupported", "{refused}");
     assert!(
@@ -217,6 +224,23 @@ fn a_backup_reaches_the_replica_and_the_standby_serves_it() {
             "/api/call/refs",
             Some(json!({})),
         );
-        refs[0]["snapshot"] == later
+        home(&refs) == Some(later.clone())
     }));
+
+    // A link made on the primary works on the standby (REPLICATION.md §6.1).
+    let (status, _, made) = send(
+        a,
+        Some(&on_primary),
+        "POST",
+        "/api/shares",
+        Some(json!({"snapshot": snapshot, "days": 1})),
+    );
+    assert_eq!(status, 200, "{made}");
+    let path = format!("/api/shared/{}", made["secret"].as_str().unwrap());
+    assert!(eventually(|| send(b, None, "GET", &path, None).0 == 200));
+    let copied = fs::read_to_string(standby_dir.join("shares.json")).unwrap();
+    assert!(copied.contains("\"copied\": true"), "{copied}");
+    // The primary's audit log is in the replica, for an admin only.
+    let primary_log = Repository::open(&replica).unwrap().resolve("apeiron/web");
+    assert!(primary_log.is_ok());
 }

@@ -97,8 +97,16 @@ When the old primary comes back, its pushes of a ref the new primary has moved p
 | --- | --- |
 | Users and identity provider (`web.json`), tenants (`tenants.json`) | Copied to the standby by the admin, for example with the configuration management already in use; they hold no backup data |
 | Password of an encrypted repository | The same password opens the replica |
-| Audit log | Each server keeps its own; the primary's stays on the primary |
-| Share links | Each server keeps its own; links made on the primary do not work on the standby |
+| Audit log | Each server keeps its own; a copy of the primary's reaches the replica (§6.1) |
+| Share links | Links made on the primary reach the standby and work there (§6.1); links made on the standby stay there |
+
+### 6.1 The primary's audit log and links in the replica
+
+A primary with `--replicate` keeps a copy of its audit log, with every part (AUDIT.md §3), and of its share links (SHARE.md §3) as a snapshot of the ref `apeiron/web`: `audit/` holds the log's files and `shares.json` the links, with their hashes only, never their secrets. A new copy is made in the next round (§4) after a link is made or removed, and when only the log changed, at most every five minutes. The ref is pushed with the others, so the replica holds the copy, encrypted as everything else when the repository is.
+
+A standby looks at `apeiron/web` every five seconds; when it moved, the standby takes the links in it into its own `shares.json`, marked `"copied": true`. A link made on the primary therefore opens on the standby a few seconds after the push; its downloads are counted on each server apart, and the higher count is kept when a new copy comes. A link removed on the primary goes from the standby with the next copy. Links made on the standby are left alone.
+
+After taking over (§5), the old primary's audit log can be read with `apeiron restore apeiron/web <folder>`; its lines keep their hashes, so its chain can still be checked (AUDIT.md §3). The new primary goes on with its own log. Refs under `apeiron/` belong to an `admin` only: no pattern in a user's `backups` reaches them, and the pages leave them out of the list of backups.
 
 ## 7. In the pages, the JSON API, the CLI and the audit log
 
@@ -119,7 +127,6 @@ When the old primary comes back, its pushes of a ref the new primary has moved p
 | --- | --- |
 | Taking over without an admin | Not planned: deciding that the primary is down is where automatic systems make two primaries |
 | Two primaries taking backups at once | Not planned; sync between devices (SYNC.md) is the tool for two writers |
-| Copying the audit log and share links to the standby | Later, if a pilot needs it |
 | Deleting refs on the replica that were deleted on the primary | Left to the admin of the replica (§2) |
 
 ## 9. Crates

@@ -877,6 +877,8 @@ async fn share_add(
                     let _ = web.shares.remove(&share.id, |_| true);
                     return Err(e);
                 }
+                // The standby gets the link with the next copy (REPLICATION.md §6.1).
+                web.replicate_now();
                 Ok(json!({"share": share.public(), "secret": secret}))
             }
             Err(e) => {
@@ -927,6 +929,7 @@ async fn share_remove(
             json!({ "id": id }),
             &outcome(removed.as_ref().map(|_| ())),
         )?;
+        web.replicate_now();
         removed.map(|_| ())
     })
     .await?;

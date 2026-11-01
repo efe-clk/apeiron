@@ -412,7 +412,9 @@ async function overview() {
   show(h("p", {}, t("loading")));
   try {
     // `folder/…` refs hold the state of synced folders (SYNC.md §3).
-    const refs = (await call("refs")).filter((r) => !r.name.startsWith("folder/"));
+    // Refs of the program itself, such as the primary's copy of its audit
+    // log (REPLICATION.md §6.1), are not backups.
+    const refs = (await call("refs")).filter((r) => !r.name.startsWith("folder/") && !r.name.startsWith("apeiron/"));
     if (refs.length === 0) {
       show(
         h("h1", {}, t("overview_heading")),

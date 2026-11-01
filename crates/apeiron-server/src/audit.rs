@@ -283,6 +283,16 @@ impl Audit {
         &self.file
     }
 
+    /// The parts the log went on from and `audit.log`, oldest first; only
+    /// those that exist.
+    pub(crate) fn files(&self) -> Result<Vec<PathBuf>, Error> {
+        let mut files = self.parts()?;
+        if self.file.exists() {
+            files.push(self.file.clone());
+        }
+        Ok(files)
+    }
+
     /// Appends an event and flushes it to disk.
     pub fn record(
         &self,

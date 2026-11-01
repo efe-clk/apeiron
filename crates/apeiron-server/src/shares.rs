@@ -83,6 +83,9 @@ pub struct Share {
     /// the files go into (SHARE.md §7).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub upload: Option<String>,
+    /// Copied from the primary to this standby (REPLICATION.md §6.1).
+    #[serde(skip_serializing_if = "std::ops::Not::not", default)]
+    pub copied: bool,
 }
 
 impl Share {
@@ -270,6 +273,7 @@ impl Shares {
             max_downloads: options.downloads,
             downloads: 0,
             upload: options.upload.clone(),
+            copied: false,
         };
         self.change(|shares| {
             shares.push(share.clone());
@@ -301,6 +305,39 @@ impl Shares {
         self.change(|shares| {
             let share = shares.iter_mut().find(|s| s.id == id).ok_or_else(gone)?;
             share.downloads += 1;
+            Ok(())
+        })
+    }
+
+    /// The file the links are kept in.
+    pub(crate) fn file(&self) -> &Path {
+        &self.file
+    }
+
+    /// Replaces the links copied from the primary with `primary`'s, which
+    /// are the links of its shares file (REPLICATION.md §6.1); links made
+    /// here stay, and a copied link keeps the downloads counted here when
+    /// they are more.
+    pub(crate) fn take_copies(&self, primary: &[u8]) -> Result<(), Error> {
+        let primary: Stored = serde_json::from_slice(primary)
+            .map_err(|e| Error::new(ErrorKind::Corrupt, format!("the primary's links: {e}")))?;
+        self.change(|shares| {
+            let counted: Vec<(String, u32)> = shares
+                .iter()
+                .filter(|s| s.copied)
+                .map(|s| (s.id.clone(), s.downloads))
+                .collect();
+            shares.retain(|s| !s.copied);
+            for mut share in primary.shares {
+                if shares.iter().any(|s| s.id == share.id) {
+                    continue;
+                }
+                if let Some((_, here)) = counted.iter().find(|(id, _)| *id == share.id) {
+                    share.downloads = share.downloads.max(*here);
+                }
+                share.copied = true;
+                shares.push(share);
+            }
             Ok(())
         })
     }

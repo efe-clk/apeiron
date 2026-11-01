@@ -78,12 +78,15 @@ pub struct User {
 
 impl User {
     /// Whether the user's backups include `name`.
+    /// Refs under `apeiron/`, such as the primary's audit log and links
+    /// (REPLICATION.md §6.1), are an admin's only.
     pub fn owns(&self, name: &str) -> bool {
         self.role == Role::Admin
-            || self.backups.iter().any(|b| match b.strip_suffix('*') {
-                Some(prefix) => name.starts_with(prefix),
-                None => b == name,
-            })
+            || (!name.starts_with("apeiron/")
+                && self.backups.iter().any(|b| match b.strip_suffix('*') {
+                    Some(prefix) => name.starts_with(prefix),
+                    None => b == name,
+                }))
     }
 
     /// Whether `password` is the user's password.

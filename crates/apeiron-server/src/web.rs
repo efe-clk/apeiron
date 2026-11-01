@@ -1532,6 +1532,9 @@ pub(crate) fn site(site: Site) -> Result<Arc<App>, Error> {
     });
     if let Mode::Web(web) = &app.mode {
         web.replicate_now();
+        if web.standby() {
+            crate::replicate::follow(Arc::downgrade(&app));
+        }
     }
     Ok(app)
 }

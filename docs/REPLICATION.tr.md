@@ -97,8 +97,16 @@ Eski birincil geri geldiğinde, yeni birincilin ilerlediği bir ref'i push etmes
 | --- | --- |
 | Kullanıcılar ve kimlik sağlayıcısı (`web.json`), kiracılar (`tenants.json`) | Admin tarafından, örneğin zaten kullanılan yapılandırma yönetimiyle yedek sunucuya kopyalanır; yedek verisi tutmazlar |
 | Şifreli bir deponun parolası | Aynı parola replikayı açar |
-| Denetim kaydı | Her sunucu kendininkini tutar; birincilinki birincilde kalır |
-| Paylaşım bağlantıları | Her sunucu kendininkini tutar; birincilde oluşturulan bağlantılar yedek sunucuda çalışmaz |
+| Denetim kaydı | Her sunucu kendininkini tutar; birincilinkinin bir kopyası replikaya ulaşır (§6.1) |
+| Paylaşım bağlantıları | Birincilde oluşturulan bağlantılar yedek sunucuya ulaşır ve orada çalışır (§6.1); yedek sunucuda oluşturulanlar orada kalır |
+
+### 6.1 Birincilin denetim kaydı ve bağlantıları replikada
+
+`--replicate` ile çalışan bir birincil, denetim kaydının her parçasıyla (AUDIT.tr.md §3) bir kopyasını ve paylaşım bağlantılarının (SHARE.tr.md §3) bir kopyasını `apeiron/web` ref'inin bir sürümü olarak tutar: `audit/` kaydın dosyalarını, `shares.json` ise bağlantıları tutar; bağlantıların yalnızca özetleri, gizli değerleri asla. Bir bağlantı oluşturulduktan ya da kaldırıldıktan sonraki ilk turda (§4) yeni bir kopya alınır; yalnızca kayıt değiştiyse en fazla beş dakikada bir. Ref diğerleriyle birlikte push edilir; böylece kopya replikada, depo şifreliyse her şey gibi şifreli olarak durur.
+
+Yedek sunucu `apeiron/web`'e her beş saniyede bir bakar; ref ilerlemişse içindeki bağlantıları kendi `shares.json` dosyasına `"copied": true` işaretiyle alır. Böylece birincilde oluşturulan bir bağlantı, push'tan birkaç saniye sonra yedek sunucuda da açılır; indirmeleri her sunucuda ayrı sayılır ve yeni bir kopya geldiğinde büyük olan sayı korunur. Birincilde kaldırılan bir bağlantı sonraki kopyayla yedek sunucudan da gider. Yedek sunucuda oluşturulan bağlantılara dokunulmaz.
+
+Devraldıktan sonra (§5) eski birincilin denetim kaydı `apeiron restore apeiron/web <klasör>` ile okunabilir; satırları özetlerini koruduğu için zinciri yine denetlenebilir (AUDIT.tr.md §3). Yeni birincil kendi kaydıyla devam eder. `apeiron/` altındaki ref'ler yalnızca bir `admin`'indir: bir kullanıcının `backups` listesindeki hiçbir kalıp onlara ulaşmaz ve sayfalar onları yedek listesinde göstermez.
 
 ## 7. Sayfalarda, JSON API'de, CLI'da ve denetim kaydında
 
@@ -119,7 +127,6 @@ Eski birincil geri geldiğinde, yeni birincilin ilerlediği bir ref'i push etmes
 | --- | --- |
 | Admin olmadan görevi devralmak | Planlanmadı: birincilin kapalı olduğuna karar vermek, otomatik sistemlerin iki birincil oluşturduğu yerdir |
 | Aynı anda yedek alan iki birincil | Planlanmadı; iki yazar için araç cihazlar arası senkrondur (SYNC.tr.md) |
-| Denetim kaydını ve paylaşım bağlantılarını yedek sunucuya kopyalamak | Sonra, bir pilot gerektirirse |
 | Birincilde silinen ref'leri replikada silmek | Replikanın admin'ine bırakılır (§2) |
 
 ## 9. Crate'ler
