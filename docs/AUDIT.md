@@ -17,6 +17,7 @@ When several people share a backup server, the admin must be able to answer "who
 | `call:<operation>` | Every short operation, such as `list` or `log` | The request after the checks of USERS.md §4, with snapshots as ids and paths resolved; a `password` in it is written as `null` |
 | `start:<operation>` | Every long operation started: `backup`, `restore`, `verify`, `search` | The same |
 | `done:<operation>` | When the result of a long operation is collected | The job number |
+| `start:backup`, `done:backup`, `start:restore`, `done:restore` with `"via": "cli"` | `apeiron backup` and `apeiron restore`, when the web server of this computer has an audit log: that of the tenant whose repository it is, or else the server's own | The repository, the folder or snapshot and target, and at the end the new snapshot or the files and bytes restored; the outcome is the error kind if it failed. A start that cannot be recorded stops the command |
 | `cancel` | A request to stop a job | The job number |
 | `share_add`, `share_remove` | Making or removing a share link | The link's id, version, path and end ([SHARE.md](SHARE.md) §6) |
 | `shared:list`, `shared:read`, `shared:upload` | Every use of a share link, without signing in; `shared:upload` names the file sent ([SHARE.md](SHARE.md) §7) | The link's id and the path; never the link's secret |
@@ -27,7 +28,7 @@ When several people share a backup server, the admin must be able to answer "who
 | `replicate` | Each push to a replica by the web server | The remote, refs and objects, the refs left by a conflict, or the error ([REPLICATION.md](REPLICATION.md) §7) |
 | `tenant_add`, `tenant_remove` | `apeiron web tenant`, in that tenant's own log | The tenant's settings ([TENANTS.md](TENANTS.md) §5) |
 
-An operation refused by the checks is recorded with its error, so attempts are visible too. Polling a job, the session state and the folder browser are not recorded. The desktop interface records nothing: it serves only the person who runs it.
+An operation refused by the checks is recorded with its error, so attempts are visible too. Polling a job, the session state and the folder browser are not recorded. The desktop interface records nothing: it serves only the person who runs it. The CLI's other commands are not recorded; the repository's reflog records every ref change.
 
 ## 2. The file
 
@@ -41,8 +42,8 @@ The log is `audit.log` in the state folder (`~/.local/state/apeiron` on Linux), 
 | --- | --- |
 | `seq` | 1 for the first line, one more for each next line |
 | `time` | UTC time of the event |
-| `user` | The signed-in user; absent for `apeiron web user`, for sign-ins that failed and for uses of a share link |
-| `from` | The address and port of the browser's connection; behind a proxy, the proxy's |
+| `user` | The signed-in user, or for the CLI the system user who ran it; absent for `apeiron web user`, for sign-ins that failed and for uses of a share link |
+| `from` | The address and port of the browser's connection; behind a proxy, the proxy's; `cli` for the CLI |
 | `event`, `detail` | §1; strings in `detail` longer than 256 characters are cut |
 | `outcome` | `ok`, or the error kind (`not_found`, `key`, `unsupported` …); a long operation is recorded as `ok` when it is allowed and starts, and its result comes with `done:` |
 | `prev` | SHA-256 of the previous line's bytes, hex; 64 zeros on the first line |
@@ -74,7 +75,6 @@ The file stays the record: an event is sent only after it is on disk, and an eve
 
 | Item | Where |
 | --- | --- |
-| Recording the CLI's own backups and restores | Later; the repository's reflog already records every ref change |
 | Archiving old parts elsewhere | Left to the admin: the parts are plain files that never change once renamed |
 
 ## 7. Crates

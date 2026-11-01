@@ -17,6 +17,7 @@ Birkaç kişi bir yedek sunucusunu paylaştığında admin, "bu klasörü kim, n
 | `call:<operation>` | `list` ya da `log` gibi her kısa işlem | USERS.tr.md §4'teki denetimlerden sonraki istek; snapshot'lar kimlik olarak, yollar çözülmüş olarak; içindeki bir `password` `null` olarak yazılır |
 | `start:<operation>` | Başlatılan her uzun işlem: `backup`, `restore`, `verify`, `search` | Aynısı |
 | `done:<operation>` | Uzun bir işlemin sonucu alındığında | İş numarası |
+| `"via": "cli"` ile `start:backup`, `done:backup`, `start:restore`, `done:restore` | Bu bilgisayardaki web sunucusunun bir denetim kaydı varsa `apeiron backup` ve `apeiron restore`: deposu bu olan kiracınınki, yoksa sunucunun kendisininki | Depo, klasör ya da sürüm ve hedef; sonunda yeni sürüm ya da geri yüklenen dosyalar ve baytlar; başarısız olduysa sonuç hata türüdür. Başlangıcı kaydedilemeyen komut çalışmaz |
 | `cancel` | Bir işi durdurma isteği | İş numarası |
 | `share_add`, `share_remove` | Bir paylaşım bağlantısı oluşturmak ya da kaldırmak | Bağlantının kimliği, sürümü, yolu ve bitişi ([SHARE.tr.md](SHARE.tr.md) §6) |
 | `shared:list`, `shared:read`, `shared:upload` | Bir paylaşım bağlantısının oturum açmadan her kullanımı; `shared:upload` gönderilen dosyayı adlandırır ([SHARE.tr.md](SHARE.tr.md) §7) | Bağlantının kimliği ve yol; bağlantının gizli kısmı asla |
@@ -27,7 +28,7 @@ Birkaç kişi bir yedek sunucusunu paylaştığında admin, "bu klasörü kim, n
 | `replicate` | Web sunucusunun bir replikaya yaptığı her push | Uzak depo, ref'ler ve nesneler, bir çatışmanın bıraktığı ref'ler ya da hata ([REPLICATION.tr.md](REPLICATION.tr.md) §7) |
 | `tenant_add`, `tenant_remove` | `apeiron web tenant`, o kiracının kendi kaydında | Kiracının ayarları ([TENANTS.tr.md](TENANTS.tr.md) §5) |
 
-Denetimlerin reddettiği bir işlem hatasıyla kaydedilir; böylece denemeler de görünür. Bir işin durumunu yoklamak, oturum durumu ve klasör seçici kaydedilmez. Masaüstü arayüzü hiçbir şey kaydetmez: yalnızca onu çalıştıran kişiye hizmet eder.
+Denetimlerin reddettiği bir işlem hatasıyla kaydedilir; böylece denemeler de görünür. Bir işin durumunu yoklamak, oturum durumu ve klasör seçici kaydedilmez. Masaüstü arayüzü hiçbir şey kaydetmez: yalnızca onu çalıştıran kişiye hizmet eder. CLI'nın diğer komutları kaydedilmez; deponun reflog'u her ref değişikliğini kaydeder.
 
 ## 2. Dosya
 
@@ -41,8 +42,8 @@ Kayıt, durum klasöründeki (Linux'ta `~/.local/state/apeiron`) `audit.log` dos
 | --- | --- |
 | `seq` | İlk satırda 1, sonraki her satırda bir fazlası |
 | `time` | Olayın UTC zamanı |
-| `user` | Oturum açmış kullanıcı; `apeiron web user`, başarısız oturum açmalar ve paylaşım bağlantısı kullanımları için yoktur |
-| `from` | Tarayıcı bağlantısının adresi ve kapısı; bir vekilin arkasında vekilinki |
+| `user` | Oturum açmış kullanıcı ya da CLI için onu çalıştıran sistem kullanıcısı; `apeiron web user`, başarısız oturum açmalar ve paylaşım bağlantısı kullanımları için yoktur |
+| `from` | Tarayıcı bağlantısının adresi ve kapısı; bir vekilin arkasında vekilinki; CLI için `cli` |
 | `event`, `detail` | §1; `detail` içindeki 256 karakterden uzun dizeler kesilir |
 | `outcome` | `ok` ya da hata türü (`not_found`, `key`, `unsupported` …); uzun bir işlem izin verilip başladığında `ok` olarak kaydedilir, sonucu `done:` ile gelir |
 | `prev` | Önceki satırın baytlarının SHA-256 özeti, onaltılık; ilk satırda 64 sıfır |
@@ -74,7 +75,6 @@ Kayıt yine dosyadır: bir olay ancak diske yazıldıktan sonra gönderilir ve g
 
 | Konu | Nerede |
 | --- | --- |
-| CLI'nın kendi yedeklerini ve geri yüklemelerini kaydetmek | Sonra; deponun reflog'u her ref değişikliğini zaten kaydeder |
 | Eski parçaları başka bir yerde arşivlemek | Admin'e bırakılır: parçalar, yeniden adlandırıldıktan sonra hiç değişmeyen düz dosyalardır |
 
 ## 7. Crate'ler

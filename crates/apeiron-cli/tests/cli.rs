@@ -776,3 +776,47 @@ fn the_text_plugin_merges_lines_and_shows_differences() {
         "{\n  \"port\": 8080,\n  \"name\": \"b\"\n}\n"
     );
 }
+
+/// Backups and restores of the CLI go into the web server's audit log when
+/// there is one (AUDIT.md §1).
+#[cfg(target_os = "linux")]
+#[test]
+fn cli_backups_and_restores_are_recorded() {
+    let s = Setup::new();
+    let state = s.root.join("state");
+    let run = |args: &[&str], with_log: bool| {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_apeiron"));
+        command
+            .args(args)
+            .env("APEIRON_REPO", s.repo())
+            .env("XDG_CONFIG_HOME", s.root.join("config"))
+            .env("XDG_STATE_HOME", &state);
+        let out = command.output().unwrap();
+        assert_eq!(code(&out), Some(0), "{args:?} {with_log}");
+        out.stdout
+    };
+    // Without a log nothing is written.
+    run(&["backup", &s.path("src")], false);
+    assert!(!state.join("apeiron/audit.log").exists());
+
+    fs::create_dir_all(state.join("apeiron")).unwrap();
+    fs::write(state.join("apeiron/audit.log"), b"").unwrap();
+    run(&["backup", &s.path("src")], true);
+    run(&["restore", "main", &s.path("out")], true);
+    let shown: serde_json::Value =
+        serde_json::from_slice(&run(&["--json", "web", "audit", "show"], true)).unwrap();
+    let events: Vec<&str> = shown
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["event"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        events,
+        ["start:backup", "done:backup", "start:restore", "done:restore"]
+    );
+    assert_eq!(shown[0]["from"], "cli");
+    assert_eq!(shown[1]["detail"]["via"], "cli");
+    assert!(shown[1]["detail"]["snapshot"].is_string());
+    run(&["web", "audit", "verify"], true);
+}

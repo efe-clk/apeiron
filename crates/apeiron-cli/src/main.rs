@@ -1652,6 +1652,79 @@ fn open(cli_repo: Option<PathBuf>, password_file: Option<&Path>) -> Result<Repos
     unlock(&path, password_file, "Password or recovery key: ")
 }
 
+/// The audit log a backup or restore of the CLI is recorded in (AUDIT.md
+/// §1): that of the tenant whose repository it is, or else the web
+/// server's, if there is one on this computer.
+struct CliAudit {
+    log: Option<(apeiron_server::Audit, PathBuf)>,
+    actor: apeiron_server::Actor,
+}
+
+impl CliAudit {
+    fn find(repo: Option<&Path>) -> Result<CliAudit, Failure> {
+        let actor = apeiron_server::Actor {
+            user: std::env::var("USER")
+                .or_else(|_| std::env::var("USERNAME"))
+                .ok(),
+            from: Some("cli".to_owned()),
+        };
+        let Some(repo) = repo.and_then(|r| std::fs::canonicalize(r).ok()) else {
+            return Ok(CliAudit { log: None, actor });
+        };
+        let same = |path: &Path| std::fs::canonicalize(path).is_ok_and(|p| p == repo);
+        let tenants = match tenants_file() {
+            Ok(file) if file.exists() => apeiron_server::Tenants::load(&file)?.tenants,
+            _ => Vec::new(),
+        };
+        let audit = match tenants.iter().find(|t| same(&t.repo)) {
+            Some(t) => Some(WebFiles::of_tenant(t)?.audit),
+            None => apeiron_server::Audit::default_file().map(apeiron_server::Audit::new),
+        };
+        let log = audit.filter(|a| a.file().exists()).map(|a| (a, repo));
+        Ok(CliAudit { log, actor })
+    }
+
+    /// Records `start:<operation>` before it runs; if that fails, it does
+    /// not run.
+    fn start(&self, operation: &str, detail: &serde_json::Value) -> Result<(), Failure> {
+        let Some((audit, repo)) = &self.log else {
+            return Ok(());
+        };
+        let mut detail = detail.clone();
+        detail["repo"] = serde_json::json!(repo);
+        detail["via"] = serde_json::json!("cli");
+        audit.record(&self.actor, &format!("start:{operation}"), detail, "ok")?;
+        Ok(())
+    }
+
+    /// Records `done:<operation>` with what `result` says, then returns it.
+    fn done<T>(
+        &self,
+        operation: &str,
+        result: Result<T, Failure>,
+        detail: impl Fn(&T) -> serde_json::Value,
+    ) -> Result<T, Failure> {
+        let Some((audit, repo)) = &self.log else {
+            return result;
+        };
+        let (mut detail, outcome) = match &result {
+            Ok(value) => (detail(value), "ok".to_owned()),
+            Err(Failure::Api(e)) => (
+                serde_json::json!({}),
+                serde_json::to_value(e.kind)
+                    .ok()
+                    .and_then(|v| v.as_str().map(str::to_owned))
+                    .unwrap_or_else(|| "error".to_owned()),
+            ),
+            Err(_) => (serde_json::json!({}), "internal".to_owned()),
+        };
+        detail["repo"] = serde_json::json!(repo);
+        detail["via"] = serde_json::json!("cli");
+        audit.record(&self.actor, &format!("done:{operation}"), detail, &outcome)?;
+        result
+    }
+}
+
 /// Opens the repository at `path`, asking with `asking` for the password of
 /// an encrypted one unless `password_file` holds it.
 fn unlock(path: &Path, password_file: Option<&Path>, asking: &str) -> Result<Repository, Failure> {
@@ -1749,12 +1822,24 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             author,
             host,
         } => {
+            let audit = CliAudit::find(cli.repo.as_deref())?;
             let repo = open(cli.repo, password_file)?;
             let mut request = BackupRequest::new(folder, ref_name.clone());
             request.message = message;
             request.author = author;
             request.host = host;
-            let report = watch(out, repo.backup(request)?)?;
+            let detail = serde_json::json!({
+                "source": request.source,
+                "ref": request.ref_name,
+            });
+            audit.start("backup", &detail)?;
+            let report = audit.done(
+                "backup",
+                repo.backup(request)
+                    .map_err(Failure::from)
+                    .and_then(|job| watch(out, job)),
+                |r| serde_json::json!({ "snapshot": r.snapshot }),
+            )?;
             out.result(&report, |r| {
                 say!(
                     "Snapshot {} ({ref_name}): {}, {}, {} read, {} new",
@@ -1848,14 +1933,27 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             target,
             path,
         } => {
+            let audit = CliAudit::find(cli.repo.as_deref())?;
             let repo = open(cli.repo, password_file)?;
-            let report = watch(
-                out,
-                repo.restore(RestoreRequest {
-                    snapshot,
-                    target: target.clone(),
-                    path: Name::from(path.as_str()),
-                })?,
+            let request = RestoreRequest {
+                snapshot,
+                target: target.clone(),
+                path: Name::from(path.as_str()),
+            };
+            audit.start(
+                "restore",
+                &serde_json::json!({
+                    "snapshot": request.snapshot,
+                    "target": request.target,
+                    "path": request.path,
+                }),
+            )?;
+            let report = audit.done(
+                "restore",
+                repo.restore(request)
+                    .map_err(Failure::from)
+                    .and_then(|job| watch(out, job)),
+                |r| serde_json::json!({ "files": r.files, "bytes": r.bytes }),
             )?;
             out.result(&report, |r| {
                 say!(
