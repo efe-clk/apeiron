@@ -64,15 +64,20 @@ Her satır kendinden öncekinin özetini tuttuğu için bir satırı değiştirm
 | Etkinlik sayfası | Web arayüzündeki bir `admin` için: en yeni 200 olay, en yenisi önce |
 | `GET /api/audit?limit=<n>` | Bir `admin` için aynısı; diğerleri `unsupported` alır |
 
-## 5. Bu işin parçası olmayanlar
+## 5. Syslog'da bir kopya
+
+`apeiron web --audit-syslog <target>`, her olayı dosyaya yazdıktan sonra bir syslog sunucusuna (`udp://host:port`) ya da yerel bir syslog soketine (Linux'ta `/dev/log`) da gönderir; böylece merkezi bir kayıt hizmeti, sunucunun geri alamayacağı bir kopya tutar. Her olay, `authpriv` tesisi ve `info` önem düzeyiyle bir RFC 5424 iletisidir; uygulama adı `apeiron`, `--tenants` ile `apeiron-<tenant>`, ileti kimliği olayın adı, ileti ise olayın dosyadaki satırının ta kendisidir, `seq` ve `prev` alanlarıyla birlikte; böylece kopya zincirle karşılaştırılabilir.
+
+Kayıt yine dosyadır: bir olay ancak diske yazıldıktan sonra gönderilir ve gönderilemeyen bir olay isteği durdurmaz; sunucu, hata çıktısına olayın `seq` numarasıyla bir uyarı yazar, merkezi hizmetin aldığı `seq` numaralarındaki boşluk da bunu gösterir. UDP iletileri uyarı vermeden kaybedebilir; TCP ya da TLS üzerinden ileten bir syslog hizmetine giden yerel bir soket kaybetmez.
+
+## 6. Bu işin parçası olmayanlar
 
 | Konu | Nerede |
 | --- | --- |
 | CLI'nın kendi yedeklerini ve geri yüklemelerini kaydetmek | Sonra; deponun reflog'u her ref değişikliğini zaten kaydeder |
-| Olayları syslog'a ya da merkezi bir kayıt hizmetine göndermek | Aşama 5 |
 | Eski parçaları başka bir yerde arşivlemek | Admin'e bırakılır: parçalar, yeniden adlandırıldıktan sonra hiç değişmeyen düz dosyalardır |
 
-## 6. Crate'ler
+## 7. Crate'ler
 
 | Crate | Görevi | Durum |
 | --- | --- | --- |

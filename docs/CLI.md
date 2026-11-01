@@ -100,6 +100,7 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | `apeiron retention add <refs> --days <n>`, `apeiron retention list` | Keeps the refs a name or a prefix followed by `*` matches as an archive: they only move forward and are not deleted until the days have passed since their last change; a rule can never be removed ([ARCHIVE.md](ARCHIVE.md)) | Done |
 | `apeiron push --all <remote>`, `apeiron pull --all <remote> [--rate <speed>]` | Pushes or pulls every ref, to keep a replica or a standby; a ref with a conflict is left and named, the others are copied; exit code 3 then ([REPLICATION.md](REPLICATION.md)) | Done |
 | `apeiron web … [--replicate <remote>]... [--standby]` | Pushes every ref to each replica after each backup, or serves a standby copy that takes no backups ([REPLICATION.md](REPLICATION.md)) | Done |
+| `apeiron web … --audit-syslog <target>` | Also sends each audit event to a syslog server (`udp://host:port`) or a local socket such as `/dev/log` ([AUDIT.md](AUDIT.md) §5) | Done |
 | `apeiron key remove <id>` | Removes a password or recovery key; the last one cannot be removed | Done |
 
 A `<snapshot>` can be written as a ref name (`main`), a full snapshot id, or the first 8 or more characters of an id if they match exactly one snapshot. A `~N` suffix goes N steps back through first parents: `main~1` is the snapshot before `main`.

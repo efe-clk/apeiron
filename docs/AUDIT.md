@@ -64,15 +64,20 @@ When `audit.log` has grown past 16 MiB, about 50 000 events, the next event firs
 | The Activity page | For an `admin` in the web interface: the newest 200 events, newest first |
 | `GET /api/audit?limit=<n>` | The same for an `admin`; others get `unsupported` |
 
-## 5. Not part of this work item
+## 5. A copy in syslog
+
+`apeiron web --audit-syslog <target>` also sends each event, after it is written to the file, to a syslog server (`udp://host:port`) or a local syslog socket (`/dev/log` on Linux), so that a central log service holds a copy the server cannot take back. Each event is one RFC 5424 message with the facility `authpriv` and the severity `info`; the app name is `apeiron`, or `apeiron-<tenant>` with `--tenants`, the message id is the event's name, and the message is the event's line exactly as in the file, with its `seq` and `prev`, so the copy can be checked against the chain.
+
+The file stays the record: an event is sent only after it is on disk, and an event that cannot be sent does not stop the request; the server writes a warning with its `seq` to its error output, and the gap in the `seq` numbers the central service received shows it too. UDP may lose messages without a warning; a local socket to a syslog daemon that forwards over TCP or TLS does not.
+
+## 6. Not part of this work item
 
 | Item | Where |
 | --- | --- |
 | Recording the CLI's own backups and restores | Later; the repository's reflog already records every ref change |
-| Sending events to syslog or a central log service | Stage 5 |
 | Archiving old parts elsewhere | Left to the admin: the parts are plain files that never change once renamed |
 
-## 6. Crates
+## 7. Crates
 
 | Crate | Role | Status |
 | --- | --- | --- |

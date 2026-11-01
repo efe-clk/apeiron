@@ -28,7 +28,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-pub use audit::{Actor, Audit, Event, Verified};
+pub use audit::{Actor, Audit, Event, Syslog, Verified};
 pub use oidc::{OidcConfig, Provider, check_provider};
 pub use shares::{DEFAULT_DAYS, LinkOptions, MAX_DAYS, MAX_DOWNLOADS, Share, Shares};
 pub use tenants::{Tenant, Tenants};

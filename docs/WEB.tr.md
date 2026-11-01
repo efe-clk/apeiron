@@ -38,6 +38,7 @@ apeiron web --repo /srv/backup --listen 0.0.0.0:8443 --folder /home/efe
 | `--folder` | Sunucunun kullanıcılara verilebilen bir klasörü (USERS.tr.md §1); birden çok kez verilebilir | Ev klasörü |
 | `--replicate` | Her yedekten sonra her ref'in push edildiği bir uzak depo ([REPLICATION.tr.md](REPLICATION.tr.md) §4); birden çok kez verilebilir | Yok |
 | `--standby` | Bir yedek sunucu kopyası sunar: yedek almak dışında her şey ([REPLICATION.tr.md](REPLICATION.tr.md) §5) | Kapalı |
+| `--audit-syslog` | Her denetim olayını syslog'a da gönderir: `udp://host:port` ya da `/dev/log` gibi yerel bir soket ([AUDIT.tr.md](AUDIT.tr.md) §5) | Yok |
 
 `--cert` ve `--key` verilmezse, `localhost` ve dinlenen adres için kendinden imzalı bir sertifika bir kez oluşturulur ve yapılandırma klasöründe tutulur (`web-cert.pem`, `web-key.pem` ve oluşturulduğu adlarla `web-cert.names`); yalnızca yeni bir kiracının ana makinesi gibi yeni bir ad gerektiğinde yeniden oluşturulur ([TENANTS.tr.md](TENANTS.tr.md) §3). SHA-256 parmak izi başlarken yazılır; tarayıcı bir kez uyarır ve gösterdiği parmak izi yazılanla aynı olmalıdır.
 

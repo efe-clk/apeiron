@@ -77,11 +77,88 @@ fn shorten(value: Value) -> Value {
     }
 }
 
+/// Where a copy of each event is sent (AUDIT.md §5).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Syslog {
+    /// A syslog server, as `host:port`, over UDP.
+    Udp(String),
+    /// A local syslog socket, such as `/dev/log`.
+    #[cfg(unix)]
+    Socket(PathBuf),
+}
+
+impl std::str::FromStr for Syslog {
+    type Err = String;
+
+    /// `udp://host:port`, or the path of a local socket.
+    fn from_str(text: &str) -> Result<Self, String> {
+        if let Some(address) = text.strip_prefix("udp://") {
+            return if address.contains(':') {
+                Ok(Syslog::Udp(address.to_owned()))
+            } else {
+                Err(format!("{text}: a port is needed, as in udp://logs:514"))
+            };
+        }
+        #[cfg(unix)]
+        if text.starts_with('/') {
+            return Ok(Syslog::Socket(PathBuf::from(text)));
+        }
+        Err(format!(
+            "{text}: give udp://host:port or the path of a local socket such as /dev/log"
+        ))
+    }
+}
+
+/// Facility `authpriv` (10), severity `info` (6).
+const PRIORITY: u8 = 10 * 8 + 6;
+
+impl Syslog {
+    /// Sends `line`, an event of the log, as one RFC 5424 message from
+    /// the program `app`.
+    fn send(&self, app: &str, event: &Event, line: &[u8]) -> io::Result<()> {
+        let host = gethostname::gethostname()
+            .into_string()
+            .ok()
+            .filter(|h| !h.is_empty() && h.is_ascii() && !h.contains(' '))
+            .unwrap_or_else(|| "-".to_owned());
+        let msgid: String = event
+            .event
+            .chars()
+            .filter(|c| c.is_ascii_graphic())
+            .take(32)
+            .collect();
+        let mut message = format!(
+            "<{PRIORITY}>1 {} {host} {app} - {} - ",
+            event.time,
+            if msgid.is_empty() { "-" } else { &msgid }
+        )
+        .into_bytes();
+        message.extend_from_slice(line);
+        match self {
+            Syslog::Udp(address) => {
+                let socket = std::net::UdpSocket::bind(if address.starts_with('[') {
+                    "[::]:0"
+                } else {
+                    "0.0.0.0:0"
+                })?;
+                socket.send_to(&message, address.as_str()).map(drop)
+            }
+            #[cfg(unix)]
+            Syslog::Socket(path) => {
+                let socket = std::os::unix::net::UnixDatagram::unbound()?;
+                socket.send_to(&message, path).map(drop)
+            }
+        }
+    }
+}
+
 /// The audit log: `audit.log` and the parts it went on from.
 #[derive(Clone, Debug)]
 pub struct Audit {
     file: PathBuf,
     rotate_at: u64,
+    /// Where copies go, and the app name they carry.
+    syslog: Option<(Syslog, String)>,
 }
 
 impl Audit {
@@ -89,7 +166,23 @@ impl Audit {
         Audit {
             file: file.into(),
             rotate_at: ROTATE_AT,
+            syslog: None,
         }
+    }
+
+    /// The same log, sending a copy of each event to `syslog` after it is
+    /// written (AUDIT.md §5): as `apeiron`, or `apeiron-<tenant>`.
+    pub fn copying_to(mut self, syslog: Syslog, tenant: Option<&str>) -> Self {
+        let app: String = match tenant {
+            Some(t) => format!("apeiron-{t}"),
+            None => "apeiron".to_owned(),
+        }
+        .chars()
+        .filter(|c| c.is_ascii_graphic())
+        .take(48)
+        .collect();
+        self.syslog = Some((syslog, app));
+        self
     }
 
     /// The same log, going on in a new file past `bytes` instead of 16 MiB.
@@ -248,7 +341,15 @@ impl Audit {
         }
         file.write_all(&line)
             .and_then(|()| file.sync_data())
-            .map_err(|e| io_error(path, e))
+            .map_err(|e| io_error(path, e))?;
+        // The file is the record; a copy that cannot be sent does not stop
+        // the request, but is reported.
+        if let Some((syslog, app)) = &self.syslog
+            && let Err(e) = syslog.send(app, &event, line.trim_ascii())
+        {
+            eprintln!("apeiron: audit event {seq} not sent to syslog: {e}");
+        }
+        Ok(())
     }
 
     /// The lines of every part and of `audit.log`, oldest first, each with
@@ -369,5 +470,45 @@ fn last_line(file: &mut File) -> io::Result<Option<Vec<u8>>> {
             return Ok((!body.is_empty()).then(|| body.to_vec()));
         }
         step *= 2;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Actor, Audit, Syslog};
+
+    #[test]
+    fn events_are_copied_to_syslog() {
+        let receiver = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+        receiver
+            .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+            .unwrap();
+        let target: Syslog = format!("udp://{}", receiver.local_addr().unwrap())
+            .parse()
+            .unwrap();
+        let dir = std::env::temp_dir().join(format!("apeiron-syslog-{}", std::process::id()));
+        let audit = Audit::new(dir.join("audit.log")).copying_to(target, None);
+        let actor = Actor {
+            user: Some("ayse".to_owned()),
+            from: None,
+        };
+        audit
+            .record(&actor, "sign_in", serde_json::json!({}), "ok")
+            .unwrap();
+        let mut buf = [0; 2048];
+        let n = receiver.recv(&mut buf).unwrap();
+        let text = String::from_utf8_lossy(&buf[..n]).into_owned();
+        assert!(text.starts_with("<86>1 "), "{text}");
+        assert!(text.contains(" apeiron - sign_in - {\"seq\":1,"), "{text}");
+        assert!(text.ends_with('}'), "{text}");
+        assert_eq!(audit.verify().unwrap().events, 1);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn targets_are_read() {
+        assert!("udp://logs:514".parse::<Syslog>().is_ok());
+        assert!("udp://logs".parse::<Syslog>().is_err());
+        assert!("logs:514".parse::<Syslog>().is_err());
     }
 }

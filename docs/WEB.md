@@ -38,6 +38,7 @@ apeiron web --repo /srv/backup --listen 0.0.0.0:8443 --folder /home/efe
 | `--folder` | A folder of the server that users may be given (USERS.md §1); can be given more than once | The home folder |
 | `--replicate` | A remote every ref is pushed to after each backup ([REPLICATION.md](REPLICATION.md) §4); can be given more than once | None |
 | `--standby` | Serve a standby copy: everything but backups ([REPLICATION.md](REPLICATION.md) §5) | Off |
+| `--audit-syslog` | Also send each audit event to syslog: `udp://host:port`, or a local socket such as `/dev/log` ([AUDIT.md](AUDIT.md) §5) | None |
 
 Without `--cert` and `--key`, a self-signed certificate for `localhost` and the listen address is made once and kept in the configuration folder (`web-cert.pem`, `web-key.pem`, and `web-cert.names` with the names it was made for); it is made again only when a new name is needed, such as a new tenant's host ([TENANTS.md](TENANTS.md) §3). Its SHA-256 fingerprint is printed at start; the browser warns about it once, and the fingerprint it shows must be the printed one.
 

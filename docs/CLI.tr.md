@@ -100,6 +100,7 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | `apeiron retention add <refs> --days <n>`, `apeiron retention list` | Bir adın ya da ardından `*` gelen bir önekin eşleştiği ref'leri arşiv olarak tutar: yalnızca ileri giderler ve son değişikliklerinden bu yana gün sayısı geçene kadar silinmezler; bir kural asla kaldırılamaz ([ARCHIVE.tr.md](ARCHIVE.tr.md)) | Tamamlandı |
 | `apeiron push --all <remote>`, `apeiron pull --all <remote> [--rate <hız>]` | Bir replikayı ya da yedek sunucuyu güncel tutmak için her ref'i push ya da pull eder; çatışmalı bir ref bırakılır ve adlandırılır, diğerleri kopyalanır; o zaman çıkış kodu 3'tür ([REPLICATION.tr.md](REPLICATION.tr.md)) | Tamamlandı |
 | `apeiron web … [--replicate <remote>]... [--standby]` | Her yedekten sonra her ref'i her replikaya push eder ya da yedek almayan bir yedek sunucu kopyası sunar ([REPLICATION.tr.md](REPLICATION.tr.md)) | Tamamlandı |
+| `apeiron web … --audit-syslog <target>` | Her denetim olayını bir syslog sunucusuna (`udp://host:port`) ya da `/dev/log` gibi yerel bir sokete de gönderir ([AUDIT.tr.md](AUDIT.tr.md) §5) | Tamamlandı |
 | `apeiron key remove <id>` | Bir parolayı ya da kurtarma anahtarını siler; sonuncusu silinemez | Tamamlandı |
 
 Bir `<snapshot>`; ref adı (`main`), tam snapshot kimliği ya da tek bir snapshot'a uyuyorsa kimliğin ilk 8 ya da daha fazla karakteri olarak yazılabilir. `~N` eki ilk ebeveynler üzerinden N adım geri gider: `main~1`, `main`'den önceki snapshot'tır.

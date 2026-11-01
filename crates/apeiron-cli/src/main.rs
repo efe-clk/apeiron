@@ -342,6 +342,10 @@ enum Command {
         /// Serve a standby copy: everything but backups (docs/REPLICATION.md)
         #[arg(long)]
         standby: bool,
+        /// Also send each audit event to syslog: udp://host:port or a local
+        /// socket such as /dev/log (docs/AUDIT.md)
+        #[arg(long, value_name = "TARGET")]
+        audit_syslog: Option<apeiron_server::Syslog>,
         /// The tenant whose users, audit log, share links or identity
         /// provider to manage
         #[arg(long, global = true, value_name = "NAME")]
@@ -571,6 +575,18 @@ impl WebFiles {
             audit: apeiron_server::Audit::new(state.join("audit.log")),
             shares: apeiron_server::Shares::new(state.join("shares.json")),
         })
+    }
+}
+
+/// `audit`, sending a copy of each event to `syslog` if given.
+fn copy_audit(
+    audit: apeiron_server::Audit,
+    syslog: &Option<apeiron_server::Syslog>,
+    tenant: Option<&str>,
+) -> apeiron_server::Audit {
+    match syslog {
+        Some(s) => audit.copying_to(s.clone(), tenant),
+        None => audit,
     }
 }
 
@@ -2309,6 +2325,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             tenants,
             replicas,
             standby,
+            audit_syslog,
             tenant,
             command,
         } => {
@@ -2384,13 +2401,14 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                 for t in listed {
                     let files = WebFiles::of_tenant(&t)?;
                     let asking = format!("Password or recovery key of {}: ", t.name);
+                    let audit = copy_audit(files.audit, &audit_syslog, Some(&t.name));
                     options.push(apeiron_server::TenantOptions {
                         repo: unlock(&t.repo, t.password_file.as_deref(), &asking)?,
                         name: t.name,
                         host: t.host,
                         users: files.users,
                         folders: t.folders,
-                        audit: files.audit,
+                        audit,
                         shares: files.shares,
                         replicas: t.replicas,
                         standby,
@@ -2415,7 +2433,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     tls,
                     users: files.users,
                     folders,
-                    audit: files.audit,
+                    audit: copy_audit(files.audit, &audit_syslog, None),
                     shares: files.shares,
                     replicas,
                     standby,
