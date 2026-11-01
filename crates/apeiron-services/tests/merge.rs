@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use apeiron_core::{EntryKind, ObjectId, Repository};
 use apeiron_services::{
     BackupOptions, ConflictKind, ContentMerger, Control, Error, MergeAction, MergeOptions, Merged,
-    WarningKind, backup, cherry_pick, merge,
+    WarningKind, backup, cherry_pick, merge, rebase,
 };
 
 struct Setup {
@@ -413,5 +413,51 @@ fn a_cherry_pick_keeps_both_versions_of_a_file_changed_on_both_sides() {
     assert_eq!(
         s.files("main"),
         pairs(&[("b (conflict feature).txt", "theirs"), ("b.txt", "ours")])
+    );
+}
+
+#[test]
+fn a_rebase_puts_the_branch_s_snapshots_on_top_of_the_other() {
+    let mut s = setup();
+    let first = s.commit("main", &[("a.txt", "a"), ("b.txt", "b")]);
+    s.repo.update_ref("feature", None, Some(first)).unwrap();
+    let one = s.commit("feature", &[("a.txt", "a"), ("b.txt", "b"), ("c.txt", "c")]);
+    s.commit(
+        "feature",
+        &[("a.txt", "a"), ("b.txt", "b"), ("c.txt", "c2")],
+    );
+    let main = s.commit("main", &[("a.txt", "a main"), ("b.txt", "b")]);
+
+    let options = |dry_run| MergeOptions {
+        from: main,
+        from_name: "main".to_owned(),
+        into: "feature".to_owned(),
+        message: None,
+        author: None,
+        host: None,
+        dry_run,
+    };
+    let preview = rebase(&mut s.repo, &options(true), None).unwrap();
+    assert_eq!(preview.action, MergeAction::Rebased);
+    let out = rebase(&mut s.repo, &options(false), None).unwrap();
+    assert_eq!(out.action, MergeAction::Rebased);
+    assert!(out.conflicts.is_empty());
+    assert_eq!(
+        s.files("feature"),
+        pairs(&[("a.txt", "a main"), ("b.txt", "b"), ("c.txt", "c2")])
+    );
+    // Two copies in a line on top of main, with the originals' times.
+    let top = s.repo.read_snapshot(&out.snapshot).unwrap();
+    let below = s.repo.read_snapshot(&top.parents[0]).unwrap();
+    assert_eq!(below.parents, vec![main]);
+    assert_eq!(below.time, s.repo.read_snapshot(&one).unwrap().time);
+    // Main can now move forward to it, and a second rebase changes nothing.
+    assert_eq!(
+        rebase(&mut s.repo, &options(false), None).unwrap().action,
+        MergeAction::UpToDate
+    );
+    assert_eq!(
+        s.merge("feature", "main", false).action,
+        MergeAction::FastForward
     );
 }

@@ -498,6 +498,9 @@ class Repository:
     def cherry_pick(self, from_: str, into: str = "main", **options: Any) -> Record:
         return self.call("cherry_pick", **{"from": from_, "into": into}, **options)
 
+    def rebase(self, branch: str, onto: str = "main", **options: Any) -> Record:
+        return self.call("rebase", **{"from": onto, "into": branch}, **options)
+
     def repair(self) -> Record:
         return self.call("repair")
 

@@ -437,6 +437,9 @@ pub enum MergeAction {
     /// A new snapshot on the ref holds the changes of one other snapshot
     /// (BRANCH.md §4).
     Picked,
+    /// The ref's own snapshots were copied, one by one, on top of the
+    /// other snapshot (BRANCH.md §5).
+    Rebased,
 }
 
 /// What to merge into which ref.
@@ -638,6 +641,101 @@ pub fn cherry_pick(
     writer.finish()?;
     repo.update_ref(into, Some(ours), Some(id))?;
     outcome.snapshot = id;
+    Ok(outcome)
+}
+
+/// Copies the snapshots of the ref `options.into` that `options.from` does
+/// not have, oldest first, on top of `options.from`, each as with
+/// [`cherry_pick`] but keeping its time, author, host and message; then
+/// moves the ref to the last copy (BRANCH.md §5). The old snapshots stay
+/// in the reflog. `options.message` is not used. The caller holds the
+/// repository lock shared.
+pub fn rebase(
+    repo: &mut Repository,
+    options: &MergeOptions,
+    merger: Option<&dyn ContentMerger>,
+) -> Result<MergeOutcome> {
+    let into = options.into.as_str();
+    let tip = repo
+        .read_ref(into)?
+        .ok_or_else(|| Error::NotFound(format!("ref {into}")))?;
+    let onto = options.from;
+    let mut outcome = MergeOutcome {
+        action: MergeAction::UpToDate,
+        snapshot: tip,
+        previous: tip,
+        changes: Vec::new(),
+        conflicts: Vec::new(),
+        plugin_merges: Vec::new(),
+        warnings: Vec::new(),
+    };
+    if tip == onto || repo.is_ancestor(onto, tip)? {
+        return Ok(outcome);
+    }
+    let old_tree = repo.read_snapshot(&tip)?.tree;
+    let mut current = onto;
+    if repo.is_ancestor(tip, onto)? {
+        outcome.action = MergeAction::FastForward;
+    } else {
+        // The ref's own snapshots, along first parents, newest first.
+        let mut own = Vec::new();
+        let mut at = Some(tip);
+        while let Some(id) = at {
+            if repo.is_ancestor(id, onto)? {
+                break;
+            }
+            let snapshot = repo.read_snapshot(&id)?;
+            at = snapshot.parents.first().copied();
+            own.push(snapshot);
+        }
+        let suffix = format!(" (conflict {into})", into = into.replace(['/', '\\'], "-"));
+        for picked in own.into_iter().rev() {
+            let base = picked
+                .parents
+                .first()
+                .map(|p| repo.read_snapshot(p).map(|s| s.tree))
+                .transpose()?;
+            let current_tree = repo.read_snapshot(&current)?.tree;
+            let result = Merge::new(repo, &suffix, merger).run(base, current_tree, picked.tree)?;
+            let mut writer = repo.writer();
+            let tree = write_items(&mut writer, result.items)?;
+            writer.finish()?;
+            // A snapshot whose changes are already there is left out.
+            if tree == current_tree {
+                continue;
+            }
+            let mut message = picked.message.clone().unwrap_or_default();
+            describe(&mut message, &result.conflicts, &result.plugin_merges);
+            let copy = Snapshot {
+                tree,
+                parents: vec![current],
+                time: picked.time,
+                author: picked.author.clone(),
+                host: picked.host.clone(),
+                message: (!message.is_empty()).then_some(message),
+                meta: picked.meta.clone(),
+            };
+            let mut writer = repo.writer();
+            current = writer.put_snapshot(&copy)?;
+            writer.finish()?;
+            outcome.conflicts.extend(result.conflicts);
+            outcome.plugin_merges.extend(result.plugin_merges);
+            outcome.warnings.extend(result.warnings);
+        }
+        outcome.action = MergeAction::Rebased;
+    }
+    let new_tree = repo.read_snapshot(&current)?.tree;
+    changes(
+        repo,
+        old_tree,
+        new_tree,
+        &Name::default(),
+        &mut outcome.changes,
+    )?;
+    outcome.snapshot = current;
+    if !options.dry_run {
+        repo.update_ref(into, Some(tip), Some(current))?;
+    }
     Ok(outcome)
 }
 

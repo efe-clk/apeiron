@@ -598,6 +598,13 @@ impl Repository {
         self.merge_with(request, services::cherry_pick)
     }
 
+    /// Copies the snapshots of the ref `request.into` that `request.from`
+    /// lacks on top of it, one by one, and moves the ref to the last copy
+    /// ([BRANCH.md](BRANCH.md) §5); `request.message` is not used.
+    pub fn rebase(&self, request: &MergeRequest) -> Result<MergeReport> {
+        self.merge_with(request, services::rebase)
+    }
+
     fn merge_with(
         &self,
         request: &MergeRequest,

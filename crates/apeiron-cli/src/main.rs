@@ -256,6 +256,18 @@ enum Command {
         #[command(subcommand)]
         command: PluginCommand,
     },
+    /// Copy the snapshots of a branch that another snapshot lacks on top of
+    /// it, and move the branch there
+    Rebase {
+        /// The ref that moves
+        branch: String,
+        /// The snapshot to build on, usually main
+        #[arg(long, default_value = "main")]
+        onto: String,
+        /// Only show what the rebase would do
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// Copy the changes one snapshot made into a ref, as a new snapshot there
     CherryPick {
         snapshot: String,
@@ -2211,7 +2223,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             out,
             cli.repo,
             password_file,
-            false,
+            Joining::Merge,
             from,
             into,
             message,
@@ -2226,10 +2238,24 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             out,
             cli.repo,
             password_file,
-            true,
+            Joining::CherryPick,
             snapshot,
             into,
             message,
+            dry_run,
+        ),
+        Command::Rebase {
+            branch,
+            onto,
+            dry_run,
+        } => merge_command(
+            out,
+            cli.repo,
+            password_file,
+            Joining::Rebase,
+            onto,
+            branch,
+            None,
             dry_run,
         ),
         Command::Ui { no_browser } => {
@@ -2786,13 +2812,21 @@ fn parse_size(s: &str) -> std::result::Result<u64, String> {
 }
 
 /// The start of a day `YYYY-MM-DD` in local time.
-/// Runs `merge` or, with `pick`, `cherry-pick`, and prints the result.
+/// Which way `merge_command` joins two lines of history.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Joining {
+    Merge,
+    CherryPick,
+    Rebase,
+}
+
+/// Runs `merge`, `cherry-pick` or `rebase`, and prints the result.
 #[allow(clippy::too_many_arguments)]
 fn merge_command(
     out: &Output,
     repo_path: Option<PathBuf>,
     password_file: Option<&Path>,
-    pick: bool,
+    kind: Joining,
     from: String,
     into: String,
     message: Option<String>,
@@ -2802,10 +2836,16 @@ fn merge_command(
     let mut request = MergeRequest::new(from.clone(), into.clone());
     request.message = message;
     request.dry_run = dry_run;
-    let report = if pick {
-        repo.cherry_pick(&request)?
+    let report = match kind {
+        Joining::Merge => repo.merge(&request)?,
+        Joining::CherryPick => repo.cherry_pick(&request)?,
+        Joining::Rebase => repo.rebase(&request)?,
+    };
+    // The conflict copy holds the version of the side brought in.
+    let brought = if kind == Joining::Rebase {
+        &into
     } else {
-        repo.merge(&request)?
+        &from
     };
     out.result(&report, |r| {
         for change in &r.changes {
@@ -2822,7 +2862,7 @@ fn merge_command(
         for c in &r.conflicts {
             match &c.copy {
                 Some(copy) => {
-                    say!("conflict: {}; the version from {from} is {copy}", c.path)
+                    say!("conflict: {}; the version from {brought} is {copy}", c.path)
                 }
                 None => say!(
                     "conflict: {} (deleted on one side, changed on the other; kept)",
@@ -2837,6 +2877,11 @@ fn merge_command(
             MergeAction::FastForward => {
                 say!("{into} {would}moved forward to {from} ({id})")
             }
+            MergeAction::Rebased => say!(
+                "{into} {would}rebased onto {from} ({}, {})",
+                format::count(r.changes.len() as u64, "change"),
+                format::count(r.conflicts.len() as u64, "conflict")
+            ),
             MergeAction::Picked => say!(
                 "the changes of {from} {would}copied into {into} ({}, {})",
                 format::count(r.changes.len() as u64, "change"),

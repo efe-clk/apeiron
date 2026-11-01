@@ -14,6 +14,7 @@ Bir dal bir ref'tir (FORMAT.tr.md §9.3): bir snapshot'a işaret eden bir ad. Ap
 | `apeiron ref delete <name>` | Bir ref'i siler; reflog'u geçmişi tutar (FORMAT.tr.md §9.4), böylece çöp toplamaya kadar geri getirilebilir | Tamamlandı |
 | `apeiron merge <from> [--into <ref>] [--message <text>] [--dry-run]` | `<from>`'un adlandırdığı snapshot'ı `<into>` ref'ine (varsayılan `main`) birleştirir; çatışma varsa çıkış kodu 3'tür | Tamamlandı |
 | `apeiron cherry-pick <snapshot> [--into <ref>] [--message <text>] [--dry-run]` | Bir snapshot'ın yaptığı değişiklikleri `<into>` ref'ine (varsayılan `main`) orada yeni bir snapshot olarak kopyalar (bölüm 4); çatışma varsa çıkış kodu 3'tür | Tamamlandı |
+| `apeiron rebase <branch> [--onto <snapshot>] [--dry-run]` | `<branch>`'in, `<onto>`'da (varsayılan `main`) olmayan snapshot'larını onun üstüne kopyalar ve `<branch>`'i oraya taşır (bölüm 5); çatışma varsa çıkış kodu 3'tür | Tamamlandı |
 
 Bir dal üzerinde her klasörde olduğu gibi çalışılır: `apeiron restore feature ~/feature` onu bir klasöre yazar, `apeiron backup ~/feature --ref feature` değişiklikleri kaydeder ve `apeiron merge feature` onları `main`'e birleştirir. `apeiron diff main feature`, bir birleştirmenin ne getireceğini gösterir.
 
@@ -50,19 +51,27 @@ Bir cherry-pick, bir daldan dalın geri kalanı olmadan tek bir düzeltmeyi geti
 
 Bir birleştirmenin aksine yeni snapshot'ın ebeveynlerinden biri P değildir: `<into>`'nun geçmişi tek çizgi kalır; dalın sonraki bir birleştirmesi dosyaları yeniden karşılaştırır, düzeltmeyi zaten orada bulur ve onu iki kez saymaz.
 
-## 5. Bu işin parçası olmayanlar
+## 5. Rebase
+
+Bir rebase, bir dalı başka bir dalın en yeni snapshot'ından başlatır; sanki dalın işi ondan sonra yapılmış gibi. Böylece `main`'e sonraki bir birleştirme ileri sarmadır ve geçmiş tek çizgi kalır.
+
+1. `<onto>` zaten `<branch>`'in geçmişindeyse hiçbir şey değişmez; `<branch>` `<onto>`'nun geçmişindeyse `<branch>` doğrudan `<onto>`'ya taşınır.
+2. Aksi hâlde `<branch>`'in snapshot'larını ilk ebeveynler boyunca, en yeniden başlayarak, `<onto>`'nun da sahip olduğu birine kadar al; bunlar dalın kendi snapshot'larıdır.
+3. Onları en eskiden başlayarak kopyala; her biri bir öncekinin kopyasının üstüne, `<onto>`'dan başlayarak bir cherry-pick (bölüm 4) gibi yapılır, ama her birinin zamanı, yazarı, makinesi ve mesajı korunur. İki tarafın da farklı değiştirdiği bir dosya iki kez tutulur, dalın sürümü `ad (conflict <branch>).uzantı` olarak; çatışma o kopyanın mesajına eklenir. Değişiklikleri zaten orada olan bir snapshot atlanır.
+4. `<branch>`'i eski snapshot'ından son kopyaya karşılaştır-ve-değiştir ile taşı. Eski snapshot'lar silinmez: `<branch>`'in reflog'u çöp toplamaya kadar onları adlandırmaya devam eder (FORMAT.tr.md §9.4). Bir saklama kuralının tuttuğu ref yalnızca ileri gider (ARCHIVE.tr.md), bu yüzden rebase edilemez.
+
+## 6. Bu işin parçası olmayanlar
 
 | Konu | Nerede |
 | --- | --- |
 | Bir dosyanın içinde, satır satır birleştirme | Metin diff eklentisi, Aşama 3 |
-| Rebase | Daha sonra; bir birleştirme iki geçmiş çizgisini de tutar ve hiçbir şey kaybetmez, bir cherry-pick de tek tek snapshot'ları getirir |
 | Bir dalı izleyen çalışma klasörü (`checkout` ya da `switch`) | Daha sonra; `restore` ve `backup` bunu karşılar ve senkron bir klasörün güvenle nasıl değiştirildiğini gösterir |
 | Çatışmaları çözmek için bir araç | Masaüstü arayüzü (Aşama 4); o zamana kadar çatışma kopyaları düz dosyalardır |
 
-## 6. Crate'ler
+## 7. Crate'ler
 
 | Crate | Görev | Durum |
 | --- | --- | --- |
-| `apeiron-services` | Senkron, `merge` ve `cherry_pick` tarafından paylaşılan birleştirme | Tamamlandı |
-| `apeiron` | `create_ref`, `merge` ve `cherry_pick` (API.tr.md §8.3) | Tamamlandı |
-| `apeiron-cli` | `apeiron ref`, `apeiron merge` ve `apeiron cherry-pick` | Tamamlandı |
+| `apeiron-services` | Senkron, `merge`, `cherry_pick` ve `rebase` tarafından paylaşılan birleştirme | Tamamlandı |
+| `apeiron` | `create_ref`, `merge`, `cherry_pick` ve `rebase` (API.tr.md §8.3) | Tamamlandı |
+| `apeiron-cli` | `apeiron ref`, `apeiron merge`, `apeiron cherry-pick` ve `apeiron rebase` | Tamamlandı |

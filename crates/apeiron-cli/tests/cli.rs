@@ -522,6 +522,24 @@ fn branches_are_created_merged_and_deleted() {
             .contains("main already has everything in feature")
     );
 
+    // feature and main both move on; a rebase puts feature on top of main.
+    fs::write(s.root.join("src/feature.txt"), b"only on feature").unwrap();
+    s.ok(&["backup", &src, "--ref", "feature"]);
+    fs::remove_file(s.root.join("src/feature.txt")).unwrap();
+    fs::write(s.root.join("src/main.txt"), b"only on main").unwrap();
+    s.ok(&["backup", &src]);
+    let out = s.ok(&["rebase", "feature"]);
+    assert!(out.contains("feature rebased onto main"), "{out}");
+    let listing = s.ok(&["ls", "feature"]);
+    assert!(
+        listing.contains("feature.txt") && listing.contains("main.txt"),
+        "{listing}"
+    );
+    assert!(
+        s.ok(&["merge", "feature"])
+            .contains("main moved forward to feature")
+    );
+
     assert!(
         s.ok(&["ref", "delete", "feature"])
             .contains("Deleted feature")
