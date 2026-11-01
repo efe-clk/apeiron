@@ -56,6 +56,7 @@ Uygulama durumu (`apeiron-core`):
 ├── keys/                  # Şifreli bir deponun anahtar dosyaları, bölüm 14
 ├── remotes                # Bu kopyanın uzak depoları (TOML), bölüm 15.1
 ├── retention/             # Saklama kuralları, bölüm 16
+├── holds/                 # Yasal saklama kilitleri, bölüm 17
 └── tmp/                   # Yazılmakta olan geçici dosyalar
 ```
 
@@ -637,7 +638,52 @@ Push, uzak depoda olmayan kural dosyalarını anahtar dosyalarından sonra yazar
 
 Kurallar bu format sürümünün her Apeiron programını bağlar. Dosyaları doğrudan değiştirebilen biri ya da `retention/` klasörünü bilmeyen bir program ref'leri yine de taşıyabilir ya da silebilir. Object Lock'lu bir S3 kovası gibi değişikliği kendiliğinden reddeden bir depolama bu boşluğu kapatır (ARCHIVE.tr.md §4).
 
-## 17. Sonraki sürümlere bırakılanlar
+## 17. Yasal saklama kilitleri (`holds/`)
+
+Yasal saklama kilidi (legal hold), adlarıyla eşleştiği ref'leri ve onların gösterdiği her şeyi, kaldırılana kadar tutar; örneğin bir dava ya da soruşturma sürerken. Bir saklama kuralının (bölüm 16) aksine kendi başına bir sonu yoktur; bir dosyayı silmenin aksine kaldırılması geri alınamayan bir iz bırakır.
+
+### 17.1 Kilit dosyaları
+
+Bir kilit bir `holds/<id>.toml` dosyasıdır; `id`, dosyanın baytlarının düz BLAKE3 özetinin ilk 32 hex karakteridir:
+
+```toml
+refs = "backup/finance-*"   # bir ref adı ya da ardından "*" gelen bir önek; tek başına "*" her ref'le eşleşir
+reason = "Case 2026-114"    # 1 ile 200 karakter, tek satır
+added = 1793318400          # Kilidin konduğu Unix saniyesi
+```
+
+Bir kilit, yanına yazılan ve o da hiç değişmeyen ikinci bir dosyayla, `holds/<id>.lifted.toml` ile kaldırılır:
+
+```toml
+reason = "Case closed"      # 1 ile 200 karakter, tek satır
+lifted = 1795910400         # Unix saniyesi; `added`'dan önce olamaz
+```
+
+- İki dosya da bir kez yazılır (bölüm 9.1) ve Apeiron tarafından hiç değiştirilmez ya da silinmez. Kaldırılmış bir kilit kaldırılmış kalır; ref'leri yeniden tutmak yeni bir kilittir.
+- Kalıp bölüm 16.1'deki kurallara uyar.
+- Ayrıştırılamayan ya da adı içeriğinin özeti olmayan bir kilit dosyası ve ayrıştırılamayan ya da hiçbir kilit dosyasını adlandırmayan bir kaldırma dosyası bozuktur. `holds/` içindeki bir dosya bozukken hiçbir ref değiştirilemez: hata dosyayı adlandırır; dosya bir kopyadan geri yüklenir (bölüm 15).
+- `holds/` klasörünün olmaması kilit olmaması demektir.
+
+### 17.2 Bir kilit ne yapar
+
+Kaldırılmamış en az bir kilit bir ref'le eşleştiği sürece:
+
+1. Ref'i **taşımak** yalnızca, bölüm 16.2'deki gibi, şu anki sürümüne ya da onu ata olarak içeren bir sürüme izinlidir.
+2. Ref'i **silmek**, saklama kuralları ne derse desin reddedilir.
+3. Ref'i **oluşturmak** izinlidir.
+4. **Çöp toplama** (bölüm 13), ref'in reflog'unun bir satırının adlandırdığı her sürümü, ne kadar eski olursa olsun tutar; böylece ref'in kilit konmadan önce bıraktığı sürümler de, daha önce toplanmamışlarsa, tutulur.
+
+Saklama kuralları kilitlerle birlikte geçerlidir; bir kilidi kaldırmak bir saklama süresini asla kısaltmaz.
+
+### 17.3 Kopyalar
+
+Push, uzak deponun eksik olduğu kilit ve kaldırma dosyalarını saklama kurallarından sonra yazar (bölüm 16.3); pull ve clone, uzak depoda olup bu kopyada eksik olanları yazar. İki tarafta da hiç silinmezler; böylece bir kopyada konan ya da kaldırılan bir kilit, sonraki push ya da pull ile diğerlerine ulaşır. Bir uzak deponun çöp toplaması (bölüm 15.8) eskisi gibi uzak deponun ref'lerinin ulaştığını tutar: uzak deponun reflog'u yoktur.
+
+### 17.4 Sınırlar
+
+Saklama kurallarındaki gibi (bölüm 16.4): kilitler bu format sürümünün her Apeiron programını bağlar; dosyaları doğrudan değiştiren birini bağlamaz.
+
+## 18. Sonraki sürümlere bırakılanlar
 
 - Çok katmanlı blob, sabit bağlantılar, Windows ACL'leri, aygıt dosyaları.
 - Format yükseltme aracı: format sürümü değiştiğinde otomatik ve geri alınabilir geçiş.

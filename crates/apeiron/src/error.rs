@@ -111,7 +111,8 @@ impl From<apeiron_core::Error> for Error {
             | E::RefNameConflict(_)
             | E::RemoteAhead(_)
             | E::LocalAhead(_)
-            | E::Retained { .. } => Error::new(ErrorKind::Conflict, message),
+            | E::Retained { .. }
+            | E::Held { .. } => Error::new(ErrorKind::Conflict, message),
             E::NotASnapshot(_)
             | E::WrongObjectType { .. }
             | E::ObjectTooLarge(_)
@@ -121,7 +122,9 @@ impl From<apeiron_core::Error> for Error {
             | E::NotEncrypted
             | E::LastKey
             | E::InvalidRemote(_)
-            | E::InvalidRetention(_) => Error::new(ErrorKind::InvalidInput, message),
+            | E::InvalidRetention(_)
+            | E::InvalidHold(_) => Error::new(ErrorKind::InvalidInput, message),
+            E::NoHold(_) => Error::new(ErrorKind::NotFound, message),
             _ => Error::new(ErrorKind::Internal, message),
         }
     }

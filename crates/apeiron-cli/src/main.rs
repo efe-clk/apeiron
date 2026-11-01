@@ -205,6 +205,11 @@ enum Command {
         #[command(subcommand)]
         command: RetentionCommand,
     },
+    /// Place, list and lift legal holds (docs/ARCHIVE.md)
+    Hold {
+        #[command(subcommand)]
+        command: HoldCommand,
+    },
     /// Find files by name, size, time and text in a snapshot or its history
     Search {
         /// A name with `*` and `?`; with `/`, a whole path
@@ -463,6 +468,27 @@ enum RetentionCommand {
     },
     /// List the retention rules
     List,
+}
+
+#[derive(Subcommand)]
+enum HoldCommand {
+    /// Keep the refs a name or a prefix followed by * matches, with every
+    /// version they had, until the hold is lifted
+    Add {
+        /// A ref name, or a prefix followed by *, such as "backup/finance-*"
+        refs: String,
+        /// Why, such as a case number; one line
+        #[arg(long)]
+        reason: String,
+    },
+    /// List the holds, lifted ones too
+    List,
+    /// Lift a hold; this is recorded and cannot be undone
+    Lift {
+        id: String,
+        #[arg(long)]
+        reason: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -2362,6 +2388,54 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                         }
                         if rules.is_empty() {
                             say!("No retention rules; see docs/ARCHIVE.md");
+                        }
+                    });
+                }
+            }
+            Ok(0)
+        }
+        Command::Hold { command } => {
+            let repo = open(cli.repo, password_file)?;
+            let when = |seconds: u64| {
+                format::time(&apeiron::Time {
+                    seconds: seconds as i64,
+                    nanos: 0,
+                })
+            };
+            match command {
+                HoldCommand::Add { refs, reason } => {
+                    let hold = repo.add_legal_hold(&refs, &reason)?;
+                    out.result(&hold, |h| {
+                        say!("{} is held as {}: {}", h.hold.refs, h.id, h.hold.reason)
+                    });
+                }
+                HoldCommand::Lift { id, reason } => {
+                    let hold = repo.lift_legal_hold(&id, &reason)?;
+                    out.result(&hold, |h| {
+                        say!(
+                            "The hold {} on {} is lifted; this cannot be undone",
+                            h.id,
+                            h.hold.refs
+                        )
+                    });
+                }
+                HoldCommand::List => {
+                    let holds = repo.legal_holds()?;
+                    out.result(&holds, |holds| {
+                        for h in holds {
+                            say!(
+                                "{}  {}  placed {}: {}",
+                                h.id,
+                                h.hold.refs,
+                                when(h.hold.added),
+                                h.hold.reason
+                            );
+                            if let Some(lift) = &h.lift {
+                                say!("    lifted {}: {}", when(lift.lifted), lift.reason);
+                            }
+                        }
+                        if holds.is_empty() {
+                            say!("No legal holds; see docs/ARCHIVE.md");
                         }
                     });
                 }

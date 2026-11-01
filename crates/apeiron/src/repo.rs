@@ -24,9 +24,9 @@ use crate::types::{
 use crate::{
     AddFileReport, AddFileRequest, ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo,
     ExportReport, GcReport, GcRequest, GitExportReport, GitImportReport, GitPushResult,
-    GitPushedRef, GitServedRef, KeyInfo, ObjectId, Phase, ReflogEntry, Remote, RepairReport,
-    RestoreReport, RestoreTestReport, RetentionRule, SearchReport, SwitchReport, SyncReport,
-    TransferReport, VerifyReport,
+    GitPushedRef, GitServedRef, KeyInfo, LegalHold, ObjectId, Phase, ReflogEntry, Remote,
+    RepairReport, RestoreReport, RestoreTestReport, RetentionRule, SearchReport, SwitchReport,
+    SyncReport, TransferReport, VerifyReport,
 };
 
 /// An open repository. Cloning is cheap; clones share the same state and can
@@ -833,6 +833,27 @@ impl Repository {
     pub fn add_retention(&self, refs: &str, days: u32) -> Result<RetentionRule> {
         let _writer = self.lock_writer();
         Ok(self.read().add_retention_rule(refs, days)?)
+    }
+
+    /// Every legal hold, lifted ones too, oldest first ([ARCHIVE.md](ARCHIVE.md)
+    /// §2.1).
+    pub fn legal_holds(&self) -> Result<Vec<LegalHold>> {
+        Ok(self.read().legal_holds()?)
+    }
+
+    /// Places a legal hold on the refs `refs` matches (a name, or a prefix
+    /// followed by `*`): until it is lifted they only move forward, are not
+    /// deleted, and keep every version their reflog names
+    /// ([FORMAT.md](FORMAT.md) §17).
+    pub fn add_legal_hold(&self, refs: &str, reason: &str) -> Result<LegalHold> {
+        let _writer = self.lock_writer();
+        Ok(self.read().add_legal_hold(refs, reason)?)
+    }
+
+    /// Lifts the legal hold `id`, for `reason`; this cannot be undone.
+    pub fn lift_legal_hold(&self, id: &str, reason: &str) -> Result<LegalHold> {
+        let _writer = self.lock_writer();
+        Ok(self.read().lift_legal_hold(id, reason)?)
     }
 
     /// The remotes of this copy, sorted by name.

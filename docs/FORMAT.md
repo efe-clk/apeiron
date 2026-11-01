@@ -56,6 +56,7 @@ Implementation status (`apeiron-core`):
 ├── keys/                  # Key files of an encrypted repository, section 14
 ├── remotes                # Remote repositories of this copy (TOML), section 15.1
 ├── retention/             # Retention rules, section 16
+├── holds/                 # Legal holds, section 17
 └── tmp/                   # Temporary files being written
 ```
 
@@ -636,7 +637,52 @@ Push writes the rule files the remote lacks, after the key files (section 15.3 s
 
 The rules bind every Apeiron program of this format version. Someone who can change the files directly, or a program that does not know `retention/`, can still move or delete refs. Storage that refuses changes by itself, such as an S3 bucket with Object Lock, closes that gap (ARCHIVE.md §4).
 
-## 17. Left for later versions
+## 17. Legal holds (`holds/`)
+
+A legal hold keeps the refs whose names it matches, and everything they ever pointed to, until it is lifted, for example while a court case or an investigation runs. Unlike a retention rule (section 16) it has no end of its own; unlike deleting a file, lifting it leaves a record that cannot be taken back.
+
+### 17.1 Hold files
+
+A hold is one file `holds/<id>.toml`, where `id` is the first 32 hex characters of the plain BLAKE3 hash of the file's bytes:
+
+```toml
+refs = "backup/finance-*"   # a ref name, or a prefix followed by "*"; "*" alone matches every ref
+reason = "Case 2026-114"    # 1 to 200 characters, one line
+added = 1793318400          # Unix seconds when the hold was placed
+```
+
+A hold is lifted by a second file beside it, `holds/<id>.lifted.toml`, which never changes either:
+
+```toml
+reason = "Case closed"      # 1 to 200 characters, one line
+lifted = 1795910400         # Unix seconds; not before `added`
+```
+
+- Both files are written once (section 9.1) and never changed or deleted by Apeiron. A lifted hold stays lifted; holding the refs again is a new hold.
+- The pattern follows the rules of section 16.1.
+- A hold file that does not parse, or whose name is not the hash of its content, and a lift file that does not parse or names no hold file, are damaged. While a file of `holds/` is damaged, no ref can be changed: the error names the file, which is restored from a copy (section 15).
+- A missing `holds/` folder means no holds.
+
+### 17.2 What a hold does
+
+While at least one hold that is not lifted matches a ref:
+
+1. **Moving** the ref is allowed only to its current snapshot or one that has it as an ancestor, as in section 16.2.
+2. **Deleting** the ref is refused, whatever the retention rules say.
+3. **Creating** the ref is allowed.
+4. **Garbage collection** (section 13) keeps every snapshot that a line of the ref's reflog names, however old, so even versions the ref had left before the hold was placed are kept, as long as they were not collected before.
+
+Retention rules apply beside holds; lifting a hold never shortens a retention.
+
+### 17.3 Copies
+
+Push writes the hold and lift files the remote lacks, after the retention rules (section 16.3); pull and clone write those of the remote that this copy lacks. They are never deleted on either side, so a hold placed or lifted on one copy reaches the others with the next push or pull. Garbage collection of a remote (section 15.8) keeps what the remote's refs reach, as before: a remote has no reflog.
+
+### 17.4 Limits
+
+As for retention rules (section 16.4): the holds bind every Apeiron program of this format version, not someone who changes the files directly.
+
+## 18. Left for later versions
 
 - Multi-level blobs, hard links, Windows ACLs, device files.
 - Format upgrade tool: automatic and reversible migration when the format version changes.

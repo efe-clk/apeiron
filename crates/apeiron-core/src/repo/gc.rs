@@ -155,17 +155,21 @@ impl Repository {
             .duration_since(SystemTime::UNIX_EPOCH)
             .map_or(0, |d| d.as_secs());
         let cutoff = now.saturating_sub(u64::from(keep_days) * SECONDS_PER_DAY);
-        if keep_days > 0 {
-            for name in self.refs.log_names()? {
-                for entry in self.refs.reflog(&name)? {
-                    if entry.time < cutoff {
-                        continue;
-                    }
-                    // Snapshots of old lines may already have been collected.
-                    for id in [entry.old, entry.new].into_iter().flatten() {
-                        if self.contains(&id) {
-                            stack.push((id, ObjectType::Snapshot));
-                        }
+        // A ref under a legal hold keeps its whole reflog (FORMAT.md §17.2).
+        let holds = self.legal_holds()?;
+        for name in self.refs.log_names()? {
+            let held = holds.iter().any(|h| h.holds(&name));
+            if keep_days == 0 && !held {
+                continue;
+            }
+            for entry in self.refs.reflog(&name)? {
+                if entry.time < cutoff && !held {
+                    continue;
+                }
+                // Snapshots of old lines may already have been collected.
+                for id in [entry.old, entry.new].into_iter().flatten() {
+                    if self.contains(&id) {
+                        stack.push((id, ObjectType::Snapshot));
                     }
                 }
             }

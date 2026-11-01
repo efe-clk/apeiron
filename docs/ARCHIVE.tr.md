@@ -37,6 +37,19 @@ Korunan bir ref yalnızca büyüdüğü için gösterdiği her snapshot ulaşıl
 
 Kurallar depoyla birlikte gider: push onları uzak depoya yazar, pull ya da klon geri getirir; böylece bir replika aynı ref'leri korur (FORMAT.tr.md §16.3).
 
+### 2.1 Yasal saklama kilitleri
+
+Yasal saklama kilidi (legal hold), ref'leri bir davanın, bir denetimin ya da bir soruşturmanın gerektirdiği süre boyunca tutar; bu süreyi önceden kimse bilmez:
+
+```text
+apeiron hold add "backup/finance-*" --reason "Case 2026-114"
+apeiron hold lift 3f9a… --reason "Case closed"
+```
+
+Kaldırılmamış bir kilit bir ref'le eşleştiği sürece ([FORMAT.tr.md](FORMAT.tr.md) §17) ref, bir saklama kuralındaki gibi yalnızca ileri gider ve hiç silinmez; çöp toplama da reflog'unun adlandırdığı her sürümü tutar; böylece ref'in kilitten önce bıraktığı ve `apeiron gc`'nin henüz silmediği sürümler kalır. Reddedilen bir değişiklik `conflict` ile başarısız olur ve kilidi ve nedenini adlandırır.
+
+Uyumluluk kurallarının kaygılandığı şey kaldırmaktır; bu yüzden kaldırma asla sessiz değildir: kaldırma, nedeni ve zamanıyla birlikte değiştirilemeyen ya da silinemeyen ikinci bir dosyadır ve `apeiron hold list`, depo var olduğu sürece her kilidi kaldırılışıyla birlikte gösterir. Kaldırılmış bir kilit yeniden konamaz; ref'leri yeniden tutmak yeni bir kilittir. Bir kilidi kaldırmak bir saklama kuralını asla kısaltmaz. Kilitler ve kaldırmalar kurallar gibi push ve pull ile taşınır; böylece birincilde konan bir kilit replikayı da tutar.
+
 ## 3. Saklananı kanıtlamak
 
 Kanıt için her deponun sahip olduğundan fazlası gerekmez: her nesne özetiyle adlandırılır ve her snapshot kendi tree'sini ve ebeveynlerini adlandırır ([FORMAT.tr.md](FORMAT.tr.md) §4); bu yüzden bir snapshot'ın kimliği, altındaki her dosyanın her baytını ve ondan önceki tüm geçmişi sabitler. `apeiron verify` saklanan her baytı okur ve bu özetlerle denetler. Oluşturulduğu anda bir snapshot kimliği verilmiş bir denetçi, arşivin hâlâ tam olarak onu tuttuğunu denetleyebilir.
@@ -58,6 +71,8 @@ Apeiron'un S3'e yazdığı her nesne, Object Lock'lu kovaların istediği ve ver
 | `apeiron retention add <refs> --days <n>` | Bir kural ekler; geri alınamaz |
 | `apeiron retention list` | Kuralları listeler |
 | `retention`, `add_retention` (API.tr.md §8) | Programlar için aynısı |
+| `apeiron hold add <refs> --reason <metin>`, `hold list`, `hold lift <id> --reason <metin>` | Yasal saklama kilitlerini koyar, listeler ya da kaldırır (§2.1) |
+| `holds`, `add_hold`, `lift_hold` (API.tr.md §8) | Programlar için aynısı; web arayüzünde yalnızca bir `admin` için |
 | Web ve masaüstü arayüzlerinin Saklama sayfası | Kuralları listeler ve bir uyarıdan sonra kural ekler; web arayüzünde yalnızca bir `admin` için |
 | Korunan bir ref'i herhangi bir programla silmek ya da geri almak | `conflict` ve kalan gün sayısıyla reddedilir |
 
@@ -65,7 +80,7 @@ Apeiron'un S3'e yazdığı her nesne, Object Lock'lu kovaların istediği ve ver
 
 | Konu | Nerede |
 | --- | --- |
-| Bir ref'i kaldırılana kadar kuralının ötesinde tutan yasal saklama (legal hold) | Sonra, bir pilot gerektirirse; kaldırılabilen bir saklama tam da uyumluluk kurallarının yasakladığı şeydir, bu yüzden kendi tasarımını ister |
+| Saklama sayfasında kilitler | Sonra; o zamana kadar `apeiron hold` ve JSON API |
 | SFTP ya da klasör uzak depoları için Object Lock | Apeiron'da mümkün değil; böyle bir depolamanın ZFS ya da bir yedek cihazınınki gibi kendi değiştirilemez anlık görüntüleri gerekir |
 | Korunan bir geçmişin ortasından tek tek eski snapshot'ları silmek | Planlanmadı: ortası kaybolabilen bir geçmiş arşiv değildir |
 
@@ -73,8 +88,8 @@ Apeiron'un S3'e yazdığı her nesne, Object Lock'lu kovaların istediği ve ver
 
 | Crate | Görevi | Durum |
 | --- | --- | --- |
-| `apeiron-core` | Kural dosyaları, her ref değişikliğinin denetimleri, kuralları push ve pull ile kopyalamak | Tamamlandı |
-| `apeiron` | `retention`, `add_retention` | Tamamlandı |
+| `apeiron-core` | Kural ve kilit dosyaları, her ref değişikliğinin denetimleri, onları push ve pull ile kopyalamak | Tamamlandı |
+| `apeiron` | `retention`, `add_retention`, `holds`, `add_hold`, `lift_hold` | Tamamlandı |
 | `apeiron-remote` | Her S3 yazmasında SHA-256 sağlama toplamları | Tamamlandı |
-| `apeiron-cli` | `apeiron retention` | Tamamlandı |
+| `apeiron-cli` | `apeiron retention`, `apeiron hold` | Tamamlandı |
 | `apeiron-server` | Saklama sayfası | Tamamlandı |

@@ -11,6 +11,7 @@ use crate::config::Config;
 use crate::crypto::{Keys, SecretKey};
 use crate::error::{Error, IoContext, Result};
 use crate::fsutil;
+use crate::hold;
 use crate::id::{IdKey, ObjectId, ObjectType};
 use crate::index::{self, Location};
 use crate::keyfile::{self, KeyInfo};
@@ -37,6 +38,7 @@ const KEYS: &str = "keys";
 const TMP: &str = "tmp";
 const REMOTES: &str = "remotes";
 const RETENTION: &str = "retention";
+const HOLDS: &str = "holds";
 const TMP_MAX_AGE: Duration = Duration::from_secs(3600);
 
 /// An open repository.
@@ -511,7 +513,95 @@ impl Repository {
             }
         }
         self.check_retention(name, expected, new)?;
+        self.check_holds(name, expected, new)?;
         self.refs.update(name, expected, new)
+    }
+
+    /// Every legal hold, lifted ones too, oldest first (FORMAT.md §17).
+    pub fn legal_holds(&self) -> Result<Vec<hold::LegalHold>> {
+        let dir = self.dir(HOLDS);
+        hold::decode_all(&dir, &hold::read_files(&dir)?)
+    }
+
+    /// Places a legal hold on the refs `refs` matches.
+    pub fn add_legal_hold(&self, refs: &str, reason: &str) -> Result<hold::LegalHold> {
+        let held = hold::Hold::new(refs, reason, refs::now())?;
+        let file = held.encode()?;
+        self.write_hold_file(&file)?;
+        Ok(hold::LegalHold {
+            id: file.0.trim_end_matches(".toml").to_owned(),
+            hold: held,
+            lift: None,
+        })
+    }
+
+    /// Lifts the hold `id`; it cannot be placed again, only a new one.
+    pub fn lift_legal_hold(&self, id: &str, reason: &str) -> Result<hold::LegalHold> {
+        let mut held = self
+            .legal_holds()?
+            .into_iter()
+            .find(|h| h.id == id)
+            .ok_or_else(|| Error::NoHold(id.to_owned()))?;
+        if held.lift.is_some() {
+            return Err(Error::InvalidHold(format!(
+                "the hold {id} is lifted already"
+            )));
+        }
+        let lift = hold::Lift {
+            reason: reason.trim().to_owned(),
+            lifted: refs::now().max(held.hold.added),
+        };
+        self.write_hold_file(&lift.encode(id)?)?;
+        held.lift = Some(lift);
+        Ok(held)
+    }
+
+    /// Writes a hold or lift file as it is, if it is valid with the files
+    /// there and not there yet.
+    pub(crate) fn write_hold_file(&self, (name, bytes): &(String, Vec<u8>)) -> Result<()> {
+        let dir = self.dir(HOLDS);
+        let mut files = hold::read_files(&dir)?;
+        if files.iter().any(|(n, _)| n == name) {
+            return Ok(());
+        }
+        files.push((name.clone(), bytes.clone()));
+        hold::decode_all(&dir, &files)?;
+        fsutil::ensure_dir(&dir)?;
+        fsutil::write_durable_new(&self.dir(TMP), &dir.join(name), bytes)?;
+        fsutil::sync_dir(&dir)
+    }
+
+    /// The hold and lift files, holds first, with their bytes.
+    pub(crate) fn hold_files(&self) -> Result<Vec<(String, Vec<u8>)>> {
+        hold::read_files(&self.dir(HOLDS))
+    }
+
+    /// Refuses a change of `name` that a legal hold forbids (FORMAT.md
+    /// §17.2).
+    fn check_holds(
+        &self,
+        name: &str,
+        expected: Option<ObjectId>,
+        new: Option<ObjectId>,
+    ) -> Result<()> {
+        let holds = self.legal_holds()?;
+        let Some(held) = holds.iter().find(|h| h.holds(name)) else {
+            return Ok(());
+        };
+        let refused = |what: &str| Error::Held {
+            name: name.to_owned(),
+            id: held.id.clone(),
+            reason: held.hold.reason.clone(),
+            what: what.to_owned(),
+        };
+        match (expected, new) {
+            (None, _) => Ok(()),
+            (Some(old), Some(new)) if self.is_ancestor(old, new)? => Ok(()),
+            (Some(_), Some(_)) => Err(refused(
+                "it can only move to a snapshot that follows the one it points to",
+            )),
+            (Some(_), None) => Err(refused("it cannot be deleted until the hold is lifted")),
+        }
     }
 
     /// The retention rules, sorted by when they were added (FORMAT.md §16).

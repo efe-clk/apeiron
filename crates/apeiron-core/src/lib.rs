@@ -12,6 +12,7 @@ mod error;
 #[cfg(test)]
 mod fault;
 mod fsutil;
+mod hold;
 mod id;
 mod index;
 mod keyfile;
@@ -26,6 +27,7 @@ mod retention;
 pub use chunker::ChunkerParams;
 pub use config::FORMAT_VERSION;
 pub use error::{Error, Result};
+pub use hold::{Hold, LegalHold, Lift};
 pub use id::{ID_LEN, ObjectId, ObjectType};
 pub use keyfile::{KeyInfo, KeyKind};
 pub use lock::RepoLock;

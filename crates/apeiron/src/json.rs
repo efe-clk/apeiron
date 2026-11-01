@@ -148,6 +148,18 @@ struct NewRetention {
     days: u32,
 }
 
+#[derive(Deserialize)]
+struct NewHold {
+    refs: String,
+    reason: String,
+}
+
+#[derive(Deserialize)]
+struct LiftHold {
+    id: String,
+    reason: String,
+}
+
 fn unknown(operation: &str) -> Error {
     Error::new(
         ErrorKind::Unsupported,
@@ -183,6 +195,15 @@ pub fn call(repo: &Repository, operation: &str, request: Value) -> Result<Value>
             json(&repo.add_remote(&r.name, &r.url)?)
         }
         "remove_remote" => json(&repo.remove_remote(&parse::<Named>(request)?.name)?),
+        "holds" => json(&repo.legal_holds()?),
+        "add_hold" => {
+            let r: NewHold = parse(request)?;
+            json(&repo.add_legal_hold(&r.refs, &r.reason)?)
+        }
+        "lift_hold" => {
+            let r: LiftHold = parse(request)?;
+            json(&repo.lift_legal_hold(&r.id, &r.reason)?)
+        }
         "retention" => json(&repo.retention()?),
         "add_retention" => {
             let r: NewRetention = parse(request)?;

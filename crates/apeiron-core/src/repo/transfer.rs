@@ -7,8 +7,8 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    CONFIG, INDEX, KEYS, LOCKS, LOGS, PACKS, REFS, REMOTES, RETENTION, Repository, TMP, Unlock,
-    create_layout,
+    CONFIG, HOLDS, INDEX, KEYS, LOCKS, LOGS, PACKS, REFS, REMOTES, RETENTION, Repository, TMP,
+    Unlock, create_layout,
 };
 use crate::config::Config;
 use crate::crypto::Keys;
@@ -481,7 +481,7 @@ impl Repository {
         match store.read(CONFIG)? {
             Some(bytes) => self.check_remote_config(store, &bytes)?,
             None => {
-                let layout = [PACKS, INDEX, REFS, LOGS, LOCKS, KEYS, RETENTION, TMP];
+                let layout = [PACKS, INDEX, REFS, LOGS, LOCKS, KEYS, RETENTION, HOLDS, TMP];
                 if store
                     .list("")?
                     .iter()
@@ -503,18 +503,22 @@ impl Repository {
         self.send_rules(store)
     }
 
-    /// Writes the retention rule files the remote lacks; none is ever
-    /// deleted (FORMAT.md §16.3).
+    /// Writes the retention rule files, then the legal hold files, the
+    /// remote lacks; none is ever deleted (FORMAT.md §16.3, §17.3).
     fn send_rules(&self, store: &dyn Store) -> Result<()> {
-        let local = self.retention_files()?;
-        if local.is_empty() {
-            return Ok(());
-        }
-        let remote = store.list(RETENTION)?;
-        store.create_dirs(&[RETENTION])?;
-        for (name, bytes) in local {
-            if !remote.contains(&name) {
-                store.write_new(&format!("{RETENTION}/{name}"), &bytes)?;
+        for (dir, local) in [
+            (RETENTION, self.retention_files()?),
+            (HOLDS, self.hold_files()?),
+        ] {
+            if local.is_empty() {
+                continue;
+            }
+            let remote = store.list(dir)?;
+            store.create_dirs(&[dir])?;
+            for (name, bytes) in local {
+                if !remote.contains(&name) {
+                    store.write_new(&format!("{dir}/{name}"), &bytes)?;
+                }
             }
         }
         Ok(())
@@ -530,6 +534,19 @@ impl Repository {
             }
             if let Some(bytes) = store.read(&format!("{RETENTION}/{name}"))? {
                 self.write_retention_file(&(name, bytes))?;
+            }
+        }
+        // Holds before the files that lift them (FORMAT.md §17.3).
+        let local = self.hold_files()?;
+        let mut names: Vec<String> = store
+            .list(HOLDS)?
+            .into_iter()
+            .filter(|n| n.ends_with(".toml") && !local.iter().any(|(l, _)| l == n))
+            .collect();
+        names.sort_by_key(|n| (crate::hold::lifts(n).is_some(), n.clone()));
+        for name in names {
+            if let Some(bytes) = store.read(&format!("{HOLDS}/{name}"))? {
+                self.write_hold_file(&(name, bytes))?;
             }
         }
         Ok(())
@@ -1105,6 +1122,54 @@ mod tests {
         ));
         fs::write(&file, kept).unwrap();
         a.update_ref("main", Some(first), Some(second)).unwrap();
+    }
+
+    #[test]
+    fn legal_holds_keep_refs_until_lifted_and_travel_with_copies() {
+        let Setup {
+            _dir,
+            root,
+            mut a,
+            first,
+        } = setup(true);
+        // A version a ref leaves before the hold is in its reflog only.
+        a.update_ref("case/old", None, Some(first)).unwrap();
+        let old = commit_on(&mut a, "case/old", first);
+        a.update_ref("case/old", Some(old), Some(first)).unwrap();
+        let gone = commit(&mut a, b"gone", Some(first));
+        a.update_ref("main", Some(gone), Some(first)).unwrap();
+        a.update_ref("case/mail", None, Some(first)).unwrap();
+
+        let held = a.add_legal_hold("case/*", "Case 2026-114").unwrap();
+        let mail = commit_on(&mut a, "case/mail", first);
+        let refused = |r: Result<()>| matches!(r, Err(Error::Held { .. }));
+        assert!(refused(a.update_ref("case/mail", Some(mail), Some(first))));
+        assert!(refused(a.update_ref("case/mail", Some(mail), None)));
+
+        // gc keeps what a held ref's reflog names, however old, and
+        // nothing else.
+        let options = crate::GcOptions {
+            keep_reflog_days: 0,
+            dry_run: false,
+        };
+        a.gc(&options).unwrap();
+        assert!(a.contains(&old));
+        assert!(!a.contains(&gone));
+
+        // The hold goes with a push; lifting it there and pulling it back
+        // lifts it here too.
+        let remote = root.join("remote");
+        let store = FolderStore::open(&remote).unwrap();
+        a.push_all(&store, &mut |_| Ok(())).unwrap();
+        let copy = Repository::unlock(&remote, PASSWORD).unwrap();
+        assert_eq!(copy.legal_holds().unwrap(), a.legal_holds().unwrap());
+        let lifted = copy.lift_legal_hold(&held.id, "Case closed").unwrap();
+        assert!(lifted.lift.is_some());
+        assert!(copy.lift_legal_hold(&held.id, "again").is_err());
+        a.pull_all(&store, &mut |_| Ok(())).unwrap();
+        assert!(a.legal_holds().unwrap()[0].lift.is_some());
+        a.update_ref("case/mail", Some(mail), None).unwrap();
+        assert!(a.lift_legal_hold("0000", "x").is_err());
     }
 
     #[test]

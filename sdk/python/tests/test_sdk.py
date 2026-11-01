@@ -69,6 +69,16 @@ class Sdk(unittest.TestCase):
         with self.assertRaises(apeiron.InvalidInputError):
             repo.refs()
 
+    def test_legal_holds(self):
+        with apeiron.Repository.init(self.root / "repo") as repo:
+            repo.backup(self.root / "src").wait()
+            hold = repo.add_hold("main", "Case 1")
+            with self.assertRaises(apeiron.ConflictError):
+                repo.delete_ref("main", repo.resolve("main"))
+            lifted = repo.lift_hold(hold.id, "Closed")
+            self.assertEqual(lifted.lift.reason, "Closed")
+            self.assertEqual(len(repo.holds()), 1)
+
     def test_wrong_password(self):
         repo, key = apeiron.Repository.init_encrypted(self.root / "repo", "pw")
         repo.close()

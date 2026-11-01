@@ -37,6 +37,19 @@ Since a kept ref only grows, every snapshot it ever pointed to stays reachable, 
 
 Rules travel with the repository: a push writes them to the remote and a pull or clone brings them back, so a replica keeps the same refs (FORMAT.md §16.3).
 
+### 2.1 Legal holds
+
+A legal hold keeps refs for as long as a court case, an audit or an investigation needs, which nobody knows beforehand:
+
+```text
+apeiron hold add "backup/finance-*" --reason "Case 2026-114"
+apeiron hold lift 3f9a… --reason "Case closed"
+```
+
+While a hold that is not lifted matches a ref ([FORMAT.md](FORMAT.md) §17), the ref only moves forward, as under a retention rule, and is not deleted at all; garbage collection also keeps every version its reflog names, so versions the ref had left before the hold, and that `apeiron gc` had not removed yet, stay. A refused change fails with `conflict` and names the hold and its reason.
+
+Lifting is what compliance rules worry about, so it is never silent: a lift is a second file that cannot be changed or removed, with its reason and time, and `apeiron hold list` shows every hold with its lift for as long as the repository exists. A lifted hold cannot be placed again; holding the refs again is a new hold. Lifting a hold never shortens a retention rule. Holds and lifts travel with push and pull as rules do, so a hold placed on the primary holds the replica too.
+
 ## 3. Proving what was stored
 
 Nothing more is needed for the proof than what every repository has: each object is named by its hash and each snapshot names its tree and its parents ([FORMAT.md](FORMAT.md) §4), so the id of a snapshot fixes every byte of every file under it and all the history before it. `apeiron verify` reads every stored byte and checks it against these hashes. An auditor given a snapshot id from the time it was made can check that the archive still holds exactly that.
@@ -58,6 +71,8 @@ Every object Apeiron writes to S3 carries a SHA-256 checksum, which buckets with
 | `apeiron retention add <refs> --days <n>` | Adds a rule; it cannot be undone |
 | `apeiron retention list` | Lists the rules |
 | `retention`, `add_retention` (API.md §8) | The same for programs |
+| `apeiron hold add <refs> --reason <text>`, `hold list`, `hold lift <id> --reason <text>` | Places, lists or lifts legal holds (§2.1) |
+| `holds`, `add_hold`, `lift_hold` (API.md §8) | The same for programs; in the web interface for an `admin` only |
 | The Retention page of the web and desktop interfaces | Lists the rules and adds one after a warning; in the web interface for an `admin` only |
 | Deleting or moving a kept ref back, by any program | Refused with `conflict` and the days left |
 
@@ -65,7 +80,7 @@ Every object Apeiron writes to S3 carries a SHA-256 checksum, which buckets with
 
 | Item | Where |
 | --- | --- |
-| Legal holds that keep a ref beyond its rule until lifted | Later, if a pilot needs one; a lifted hold is exactly what compliance rules forbid, so it needs its own design |
+| Holds on the Retention page | Later; `apeiron hold` and the JSON API until then |
 | Object Lock for SFTP or folder remotes | Not possible in Apeiron; such storage needs its own immutable snapshots, such as those of ZFS or a backup appliance |
 | Deleting single old snapshots from the middle of a kept history | Not planned: a history that can lose its middle is not an archive |
 
@@ -73,8 +88,8 @@ Every object Apeiron writes to S3 carries a SHA-256 checksum, which buckets with
 
 | Crate | Role | Status |
 | --- | --- | --- |
-| `apeiron-core` | Rule files, the checks of every ref change, copying rules with push and pull | Done |
-| `apeiron` | `retention`, `add_retention` | Done |
+| `apeiron-core` | Rule and hold files, the checks of every ref change, copying them with push and pull | Done |
+| `apeiron` | `retention`, `add_retention`, `holds`, `add_hold`, `lift_hold` | Done |
 | `apeiron-remote` | SHA-256 checksums on every S3 write | Done |
-| `apeiron-cli` | `apeiron retention` | Done |
+| `apeiron-cli` | `apeiron retention`, `apeiron hold` | Done |
 | `apeiron-server` | The Retention page | Done |

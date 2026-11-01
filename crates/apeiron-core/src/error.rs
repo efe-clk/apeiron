@@ -87,6 +87,17 @@ pub enum Error {
     InvalidRetention(String),
     #[error("ref {name:?} is kept by a retention rule: {reason}")]
     Retained { name: String, reason: String },
+    #[error("invalid legal hold: {0}")]
+    InvalidHold(String),
+    #[error("ref {name:?} is kept by the legal hold {id} ({reason}): {what}")]
+    Held {
+        name: String,
+        id: String,
+        reason: String,
+        what: String,
+    },
+    #[error("no legal hold {0}")]
+    NoHold(String),
     #[error("cancelled")]
     Cancelled,
     #[error("random number generator failed: {0}")]

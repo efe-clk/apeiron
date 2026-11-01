@@ -531,6 +531,15 @@ class Repository:
     def add_retention(self, refs: str, days: int) -> Record:
         return self.call("add_retention", refs=refs, days=days)
 
+    def holds(self) -> list:
+        return self.call("holds")
+
+    def add_hold(self, refs: str, reason: str) -> Record:
+        return self.call("add_hold", refs=refs, reason=reason)
+
+    def lift_hold(self, id: str, reason: str) -> Record:
+        return self.call("lift_hold", id=id, reason=reason)
+
     # Long operations; each returns a Job.
 
     def backup(self, source: Any, ref: str = "main", **options: Any) -> Job:

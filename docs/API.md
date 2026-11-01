@@ -178,6 +178,9 @@ Every operation takes one plain request value and returns one plain result value
 | `pull` | remote name, ref name (default `main`) | `TransferReport`, the same for the local ref; `conflict` if the local ref has snapshots the remote does not | Yes |
 | `retention` | — | `Vec<RetentionRule>`: refs pattern, days, when added; oldest first ([ARCHIVE.md](ARCHIVE.md)) | No |
 | `add_retention` | refs (a name, or a prefix followed by `*`), days (1 to 36500) | `RetentionRule`; it can never be removed or shortened ([FORMAT.md](FORMAT.md) §16). A ref change a rule forbids fails with `conflict` | No |
+| `holds` | — | `Vec<LegalHold>`: id, refs pattern, reason, when placed and, once lifted, the lift's reason and time; oldest first ([ARCHIVE.md](ARCHIVE.md) §2.1) | No |
+| `add_hold` | refs (a name, or a prefix followed by `*`), reason (one line, 1 to 200 characters) | `LegalHold`; until lifted, a ref it matches only moves forward and is not deleted, and gc keeps its whole reflog ([FORMAT.md](FORMAT.md) §17). A ref change it forbids fails with `conflict` | No |
+| `lift_hold` | id, reason | `LegalHold` with its lift; cannot be undone. `not_found` for an unknown id | No |
 | `report` | verify, remotes, stale days (default 7) | `ComplianceReport`: time, repository facts (encryption, keys, damaged files), per ref the snapshot, newest time, history length, retention and state on each remote, retention rules, verify result, remotes, findings ([REPORTS.md](REPORTS.md)) | Yes |
 | `push_all`, `pull_all` | remote name | `MirrorReport`: per ref its name and either a `TransferReport` or the `conflict` that left it; other errors stop them all ([REPLICATION.md](REPLICATION.md) §2, [FORMAT.md](FORMAT.md) §15.7) | Yes |
 | `git_import` | Git repository path, ref prefix (default `git`) | `GitImportReport`: commits and tags stored, refs moved (Git name, ref, Git id, snapshot, previous), skipped refs with the reason, stale refs ([GIT.md](GIT.md)) | Yes |
