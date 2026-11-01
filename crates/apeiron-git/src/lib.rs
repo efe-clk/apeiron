@@ -9,6 +9,7 @@ mod export;
 mod import;
 mod names;
 mod raw;
+mod receive;
 mod serve;
 
 use std::path::{Path, PathBuf};
@@ -17,6 +18,7 @@ use serde::{Deserialize, Serialize};
 
 pub use export::export;
 pub use import::import;
+pub use receive::{PushResult, PushedRef, receive};
 pub use serve::{ServedRef, common_haves, serve_refs, write_pack};
 
 /// Called after each commit or tag with the number done so far; an error,

@@ -120,55 +120,65 @@ fn copy(out: &mut Vec<u8>, mut offset: usize, mut len: usize) {
     }
 }
 
+/// The object a delta makes from `base`; `None` when the delta is broken
+/// or was made from another base.
+pub(crate) fn apply(base: &[u8], delta: &[u8]) -> Option<Vec<u8>> {
+    let mut d = delta;
+    let mut size = || -> Option<usize> {
+        let (mut n, mut shift) = (0usize, 0u32);
+        loop {
+            let (&b, rest) = d.split_first()?;
+            d = rest;
+            n |= usize::from(b & 0x7f).checked_shl(shift)?;
+            shift += 7;
+            if b & 0x80 == 0 {
+                return Some(n);
+            }
+        }
+    };
+    if size()? != base.len() {
+        return None;
+    }
+    let want = size()?;
+    let mut out = Vec::with_capacity(want.min(1 << 30));
+    while let Some((&op, rest)) = d.split_first() {
+        d = rest;
+        if op & 0x80 == 0 {
+            let n = usize::from(op);
+            if n == 0 {
+                return None;
+            }
+            out.extend_from_slice(d.get(..n)?);
+            d = &d[n..];
+            continue;
+        }
+        let mut field = |bits: std::ops::Range<u32>| -> Option<usize> {
+            let mut n = 0usize;
+            for (k, bit) in bits.enumerate() {
+                if op & (1 << bit) != 0 {
+                    let (&b, rest) = d.split_first()?;
+                    d = rest;
+                    n |= usize::from(b) << (8 * k);
+                }
+            }
+            Some(n)
+        };
+        let offset = field(0..4)?;
+        let len = match field(4..7)? {
+            0 => 0x10000,
+            n => n,
+        };
+        out.extend_from_slice(base.get(offset..offset.checked_add(len)?)?);
+        if out.len() > want {
+            return None;
+        }
+    }
+    (out.len() == want).then_some(out)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Index, encode};
-
-    /// Git's reading of a delta, to check ours against.
-    fn apply(base: &[u8], delta: &[u8]) -> Vec<u8> {
-        let mut d = delta;
-        let mut size = || {
-            let (mut n, mut shift) = (0usize, 0);
-            loop {
-                let b = d[0];
-                d = &d[1..];
-                n |= usize::from(b & 0x7f) << shift;
-                shift += 7;
-                if b & 0x80 == 0 {
-                    return n;
-                }
-            }
-        };
-        assert_eq!(size(), base.len());
-        let want = size();
-        let mut out = Vec::new();
-        while let Some((&op, rest)) = d.split_first() {
-            d = rest;
-            if op & 0x80 == 0 {
-                out.extend_from_slice(&d[..usize::from(op)]);
-                d = &d[usize::from(op)..];
-                continue;
-            }
-            let mut field = |bits: std::ops::Range<u32>| {
-                let mut n = 0usize;
-                for (k, bit) in bits.enumerate() {
-                    if op & (1 << bit) != 0 {
-                        n |= usize::from(d[0]) << (8 * k);
-                        d = &d[1..];
-                    }
-                }
-                n
-            };
-            let offset = field(0..4);
-            let mut len = field(4..7);
-            if len == 0 {
-                len = 0x10000;
-            }
-            out.extend_from_slice(&base[offset..offset + len]);
-        }
-        assert_eq!(out.len(), want);
-        out
-    }
+    use super::{Index, apply, encode};
 
     fn text(seed: u64, len: usize) -> Vec<u8> {
         let mut x = seed;
@@ -182,6 +192,12 @@ mod tests {
             .collect()
     }
 
+    fn delta_of(base: &[u8]) -> Vec<u8> {
+        let mut target = base.to_vec();
+        target.extend_from_slice(b"more");
+        encode(base, &Index::new(base), &target, usize::MAX).unwrap()
+    }
+
     #[test]
     fn a_changed_object_is_written_as_its_changes() {
         let base = text(1, 200_000);
@@ -191,15 +207,19 @@ mod tests {
         target.drain(150_000..150_100);
         let delta = encode(&base, &Index::new(&base), &target, usize::MAX).unwrap();
         assert!(delta.len() < 200, "{}", delta.len());
-        assert_eq!(apply(&base, &delta), target);
+        assert_eq!(apply(&base, &delta).unwrap(), target);
 
         // Unrelated bytes make a delta longer than the limit.
         let other = text(2, 1000);
         assert!(encode(&base, &Index::new(&base), &other, 500).is_none());
+        // A delta read against another base, or cut short, is refused.
+        assert!(apply(&other, &delta_of(&base)).is_none());
+        let delta = delta_of(&base);
+        assert!(apply(&base, &delta[..delta.len() - 1]).is_none());
         // Small and empty objects.
         for target in [&b""[..], b"short", &base[..5]] {
             let delta = encode(&base, &Index::new(&base), target, usize::MAX).unwrap();
-            assert_eq!(apply(&base, &delta), target);
+            assert_eq!(apply(&base, &delta).unwrap(), target);
         }
     }
 }

@@ -437,3 +437,101 @@ fn a_changed_file_travels_as_its_changes() {
         env.git(&src, &["show", "main:data.txt"]).len()
     );
 }
+
+#[test]
+fn pushed_commits_become_snapshots_and_refs_move_forward() {
+    let Some(env) = Env::new() else { return };
+    let src = make_repo(&env);
+    let mut repo = init(&env.root.join("apeiron"));
+    apeiron_git::import(&mut repo, &src, "git", &mut |_| Ok(())).unwrap();
+    let cache = env.root.join("cache.git");
+    let refs = apeiron_git::serve_refs(&repo, &cache, "git").unwrap();
+    let old = refs
+        .iter()
+        .find(|r| r.git == "refs/heads/main")
+        .unwrap()
+        .id
+        .clone();
+    let zero = "0".repeat(40);
+
+    // Two commits on main, sent as Git sends them, with offset deltas.
+    for round in 0..2 {
+        fs::write(src.join("a.txt"), format!("pushed {round}\n").repeat(50)).unwrap();
+        env.git(&src, &["add", "a.txt"]);
+        env.git(&src, &["commit", "-q", "-m", &format!("pushed {round}")]);
+    }
+    let new = env.git(&src, &["rev-parse", "main"]);
+    let pack = |revs: &str, offsets: bool| {
+        let mut args = vec!["pack-objects", "--stdout", "--revs", "-q"];
+        if offsets {
+            args.push("--delta-base-offset");
+        }
+        let out = Command::new("git")
+            .args(&args)
+            .current_dir(&src)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut out = out;
+        out.stdin
+            .take()
+            .unwrap()
+            .write_all(revs.as_bytes())
+            .unwrap();
+        out.wait_with_output().unwrap().stdout
+    };
+    let push = |repo: &mut Repository, git: &str, old: &str, new: &str, pack: &[u8]| {
+        let update = apeiron_git::PushedRef {
+            git: git.to_owned(),
+            old: old.to_owned(),
+            new: new.to_owned(),
+        };
+        let may = |name: &str| name != "git/heads/locked";
+        let mut results = apeiron_git::receive(repo, &cache, "git", &[update], pack, &may).unwrap();
+        results.remove(0).error
+    };
+    let sent = pack(&format!("{new}\n^{old}\n"), true);
+    assert_eq!(push(&mut repo, "refs/heads/main", &old, &new, &sent), None);
+    let main = repo.read_ref("git/heads/main").unwrap().unwrap();
+    let snapshot = repo.read_snapshot(&main).unwrap();
+    let id = snapshot.meta.iter().find(|(k, _)| k == "git.id").unwrap();
+    assert_eq!(id.1, new);
+    assert_eq!(snapshot.message.as_deref(), Some("pushed 1\n"));
+
+    // A new branch, sent with deltas against named bases.
+    env.git(&src, &["checkout", "-q", "-b", "topic"]);
+    fs::write(src.join("a.txt"), "on topic\n".repeat(50)).unwrap();
+    env.git(&src, &["commit", "-q", "-am", "topic"]);
+    let topic = env.git(&src, &["rev-parse", "topic"]);
+    let sent = pack(&format!("{topic}\n^{new}\n"), false);
+    assert_eq!(
+        push(&mut repo, "refs/heads/topic", &zero, &topic, &sent),
+        None
+    );
+    assert!(repo.read_ref("git/heads/topic").unwrap().is_some());
+
+    // Refused: going back, a stale old id, a ref it may not write, a
+    // delete, and a remote-tracking branch.
+    let back = env.git(&src, &["rev-parse", "main~1"]);
+    let refused = [
+        ("refs/heads/main", new.as_str(), back.as_str()),
+        ("refs/heads/main", old.as_str(), topic.as_str()),
+        ("refs/heads/locked", zero.as_str(), topic.as_str()),
+        ("refs/heads/topic", topic.as_str(), zero.as_str()),
+        ("refs/remotes/origin/x", zero.as_str(), topic.as_str()),
+    ];
+    for (git, from, to) in refused {
+        assert!(
+            push(&mut repo, git, from, to, &[]).is_some(),
+            "{git} {from} {to}"
+        );
+    }
+    assert_eq!(repo.read_ref("git/heads/locked").unwrap(), None);
+
+    // The server's copy shows the new commits with the ids Git made.
+    let served = apeiron_git::serve_refs(&repo, &cache, "git").unwrap();
+    let main = served.iter().find(|r| r.git == "refs/heads/main").unwrap();
+    assert_eq!(main.id, new);
+    env.git(&cache, &["fsck", "--no-progress"]);
+}

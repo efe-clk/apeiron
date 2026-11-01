@@ -25,8 +25,9 @@ pub use apeiron_core::{
     ReflogEntry, Remote, RepairReport, RetentionRule, Time, TransferReport, VerifyReport,
 };
 pub use apeiron_git::{
-    ExportReport as GitExportReport, ImportReport as GitImportReport, RefUpdate as GitRefUpdate,
-    ServedRef as GitServedRef, Skipped as GitSkipped,
+    ExportReport as GitExportReport, ImportReport as GitImportReport, PushResult as GitPushResult,
+    PushedRef as GitPushedRef, RefUpdate as GitRefUpdate, ServedRef as GitServedRef,
+    Skipped as GitSkipped,
 };
 pub use apeiron_plugin::{Added as PluginAdded, PluginInfo};
 pub use apeiron_services::PluginMerge;

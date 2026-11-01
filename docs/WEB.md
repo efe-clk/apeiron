@@ -68,7 +68,7 @@ The requests of DESKTOP.md §3 stay, with these differences:
 | `POST /api/call/<operation>` | Only `info`, `resolve`, `log`, `list`, `diff`, `diff_text`, `refs`, `reflog`, and for an `admin` `retention`, `add_retention` ([ARCHIVE.md](ARCHIVE.md)); others are refused with `unsupported` |
 | `POST /api/start/<operation>` | Only `backup`, `restore`, `verify`, `search`, `report` ([REPORTS.md](REPORTS.md)); `source` of a backup and `target` of a restore must be inside a `--folder` |
 | `GET /api/folders` | Only inside a `--folder`; without a path, the first one; `parent` is empty at a `--folder` |
-| `GET /git/<prefix>/info/refs`, `POST /git/<prefix>/git-upload-pack` | `git clone` and `git fetch` with the user's name and password, not a session ([GIT.md](GIT.md) §7) |
+| `GET /git/<prefix>/info/refs`, `POST /git/<prefix>/git-upload-pack`, `POST /git/<prefix>/git-receive-pack` | `git clone`, `git fetch` and `git push` with the user's name and password, not a session ([GIT.md](GIT.md) §7) |
 
 A request without a valid session has status 401 with the kind `invalid_input` and `"sign_in": true`, and the pages show the sign-in screen.
 

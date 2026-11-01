@@ -87,15 +87,15 @@ A snapshot without Git fields becomes a commit with the snapshot's author (or `A
 | Submodule content | Not imported; the submodule's own repository can be imported separately |
 | Git LFS | The pointer files are imported, not the large files |
 
-## 7. Cloning from the web server
+## 7. Git over HTTP
 
-`apeiron web` (WEB.md) serves the branches and tags under a ref prefix to Git over HTTP, so a project kept in Apeiron can be cloned without exporting it first:
+`apeiron web` (WEB.md) serves the branches and tags under a ref prefix to Git over HTTP, so a project kept in Apeiron can be cloned, fetched and pushed to without exporting or importing it:
 
 ```bash
 git clone https://ayse@backup.example.com:8443/git/git    # the refs under git/, the default prefix of import
 ```
 
-The address is `/git/<prefix>`, with or without `.git` at the end. Only reading is served: `git clone` and `git fetch`; `git push` is refused.
+The address is `/git/<prefix>`, with or without `.git` at the end. Fetching works as follows; pushing is in section 7.1.
 
 1. Git signs in with the user's name and password (HTTP Basic), at every request; wrong passwords pause as sign-ins in the pages do (WEB.md §5). A user with a second factor (IDENTITY.md §4) or without a password cannot use it, because Git cannot send the code.
 2. The server exports the refs under the prefix into a Git copy of its own, `git/<prefix>.git` in the folder of its audit log, and brings it up to date at each request as `apeiron git export` does (section 5). The copy can be deleted at any time; it is made again.
@@ -106,11 +106,21 @@ The address is `/git/<prefix>`, with or without `.git` at the end. Only reading 
 
 The server speaks Git's smart HTTP protocol, version 0, without side-band; newer Git asks for version 2 and falls back to it.
 
+### 7.1 Pushing
+
+`git push` stores new commits as snapshots, as `apeiron git import` would, and moves the refs. Only a user who may back up (USERS.md §1: `admin`, or a `member` for its own backups) may push, and not to a standby (REPLICATION.md §5).
+
+1. The server offers the refs the user sees, and asks for a pack without objects from outside it (`no-thin`) and a report per ref (`report-status`).
+2. It brings its Git copy up to date, then writes every object of the pack into it, making deltas whole against their base. A push may be at most 256 MiB; a larger history is pushed in parts.
+3. Each ref is checked: it must be a branch or tag under the prefix that the user owns, its old id must be the one the copy holds (else "fetch first"), and its new commit must have the old one in its history. Deleting a ref and moving one back, as `git push --force` does, are refused: the history on the server is kept. A ref kept by a retention rule only moves forward anyway (ARCHIVE.md).
+4. The commits the accepted refs reach and that are not stored yet become snapshots, with the Git fields of section 2.2, so exporting them gives the same ids. Then each ref moves with compare-and-swap; one that another program moved meanwhile is refused.
+5. Git shows `ok` or the reason per ref. The push is recorded as `git_push` with each ref, its new id and its error (AUDIT.md §1), and a push that moved a ref is copied to the replicas, as a backup is (REPLICATION.md §4).
+
 ## 8. Not part of this work item
 
 | Item | Where |
 | --- | --- |
-| Push over HTTP, Git over SSH | Later; clone and fetch over HTTP (section 7) already take a project out of Apeiron |
+| Git over SSH; deleting refs and force pushes over HTTP | Later; HTTP (section 7) takes a project in and out of Apeiron, and `apeiron ref delete` removes a ref |
 | Checking out into a Git working tree | `apeiron restore` writes a snapshot into a folder |
 | Branching and merging inside Apeiron | Stage 3 work item 2 |
 | Moving the code behind the plugin interface | With the plugin system, Stage 3 |
@@ -119,9 +129,9 @@ The server speaks Git's smart HTTP protocol, version 0, without side-band; newer
 
 | Crate | Role | Status |
 | --- | --- | --- |
-| `apeiron-git` | Import and export, and the refs and packs served (section 7); only it uses `gix` | Done |
-| `apeiron` | `git_import` and `git_export` jobs (API.md §8.3); `git_serve_refs` and `git_pack` for the server | Done |
-| `apeiron-server` | `/git/<prefix>/info/refs` and `/git/<prefix>/git-upload-pack` (section 7) | Done |
+| `apeiron-git` | Import and export, the refs and packs served and the packs taken (section 7); only it uses `gix` | Done |
+| `apeiron` | `git_import` and `git_export` jobs (API.md §8.3); `git_serve_refs`, `git_common`, `git_pack` and `git_receive` for the server | Done |
+| `apeiron-server` | `/git/<prefix>/info/refs`, `/git/<prefix>/git-upload-pack` and `/git/<prefix>/git-receive-pack` (section 7) | Done |
 | `apeiron-cli` | `apeiron git import` and `apeiron git export` | Done |
 
 `gix` (gitoxide) 0.85 reads and writes the objects and refs (VISION.md); it is the newest release that builds with Rust 1.85. Objects are parsed and written as raw bytes, so nothing gix normalizes can change an id.

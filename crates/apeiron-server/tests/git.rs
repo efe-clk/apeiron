@@ -67,6 +67,9 @@ fn git_clones_the_branches_a_user_sees() {
     users
         .add(user("ayse", Role::Reader, &["git/heads/main"], &hash))
         .unwrap();
+    users
+        .add(user("okan", Role::Member, &["git/heads/main"], &hash))
+        .unwrap();
     let mut with_code = user("cem", Role::Admin, &[], &hash);
     with_code.totp = Some("JBSWY3DPEHPK3PXP".to_owned());
     users.add(with_code).unwrap();
@@ -149,11 +152,58 @@ fn git_clones_the_branches_a_user_sees() {
         let out = git(root, &["clone", "-q", &url(name, password), name]);
         assert!(!out.status.success(), "{name}");
     }
-    // Pushing is not served.
-    let out = git(&root.join("all"), &["push", "-q", "origin", "main:pushed"]);
+    // A member pushes a commit to a branch it owns; it becomes a snapshot.
+    let okan = root.join("okan");
+    let out = git(root, &["clone", "-q", &url("okan", PASSWORD), "okan"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    fs::write(okan.join("readme.txt"), "from git").unwrap();
+    let commit = [
+        "-c",
+        "user.name=Okan",
+        "-c",
+        "user.email=okan@example.org",
+        "commit",
+        "-q",
+        "-am",
+        "a change from git",
+    ];
+    assert!(git(&okan, &commit).status.success());
+    let out = git(&okan, &["push", "-q", "origin", "main"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let out = git(root, &["clone", "-q", &url("ayse", PASSWORD), "again"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_eq!(
+        fs::read_to_string(root.join("again/readme.txt")).unwrap(),
+        "from git"
+    );
+    let same = |dir: &str| {
+        let out = git(&root.join(dir), &["rev-parse", "HEAD"]);
+        String::from_utf8_lossy(&out.stdout).into_owned()
+    };
+    assert_eq!(same("again"), same("okan"));
+
+    // Refused: a reader, a ref the member does not own, and going back.
+    let out = git(&root.join("ayse"), &["push", "-q", "origin", "main:other"]);
+    assert!(!out.status.success());
+    let out = git(&okan, &["push", "-q", "origin", "main:refs/heads/secret"]);
+    assert!(!out.status.success());
+    let out = git(&okan, &["push", "-q", "--force", "origin", "main~1:main"]);
     assert!(!out.status.success());
 
     let log = fs::read_to_string(root.join("state/audit.log")).unwrap();
     assert!(log.contains("\"git_fetch\""), "{log}");
     assert!(log.contains("\"via\":\"git\""), "{log}");
+    assert!(log.contains("\"git_push\""), "{log}");
 }

@@ -19,11 +19,12 @@ use crate::{
 const BATCH: usize = 1000;
 
 /// What a ref of the Git repository names.
-struct Wanted {
-    git: String,
-    name: String,
+#[derive(Clone)]
+pub(crate) struct Wanted {
+    pub(crate) git: String,
+    pub(crate) name: String,
     /// The commit or annotated tag.
-    id: GitId,
+    pub(crate) id: GitId,
 }
 
 /// Stores every branch and tag of the Git repository at `path` under
@@ -39,35 +40,9 @@ pub fn import(
     let mut report = ImportReport::default();
     let wanted = wanted_refs(&git, path, prefix, &mut report)?;
 
-    let mut run = Run {
-        git: &git,
-        path,
-        known: known_snapshots(repo, prefix)?,
-        blobs: HashMap::new(),
-        trees: HashMap::new(),
-        done: 0,
-    };
-    // Parents before children, in batches.
+    let mut run = Run::new(&git, path, known_snapshots(repo, prefix)?);
     let order = run.missing(&wanted)?;
-    for batch in order.chunks(BATCH) {
-        let mut writer = repo.writer();
-        for &(id, is_tag) in batch {
-            let snapshot = if is_tag {
-                run.store_tag(&mut writer, id)?
-            } else {
-                run.store_commit(&mut writer, id)?
-            };
-            run.known.insert(id, snapshot);
-            if is_tag {
-                report.tags += 1;
-            } else {
-                report.commits += 1;
-            }
-            run.done += 1;
-            on_object(run.done)?;
-        }
-        writer.finish()?;
-    }
+    (report.commits, report.tags) = store(repo, &mut run, &order, on_object)?;
 
     // Refs last, so none points to anything incomplete.
     let mut seen = HashSet::new();
@@ -104,6 +79,37 @@ pub fn import(
         .filter(|n| n.starts_with(&own) && !seen.contains(n))
         .collect();
     Ok(report)
+}
+
+/// Stores the commits and tags of `order`, parents before children, in
+/// batches; returns how many commits and tags.
+pub(crate) fn store(
+    repo: &mut Repository,
+    run: &mut Run<'_>,
+    order: &[(GitId, bool)],
+    on_object: OnObject<'_>,
+) -> Result<(u64, u64)> {
+    let (mut commits, mut tags) = (0, 0);
+    for batch in order.chunks(BATCH) {
+        let mut writer = repo.writer();
+        for &(id, is_tag) in batch {
+            let snapshot = if is_tag {
+                run.store_tag(&mut writer, id)?
+            } else {
+                run.store_commit(&mut writer, id)?
+            };
+            run.known.insert(id, snapshot);
+            if is_tag {
+                tags += 1;
+            } else {
+                commits += 1;
+            }
+            run.done += 1;
+            on_object(run.done)?;
+        }
+        writer.finish()?;
+    }
+    Ok((commits, tags))
 }
 
 /// The branches and tags to import; everything else is listed as skipped.
@@ -167,7 +173,7 @@ fn wanted_refs(
 
 /// Git ids already stored: the `git.id` of every snapshot that the refs
 /// under `prefix` reach, with the snapshot and its tree.
-fn known_snapshots(
+pub(crate) fn known_snapshots(
     repo: &Repository,
     prefix: &str,
 ) -> Result<HashMap<GitId, (ObjectId, ObjectId)>> {
@@ -201,7 +207,7 @@ fn known_snapshots(
 /// Submodule entries below a tree: path and commit id.
 type Gitlinks = Vec<(Vec<u8>, String)>;
 
-struct Run<'a> {
+pub(crate) struct Run<'a> {
     git: &'a gix::Repository,
     path: &'a Path,
     /// Git commit or tag → its snapshot and that snapshot's tree.
@@ -213,7 +219,27 @@ struct Run<'a> {
     done: u64,
 }
 
-impl Run<'_> {
+impl<'a> Run<'a> {
+    pub(crate) fn new(
+        git: &'a gix::Repository,
+        path: &'a Path,
+        known: HashMap<GitId, (ObjectId, ObjectId)>,
+    ) -> Self {
+        Run {
+            git,
+            path,
+            known,
+            blobs: HashMap::new(),
+            trees: HashMap::new(),
+            done: 0,
+        }
+    }
+
+    /// The snapshot stored for a Git commit or tag.
+    pub(crate) fn stored(&self, id: GitId) -> Option<ObjectId> {
+        self.known.get(&id).map(|(snapshot, _)| *snapshot)
+    }
+
     fn read(&self, id: GitId) -> Result<(gix::object::Kind, Vec<u8>)> {
         let object = self
             .git
@@ -235,7 +261,7 @@ impl Run<'_> {
 
     /// The commits and tags not stored yet, each after what it points to.
     /// `true` marks a tag.
-    fn missing(&self, wanted: &[Wanted]) -> Result<Vec<(GitId, bool)>> {
+    pub(crate) fn missing(&self, wanted: &[Wanted]) -> Result<Vec<(GitId, bool)>> {
         let mut order = Vec::new();
         let mut placed = HashSet::new();
         // (id, is_tag, children pushed)

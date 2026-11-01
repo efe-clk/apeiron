@@ -1,11 +1,11 @@
-//! `git clone` and `git fetch` over HTTP from the web server (GIT.md §7):
-//! Git's smart protocol, version 0, read only, with a full pack each time.
+//! `git clone`, `git fetch` and `git push` over HTTP from the web server
+//! (GIT.md §7): Git's smart protocol, version 0.
 
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use apeiron::{Error, ErrorKind, GitRequest, GitServedRef, Repository};
+use apeiron::{Error, ErrorKind, GitPushedRef, GitRequest, GitServedRef, Repository};
 use axum::body::{Body, Bytes};
 use axum::extract::{Path as UrlPath, Query, Request, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
@@ -14,7 +14,7 @@ use serde::Deserialize;
 use serde_json::json;
 
 use crate::audit::Actor;
-use crate::users::User;
+use crate::users::{Role, User};
 use crate::web::WebState;
 use crate::{App, Failure, Mode, blocking, lock, peer};
 
@@ -26,39 +26,60 @@ pub(crate) struct Service {
     service: Option<String>,
 }
 
-/// `GET /git/<prefix>/info/refs?service=git-upload-pack`: the branches and
-/// tags under `<prefix>` the user sees.
+/// `GET /git/<prefix>/info/refs?service=git-upload-pack` or
+/// `git-receive-pack`: the branches and tags under `<prefix>` the user
+/// sees, to fetch or to push to.
 pub(crate) async fn info_refs(
     State(app): State<Arc<App>>,
     UrlPath(prefix): UrlPath<String>,
     Query(query): Query<Service>,
     request: Request,
 ) -> Response {
-    if query.service.as_deref() != Some("git-upload-pack") {
-        return text(
-            StatusCode::FORBIDDEN,
-            "only git clone and git fetch are served; upgrade Git if it asks otherwise",
-        );
-    }
+    let push = match query.service.as_deref() {
+        Some("git-upload-pack") => false,
+        Some("git-receive-pack") => true,
+        _ => {
+            return text(
+                StatusCode::FORBIDDEN,
+                "only git clone, git fetch and git push are served; upgrade Git if it asks otherwise",
+            );
+        }
+    };
     let from = peer(&request);
     let (user, repo, cache, prefix) = match signed_in(&app, &prefix, request.headers(), from).await
     {
         Ok(found) => found,
         Err(response) => return *response,
     };
+    if push && let Err(response) = may_push(&app, &user) {
+        return *response;
+    }
     let refs = match visible_refs(&repo, &user, &cache, &prefix).await {
         Ok(refs) => refs,
         Err(e) => return Failure::from(e).into_response(),
     };
+    let service = if push {
+        "git-receive-pack"
+    } else {
+        "git-upload-pack"
+    };
     let mut out = Vec::new();
-    pkt(&mut out, b"# service=git-upload-pack\n");
+    pkt(&mut out, format!("# service={service}\n").as_bytes());
     out.extend_from_slice(b"0000");
-    let mut caps = format!("agent=apeiron/{}", env!("CARGO_PKG_VERSION"));
+    let agent = format!("agent=apeiron/{}", env!("CARGO_PKG_VERSION"));
+    // A push gets a report per ref, and no packs that lean on objects
+    // outside them.
+    let mut caps = if push {
+        format!("report-status no-thin {agent}")
+    } else {
+        agent
+    };
     let head = refs
         .iter()
         .find(|r| r.git == "refs/heads/main")
         .or_else(|| refs.iter().find(|r| r.git == "refs/heads/master"))
-        .or_else(|| refs.iter().find(|r| r.git.starts_with("refs/heads/")));
+        .or_else(|| refs.iter().find(|r| r.git.starts_with("refs/heads/")))
+        .filter(|_| !push);
     match head {
         Some(head) => {
             caps = format!("symref=HEAD:{} {caps}", head.git);
@@ -84,10 +105,165 @@ pub(crate) async fn info_refs(
         },
     }
     out.extend_from_slice(b"0000");
-    git_response(
-        "application/x-git-upload-pack-advertisement",
-        Body::from(out),
-    )
+    let content_type = if push {
+        "application/x-git-receive-pack-advertisement"
+    } else {
+        "application/x-git-upload-pack-advertisement"
+    };
+    git_response(content_type, Body::from(out))
+}
+
+/// Whether the user may push: a writing role, on a server that takes
+/// backups (USERS.md §1, REPLICATION.md §5).
+#[allow(clippy::result_large_err)]
+fn may_push(app: &App, user: &User) -> Result<(), Box<Response>> {
+    if user.role == Role::Reader {
+        return Err(Box::new(text(
+            StatusCode::FORBIDDEN,
+            "a reader cannot push",
+        )));
+    }
+    if let Mode::Web(web) = &app.mode
+        && web.standby()
+    {
+        return Err(Box::new(text(
+            StatusCode::FORBIDDEN,
+            "this is a standby copy; push to the primary",
+        )));
+    }
+    Ok(())
+}
+
+/// `POST /git/<prefix>/git-receive-pack`: the refs to change and a pack of
+/// their objects; each ref the user owns moves forward or is refused.
+pub(crate) async fn receive_pack(
+    State(app): State<Arc<App>>,
+    UrlPath(prefix): UrlPath<String>,
+    request: Request,
+) -> Response {
+    let from = peer(&request);
+    let (user, repo, cache, prefix) =
+        match signed_in(&app, &prefix, request.headers(), from.clone()).await {
+            Ok(found) => found,
+            Err(response) => return *response,
+        };
+    if let Err(response) = may_push(&app, &user) {
+        return *response;
+    }
+    let Ok(bytes) = axum::body::to_bytes(request.into_body(), PUSH_LIMIT).await else {
+        return text(
+            StatusCode::PAYLOAD_TOO_LARGE,
+            "the push is larger than 256 MiB; push fewer commits at a time",
+        );
+    };
+    let Some((updates, pack)) = parse_commands(&bytes) else {
+        return text(StatusCode::BAD_REQUEST, "not a Git receive-pack request");
+    };
+    let results = {
+        let (repo, prefix, cache) = (repo.clone(), prefix.clone(), cache.clone());
+        let user = user.clone();
+        let updates = updates.clone();
+        let pack = pack.to_vec();
+        blocking(move || {
+            let _one = lock(&EXPORTING);
+            let request = GitRequest {
+                path: cache,
+                prefix,
+            };
+            repo.git_receive(&request, &updates, &pack, &|name| user.owns(name))
+        })
+        .await
+    };
+    let mut out = Vec::new();
+    let results = match results {
+        Ok(results) => {
+            pkt(&mut out, b"unpack ok\n");
+            for r in &results {
+                let line = match &r.error {
+                    None => format!("ok {}\n", r.git),
+                    Some(e) => format!("ng {} {}\n", r.git, e.replace('\n', " ")),
+                };
+                pkt(&mut out, line.as_bytes());
+            }
+            results
+        }
+        Err(e) => {
+            pkt(
+                &mut out,
+                format!("unpack {}\n", e.message.replace('\n', " ")).as_bytes(),
+            );
+            for u in &updates {
+                pkt(
+                    &mut out,
+                    format!("ng {} unpacker error\n", u.git).as_bytes(),
+                );
+            }
+            Vec::new()
+        }
+    };
+    out.extend_from_slice(b"0000");
+    if let Mode::Web(web) = &app.mode {
+        let actor = Actor {
+            user: Some(user.name.clone()),
+            from,
+        };
+        let refs: Vec<_> = updates
+            .iter()
+            .map(|u| {
+                let error = results
+                    .iter()
+                    .find(|r| r.git == u.git)
+                    .map_or(Some("unpacker error"), |r| r.error.as_deref());
+                json!({"git": u.git, "new": u.new, "error": error})
+            })
+            .collect();
+        let moved = results.iter().any(|r| r.error.is_none());
+        let outcome = if moved { "ok" } else { "conflict" };
+        if let Err(e) = web.audit.record(
+            &actor,
+            "git_push",
+            json!({ "prefix": prefix, "refs": refs }),
+            outcome,
+        ) {
+            return Failure::from(e).into_response();
+        }
+        if moved {
+            web.replicate_now();
+        }
+    }
+    git_response("application/x-git-receive-pack-result", Body::from(out))
+}
+
+/// The largest push taken in one request.
+const PUSH_LIMIT: usize = 256 << 20;
+
+/// The ref changes of a push and the pack after them.
+fn parse_commands(mut data: &[u8]) -> Option<(Vec<GitPushedRef>, &[u8])> {
+    let mut updates = Vec::new();
+    loop {
+        let len = usize::from_str_radix(std::str::from_utf8(data.get(..4)?).ok()?, 16).ok()?;
+        if len == 0 {
+            data = &data[4..];
+            break;
+        }
+        let line = data.get(4..len)?;
+        data = &data[len..];
+        // The first line carries the client's capabilities after a NUL.
+        let line = line.split(|&b| b == 0).next()?;
+        let line = std::str::from_utf8(line).ok()?.trim_end_matches('\n');
+        let mut parts = line.splitn(3, ' ');
+        let (old, new, git) = (parts.next()?, parts.next()?, parts.next()?);
+        let hex = |s: &str| s.len() == 40 && s.bytes().all(|b| b.is_ascii_hexdigit());
+        if !hex(old) || !hex(new) {
+            return None;
+        }
+        updates.push(GitPushedRef {
+            git: git.to_owned(),
+            old: old.to_ascii_lowercase(),
+            new: new.to_ascii_lowercase(),
+        });
+    }
+    (!updates.is_empty()).then_some((updates, data))
 }
 
 /// `POST /git/<prefix>/git-upload-pack`: a pack of what the client wants,

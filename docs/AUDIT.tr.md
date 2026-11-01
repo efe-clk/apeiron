@@ -12,6 +12,7 @@ Birkaç kişi bir yedek sunucusunu paylaştığında admin, "bu klasörü kim, n
 | --- | --- | --- |
 | `sign_in` | Doğru ya da yanlış, her oturum açma | Verilen ad, ya da kimlik sağlayıcısı için kimlikle birlikte `"via": "oidc"` ([IDENTITY.tr.md](IDENTITY.tr.md) §5); parola ya da kod asla. Doğru olduğu hâlde doğrulama kodu da gereken bir parolanın sonucu `code_needed`'dır. Git her istekte oturum açar ([GIT.tr.md](GIT.tr.md) §7): burada yalnızca onun yanlış parolaları `"via": "git"` ile kaydedilir |
 | `git_fetch` | `git clone` ya da `git fetch`'e gönderilen her paket | Ref öneki ve istenen ref'ler |
+| `git_push` | Her `git push` | Ref öneki ve her ref'in yeni Git kimliği ve hatası; hiçbir ref taşınmadıysa sonuç `conflict`'tir |
 | `sign_out` | Oturumu kapatma | |
 | `call:<operation>` | `list` ya da `log` gibi her kısa işlem | USERS.tr.md §4'teki denetimlerden sonraki istek; snapshot'lar kimlik olarak, yollar çözülmüş olarak |
 | `start:<operation>` | Başlatılan her uzun işlem: `backup`, `restore`, `verify`, `search` | Aynısı |

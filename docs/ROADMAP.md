@@ -78,7 +78,7 @@ The exit criterion came first; it was met on 2026-10-29 with item 1, and the sta
 
 | # | Work item | Status |
 | --- | --- | --- |
-| 1 | Git import/export ([GIT.md](GIT.md); clone and fetch over HTTP from `apeiron web` in §7 there; push over the network remains a goal) | Done |
+| 1 | Git import/export ([GIT.md](GIT.md); clone, fetch and push over HTTP from `apeiron web` in §7 there; SSH remains a goal) | Done |
 | 2 | Branching and merging ([BRANCH.md](BRANCH.md)) | Done |
 | 3 | Search ([SEARCH.md](SEARCH.md)) | Done |
 | 4 | C ABI and Python SDK ([SDK.md](SDK.md)) | Done |

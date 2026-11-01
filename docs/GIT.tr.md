@@ -87,15 +87,15 @@ Git alanları olmayan bir snapshot; snapshot'ın yazarıyla (ya da `Apeiron <ape
 | Alt modül içeriği | İçe alınmaz; alt modülün kendi deposu ayrıca içe alınabilir |
 | Git LFS | Büyük dosyalar değil, işaretçi dosyalar içe alınır |
 
-## 7. Web sunucusundan klonlama
+## 7. HTTP üzerinden Git
 
-`apeiron web` (WEB.tr.md), bir ref önekinin altındaki dalları ve etiketleri Git'e HTTP üzerinden sunar; böylece Apeiron'da tutulan bir proje önce dışa aktarılmadan klonlanabilir:
+`apeiron web` (WEB.tr.md), bir ref önekinin altındaki dalları ve etiketleri Git'e HTTP üzerinden sunar; böylece Apeiron'da tutulan bir proje dışa ya da içe aktarılmadan klonlanabilir, çekilebilir ve ona push edilebilir:
 
 ```bash
 git clone https://ayse@backup.example.com:8443/git/git    # git/ altındaki ref'ler, içe aktarmanın varsayılan öneki
 ```
 
-Adres, sonunda `.git` olsun ya da olmasın, `/git/<prefix>`'tir. Yalnızca okuma sunulur: `git clone` ve `git fetch`; `git push` reddedilir.
+Adres, sonunda `.git` olsun ya da olmasın, `/git/<prefix>`'tir. Çekme aşağıdaki gibi işler; push bölüm 7.1'dedir.
 
 1. Git her istekte kullanıcının adı ve parolasıyla (HTTP Basic) oturum açar; yanlış parolalar sayfalardaki oturum açmalar gibi bekletilir (WEB.tr.md §5). İkinci doğrulaması olan (IDENTITY.tr.md §4) ya da parolası olmayan bir kullanıcı bunu kullanamaz, çünkü Git kodu gönderemez.
 2. Sunucu önekin altındaki ref'leri, denetim kaydının klasöründeki `git/<prefix>.git` adlı kendi Git kopyasına aktarır ve her istekte, `apeiron git export`'un yaptığı gibi (bölüm 5) günceller. Kopya her an silinebilir; yeniden oluşturulur.
@@ -106,11 +106,21 @@ Adres, sonunda `.git` olsun ya da olmasın, `/git/<prefix>`'tir. Yalnızca okuma
 
 Sunucu Git'in akıllı HTTP protokolünün 0. sürümünü side-band olmadan konuşur; yeni Git sürümleri 2. sürümü ister ve buna geri döner.
 
+### 7.1 Push
+
+`git push`, yeni commit'leri `apeiron git import`'un yapacağı gibi snapshot olarak saklar ve ref'leri taşır. Yalnızca yedek alabilen bir kullanıcı (USERS.tr.md §1: `admin` ya da kendi yedekleri için bir `member`) push edebilir; bir yedek sunucuya (REPLICATION.tr.md §5) edemez.
+
+1. Sunucu kullanıcının gördüğü ref'leri sunar; dışarıdaki nesnelere dayanmayan bir paket (`no-thin`) ve ref başına bir rapor (`report-status`) ister.
+2. Git kopyasını günceller, sonra paketin her nesnesini deltaları tabanlarına göre bütünleyerek ona yazar. Bir push en çok 256 MiB olabilir; daha büyük bir geçmiş parça parça push edilir.
+3. Her ref denetlenir: önekin altında, kullanıcının sahip olduğu bir dal ya da etiket olmalı; eski kimliği kopyadakiyle aynı olmalı (yoksa "önce fetch et") ve yeni commit'inin geçmişinde eskisi bulunmalıdır. Bir ref'i silmek ve `git push --force`'un yaptığı gibi geri almak reddedilir: sunucudaki geçmiş korunur. Bir saklama kuralının tuttuğu ref zaten yalnızca ileri gider (ARCHIVE.tr.md).
+4. Kabul edilen ref'lerin ulaştığı ve henüz saklanmamış commit'ler bölüm 2.2'deki Git alanlarıyla snapshot olur; böylece dışa aktarıldıklarında aynı kimlikleri alırlar. Sonra her ref karşılaştır-ve-değiştir ile taşınır; bu arada başka bir programın taşıdığı ref reddedilir.
+5. Git her ref için `ok` ya da nedenini gösterir. Push, her ref, yeni kimliği ve hatasıyla `git_push` olarak kaydedilir (AUDIT.tr.md §1) ve bir ref'i taşıyan push, bir yedek gibi yedek sunuculara kopyalanır (REPLICATION.tr.md §4).
+
 ## 8. Bu işin parçası olmayanlar
 
 | Konu | Nerede |
 | --- | --- |
-| HTTP üzerinden push, SSH üzerinden Git | Daha sonra; HTTP üzerinden clone ve fetch (bölüm 7) bir projeyi Apeiron'dan zaten çıkarır |
+| SSH üzerinden Git; HTTP üzerinden ref silme ve zorla push | Daha sonra; HTTP (bölüm 7) bir projeyi Apeiron'a alır ve oradan çıkarır, `apeiron ref delete` bir ref'i siler |
 | Bir Git çalışma ağacına checkout | `apeiron restore` bir snapshot'ı bir klasöre yazar |
 | Apeiron içinde dallanma ve birleştirme | Aşama 3'ün 2. işi |
 | Kodu eklenti arayüzünün arkasına taşımak | Eklenti sistemiyle, Aşama 3 |
@@ -119,9 +129,9 @@ Sunucu Git'in akıllı HTTP protokolünün 0. sürümünü side-band olmadan kon
 
 | Crate | Görev | Durum |
 | --- | --- | --- |
-| `apeiron-git` | İçe ve dışa aktarma, sunulan ref'ler ve paketler (bölüm 7); `gix`'i yalnızca o kullanır | Tamamlandı |
-| `apeiron` | `git_import` ve `git_export` işleri (API.tr.md §8.3); sunucu için `git_serve_refs` ve `git_pack` | Tamamlandı |
-| `apeiron-server` | `/git/<prefix>/info/refs` ve `/git/<prefix>/git-upload-pack` (bölüm 7) | Tamamlandı |
+| `apeiron-git` | İçe ve dışa aktarma, sunulan ref'ler ve paketler, alınan paketler (bölüm 7); `gix`'i yalnızca o kullanır | Tamamlandı |
+| `apeiron` | `git_import` ve `git_export` işleri (API.tr.md §8.3); sunucu için `git_serve_refs`, `git_common`, `git_pack` ve `git_receive` | Tamamlandı |
+| `apeiron-server` | `/git/<prefix>/info/refs`, `/git/<prefix>/git-upload-pack` ve `/git/<prefix>/git-receive-pack` (bölüm 7) | Tamamlandı |
 | `apeiron-cli` | `apeiron git import` ve `apeiron git export` | Tamamlandı |
 
 Nesneleri ve ref'leri `gix` (gitoxide) 0.85 okur ve yazar (VISION.tr.md); Rust 1.85 ile derlenen en yeni sürüm odur. Nesneler ham bayt olarak çözülür ve yazılır; böylece gix'in normalleştirdiği hiçbir şey bir kimliği değiştiremez.
