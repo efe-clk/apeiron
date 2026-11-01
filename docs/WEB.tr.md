@@ -68,6 +68,7 @@ DESKTOP.tr.md §3'teki istekler şu farklarla kalır:
 | `POST /api/call/<operation>` | Yalnızca `info`, `resolve`, `log`, `list`, `diff`, `diff_text`, `refs`, `reflog`, bir `admin` için ayrıca `retention`, `add_retention` ([ARCHIVE.tr.md](ARCHIVE.tr.md)); diğerleri `unsupported` ile reddedilir |
 | `POST /api/start/<operation>` | Yalnızca `backup`, `restore`, `verify`, `search`, `report` ([REPORTS.tr.md](REPORTS.tr.md)); bir yedeğin `source` alanı ve bir geri yüklemenin `target` alanı bir `--folder` içinde olmalıdır |
 | `GET /api/folders` | Yalnızca bir `--folder` içinde; yol verilmezse ilki; bir `--folder` üzerinde `parent` boştur |
+| `GET /git/<prefix>/info/refs`, `POST /git/<prefix>/git-upload-pack` | Oturumla değil, kullanıcının adı ve parolasıyla `git clone` ve `git fetch` ([GIT.tr.md](GIT.tr.md) §7) |
 
 Geçerli bir oturumu olmayan istek, `invalid_input` türü ve `"sign_in": true` ile 401 durumunu alır; sayfalar oturum açma ekranını gösterir.
 

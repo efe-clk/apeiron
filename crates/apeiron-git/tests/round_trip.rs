@@ -336,3 +336,44 @@ fn a_real_repository_round_trips() {
     assert_eq!(env.refs(&out).lines().collect::<Vec<_>>(), wanted);
     env.git(&out, &["fsck", "--no-progress"]);
 }
+
+#[test]
+fn served_refs_and_packs_are_read_by_git() {
+    let Some(env) = Env::new() else { return };
+    let src = make_repo(&env);
+    let mut repo = init(&env.root.join("apeiron"));
+    apeiron_git::import(&mut repo, &src, "git", &mut |_| Ok(())).unwrap();
+
+    let cache = env.root.join("cache.git");
+    let refs = apeiron_git::serve_refs(&repo, &cache, "git").unwrap();
+    let names: Vec<&str> = refs.iter().map(|r| r.git.as_str()).collect();
+    assert_eq!(
+        names,
+        [
+            "refs/heads/Feature/ABC-1",
+            "refs/heads/main",
+            "refs/heads/signed",
+            "refs/tags/light",
+            "refs/tags/v1.0",
+        ]
+    );
+    let main = refs.iter().find(|r| r.git == "refs/heads/main").unwrap();
+    assert_eq!(main.ref_name, "git/heads/main");
+
+    // A pack of main alone, read into an empty repository by git itself.
+    let mut pack = Vec::new();
+    let count = apeiron_git::write_pack(&cache, std::slice::from_ref(&main.id), &mut pack).unwrap();
+    assert!(count > 5, "{count}");
+    let empty = env.root.join("empty.git");
+    env.git(
+        &env.root,
+        &["init", "-q", "--bare", empty.to_str().unwrap()],
+    );
+    env.git_with(&empty, &["index-pack", "--stdin", "--strict"], Some(&pack));
+    env.git(&empty, &["update-ref", "refs/heads/main", &main.id]);
+    env.git(&empty, &["fsck", "--no-progress"]);
+    assert_eq!(
+        env.git(&empty, &["rev-parse", "main"]),
+        env.git(&src, &["rev-parse", "main"])
+    );
+}

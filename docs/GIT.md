@@ -87,21 +87,40 @@ A snapshot without Git fields becomes a commit with the snapshot's author (or `A
 | Submodule content | Not imported; the submodule's own repository can be imported separately |
 | Git LFS | The pointer files are imported, not the large files |
 
-## 7. Not part of this work item
+## 7. Cloning from the web server
+
+`apeiron web` (WEB.md) serves the branches and tags under a ref prefix to Git over HTTP, so a project kept in Apeiron can be cloned without exporting it first:
+
+```bash
+git clone https://ayse@backup.example.com:8443/git/git    # the refs under git/, the default prefix of import
+```
+
+The address is `/git/<prefix>`, with or without `.git` at the end. Only reading is served: `git clone` and `git fetch`; `git push` is refused.
+
+1. Git signs in with the user's name and password (HTTP Basic), at every request; wrong passwords pause as sign-ins in the pages do (WEB.md §5). A user with a second factor (IDENTITY.md §4) or without a password cannot use it, because Git cannot send the code.
+2. The server exports the refs under the prefix into a Git copy of its own, `git/<prefix>.git` in the folder of its audit log, and brings it up to date at each request as `apeiron git export` does (section 5). The copy can be deleted at any time; it is made again.
+3. It offers the branches and tags under the prefix that the user sees (USERS.md §1); `HEAD` names `main`, else `master`, else the first branch. Only these may be asked for, so nothing reaches the user that its backups do not.
+4. The answer is a pack of everything the asked refs reach, without deltas. The server does not use what the client already has, so a fetch downloads the whole history again: fine for small and middle-sized projects, slow for big ones.
+5. Each fetch is recorded as `git_fetch` with the prefix and the refs (AUDIT.md §1), and a wrong password as `sign_in` with `"via": "git"`.
+
+The server speaks Git's smart HTTP protocol, version 0, without side-band; newer Git asks for version 2 and falls back to it.
+
+## 8. Not part of this work item
 
 | Item | Where |
 | --- | --- |
-| The Git network protocol (clone and push over SSH or HTTP) | Later in Stage 3; a goal, not a requirement (VISION.md) |
+| Push over HTTP, Git over SSH, packs with deltas and a fetch that sends only what is new | Later; clone and fetch over HTTP (section 7) already take a project out of Apeiron |
 | Checking out into a Git working tree | `apeiron restore` writes a snapshot into a folder |
 | Branching and merging inside Apeiron | Stage 3 work item 2 |
 | Moving the code behind the plugin interface | With the plugin system, Stage 3 |
 
-## 8. Crates and libraries
+## 9. Crates and libraries
 
 | Crate | Role | Status |
 | --- | --- | --- |
-| `apeiron-git` | Import and export; only it uses `gix` | Done |
-| `apeiron` | `git_import` and `git_export` jobs (API.md §8.3) | Done |
+| `apeiron-git` | Import and export, and the refs and packs served (section 7); only it uses `gix` | Done |
+| `apeiron` | `git_import` and `git_export` jobs (API.md §8.3); `git_serve_refs` and `git_pack` for the server | Done |
+| `apeiron-server` | `/git/<prefix>/info/refs` and `/git/<prefix>/git-upload-pack` (section 7) | Done |
 | `apeiron-cli` | `apeiron git import` and `apeiron git export` | Done |
 
 `gix` (gitoxide) 0.85 reads and writes the objects and refs (VISION.md); it is the newest release that builds with Rust 1.85. Objects are parsed and written as raw bytes, so nothing gix normalizes can change an id.

@@ -1,0 +1,379 @@
+//! `git clone` and `git fetch` over HTTP from the web server (GIT.md §7):
+//! Git's smart protocol, version 0, read only, with a full pack each time.
+
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+
+use apeiron::{Error, ErrorKind, GitRequest, GitServedRef, Repository};
+use axum::body::{Body, Bytes};
+use axum::extract::{Path as UrlPath, Query, Request, State};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
+use axum::response::{IntoResponse, Response};
+use serde::Deserialize;
+use serde_json::json;
+
+use crate::audit::Actor;
+use crate::users::User;
+use crate::web::WebState;
+use crate::{App, Failure, Mode, blocking, lock, peer};
+
+/// One export into a Git copy at a time.
+static EXPORTING: Mutex<()> = Mutex::new(());
+
+#[derive(Deserialize)]
+pub(crate) struct Service {
+    service: Option<String>,
+}
+
+/// `GET /git/<prefix>/info/refs?service=git-upload-pack`: the branches and
+/// tags under `<prefix>` the user sees.
+pub(crate) async fn info_refs(
+    State(app): State<Arc<App>>,
+    UrlPath(prefix): UrlPath<String>,
+    Query(query): Query<Service>,
+    request: Request,
+) -> Response {
+    if query.service.as_deref() != Some("git-upload-pack") {
+        return text(
+            StatusCode::FORBIDDEN,
+            "only git clone and git fetch are served; upgrade Git if it asks otherwise",
+        );
+    }
+    let from = peer(&request);
+    let (user, repo, cache, prefix) = match signed_in(&app, &prefix, request.headers(), from).await
+    {
+        Ok(found) => found,
+        Err(response) => return *response,
+    };
+    let refs = match visible_refs(&repo, &user, &cache, &prefix).await {
+        Ok(refs) => refs,
+        Err(e) => return Failure::from(e).into_response(),
+    };
+    let mut out = Vec::new();
+    pkt(&mut out, b"# service=git-upload-pack\n");
+    out.extend_from_slice(b"0000");
+    let mut caps = format!("agent=apeiron/{}", env!("CARGO_PKG_VERSION"));
+    let head = refs
+        .iter()
+        .find(|r| r.git == "refs/heads/main")
+        .or_else(|| refs.iter().find(|r| r.git == "refs/heads/master"))
+        .or_else(|| refs.iter().find(|r| r.git.starts_with("refs/heads/")));
+    match head {
+        Some(head) => {
+            caps = format!("symref=HEAD:{} {caps}", head.git);
+            pkt(&mut out, format!("{} HEAD\0{caps}\n", head.id).as_bytes());
+            for r in &refs {
+                pkt(&mut out, format!("{} {}\n", r.id, r.git).as_bytes());
+            }
+        }
+        None => match refs.split_first() {
+            Some((first, rest)) => {
+                pkt(
+                    &mut out,
+                    format!("{} {}\0{caps}\n", first.id, first.git).as_bytes(),
+                );
+                for r in rest {
+                    pkt(&mut out, format!("{} {}\n", r.id, r.git).as_bytes());
+                }
+            }
+            None => pkt(
+                &mut out,
+                format!("{} capabilities^{{}}\0{caps}\n", "0".repeat(40)).as_bytes(),
+            ),
+        },
+    }
+    out.extend_from_slice(b"0000");
+    git_response(
+        "application/x-git-upload-pack-advertisement",
+        Body::from(out),
+    )
+}
+
+/// `POST /git/<prefix>/git-upload-pack`: a pack of what the client wants,
+/// once it says `done`.
+pub(crate) async fn upload_pack(
+    State(app): State<Arc<App>>,
+    UrlPath(prefix): UrlPath<String>,
+    request: Request,
+) -> Response {
+    let from = peer(&request);
+    let (user, repo, cache, prefix) =
+        match signed_in(&app, &prefix, request.headers(), from.clone()).await {
+            Ok(found) => found,
+            Err(response) => return *response,
+        };
+    let headers = request.headers().clone();
+    let Ok(bytes) = axum::body::to_bytes(request.into_body(), 64 << 20).await else {
+        return text(StatusCode::BAD_REQUEST, "the request could not be read");
+    };
+    let gzip = headers
+        .get(header::CONTENT_ENCODING)
+        .is_some_and(|v| v.as_bytes() == b"gzip");
+    let body = if gzip {
+        let mut plain = Vec::new();
+        let limited = flate2::read::GzDecoder::new(&bytes[..]).take(64 << 20);
+        if std::io::BufReader::new(limited)
+            .read_to_end(&mut plain)
+            .is_err()
+        {
+            return text(StatusCode::BAD_REQUEST, "the request is not valid gzip");
+        }
+        plain
+    } else {
+        bytes.to_vec()
+    };
+    let Some(request) = parse_request(&body) else {
+        return text(StatusCode::BAD_REQUEST, "not a Git upload-pack request");
+    };
+    // Without `done` the client is still telling what it has: nothing in
+    // common, so it goes on until it says `done`.
+    if !request.done {
+        let mut out = Vec::new();
+        pkt(&mut out, b"NAK\n");
+        return git_response("application/x-git-upload-pack-result", Body::from(out));
+    }
+    let refs = match visible_refs(&repo, &user, &cache, &prefix).await {
+        Ok(refs) => refs,
+        Err(e) => return Failure::from(e).into_response(),
+    };
+    // Only the tips offered may be asked for, as Git does by default; what
+    // they reach is visible to the user (USERS.md §1).
+    if let Some(other) = request
+        .wants
+        .iter()
+        .find(|w| !refs.iter().any(|r| &r.id == *w))
+    {
+        return text(
+            StatusCode::FORBIDDEN,
+            &format!("{other} is not the tip of a branch or tag you can see"),
+        );
+    }
+    if let Mode::Web(web) = &app.mode {
+        let actor = Actor {
+            user: Some(user.name.clone()),
+            from,
+        };
+        let names: Vec<&str> = refs
+            .iter()
+            .filter(|r| request.wants.contains(&r.id))
+            .map(|r| r.ref_name.as_str())
+            .collect();
+        if let Err(e) = web.audit.record(
+            &actor,
+            "git_fetch",
+            json!({ "prefix": prefix, "refs": names }),
+            "ok",
+        ) {
+            return Failure::from(e).into_response();
+        }
+    }
+
+    let (sender, receiver) = tokio::sync::mpsc::channel::<std::io::Result<Bytes>>(8);
+    let wants = request.wants;
+    tokio::task::spawn_blocking(move || {
+        let mut out = Channel {
+            sender,
+            buffer: Vec::new(),
+        };
+        let mut nak = Vec::new();
+        pkt(&mut nak, b"NAK\n");
+        let io = |e: std::io::Error| Error::new(ErrorKind::Io, e.to_string());
+        let written = out
+            .write_all(&nak)
+            .map_err(io)
+            .and_then(|()| repo.git_pack(&cache, &wants, &mut out))
+            .and_then(|_| out.flush().map_err(io));
+        if let Err(e) = written {
+            // The client sees a pack cut short and fails.
+            let _ = out
+                .sender
+                .blocking_send(Err(std::io::Error::other(e.to_string())));
+        }
+    });
+    let stream = futures_util::stream::unfold(receiver, |mut r| async move {
+        r.recv().await.map(|item| (item, r))
+    });
+    git_response(
+        "application/x-git-upload-pack-result",
+        Body::from_stream(stream),
+    )
+}
+
+/// The user, the repository and the ref prefix of a Git request; a
+/// response that asks for a password otherwise.
+async fn signed_in(
+    app: &Arc<App>,
+    prefix: &str,
+    headers: &HeaderMap,
+    from: Option<String>,
+) -> Result<(User, Repository, PathBuf, String), Box<Response>> {
+    let Mode::Web(web) = &app.mode else {
+        return Err(Box::new(text(
+            StatusCode::NOT_FOUND,
+            "Git is served by apeiron web only",
+        )));
+    };
+    let prefix = prefix.strip_suffix(".git").unwrap_or(prefix).to_owned();
+    let valid = !prefix.is_empty()
+        && !prefix.starts_with('.')
+        && prefix
+            .bytes()
+            .all(|b| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'.' | b'_' | b'-'));
+    if !valid {
+        return Err(Box::new(text(StatusCode::NOT_FOUND, "no such ref prefix")));
+    }
+    let user = match web.basic_user(headers, from).await {
+        Ok(Some(user)) => user,
+        Ok(None) => {
+            let mut response = text(
+                StatusCode::UNAUTHORIZED,
+                "sign in with your name and password",
+            );
+            response.headers_mut().insert(
+                header::WWW_AUTHENTICATE,
+                HeaderValue::from_static("Basic realm=\"Apeiron\", charset=\"UTF-8\""),
+            );
+            return Err(Box::new(response));
+        }
+        Err(failure) => return Err(Box::new(failure.into_response())),
+    };
+    let repo = app
+        .repo()
+        .map_err(|e| Box::new(Failure::from(e).into_response()))?;
+    let cache = cache_path(web, &prefix);
+    Ok((user, repo, cache, prefix))
+}
+
+/// Brings the Git copy up to date and keeps the refs the user sees.
+async fn visible_refs(
+    repo: &Repository,
+    user: &User,
+    cache: &Path,
+    prefix: &str,
+) -> Result<Vec<GitServedRef>, Error> {
+    let repo = repo.clone();
+    let request = GitRequest {
+        path: cache.to_path_buf(),
+        prefix: prefix.to_owned(),
+    };
+    let refs = blocking(move || {
+        let _one = lock(&EXPORTING);
+        repo.git_serve_refs(&request)
+    })
+    .await?;
+    Ok(refs
+        .into_iter()
+        .filter(|r| user.owns(&r.ref_name))
+        .collect())
+}
+
+/// Where the Git copy of `prefix` lives: `git/<prefix>.git` in the folder
+/// of the site's audit log, the server's own state; it can always be made
+/// again.
+fn cache_path(web: &WebState, prefix: &str) -> PathBuf {
+    let state = web.audit.file().parent().unwrap_or(Path::new("."));
+    state.join("git").join(format!("{prefix}.git"))
+}
+
+/// What a client asks for: the ids it wants and whether it said `done`.
+struct UploadRequest {
+    wants: Vec<String>,
+    done: bool,
+}
+
+fn parse_request(mut data: &[u8]) -> Option<UploadRequest> {
+    let mut request = UploadRequest {
+        wants: Vec::new(),
+        done: false,
+    };
+    while data.len() >= 4 {
+        let len = usize::from_str_radix(std::str::from_utf8(&data[..4]).ok()?, 16).ok()?;
+        if len < 4 {
+            // A flush or delimiter packet.
+            data = &data[4..];
+            continue;
+        }
+        let line = data.get(4..len)?;
+        data = &data[len..];
+        let line = std::str::from_utf8(line).ok()?.trim_end_matches('\n');
+        if let Some(rest) = line.strip_prefix("want ") {
+            let id = rest.split(' ').next()?;
+            if id.len() != 40 || !id.bytes().all(|b| b.is_ascii_hexdigit()) {
+                return None;
+            }
+            if !request.wants.iter().any(|w| w == id) {
+                request.wants.push(id.to_ascii_lowercase());
+            }
+        } else if line == "done" {
+            request.done = true;
+        }
+        // `have` lines are read and passed over: the pack is always full.
+    }
+    (!request.wants.is_empty()).then_some(request)
+}
+
+/// Appends one packet line: four hex digits of length, then the data.
+fn pkt(out: &mut Vec<u8>, data: &[u8]) {
+    out.extend_from_slice(format!("{:04x}", data.len() + 4).as_bytes());
+    out.extend_from_slice(data);
+}
+
+fn git_response(content_type: &'static str, body: Body) -> Response {
+    let mut response = (StatusCode::OK, body).into_response();
+    response
+        .headers_mut()
+        .insert(header::CONTENT_TYPE, HeaderValue::from_static(content_type));
+    response
+}
+
+fn text(status: StatusCode, message: &str) -> Response {
+    (status, format!("{message}\n")).into_response()
+}
+
+/// Sends what is written to the response in pieces of 64 KiB.
+struct Channel {
+    sender: tokio::sync::mpsc::Sender<std::io::Result<Bytes>>,
+    buffer: Vec<u8>,
+}
+
+impl Write for Channel {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.buffer.extend_from_slice(buf);
+        if self.buffer.len() >= 64 << 10 {
+            self.flush()?;
+        }
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        if self.buffer.is_empty() {
+            return Ok(());
+        }
+        let piece = Bytes::from(std::mem::take(&mut self.buffer));
+        self.sender
+            .blocking_send(Ok(piece))
+            .map_err(|_| std::io::Error::new(std::io::ErrorKind::BrokenPipe, "the client left"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_request, pkt};
+
+    #[test]
+    fn requests_are_read_from_packet_lines() {
+        let id = "a".repeat(40);
+        let mut body = Vec::new();
+        pkt(&mut body, format!("want {id} agent=git/2\n").as_bytes());
+        pkt(&mut body, format!("want {id}\n").as_bytes());
+        body.extend_from_slice(b"0000");
+        pkt(&mut body, format!("have {}\n", "b".repeat(40)).as_bytes());
+        pkt(&mut body, b"done\n");
+        let request = parse_request(&body).unwrap();
+        assert_eq!(request.wants, [id]);
+        assert!(request.done);
+        assert!(parse_request(b"0000").is_none());
+        assert!(parse_request(b"0009want x\n").is_none());
+    }
+}

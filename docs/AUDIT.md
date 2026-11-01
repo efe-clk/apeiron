@@ -10,7 +10,8 @@ When several people share a backup server, the admin must be able to answer "who
 
 | Event | When | Detail |
 | --- | --- | --- |
-| `sign_in` | Every sign-in, right or wrong | The name given, or for the identity provider `"via": "oidc"` with the identity ([IDENTITY.md](IDENTITY.md) §5); never the password or the code. A right password that still needs the authenticator code has the outcome `code_needed` |
+| `sign_in` | Every sign-in, right or wrong | The name given, or for the identity provider `"via": "oidc"` with the identity ([IDENTITY.md](IDENTITY.md) §5); never the password or the code. A right password that still needs the authenticator code has the outcome `code_needed`. Git signs in at every request ([GIT.md](GIT.md) §7): only its wrong passwords are recorded here, with `"via": "git"` |
+| `git_fetch` | Every pack sent to `git clone` or `git fetch` | The ref prefix and the refs asked for |
 | `sign_out` | Signing out | |
 | `call:<operation>` | Every short operation, such as `list` or `log` | The request after the checks of USERS.md §4, with snapshots as ids and paths resolved |
 | `start:<operation>` | Every long operation started: `backup`, `restore`, `verify`, `search` | The same |

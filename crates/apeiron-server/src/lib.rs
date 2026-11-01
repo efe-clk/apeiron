@@ -9,6 +9,7 @@
 
 mod accounts;
 mod audit;
+mod git;
 mod oidc;
 mod replicate;
 mod shares;
@@ -1163,6 +1164,8 @@ fn router(app: Arc<App>) -> Router {
         .route("/api/shared/{secret}/file", get(shared_file))
         .route("/api/shared/{secret}/zip", get(shared_zip))
         .route("/api/shared/{secret}/unlock", post(shared_unlock))
+        .route("/git/{prefix}/info/refs", get(git::info_refs))
+        .route("/git/{prefix}/git-upload-pack", post(git::upload_pack))
         .fallback(page)
         .layer(middleware::from_fn_with_state(app.clone(), guard))
         .with_state(app)

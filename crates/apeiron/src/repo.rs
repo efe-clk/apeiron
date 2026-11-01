@@ -1,5 +1,6 @@
 //! The repository handle (API.md §8.2, §8.3).
 
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
@@ -22,9 +23,9 @@ use crate::types::{
 };
 use crate::{
     ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo, ExportReport, GcReport,
-    GcRequest, GitExportReport, GitImportReport, KeyInfo, ObjectId, Phase, ReflogEntry, Remote,
-    RepairReport, RestoreReport, RestoreTestReport, RetentionRule, SearchReport, SwitchReport,
-    SyncReport, TransferReport, VerifyReport,
+    GcRequest, GitExportReport, GitImportReport, GitServedRef, KeyInfo, ObjectId, Phase,
+    ReflogEntry, Remote, RepairReport, RestoreReport, RestoreTestReport, RetentionRule,
+    SearchReport, SwitchReport, SyncReport, TransferReport, VerifyReport,
 };
 
 /// An open repository. Cloning is cheap; clones share the same state and can
@@ -325,6 +326,25 @@ impl Repository {
             ctl.update(|p| p.phase = Phase::Done);
             Ok(report)
         })
+    }
+
+    /// Brings the Git copy at `request.path` up to date with the branches
+    /// and tags under `request.prefix` and lists them, for serving them to
+    /// Git clients (GIT.md §7).
+    pub fn git_serve_refs(&self, request: &GitRequest) -> Result<Vec<GitServedRef>> {
+        let core = self.view()?;
+        Ok(apeiron_git::serve_refs(
+            &core,
+            &request.path,
+            &request.prefix,
+        )?)
+    }
+
+    /// Writes a Git pack of everything the Git ids `wants` reach in the Git
+    /// copy at `path`, made by [`Repository::git_serve_refs`]; returns the
+    /// number of objects (GIT.md §7).
+    pub fn git_pack(&self, path: &Path, wants: &[String], out: &mut dyn Write) -> Result<u64> {
+        Ok(apeiron_git::write_pack(path, wants, out)?)
     }
 
     /// Removes objects no ref and no recent reflog line can reach. Fails with

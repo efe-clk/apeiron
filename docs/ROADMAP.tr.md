@@ -78,7 +78,7 @@ Windows'ta yeniden adlandırmalar küçük `apeiron-sys` crate'i üzerinden `MOV
 
 | # | İş | Durum |
 | --- | --- | --- |
-| 1 | Git içe/dışa aktarma ([GIT.tr.md](GIT.tr.md); Git ağ protokolü hedef olarak kalıyor) | Tamamlandı |
+| 1 | Git içe/dışa aktarma ([GIT.tr.md](GIT.tr.md); oradaki §7'de `apeiron web`'den HTTP üzerinden clone ve fetch; ağ üzerinden push hedef olarak kalıyor) | Tamamlandı |
 | 2 | Dal ve birleştirme ([BRANCH.tr.md](BRANCH.tr.md)) | Tamamlandı |
 | 3 | Arama ([SEARCH.tr.md](SEARCH.tr.md)) | Tamamlandı |
 | 4 | C ABI ve Python SDK ([SDK.tr.md](SDK.tr.md)) | Tamamlandı |

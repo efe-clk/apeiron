@@ -511,6 +511,91 @@ impl WebState {
         Ok(with_cookie(json!({}), &self.new_session(&user, None)?))
     }
 
+    /// The user an `Authorization: Basic` header names, when the password
+    /// is right (GIT.md §7); `None` when there is no such header or the
+    /// name or password is wrong. Wrong passwords pause as at sign-in. A
+    /// user with a second factor is refused, as Git cannot send its code.
+    pub(crate) async fn basic_user(
+        &self,
+        headers: &HeaderMap,
+        from: Option<String>,
+    ) -> Result<Option<User>, Failure> {
+        use base64::Engine as _;
+        let Some((name, password)) = headers
+            .get(header::AUTHORIZATION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.strip_prefix("Basic "))
+            .and_then(|v| {
+                base64::engine::general_purpose::STANDARD
+                    .decode(v.trim())
+                    .ok()
+            })
+            .and_then(|v| String::from_utf8(v).ok())
+            .and_then(|v| v.split_once(':').map(|(n, p)| (n.to_owned(), p.to_owned())))
+        else {
+            return Ok(None);
+        };
+        let record = |outcome: &str| {
+            let actor = Actor {
+                user: None,
+                from: from.clone(),
+            };
+            self.audit.record(
+                &actor,
+                "sign_in",
+                json!({ "name": name, "via": "git" }),
+                outcome,
+            )
+        };
+        let mut attempts = self.attempts.lock().await;
+        if attempts
+            .paused_until
+            .is_some_and(|until| Instant::now() < until)
+        {
+            record("locked")?;
+            return Err(Failure(
+                StatusCode::TOO_MANY_REQUESTS,
+                json!({"code": 7, "kind": "locked", "message": "too many wrong passwords; try again in a minute"}),
+            ));
+        }
+        let user = self.user(&name);
+        let decoy = self.decoy.clone();
+        let user = blocking(move || {
+            Ok(match user {
+                Some(user) if user.verify(&password) => Some(user),
+                Some(user) if !user.password.is_empty() => None,
+                _ => {
+                    let _ = Argon2::default().verify_password(password.as_bytes(), decoy.as_str());
+                    None
+                }
+            })
+        })
+        .await?;
+        match user {
+            Some(user) if user.totp.is_none() => {
+                *attempts = Attempts::default();
+                Ok(Some(user))
+            }
+            Some(_) => {
+                record("code_needed")?;
+                Err(Failure(
+                    StatusCode::FORBIDDEN,
+                    json!({"code": 12, "kind": "key",
+                           "message": "Git cannot send the code of a second factor; use a user without one"}),
+                ))
+            }
+            None => {
+                record("key")?;
+                attempts.wrong += 1;
+                if attempts.wrong >= TRIES {
+                    attempts.wrong = 0;
+                    attempts.paused_until = Some(Instant::now() + PAUSE);
+                }
+                Ok(None)
+            }
+        }
+    }
+
     /// Checks the password of the link with `secret`; once it is right the
     /// browser keeps a cookie that opens the link (SHARE.md §2). Wrong
     /// passwords pause like wrong sign-ins.
