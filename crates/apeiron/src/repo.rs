@@ -24,10 +24,13 @@ use crate::types::{
 use crate::{
     AddFileReport, AddFileRequest, ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo,
     ExportReport, GcReport, GcRequest, GitExportReport, GitImportReport, GitPushResult,
-    GitPushedRef, GitServedRef, KeyInfo, LegalHold, ObjectId, Phase, ReflogEntry, Remote,
-    RepairReport, RestoreReport, RestoreTestReport, RetentionRule, SearchReport, SwitchReport,
-    SyncReport, TransferReport, VerifyReport,
+    GitPushedRef, GitServedRef, KeyInfo, LegalHold, ObjectId, Phase, PluginAdded, PluginInfo,
+    ReflogEntry, Remote, RepairReport, RestoreReport, RestoreTestReport, RetentionRule,
+    SearchReport, SwitchReport, SyncReport, TransferReport, VerifyReport,
 };
+
+/// The ref the plugins a repository carries are kept in (PLUGIN.md §5).
+const PLUGINS_REF: &str = "apeiron/plugins";
 
 /// An open repository. Cloning is cheap; clones share the same state and can
 /// be used from several threads at once.
@@ -359,6 +362,123 @@ impl Repository {
         let report = services::add_file(&mut core, &request, reader);
         *self.write() = core;
         Ok(report?)
+    }
+
+    /// Puts the installed plugin `name` from the plugin folder `dir` (the
+    /// user's by default) into the repository's ref `apeiron/plugins`, so
+    /// copies of the repository carry it (PLUGIN.md §5).
+    pub fn share_plugin(&self, name: &str, dir: Option<&Path>) -> Result<PluginInfo> {
+        let info = crate::plugins(dir)?
+            .into_iter()
+            .find(|i| i.name == name)
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::NotFound,
+                    format!("no plugin {name} is installed"),
+                )
+            })?;
+        let dir = match dir {
+            Some(d) => d.to_path_buf(),
+            None => crate::plugin_dir()?,
+        };
+        let mut put = Vec::new();
+        for ext in ["wasm", "json"] {
+            let path = dir.join(format!("{name}.{ext}"));
+            let data = std::fs::read(&path).map_err(|e| Error::io(path.clone(), &e))?;
+            put.push((format!("{name}.{ext}").into_bytes(), data));
+        }
+        let _writer = self.lock_writer();
+        let _lock = core::RepoLock::shared(self.path())?;
+        let mut core = self.read().reopen()?;
+        let message = format!("share the plugin {name} {}", info.version);
+        let stored = services::put_files(&mut core, PLUGINS_REF, &put, &[], &message);
+        *self.write() = core;
+        stored?;
+        Ok(info)
+    }
+
+    /// Takes the plugin `name` out of `apeiron/plugins`; installed copies
+    /// stay.
+    pub fn unshare_plugin(&self, name: &str) -> Result<()> {
+        if !self.shared_plugins()?.iter().any(|i| i.name == name) {
+            return Err(Error::new(
+                ErrorKind::NotFound,
+                format!("the repository holds no plugin {name}"),
+            ));
+        }
+        let remove = [
+            format!("{name}.wasm").into_bytes(),
+            format!("{name}.json").into_bytes(),
+        ];
+        let _writer = self.lock_writer();
+        let _lock = core::RepoLock::shared(self.path())?;
+        let mut core = self.read().reopen()?;
+        let stored = services::put_files(
+            &mut core,
+            PLUGINS_REF,
+            &[],
+            &remove,
+            &format!("unshare the plugin {name}"),
+        );
+        *self.write() = core;
+        stored?;
+        Ok(())
+    }
+
+    /// The plugins the repository carries in `apeiron/plugins`.
+    pub fn shared_plugins(&self) -> Result<Vec<PluginInfo>> {
+        let entries = match self.list(&ListRequest {
+            snapshot: PLUGINS_REF.to_owned(),
+            path: crate::Name::default(),
+        }) {
+            Ok(entries) => entries,
+            Err(e) if e.kind == ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(e) => return Err(e),
+        };
+        let mut out = Vec::new();
+        for e in entries {
+            if !e.name.to_string().ends_with(".json") {
+                continue;
+            }
+            let mut data = Vec::new();
+            self.read_file(
+                &ListRequest {
+                    snapshot: PLUGINS_REF.to_owned(),
+                    path: e.name.clone(),
+                },
+                &mut data,
+            )?;
+            if let Ok(info) = serde_json::from_slice::<PluginInfo>(&data) {
+                out.push(info);
+            }
+        }
+        Ok(out)
+    }
+
+    /// Installs the plugin `name` the repository carries, checked as
+    /// [`crate::add_plugin`] checks a file, into `dir` (the user's plugin
+    /// folder by default).
+    pub fn install_shared_plugin(&self, name: &str, dir: Option<&Path>) -> Result<PluginAdded> {
+        if !self.shared_plugins()?.iter().any(|i| i.name == name) {
+            return Err(Error::new(
+                ErrorKind::NotFound,
+                format!("the repository holds no plugin {name}"),
+            ));
+        }
+        let mut wasm = Vec::new();
+        self.read_file(
+            &ListRequest {
+                snapshot: PLUGINS_REF.to_owned(),
+                path: crate::Name::from(format!("{name}.wasm").as_str()),
+            },
+            &mut wasm,
+        )?;
+        let file =
+            std::env::temp_dir().join(format!("apeiron-plugin-{}-{name}.wasm", std::process::id()));
+        std::fs::write(&file, &wasm).map_err(|e| Error::io(file.clone(), &e))?;
+        let added = crate::add_plugin(&file, dir);
+        let _ = std::fs::remove_file(&file);
+        added
     }
 
     /// Takes `git push` into the Git copy at `request.path`: stores the

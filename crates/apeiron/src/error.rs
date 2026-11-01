@@ -61,7 +61,7 @@ impl Error {
         self
     }
 
-    fn io(path: PathBuf, source: &io::Error) -> Self {
+    pub(crate) fn io(path: PathBuf, source: &io::Error) -> Self {
         let kind = match source.kind() {
             io::ErrorKind::NotFound => ErrorKind::NotFound,
             io::ErrorKind::AlreadyExists => ErrorKind::AlreadyExists,

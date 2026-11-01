@@ -43,4 +43,4 @@ pub use search::{
 pub use switch::{SwitchOptions, SwitchOutcome, switch};
 pub use sync::{SyncAction, SyncMode, SyncOptions, SyncOutcome, folder_ref, sync};
 pub use tags::{entry_tags, file_tags, set_file_tags};
-pub use upload::{AddFileOptions, AddFileOutcome, add_file};
+pub use upload::{AddFileOptions, AddFileOutcome, add_file, put_files};

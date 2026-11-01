@@ -13,6 +13,7 @@ Bir eklenti, çekirdeği değiştirmeden bir veri türü hakkında bilgi ekler (
 | `apeiron plugin add <file.wasm>` | Bir eklentiyi denetler, neyi işlediğini gösterir ve kurar; aynı adlı bir eklentinin yerini alır | Tamamlandı |
 | `apeiron plugin list` | Kurulu eklentileri sürümleri ve işledikleri dosya adlarıyla listeler | Tamamlandı |
 | `apeiron plugin remove <name>` | Bir eklentiyi kaldırır | Tamamlandı |
+| `apeiron plugin share <name>`, `plugin unshare <name>`, `plugin list --shared`, `plugin add --from-repo <name>` | Bir eklentiyi depoya koyar, depodan çıkarır, deponun taşıdıklarını listeler ya da onlardan birini kurar (§5) | Tamamlandı |
 | Masaüstü arayüzünün Eklentiler sayfası (DESKTOP.tr.md §2) | Aynı üç işlem pencerede | Tamamlandı |
 
 Eklentiler tek bir depo için değil kullanıcı için kurulur; arka plan hizmetinin iş dosyasının yanındaki `plugins` klasörüne (DAEMON.tr.md §3): Linux'ta `~/.config/apeiron/plugins`. `APEIRON_PLUGINS` ortam değişkeni başka bir klasörü adlandırır. Her eklenti orada iki dosyadır: bileşen olan `<name>.wasm` ve kurulurken `describe`'ın döndürdüğü `<name>.json`.
@@ -59,16 +60,21 @@ flowchart LR
 
 Aynı eklentiler `apeiron merge`'de ve senkronda birleştirir. Eklentisi olmayan bir cihaz bunun yerine çatışma kopyası oluşturur; iki durumda da hiçbir şey kaybolmaz.
 
-## 5. Bu işin parçası olmayanlar
+## 5. Depodaki eklentiler
+
+Bir depo eklenti taşıyabilir; böylece başka bir bilgisayardaki ya da bir klondan sonraki her kopyası aynı eklentileri kullanabilir. `apeiron plugin share <name>`, kurulu eklentinin iki dosyasını `apeiron/plugins` ref'ine, o ref'in yeni bir sürümü olarak koyar ve aynı eklentinin eski sürümünün yerini alır; `unshare` onları çıkarır. Ref, diğerleri gibi push, pull ve klonla taşınır ve `apeiron/` altındaki her ref gibi yalnızca bir admin'indir ve yedekler arasında listelenmez (REPLICATION.tr.md §6.1).
+
+Taşımak kurmak değildir: bir eklenti kod çalıştırır, bu yüzden bir kopya onu asla kendiliğinden kurmaz. `apeiron plugin list --shared` deponun taşıdıklarını gösterir; `apeiron plugin add --from-repo <name>` birini, bir dosyayla aynı denetimlerden sonra, onu çalıştıran kullanıcı için kurar.
+
+## 6. Bu işin parçası olmayanlar
 
 | Konu | Nerede |
 | --- | --- |
 | Satır satır metin birleştirme ve bir farkı göstermek | Metin eklentisi ([TEXT.tr.md](TEXT.tr.md)) |
 | Diğer eklenti türleri: depolama arka ucu, içe aktarıcı, hook, entegrasyon | Daha sonra, her biri ihtiyaç duyduğu izinlerle |
-| Bir depo ya da uzak kopya içinde gelen eklentiler | Daha sonra; şimdilik kullanıcı başına kurulur |
 | Eklenti bulup indirmek için bir mağaza | Daha sonra |
 
-## 6. Crate'ler
+## 7. Crate'ler
 
 | Crate | Görev | Durum |
 | --- | --- | --- |

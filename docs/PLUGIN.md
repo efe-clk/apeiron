@@ -13,6 +13,7 @@ A plugin adds knowledge of a kind of data without changing the core (VISION.md).
 | `apeiron plugin add <file.wasm>` | Checks a plugin, shows what it handles and installs it; a plugin of the same name is replaced | Done |
 | `apeiron plugin list` | Lists the installed plugins with their version and the file names they handle | Done |
 | `apeiron plugin remove <name>` | Removes a plugin | Done |
+| `apeiron plugin share <name>`, `plugin unshare <name>`, `plugin list --shared`, `plugin add --from-repo <name>` | Puts a plugin into the repository, takes it out, lists those it carries, or installs one of them (§5) | Done |
 | The Plugins page of the desktop interface (DESKTOP.md §2) | The same three in the window | Done |
 
 Plugins are installed for the user, not for one repository, in the folder `plugins` beside the jobs file of the background service (DAEMON.md §3): `~/.config/apeiron/plugins` on Linux. The environment variable `APEIRON_PLUGINS` names another folder. Each plugin is two files there: `<name>.wasm`, the component, and `<name>.json`, what `describe` returned when it was installed.
@@ -59,16 +60,21 @@ When both sides changed a file differently (SYNC.md §4, BRANCH.md §2), the mer
 
 The same plugins merge in `apeiron merge` and in sync. A device without the plugin makes a conflict copy instead; nothing is lost either way.
 
-## 5. Not part of this work item
+## 5. Plugins in a repository
+
+A repository can carry plugins, so that every copy of it, on another computer or after a clone, can use the same ones. `apeiron plugin share <name>` puts the installed plugin's two files into the ref `apeiron/plugins`, as a new snapshot of that ref, replacing an older version of the same plugin; `unshare` takes them out. The ref travels with push, pull and clone like any other, and as every ref under `apeiron/` it is an admin's only and not listed among backups (REPLICATION.md §6.1).
+
+Carrying is not installing: a plugin runs code, so a copy never installs one by itself. `apeiron plugin list --shared` shows what the repository carries, and `apeiron plugin add --from-repo <name>` installs one after the same checks as a file, for the user who runs it.
+
+## 6. Not part of this work item
 
 | Item | Where |
 | --- | --- |
 | Line-by-line text merge and showing a difference | The text plugin ([TEXT.md](TEXT.md)) |
 | Other plugin types: storage backend, importer, hook, integration | Later, each with the permissions it needs |
-| Plugins shipped inside a repository or a remote | Later; installed per user for now |
 | A store to find and download plugins | Later |
 
-## 6. Crates
+## 7. Crates
 
 | Crate | Role | Status |
 | --- | --- | --- |

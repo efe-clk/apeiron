@@ -197,3 +197,69 @@ fn free(tree: &Tree, name: &[u8]) -> Vec<u8> {
         .find(|candidate| !taken(candidate))
         .unwrap_or_default()
 }
+
+/// Puts `put` at the top of the snapshot `ref_name` points to, replacing
+/// files of the same names, and takes the files named in `remove` away, in
+/// a new snapshot whose parent that one is; then moves the ref. For files
+/// the program keeps in a ref of its own, such as shared plugins
+/// (PLUGIN.md §5). The caller holds the repository lock shared.
+pub fn put_files(
+    repo: &mut Repository,
+    ref_name: &str,
+    put: &[(Vec<u8>, Vec<u8>)],
+    remove: &[Vec<u8>],
+    message: &str,
+) -> Result<ObjectId> {
+    apeiron_core::validate_ref_name(ref_name)?;
+    let mut writer = repo.writer();
+    let mut stored = Vec::new();
+    for (name, data) in put {
+        let (size, blob) = writer.put_file(&mut data.as_slice())?;
+        stored.push((name.clone(), size, blob));
+    }
+    writer.finish()?;
+    let now = os::to_time(SystemTime::now());
+    let mut attempt = 1;
+    loop {
+        let parent = repo.read_ref(ref_name)?;
+        let mut root = match parent {
+            Some(id) => repo.read_tree(&repo.read_snapshot(&id)?.tree)?,
+            None => Tree {
+                entries: Vec::new(),
+            },
+        };
+        root.entries
+            .retain(|e| !remove.contains(&e.name) && !stored.iter().any(|(n, _, _)| *n == e.name));
+        for (name, size, blob) in &stored {
+            root.entries.push(TreeEntry {
+                name: name.clone(),
+                kind: EntryKind::File {
+                    size: *size,
+                    blob: *blob,
+                },
+                mode: Some(0o644),
+                mtime: Some(now),
+                uid: None,
+                gid: None,
+                xattrs: Vec::new(),
+            });
+        }
+        let mut writer = repo.writer();
+        let tree = put_sorted(&mut writer, root)?;
+        let snapshot = writer.put_snapshot(&Snapshot {
+            tree,
+            parents: parent.into_iter().collect(),
+            time: now,
+            author: None,
+            host: None,
+            message: Some(message.to_owned()),
+            meta: Vec::new(),
+        })?;
+        writer.finish()?;
+        match repo.update_ref(ref_name, parent, Some(snapshot)) {
+            Ok(()) => return Ok(snapshot),
+            Err(apeiron_core::Error::RefConflict { .. }) if attempt < ATTEMPTS => attempt += 1,
+            Err(e) => return Err(e.into()),
+        }
+    }
+}

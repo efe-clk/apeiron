@@ -1799,11 +1799,25 @@ fn web_user(files: &WebFiles, command: UserCommand, out: &Output) -> Result<(), 
 #[derive(Subcommand)]
 enum PluginCommand {
     /// Check a plugin (a WebAssembly component) and install it
-    Add { file: PathBuf },
+    Add {
+        #[arg(required_unless_present = "from_repo")]
+        file: Option<PathBuf>,
+        /// Install the plugin of this name that the repository carries
+        #[arg(long, value_name = "NAME", conflicts_with = "file")]
+        from_repo: Option<String>,
+    },
     /// List the installed plugins
-    List,
+    List {
+        /// List the plugins the repository carries instead
+        #[arg(long)]
+        shared: bool,
+    },
     /// Remove an installed plugin
     Remove { name: String },
+    /// Put an installed plugin into the repository, so its copies carry it
+    Share { name: String },
+    /// Take a plugin out of the repository; installed copies stay
+    Unshare { name: String },
 }
 
 #[derive(Subcommand)]
@@ -3016,8 +3030,16 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
         }
         Command::Plugin { command } => {
             match command {
-                PluginCommand::Add { file } => {
-                    let added = apeiron::add_plugin(&file, None)?;
+                PluginCommand::Add { file, from_repo } => {
+                    let added = match (file, from_repo) {
+                        (_, Some(name)) => {
+                            open(cli.repo, password_file)?.install_shared_plugin(&name, None)?
+                        }
+                        (Some(file), None) => apeiron::add_plugin(&file, None)?,
+                        (None, None) => {
+                            return Err(Failure::Usage("give a file or --from-repo".to_owned()));
+                        }
+                    };
                     out.result(&added, |a| {
                         let i = &a.info;
                         let verb = if a.replaced { "Replaced" } else { "Installed" };
@@ -3025,8 +3047,12 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                         say!("It merges files named {}", i.patterns.join(", "));
                     });
                 }
-                PluginCommand::List => {
-                    let list = apeiron::plugins(None)?;
+                PluginCommand::List { shared } => {
+                    let list = if shared {
+                        open(cli.repo, password_file)?.shared_plugins()?
+                    } else {
+                        apeiron::plugins(None)?
+                    };
                     out.result(&list, |list| {
                         for i in list {
                             say!(
@@ -3045,6 +3071,23 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                 PluginCommand::Remove { name } => {
                     let removed = apeiron::remove_plugin(&name, None)?;
                     out.result(&removed, |i| say!("Removed {} {}", i.name, i.version));
+                }
+                PluginCommand::Share { name } => {
+                    let shared = open(cli.repo, password_file)?.share_plugin(&name, None)?;
+                    out.result(&shared, |i| {
+                        say!(
+                            "The repository now carries {} {}; on another copy, `apeiron plugin add --from-repo {}` installs it",
+                            i.name,
+                            i.version,
+                            i.name
+                        )
+                    });
+                }
+                PluginCommand::Unshare { name } => {
+                    open(cli.repo, password_file)?.unshare_plugin(&name)?;
+                    out.result(&serde_json::json!({ "name": name }), |_| {
+                        say!("The repository no longer carries {name}")
+                    });
                 }
             }
             Ok(0)

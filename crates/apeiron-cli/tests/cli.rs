@@ -666,6 +666,15 @@ fn a_plugin_merges_what_would_be_a_conflict() {
     assert!(out.starts_with("Installed test-driver 1.0"), "{out}");
     assert!(ok(&["plugin", "list"]).starts_with("test-driver 1.0  *.merge"));
 
+    // The repository carries a plugin to its other copies (PLUGIN.md §5).
+    ok(&["plugin", "share", "test-driver"]);
+    ok(&["plugin", "remove", "test-driver"]);
+    assert!(ok(&["plugin", "list", "--shared"]).starts_with("test-driver 1.0"));
+    let out = ok(&["plugin", "add", "--from-repo", "test-driver"]);
+    assert!(out.starts_with("Installed test-driver 1.0"), "{out}");
+    ok(&["plugin", "unshare", "test-driver"]);
+    assert!(ok(&["plugin", "list", "--shared"]).starts_with("No plugins"));
+
     let src = s.path("src");
     fs::write(s.root.join("src/a.merge"), b"base").unwrap();
     ok(&["backup", &src]);
@@ -896,7 +905,12 @@ fn tags_are_kept_found_and_restored() {
         .collect();
     assert_eq!(paths, ["a.txt"]);
     assert_eq!(found["hits"][0]["entry"]["tags"][0], "Fatura");
-    assert!(s.json(&["search", "--tag", "other"])["hits"].as_array().unwrap().is_empty());
+    assert!(
+        s.json(&["search", "--tag", "other"])["hits"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
 
     s.ok(&["restore", "main", &s.path("out")]);
     let shown = s.json(&["tag", &s.path("out/a.txt")]);
