@@ -67,7 +67,7 @@ Bir rebase, bir dalı başka bir dalın en yeni snapshot'ından başlatır; sank
 
 1. Klasörü, bir yedeğin yaptığı gibi, henüz hiçbir ref'i taşımadan bir F ağacı olarak kaydet. Olmayan bir klasör boş sayılır.
 2. Klasörün henüz ref'i yoksa boş olmalı ya da örneğin bir `restore` sonrasında olduğu gibi bir ref'le aynı dosyaları tutmalıdır; başka her durum hata verir ve hiçbir şeyi değiştirmez, böylece ilgisiz dosyalarla dolu bir klasörün yerine yanlışlıkla başka bir şey yazılmaz.
-3. F, klasör ref'inin gösterdiği snapshot'tan farklıysa F'yi, ebeveyni o snapshot olan ve iletisi `switch: the folder before switching to <snapshot>` olan bir snapshot olarak sakla ve klasör ref'ini ona taşı. Böylece yedeklenmemiş iş asla kaybolmaz: sonuç bu snapshot'ı adlandırır ve `apeiron restore` onu geri getirir.
+3. F, klasör ref'inin gösterdiği snapshot'tan zamanlar dışında da farklıysa F'yi, ebeveyni o snapshot olan ve iletisi `switch: the folder before switching to <snapshot>` olan bir snapshot olarak sakla ve klasör ref'ini ona taşı. Böylece yedeklenmemiş iş asla kaybolmaz: sonuç bu snapshot'ı adlandırır ve `apeiron restore` onu geri getirir.
 4. Klasörü, senkronun bir snapshot'ı uyguladığı gibi (SYNC.tr.md §5) F'den snapshot'a değiştir: yalnızca farklı olan yazılır ya da silinir, her dosya geçici bir dosya ve tek bir yeniden adlandırmayla yazılır; geçiş sürerken değişen bir dosyaya dokunulmaz, snapshot'taki sürümü yanına `name (conflict <snapshot>).ext` olarak yazılır.
 5. Klasör ref'ini snapshot'a taşı.
 

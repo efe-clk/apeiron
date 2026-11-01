@@ -67,7 +67,7 @@ A rebase makes a branch start from the newest snapshot of another, as if its wor
 
 1. Record the folder as a tree F, as a backup does, without moving any ref yet. A missing folder counts as empty.
 2. If the folder has no ref yet, it must be empty or hold the same files as a ref, for example after `restore`; anything else fails and changes nothing, so a folder of unrelated files is never replaced by mistake.
-3. If F differs from the snapshot the folder ref points to, store F as a snapshot with that one as parent and the message `switch: the folder before switching to <snapshot>`, and move the folder ref to it. Work not backed up is thus never lost: the result names this snapshot, and `apeiron restore` brings it back.
+3. If F differs from the snapshot the folder ref points to in more than times, store F as a snapshot with that one as parent and the message `switch: the folder before switching to <snapshot>`, and move the folder ref to it. Work not backed up is thus never lost: the result names this snapshot, and `apeiron restore` brings it back.
 4. Change the folder from F to the snapshot as sync applies a snapshot (SYNC.md §5): only what differs is written or removed, each file through a temporary file and one rename, and a file changed while the switch runs is left alone with the snapshot's version beside it as `name (conflict <snapshot>).ext`.
 5. Move the folder ref to the snapshot.
 

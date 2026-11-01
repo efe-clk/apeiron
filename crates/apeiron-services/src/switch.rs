@@ -92,7 +92,13 @@ pub fn switch(
             options.folder.display()
         )));
     }
-    let unsaved = !empty && recorded != Some(folder_tree);
+    // Times alone change, for instance a folder's when a file in it is
+    // replaced; only other changes need recording, as in sync.
+    let unsaved = !empty
+        && match recorded {
+            Some(tree) => !same_content(repo, tree, folder_tree)?,
+            None => true,
+        };
     let mut saved = None;
     if unsaved && !options.dry_run {
         let mut writer = repo.writer();
