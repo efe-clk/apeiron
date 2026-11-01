@@ -32,6 +32,7 @@ class Sdk(unittest.TestCase):
             self.assertEqual(repo.log().snapshots[0].message, "one")
             self.assertEqual(len(repo.log(grep="ONE").snapshots), 1)
             self.assertEqual(repo.log(grep="nothing").snapshots, [])
+            self.assertEqual(repo.duplicates(), [])
             self.assertEqual([e.name for e in repo.list("main")], ["a.txt"])
 
             repo.create_ref("feature")

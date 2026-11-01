@@ -26,7 +26,7 @@ use apeiron::{
     TransferReport, TransferRequest, Warning,
 };
 use apeiron::{CreateRefRequest, DeleteRefRequest, MergeAction, MergeRequest};
-use apeiron::{Query, SearchRequest, Time};
+use apeiron::{DuplicatesRequest, Query, SearchRequest, Time};
 use clap::{Parser, Subcommand};
 use serde::Serialize;
 
@@ -227,6 +227,14 @@ enum Command {
         /// Show at most this many results
         #[arg(long, default_value_t = 1000)]
         limit: usize,
+    },
+    /// List files whose content is at more than one path in a snapshot
+    Duplicates {
+        #[arg(default_value = "main")]
+        snapshot: String,
+        /// Leave out files smaller than this size, such as 1M
+        #[arg(long, value_parser = parse_size, default_value = "1")]
+        smallest: u64,
     },
     /// Install, list or remove plugins
     Plugin {
@@ -1960,6 +1968,31 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     say!(
                         "{} over 16 MiB not searched for text",
                         format::count(r.skipped, "file")
+                    );
+                }
+            });
+            Ok(0)
+        }
+        Command::Duplicates { snapshot, smallest } => {
+            let repo = open(cli.repo, password_file)?;
+            let groups = repo.duplicates(&DuplicatesRequest { snapshot, smallest })?;
+            out.result(&groups, |groups| {
+                let mut extra = 0u64;
+                for d in groups {
+                    let copies = d.paths.len() as u64;
+                    extra = extra.saturating_add(d.size.saturating_mul(copies - 1));
+                    say!("{} copies of {}", copies, format::bytes(d.size));
+                    for path in &d.paths {
+                        say!("  {path}");
+                    }
+                }
+                if groups.is_empty() {
+                    say!("No files with the same content");
+                } else {
+                    say!(
+                        "{} of copies; the extra copies take {}",
+                        format::count(groups.len() as u64, "group"),
+                        format::bytes(extra)
                     );
                 }
             });

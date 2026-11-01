@@ -137,6 +137,7 @@ pub fn call(repo: &Repository, operation: &str, request: Value) -> Result<Value>
         "list" => json(&repo.list(&parse(request)?)?),
         "diff" => json(&repo.diff(&parse(request)?)?),
         "diff_text" => json(&repo.diff_text(&parse(request)?)?),
+        "duplicates" => json(&repo.duplicates(&parse(request)?)?),
         "refs" => json(&repo.refs()?),
         "reflog" => json(&repo.reflog(&parse::<Named>(request)?.name)?),
         "create_ref" => json(&repo.create_ref(&parse(request)?)?),

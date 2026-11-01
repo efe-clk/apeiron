@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use apeiron_core::{ObjectId, Repository, Time};
 use apeiron_services::{
-    BackupOptions, Control, Error, Query, SearchOptions, SearchOutcome, backup, search,
+    BackupOptions, Control, Error, Query, SearchOptions, SearchOutcome, backup, duplicates, search,
 };
 
 struct Setup {
@@ -225,4 +225,43 @@ fn the_limit_stops_the_search_and_an_empty_query_is_refused() {
         search(&s.repo, &empty, &Control::new()),
         Err(Error::InvalidInput(_))
     ));
+}
+
+#[test]
+fn files_with_the_same_content_are_grouped() {
+    let mut s = setup();
+    let big = vec![7u8; 5000];
+    s.write("a/photo.jpg", &big);
+    s.write("b/photo copy.jpg", &big);
+    s.write("c/again.jpg", &big);
+    s.write("one.txt", b"same");
+    s.write("two.txt", b"same");
+    s.write("alone.txt", b"different");
+    s.write("empty1", b"");
+    s.write("empty2", b"");
+    let snapshot = s.backup();
+
+    let groups = duplicates(&s.repo, &snapshot, 1, &Control::new()).unwrap();
+    let shown: Vec<(u64, Vec<String>)> = groups
+        .iter()
+        .map(|d| (d.size, d.paths.iter().map(ToString::to_string).collect()))
+        .collect();
+    assert_eq!(
+        shown,
+        vec![
+            (
+                5000,
+                vec![
+                    "a/photo.jpg".to_owned(),
+                    "b/photo copy.jpg".to_owned(),
+                    "c/again.jpg".to_owned()
+                ]
+            ),
+            (4, vec!["one.txt".to_owned(), "two.txt".to_owned()]),
+        ]
+    );
+
+    let large = duplicates(&s.repo, &snapshot, 1000, &Control::new()).unwrap();
+    assert_eq!(large.len(), 1);
+    assert_eq!(large[0].size, 5000);
 }

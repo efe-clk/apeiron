@@ -17,8 +17,8 @@ use crate::types::{
     RestoreTestRequest, SnapshotInfo, SyncRequest, TransferRequest,
 };
 use crate::types::{
-    CreateRefRequest, MergeRequest, MirrorReport, MirroredRef, RemoteRequest, SearchRequest,
-    TextDiff,
+    CreateRefRequest, DuplicatesRequest, MergeRequest, MirrorReport, MirroredRef, RemoteRequest,
+    SearchRequest, TextDiff,
 };
 use crate::{
     ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo, ExportReport, GcReport,
@@ -468,6 +468,19 @@ impl Repository {
         let from = spec::resolve(&core, &request.from)?;
         let to = spec::resolve(&core, &request.to)?;
         Ok(services::diff(&core, &from, &to)?)
+    }
+
+    /// The files of a snapshot whose content is at more than one path, the
+    /// groups taking the most room by their extra copies first (SEARCH.md §5).
+    pub fn duplicates(&self, request: &DuplicatesRequest) -> Result<Vec<crate::Duplicate>> {
+        let core = self.view()?;
+        let snapshot = spec::resolve(&core, &request.snapshot)?;
+        Ok(services::duplicates(
+            &core,
+            &snapshot,
+            request.smallest,
+            &services::Control::new(),
+        )?)
     }
 
     /// The changed paths between two snapshots with the difference the

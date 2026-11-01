@@ -447,6 +447,9 @@ class Repository:
     def list(self, snapshot: str, path: str = "") -> list:
         return self.call("list", snapshot=snapshot, path=path)
 
+    def duplicates(self, snapshot: str = "main", smallest: int = 0) -> list:
+        return self.call("duplicates", snapshot=snapshot, smallest=smallest)
+
     def diff(self, from_: str, to: str) -> list:
         return self.call("diff", **{"from": from_, "to": to})
 

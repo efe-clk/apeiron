@@ -353,6 +353,16 @@ impl GitRequest {
     }
 }
 
+/// Which snapshot to look for duplicate files in (SEARCH.md §5).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DuplicatesRequest {
+    /// A snapshot spec (API.md §8.4).
+    pub snapshot: String,
+    /// Files smaller than this many bytes are left out; empty files always are.
+    #[serde(default)]
+    pub smallest: u64,
+}
+
 /// What to search for and where (SEARCH.md).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SearchRequest {

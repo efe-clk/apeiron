@@ -36,8 +36,8 @@ pub use apeiron_services::{
     RestoreTestOutcome as RestoreTestReport, SyncAction, SyncMode, SyncOutcome as SyncReport,
     Warning, WarningKind,
 };
+pub use apeiron_services::{Duplicate, Query, SearchHit, SearchOutcome as SearchReport, TextLine};
 pub use apeiron_services::{MergeAction, MergeOutcome as MergeReport};
-pub use apeiron_services::{Query, SearchHit, SearchOutcome as SearchReport, TextLine};
 pub use conflicts::{conflicts, resolve_conflict};
 pub use error::{Error, ErrorKind, Result};
 pub use job::Job;
@@ -53,4 +53,4 @@ pub use types::{
     RemoteRequest, RepoInfo, RestoreRequest, RestoreTestRequest, SnapshotInfo, SyncRequest,
     TransferRequest,
 };
-pub use types::{CreateRefRequest, MergeRequest, SearchRequest, TextDiff};
+pub use types::{CreateRefRequest, DuplicatesRequest, MergeRequest, SearchRequest, TextDiff};

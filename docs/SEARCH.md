@@ -55,19 +55,25 @@ A file is searched for text when it is a text file: its content is valid UTF-8 a
 
 A stored index can be added later behind the same command, if measurements show the need, for example for text search across many large files.
 
-## 5. Not part of this work item
+## 5. Duplicate files
+
+`apeiron duplicates [<snapshot>] [--smallest <size>]` lists the files of a snapshot (default `main`) whose content is at more than one path, each group with the size of one copy and its paths. The groups whose extra copies take the most room come first, and the last line gives the room all extra copies take. Empty files, and files smaller than `--smallest`, are left out.
+
+The repository already stores each content once, so the copies take no extra room in the backup; they take room in the source folder. The list helps clean the folder up. It reads only folders, never file contents, because files with the same content already share one blob (FORMAT.md §6.2).
+
+## 6. Not part of this work item
 
 | Item | Where |
 | --- | --- |
 | Text inside PDF, office and other formats | Type drivers of the plugin system, Stage 3 |
 | Tags on files | Later; the format has no tags on files yet |
-| Saved queries and duplicate file detection | Later |
+| Saved queries | Later |
 | Hiding results a user may not see | Users and permissions, Stage 4 |
 
-## 6. Crates
+## 7. Crates
 
 | Crate | Role | Status |
 | --- | --- | --- |
 | `apeiron-services` | The search | Done |
-| `apeiron` | `search` (API.md §8.3) | Done |
-| `apeiron-cli` | `apeiron search` | Done |
+| `apeiron` | `search`, `duplicates` (API.md §8.3) | Done |
+| `apeiron-cli` | `apeiron search`, `apeiron duplicates` | Done |

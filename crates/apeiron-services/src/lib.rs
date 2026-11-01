@@ -33,5 +33,8 @@ pub use merge::{
 pub use name::Name;
 pub use restore::{RestoreOutcome, restore};
 pub use restore_test::{RestoreProblem, RestoreTestOutcome, restore_test};
-pub use search::{Query, SearchHit, SearchOptions, SearchOutcome, TextLine, name_matches, search};
+pub use search::{
+    Duplicate, Query, SearchHit, SearchOptions, SearchOutcome, TextLine, duplicates, name_matches,
+    search,
+};
 pub use sync::{SyncAction, SyncMode, SyncOptions, SyncOutcome, folder_ref, sync};

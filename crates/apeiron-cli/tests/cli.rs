@@ -74,6 +74,9 @@ fn backup_log_diff_ls_restore() {
     assert_eq!(snapshots.len(), 2);
     assert_eq!(snapshots[1]["id"], first["snapshot"]);
     assert!(s.ok(&["log"]).contains("two"));
+    let found = s.json(&["log", "--grep", "ONE"]);
+    assert_eq!(found["snapshots"].as_array().unwrap().len(), 1);
+    assert_eq!(s.ok(&["duplicates"]), "No files with the same content\n");
 
     assert_eq!(s.ok(&["diff", "main~1", "main"]), "M a.txt\n");
     let listing = s.ok(&["ls", "main", "sub"]);

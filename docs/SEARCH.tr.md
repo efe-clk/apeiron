@@ -55,19 +55,25 @@ Bir dosya metin dosyasıysa metin için aranır: içeriği geçerli UTF-8'dir ve
 
 Ölçümler gerek gösterirse, örneğin çok sayıda büyük dosyada metin araması için, aynı komutun arkasına saklanan bir dizin sonradan eklenebilir.
 
-## 5. Bu işin parçası olmayanlar
+## 5. Kopya dosyalar
+
+`apeiron duplicates [<snapshot>] [--smallest <boyut>]`, bir snapshot'ta (varsayılan `main`) içeriği birden fazla yolda bulunan dosyaları listeler; her grup bir kopyanın boyutu ve yollarıyla gösterilir. Fazla kopyaları en çok yer kaplayan gruplar önce gelir; son satır bütün fazla kopyaların kapladığı yeri verir. Boş dosyalar ve `--smallest`'tan küçük dosyalar dışarıda kalır.
+
+Depo her içeriği zaten bir kez saklar; bu yüzden kopyalar yedekte fazladan yer kaplamaz, kaynak klasörde kaplar. Liste o klasörü temizlemeye yardım eder. Yalnızca klasörleri okur, dosya içeriklerini hiç okumaz; çünkü aynı içerikli dosyalar zaten tek bir blob'u paylaşır (FORMAT.tr.md §6.2).
+
+## 6. Bu işin parçası olmayanlar
 
 | Konu | Nerede |
 | --- | --- |
 | PDF, ofis ve diğer biçimlerin içindeki metin | Eklenti sisteminin tür sürücüleri, Aşama 3 |
 | Dosyalara etiket | Daha sonra; formatta henüz dosyalara etiket yok |
-| Kayıtlı sorgular ve kopya dosya tespiti | Daha sonra |
+| Kayıtlı sorgular | Daha sonra |
 | Kullanıcının göremeyeceği sonuçları gizlemek | Kullanıcılar ve izinler, Aşama 4 |
 
-## 6. Crate'ler
+## 7. Crate'ler
 
 | Crate | Görev | Durum |
 | --- | --- | --- |
 | `apeiron-services` | Arama | Tamamlandı |
-| `apeiron` | `search` (API.tr.md §8.3) | Tamamlandı |
-| `apeiron-cli` | `apeiron search` | Tamamlandı |
+| `apeiron` | `search`, `duplicates` (API.tr.md §8.3) | Tamamlandı |
+| `apeiron-cli` | `apeiron search`, `apeiron duplicates` | Tamamlandı |

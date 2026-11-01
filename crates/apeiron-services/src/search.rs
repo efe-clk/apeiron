@@ -141,6 +141,73 @@ pub fn search(repo: &Repository, options: &SearchOptions, ctl: &Control) -> Resu
     Ok(s.out)
 }
 
+/// Paths in one snapshot that hold the same content (SEARCH.md §5).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Duplicate {
+    /// The size of each copy, in bytes.
+    pub size: u64,
+    /// Two or more paths, sorted.
+    pub paths: Vec<Name>,
+}
+
+/// Lists the files of a snapshot whose content is at more than one path,
+/// leaving out files smaller than `smallest` and empty files; the groups
+/// that take the most room by their extra copies come first.
+pub fn duplicates(
+    repo: &Repository,
+    snapshot: &ObjectId,
+    smallest: u64,
+    ctl: &Control,
+) -> Result<Vec<Duplicate>> {
+    fn walk(
+        repo: &Repository,
+        tree: &ObjectId,
+        prefix: &Name,
+        smallest: u64,
+        groups: &mut HashMap<ObjectId, Duplicate>,
+        ctl: &Control,
+    ) -> Result<()> {
+        ctl.check()?;
+        for entry in repo.read_tree(tree)?.entries {
+            let path = prefix.join(&entry.name);
+            match &entry.kind {
+                EntryKind::File {
+                    size,
+                    blob: Some(blob),
+                } if *size >= smallest => {
+                    groups
+                        .entry(*blob)
+                        .or_insert_with(|| Duplicate {
+                            size: *size,
+                            paths: Vec::new(),
+                        })
+                        .paths
+                        .push(path);
+                }
+                EntryKind::Directory { tree } => walk(repo, tree, &path, smallest, groups, ctl)?,
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+    ctl.set_phase(Phase::Scanning);
+    let tree = repo.read_snapshot(snapshot)?.tree;
+    let mut groups = HashMap::new();
+    walk(repo, &tree, &Name::default(), smallest, &mut groups, ctl)?;
+    let mut out: Vec<Duplicate> = groups
+        .into_values()
+        .filter(|d| d.paths.len() > 1)
+        .map(|mut d| {
+            d.paths.sort();
+            d
+        })
+        .collect();
+    let extra = |d: &Duplicate| d.size.saturating_mul(d.paths.len() as u64 - 1);
+    out.sort_by(|a, b| extra(b).cmp(&extra(a)).then_with(|| a.paths.cmp(&b.paths)));
+    ctl.set_phase(Phase::Done);
+    Ok(out)
+}
+
 /// The snapshots to search with their trees and times, newest first.
 fn snapshots(
     repo: &Repository,
