@@ -65,18 +65,36 @@ impl Watches {
     }
 }
 
+/// Whether `path` is in one of `folders`, also after resolving it; a path
+/// that no longer exists is resolved through its parent.
+fn inside(path: &Path, folders: &[PathBuf]) -> bool {
+    let resolved = path.canonicalize().ok().or_else(|| {
+        let name = path.file_name()?;
+        Some(path.parent()?.canonicalize().ok()?.join(name))
+    });
+    [Some(path.to_path_buf()), resolved]
+        .into_iter()
+        .flatten()
+        .any(|p| folders.iter().any(|f| p.starts_with(f)))
+}
+
 /// Starts watching `folder`; changes inside the repository, when it lies in
 /// the folder, are left out, since a backup writes there.
 fn watch(folder: &Path, repo: &Path) -> notify::Result<(Mark, RecommendedWatcher)> {
     let mark: Mark = Arc::default();
     let marked = mark.clone();
-    let repo: PathBuf = repo.canonicalize().unwrap_or_else(|_| repo.to_path_buf());
+    // The same folder can be written several ways (on Windows a short name
+    // or a `\\?\` prefix), so both the given and the resolved form count.
+    let repo: Vec<PathBuf> = [Some(repo.to_path_buf()), repo.canonicalize().ok()]
+        .into_iter()
+        .flatten()
+        .collect();
     let mut watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
         let Ok(event) = event else { return };
         if matches!(event.kind, EventKind::Access(_)) {
             return;
         }
-        if !event.paths.is_empty() && event.paths.iter().all(|p| p.starts_with(&repo)) {
+        if !event.paths.is_empty() && event.paths.iter().all(|p| inside(p, &repo)) {
             return;
         }
         *marked.lock().unwrap_or_else(PoisonError::into_inner) = Some(Instant::now());
@@ -136,6 +154,11 @@ mod tests {
         assert_eq!(watches.take_ready(Instant::now()), ["docs"]);
         // Taking it clears the mark.
         assert!(watches.take_ready(Instant::now() + quiet).is_empty());
+
+        // Some systems report one write several times, a little apart; let
+        // those pass first.
+        std::thread::sleep(Duration::from_secs(1));
+        watches.take_ready(Instant::now() + quiet);
 
         // Writes into the repository inside the folder do not count.
         std::fs::write(repo.join("pack"), b"data").unwrap();
