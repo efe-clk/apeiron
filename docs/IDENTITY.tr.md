@@ -90,7 +90,8 @@ Ardından gelen oturum, bir paroladan sonrakiyle aynıdır (WEB.tr.md §5); kull
 | `GET /api/session` | Oturum kapalıyken ve bir sağlayıcı ayarlıyken `"oidc": true` |
 | `GET /api/oidc/start` | Tarayıcıyı sağlayıcıya gönderir |
 | `GET /api/oidc/callback` | Sağlayıcının tarayıcıyı geri gönderdiği yer; başarısız olursa `/#oidc_error=<tür>` adresine |
-| `apeiron web oidc set --issuer <url> --client-id <id> --address <url> [--claim <alan>] [--client-secret-file <yol>]` | Sağlayıcıyı ayarlar; gizli anahtarı sorar; sağlayıcıya kaydedilecek geri dönüş adresini yazar |
+| `POST /api/logout` | Oturumu kapatır; sağlayıcı üzerinden açılmış bir oturumdan sonra yanıt `provider_sign_out` içerir: sağlayıcının `end_session_endpoint` adresi, `id_token_hint` olarak ID token, istemci kimliği ve `post_logout_redirect_uri` olarak `<address>/`. Sayfalar tarayıcıyı oraya gönderir; böylece kullanıcının sağlayıcıdaki oturumu da kapanır ve oturum açma ekranına döner. Bu adresi olmayan ya da ulaşılamayan bir sağlayıcıda oturum açık kalır |
+| `apeiron web oidc set --issuer <url> --client-id <id> --address <url> [--claim <alan>] [--client-secret-file <yol>]` | Sağlayıcıyı ayarlar; gizli anahtarı sorar; sağlayıcıya kaydedilecek geri dönüş adresini ve oturum kapatıldıktan sonraki adresi (`<address>/`) yazar |
 | `apeiron web oidc show`, `check`, `remove` | Ayarları gizli anahtar olmadan gösterir; sağlayıcının yanıt verdiğini görmek için ayarlarını ve anahtarlarını okur; kapatır |
 | `apeiron web user add <name> --role <role> --oidc <kimlik>` | Sağlayıcı üzerinden, parolasız oturum açan bir kullanıcı ekler |
 | `apeiron web user change <name> [--oidc <kimlik>] [--no-password]` | Bir kullanıcıya kimlik verir ya da parolasını kaldırır |
@@ -109,7 +110,6 @@ Ardından gelen oturum, bir paroladan sonrakiyle aynıdır (WEB.tr.md §5); kull
 | Doğrudan LDAP ve Active Directory | Planlanmadı; Keycloak ve Entra ID gibi sağlayıcılar bir dizini OpenID Connect'in arkasına koyar |
 | SAML | Sonra, bir pilot gerektirirse |
 | Kullanıcıları ve rolleri sağlayıcının gruplarından oluşturmak | Sonra; o zamana kadar kullanıcılar `web.json` içinde listelenir |
-| Sağlayıcıda da oturumu kapatmak | Sonra |
 | Parola kullanıcıları için ikinci adım | Sonra; ihtiyacı olan kullanıcılar sağlayıcı üzerinden oturum açar |
 
 ## 7. Crate'ler

@@ -90,7 +90,8 @@ The session that follows is the same as after a password (WEB.md §5); it ends w
 | `GET /api/session` | `"oidc": true` when signed out and a provider is set |
 | `GET /api/oidc/start` | Sends the browser to the provider |
 | `GET /api/oidc/callback` | Where the provider sends it back; on failure to `/#oidc_error=<kind>` |
-| `apeiron web oidc set --issuer <url> --client-id <id> --address <url> [--claim <claim>] [--client-secret-file <path>]` | Sets the provider; asks for the client secret; prints the redirect address to register at the provider |
+| `POST /api/logout` | Ends the session; after a sign-in through the provider the reply holds `provider_sign_out`, the provider's `end_session_endpoint` with the ID token as `id_token_hint`, the client id and `<address>/` as `post_logout_redirect_uri`, and the pages send the browser there, so the user is signed out at the provider too and comes back to the sign-in screen. A provider without that endpoint, or one that cannot be reached, leaves the user signed in there |
+| `apeiron web oidc set --issuer <url> --client-id <id> --address <url> [--claim <claim>] [--client-secret-file <path>]` | Sets the provider; asks for the client secret; prints the redirect address and the address after signing out (`<address>/`) to register at the provider |
 | `apeiron web oidc show`, `check`, `remove` | Shows the settings without the secret; reads the provider's settings and keys to see it answers; turns it off |
 | `apeiron web user add <name> --role <role> --oidc <identity>` | Adds a user who signs in through the provider, without a password |
 | `apeiron web user change <name> [--oidc <identity>] [--no-password]` | Gives a user an identity, or takes its password away |
@@ -109,7 +110,6 @@ The session that follows is the same as after a password (WEB.md §5); it ends w
 | LDAP and Active Directory directly | Not planned; providers such as Keycloak and Entra ID put a directory behind OpenID Connect |
 | SAML | Later, if a pilot needs it |
 | Creating users and roles from the provider's groups | Later; users are listed in `web.json` until then |
-| Signing out at the provider too | Later |
 | A second factor for password users | Later; users who need one sign in through the provider |
 
 ## 7. Crates

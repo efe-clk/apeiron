@@ -62,7 +62,7 @@ The requests of DESKTOP.md §3 stay, with these differences:
 | --- | --- |
 | `GET /api/session` | Allowed without signing in: `{"mode": "local" or "web", "signed_in"}` |
 | `POST /api/login` `{"name", "password"}` | Signs in; sets the cookie `apeiron_session` |
-| `POST /api/logout` | Signs out and forgets the session |
+| `POST /api/logout` | Signs out and forgets the session; after a sign-in through an identity provider, also says where to sign out there ([IDENTITY.md](IDENTITY.md) §4) |
 | `GET /api/health` | Allowed without signing in: `{"ok", "role": "primary" or "standby"}`, `503` when the repository cannot be read ([REPLICATION.md](REPLICATION.md) §5) |
 | `POST /api/open`, `POST /api/init`, `/api/schedule` | Refused with `unsupported` |
 | `POST /api/call/<operation>` | Only `info`, `resolve`, `log`, `list`, `diff`, `diff_text`, `refs`, `reflog`, and for an `admin` `retention`, `add_retention` ([ARCHIVE.md](ARCHIVE.md)); others are refused with `unsupported` |

@@ -679,6 +679,10 @@ fn web_oidc(files: &WebFiles, command: OidcCommand, out: &Output) -> Result<(), 
                 "Redirect address to register at the provider: {}",
                 config.redirect()
             );
+            say!(
+                "Address to register for after signing out: {}",
+                config.signed_out()
+            );
             let detail = view(&config);
             users.oidc = Some(config);
             users.save(file)?;
@@ -701,6 +705,7 @@ fn web_oidc(files: &WebFiles, command: OidcCommand, out: &Output) -> Result<(), 
                 );
                 say!("address: {}", config.address);
                 say!("redirect address: {}", config.redirect());
+                say!("address after signing out: {}", config.signed_out());
                 say!("claim: {}", config.claim);
             });
         }

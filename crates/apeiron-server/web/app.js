@@ -1358,7 +1358,13 @@ function signIn(error = null) {
 }
 
 async function signOut() {
-  await api("POST", "/api/logout").catch(() => {});
+  const reply = await api("POST", "/api/logout").catch(() => null);
+  // After a sign-in through the identity provider, sign out there too; it
+  // sends the browser back to these pages (IDENTITY.md §4).
+  if (reply?.provider_sign_out) {
+    location.assign(reply.provider_sign_out);
+    return;
+  }
   signIn();
 }
 

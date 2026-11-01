@@ -83,6 +83,11 @@ impl OidcConfig {
         format!("{}/api/oidc/callback", self.address.trim_end_matches('/'))
     }
 
+    /// Where the provider sends the browser after signing out there.
+    pub fn signed_out(&self) -> String {
+        format!("{}/", self.address.trim_end_matches('/'))
+    }
+
     /// Whether `value`, from the ID token, is `known`, a user's `oidc`;
     /// e-mail addresses are compared without case.
     pub fn same(&self, known: &str, value: &str) -> bool {
@@ -94,6 +99,13 @@ impl OidcConfig {
     }
 }
 
+/// A sign-in the provider confirmed: the value of the claim that names the
+/// user, and the ID token, kept for signing out at the provider.
+pub(crate) struct SignedIn {
+    pub(crate) value: String,
+    pub(crate) id_token: String,
+}
+
 /// What the provider publishes about itself.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Provider {
@@ -103,6 +115,10 @@ pub struct Provider {
     pub jwks_uri: String,
     #[serde(default)]
     pub token_endpoint_auth_methods_supported: Vec<String>,
+    /// Where to send the browser to sign out at the provider too
+    /// (OpenID Connect RP-Initiated Logout); absent when it has none.
+    #[serde(default)]
+    pub end_session_endpoint: Option<String>,
 }
 
 /// One public key of the provider (RFC 7517).
@@ -247,7 +263,7 @@ impl Oidc {
         config: &OidcConfig,
         code: &str,
         state: &str,
-    ) -> Result<String, Error> {
+    ) -> Result<SignedIn, Error> {
         let pending = lock(&self.pending)
             .remove(state)
             .filter(|p| p.made.elapsed() < PENDING)
@@ -267,7 +283,30 @@ impl Oidc {
                 "the identity provider has not verified this e-mail address",
             ));
         }
-        Ok(value.to_owned())
+        Ok(SignedIn {
+            value: value.to_owned(),
+            id_token: token,
+        })
+    }
+
+    /// Where to send the browser so that it signs out at the provider too,
+    /// then comes back to the pages (IDENTITY.md §4); `None` when the
+    /// provider offers no such place.
+    pub(crate) async fn sign_out_url(
+        &self,
+        config: &OidcConfig,
+        id_token: &str,
+    ) -> Result<Option<String>, Error> {
+        let provider = self.provider(config).await?;
+        let Some(endpoint) = &provider.end_session_endpoint else {
+            return Ok(None);
+        };
+        let mut url = checked_url("end session endpoint", endpoint)?;
+        url.query_pairs_mut()
+            .append_pair("id_token_hint", id_token)
+            .append_pair("client_id", &config.client_id)
+            .append_pair("post_logout_redirect_uri", &config.signed_out());
+        Ok(Some(url.to_string()))
     }
 
     async fn token(

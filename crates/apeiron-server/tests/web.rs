@@ -275,6 +275,8 @@ fn nothing_without_signing_in() {
     // Signing out ends the session.
     let out = c.post("/api/logout", json!({}));
     assert!(out.headers.contains("max-age=0"));
+    // A password sign-in has no provider to sign out at.
+    assert!(!out.body.contains("provider_sign_out"), "{}", out.body);
     assert_eq!(c.get("/api/state").status, 401);
 }
 

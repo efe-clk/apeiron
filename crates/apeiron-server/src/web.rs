@@ -196,6 +196,8 @@ struct Session {
     stamp: String,
     made: Instant,
     used: Instant,
+    /// The ID token of a sign-in through the identity provider.
+    id_token: Option<String>,
 }
 
 #[derive(Default)]
@@ -462,7 +464,7 @@ impl WebState {
         };
         record(Some(&user.name), "ok")?;
         *attempts = Attempts::default();
-        Ok(with_cookie(json!({}), &self.new_session(&user)?))
+        Ok(with_cookie(json!({}), &self.new_session(&user, None)?))
     }
 
     /// Checks the password of the link with `secret`; once it is right the
@@ -531,7 +533,7 @@ impl WebState {
     }
 
     /// Starts a session of `user`; returns its cookie.
-    fn new_session(&self, user: &User) -> Result<String, Error> {
+    fn new_session(&self, user: &User, id_token: Option<String>) -> Result<String, Error> {
         let id = random_hex()?;
         let now = Instant::now();
         let mut sessions = lock(&self.sessions);
@@ -543,6 +545,7 @@ impl WebState {
                 stamp: stamp(user),
                 made: now,
                 used: now,
+                id_token,
             },
         );
         Ok(format!(
@@ -610,11 +613,12 @@ impl WebState {
                 ));
             }
             let code = query.get("code").map(String::as_str).unwrap_or("");
-            let value = self
+            let signed = self
                 .oidc
                 .finish(&config, code, state)
                 .await
                 .map_err(|e| (None, e))?;
+            let value = signed.value;
             let user = self
                 .users()
                 .users
@@ -626,7 +630,7 @@ impl WebState {
                         Error::new(ErrorKind::Key, format!("no user of this server is {value}")),
                     )
                 })?;
-            Ok((value, user))
+            Ok((value, user, signed.id_token))
         }
         .await;
         let actor = |user: Option<&str>| Actor {
@@ -634,14 +638,14 @@ impl WebState {
             from: from.clone(),
         };
         match result {
-            Ok((value, user)) => {
+            Ok((value, user, id_token)) => {
                 let recorded = self.audit.record(
                     &actor(Some(&user.name)),
                     "sign_in",
                     json!({"via": "oidc", "identity": value}),
                     "ok",
                 );
-                match recorded.and_then(|()| self.new_session(&user)) {
+                match recorded.and_then(|()| self.new_session(&user, Some(id_token))) {
                     Ok(cookie) => redirect("/", &[cookie, clear]),
                     Err(e) => Failure::from(e).into_response(),
                 }
@@ -659,7 +663,9 @@ impl WebState {
         }
     }
 
-    pub(crate) fn logout(&self, headers: &HeaderMap, who: Option<&Who>) -> Response {
+    /// Ends the session; after a sign-in through the identity provider the
+    /// reply also says where to sign out there (IDENTITY.md §4).
+    pub(crate) async fn logout(&self, headers: &HeaderMap, who: Option<&Who>) -> Response {
         if let Some(who) = who
             && let Err(e) = self
                 .audit
@@ -667,11 +673,19 @@ impl WebState {
         {
             return Failure::from(e).into_response();
         }
-        if let Some(id) = cookie_value(headers) {
-            lock(&self.sessions).remove(id);
+        let id_token = cookie_value(headers)
+            .and_then(|id| lock(&self.sessions).remove(id))
+            .and_then(|s| s.id_token);
+        let mut reply = json!({});
+        if let (Some(token), Some(config)) = (id_token, self.oidc_config()) {
+            // Signing out here has worked; a provider that cannot be reached
+            // only leaves the user signed in there.
+            if let Ok(Some(url)) = self.oidc.sign_out_url(&config, &token).await {
+                reply["provider_sign_out"] = Value::String(url);
+            }
         }
         with_cookie(
-            json!({}),
+            reply,
             &format!("{COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0"),
         )
     }

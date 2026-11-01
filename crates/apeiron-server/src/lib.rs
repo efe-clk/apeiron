@@ -739,7 +739,7 @@ async fn logout(State(app): State<Arc<App>>, request: Request) -> Response {
         Mode::Local { .. } => axum::Json(json!({})).into_response(),
         Mode::Web(web) => {
             let who = request.extensions().get::<Who>().cloned();
-            web.logout(request.headers(), who.as_ref())
+            web.logout(request.headers(), who.as_ref()).await
         }
     }
 }

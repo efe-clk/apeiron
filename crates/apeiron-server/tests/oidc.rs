@@ -86,6 +86,7 @@ async fn discovery(State(idp): State<Shared>) -> axum::Json<Value> {
         "authorization_endpoint": format!("{issuer}/authorize"),
         "token_endpoint": format!("{issuer}/token"),
         "jwks_uri": format!("{issuer}/keys"),
+        "end_session_endpoint": format!("{issuer}/logout"),
     }))
 }
 
@@ -349,6 +350,26 @@ fn signing_in_through_the_provider() {
         json!({"name": "ayse", "role": "member"})
     );
 
+    // Signing out ends the session and says where to sign out at the
+    // provider too, with the ID token as a hint.
+    let other = session_cookie(&sign_in(address, &idp, |_, _| {})).unwrap();
+    let out = send(address, "POST", "/api/logout", &other, "");
+    assert_eq!(out.status, 200, "{}", out.body);
+    let url = serde_json::from_str::<Value>(&out.body).unwrap()["provider_sign_out"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    assert!(url.contains("/logout?"), "{url}");
+    let asked = query(&url);
+    assert_eq!(asked["client_id"], CLIENT);
+    assert!(asked["post_logout_redirect_uri"].ends_with('/'));
+    assert_eq!(asked["id_token_hint"].split('.').count(), 3);
+    let session = send(address, "GET", "/api/session", &other, "");
+    assert_eq!(
+        serde_json::from_str::<Value>(&session.body).unwrap()["signed_in"],
+        false
+    );
+
     // RSA keys work too.
     let rsa = sign_in(address, &idp, |i, _| i.alg = "RS256".to_owned());
     assert!(session_cookie(&rsa).is_some(), "{:?}", rsa.headers);
@@ -475,7 +496,7 @@ fn signing_in_through_the_provider() {
         .iter()
         .filter(|e| e.event == "sign_in" && e.outcome == "ok" && e.detail["via"] == "oidc")
         .count();
-    assert_eq!(ok, 3);
+    assert_eq!(ok, 4);
     assert!(events.iter().any(|e| e.event == "sign_in"
         && e.outcome == "key"
         && e.detail["identity"] == "okan@example.com"));

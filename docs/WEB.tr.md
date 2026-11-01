@@ -62,7 +62,7 @@ DESKTOP.tr.md §3'teki istekler şu farklarla kalır:
 | --- | --- |
 | `GET /api/session` | Oturum açmadan izinli: `{"mode": "local" ya da "web", "signed_in"}` |
 | `POST /api/login` `{"name", "password"}` | Oturum açar; `apeiron_session` çerezini koyar |
-| `POST /api/logout` | Oturumu kapatır ve unutur |
+| `POST /api/logout` | Oturumu kapatır ve unutur; bir kimlik sağlayıcısı üzerinden açılmış oturumdan sonra orada da nereden çıkılacağını söyler ([IDENTITY.tr.md](IDENTITY.tr.md) §4) |
 | `GET /api/health` | Oturum açmadan izinli: `{"ok", "role": "primary" ya da "standby"}`; depo okunamıyorsa `503` ([REPLICATION.tr.md](REPLICATION.tr.md) §5) |
 | `POST /api/open`, `POST /api/init`, `/api/schedule` | `unsupported` ile reddedilir |
 | `POST /api/call/<operation>` | Yalnızca `info`, `resolve`, `log`, `list`, `diff`, `diff_text`, `refs`, `reflog`, bir `admin` için ayrıca `retention`, `add_retention` ([ARCHIVE.tr.md](ARCHIVE.tr.md)); diğerleri `unsupported` ile reddedilir |
