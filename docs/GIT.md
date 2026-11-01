@@ -101,7 +101,7 @@ The address is `/git/<prefix>`, with or without `.git` at the end. Only reading 
 2. The server exports the refs under the prefix into a Git copy of its own, `git/<prefix>.git` in the folder of its audit log, and brings it up to date at each request as `apeiron git export` does (section 5). The copy can be deleted at any time; it is made again.
 3. It offers the branches and tags under the prefix that the user sees (USERS.md §1); `HEAD` names `main`, else `master`, else the first branch. Only these may be asked for, so nothing reaches the user that its backups do not.
 4. A client that already has commits names them (`have`). The first one the asked refs reach is common: the server says so (`ACK`), as Git does without `multi_ack`, and the pack leaves out everything the common commits reach, so a fetch downloads only what is new. Other names are passed over, so the answer tells nothing about refs the user was not offered.
-5. The answer is a pack of those objects, without deltas: each object compressed on its own, so a pack is larger than Git's own.
+5. The answer is a pack of those objects. As Git does, trees and files of the same name are sorted largest first, and each is tried against the ten before it: when the differences take less than half its size, it is sent as a delta, the copies from that object and the new bytes, up to 50 deltas deep. Objects over 16 MiB are sent whole. A pack is still somewhat larger than Git's own, which searches harder.
 6. Each fetch is recorded as `git_fetch` with the prefix and the refs (AUDIT.md §1), and a wrong password as `sign_in` with `"via": "git"`.
 
 The server speaks Git's smart HTTP protocol, version 0, without side-band; newer Git asks for version 2 and falls back to it.
@@ -110,7 +110,7 @@ The server speaks Git's smart HTTP protocol, version 0, without side-band; newer
 
 | Item | Where |
 | --- | --- |
-| Push over HTTP, Git over SSH, packs with deltas | Later; clone and fetch over HTTP (section 7) already take a project out of Apeiron |
+| Push over HTTP, Git over SSH | Later; clone and fetch over HTTP (section 7) already take a project out of Apeiron |
 | Checking out into a Git working tree | `apeiron restore` writes a snapshot into a folder |
 | Branching and merging inside Apeiron | Stage 3 work item 2 |
 | Moving the code behind the plugin interface | With the plugin system, Stage 3 |

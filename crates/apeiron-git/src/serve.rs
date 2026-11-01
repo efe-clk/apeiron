@@ -1,7 +1,7 @@
 //! Serving refs to `git clone` and `git fetch` (GIT.md §7): a Git copy
 //! kept up to date by export, its refs, and packs of what they reach.
 
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 use std::io::Write;
 use std::path::Path;
 
@@ -9,6 +9,7 @@ use apeiron_core::Repository;
 use gix::ObjectId;
 use serde::{Deserialize, Serialize};
 
+use crate::delta;
 use crate::raw::{self, GITLINK_MODE};
 use crate::{Error, Result, export, git_error, git_name, open_git};
 
@@ -67,7 +68,7 @@ pub fn common_haves(path: &Path, wants: &[String], haves: &[String]) -> Result<V
     let starts = parse_ids(wants)?;
     let commits: HashSet<ObjectId> = reach(&git, path, &starts, &HashSet::new(), true)?
         .into_iter()
-        .map(|(id, _)| id)
+        .map(|r| r.id)
         .collect();
     Ok(haves
         .iter()
@@ -89,9 +90,27 @@ pub fn write_pack(
     let git = open_git(path)?;
     let known: HashSet<ObjectId> = reach(&git, path, &parse_ids(common)?, &HashSet::new(), false)?
         .into_iter()
-        .map(|(id, _)| id)
+        .map(|r| r.id)
         .collect();
-    let order = reach(&git, path, &parse_ids(wants)?, &known, false)?;
+    let mut order = reach(&git, path, &parse_ids(wants)?, &known, false)?;
+    // Trees and files of the same name, largest first: a changed version
+    // is then usually next to the one it is written against, as Git does.
+    let deltas =
+        |k: gix::object::Kind| matches!(k, gix::object::Kind::Tree | gix::object::Kind::Blob);
+    order.sort_by(|a, b| {
+        (
+            deltas(a.kind),
+            a.kind as u8,
+            &a.name,
+            std::cmp::Reverse(a.size),
+        )
+            .cmp(&(
+                deltas(b.kind),
+                b.kind as u8,
+                &b.name,
+                std::cmp::Reverse(b.size),
+            ))
+    });
 
     let mut pack = Hashed {
         out,
@@ -103,23 +122,102 @@ pub fn write_pack(
     let count = u32::try_from(order.len())
         .map_err(|_| Error::Unsupported("too many objects for one pack".to_owned()))?;
     pack.write_all(&count.to_be_bytes()).map_err(io)?;
-    for (id, kind) in &order {
-        let object = git.find_object(*id).map_err(|e| git_error(path, e))?;
-        let type_bits: u8 = match kind {
-            gix::object::Kind::Commit => 1,
-            gix::object::Kind::Tree => 2,
-            gix::object::Kind::Blob => 3,
-            gix::object::Kind::Tag => 4,
+    let mut window: VecDeque<Candidate> = VecDeque::new();
+    for reached in &order {
+        let object = git
+            .find_object(reached.id)
+            .map_err(|e| git_error(path, e))?;
+        let data = &object.data;
+        let mut best: Option<(ObjectId, Vec<u8>, u32)> = None;
+        if deltas(reached.kind) && data.len() >= MIN_DELTA {
+            for base in window
+                .iter()
+                .filter(|c| c.kind == reached.kind && c.depth < MAX_DEPTH)
+            {
+                let limit = best
+                    .as_ref()
+                    .map_or(data.len() / 2, |(_, d, _)| d.len().saturating_sub(1));
+                if let Some(d) = delta::encode(&base.data, &base.index, data, limit) {
+                    best = Some((base.id, d, base.depth + 1));
+                }
+            }
+        }
+        let z = |pack: &mut Hashed<'_>, bytes: &[u8]| -> Result<()> {
+            let mut z = flate2::write::ZlibEncoder::new(pack, flate2::Compression::default());
+            z.write_all(bytes).map_err(io)?;
+            z.finish().map_err(io)?;
+            Ok(())
         };
-        pack.write_all(&entry_header(type_bits, object.data.len() as u64))
-            .map_err(io)?;
-        let mut z = flate2::write::ZlibEncoder::new(&mut pack, flate2::Compression::fast());
-        z.write_all(&object.data).map_err(io)?;
-        z.finish().map_err(io)?;
+        let depth = match best {
+            Some((base, d, depth)) => {
+                pack.write_all(&entry_header(REF_DELTA, d.len() as u64))
+                    .map_err(io)?;
+                pack.write_all(base.as_bytes()).map_err(io)?;
+                z(&mut pack, &d)?;
+                depth
+            }
+            None => {
+                pack.write_all(&entry_header(type_bits(reached.kind), data.len() as u64))
+                    .map_err(io)?;
+                z(&mut pack, data)?;
+                0
+            }
+        };
+        if deltas(reached.kind) && data.len() <= MAX_WINDOW_OBJECT {
+            if window.len() == WINDOW {
+                window.pop_front();
+            }
+            window.push_back(Candidate {
+                id: reached.id,
+                kind: reached.kind,
+                index: delta::Index::new(data),
+                data: data.to_vec(),
+                depth,
+            });
+        }
     }
     let digest = pack.hasher.try_finalize().map_err(|e| git_error(path, e))?;
     pack.out.write_all(digest.as_bytes()).map_err(io)?;
     Ok(order.len() as u64)
+}
+
+/// How many objects before one are tried as its base.
+const WINDOW: usize = 10;
+/// Longer chains of deltas make reading slow.
+const MAX_DEPTH: u32 = 50;
+/// Smaller objects are not worth a delta.
+const MIN_DELTA: usize = 64;
+/// Larger objects are not kept in memory to serve as a base.
+const MAX_WINDOW_OBJECT: usize = 16 << 20;
+/// The pack type of an object written as a delta from the object named
+/// after its header.
+const REF_DELTA: u8 = 7;
+
+/// An object recently written, to try as the base of the next ones.
+struct Candidate {
+    id: ObjectId,
+    kind: gix::object::Kind,
+    data: Vec<u8>,
+    index: delta::Index,
+    depth: u32,
+}
+
+fn type_bits(kind: gix::object::Kind) -> u8 {
+    match kind {
+        gix::object::Kind::Commit => 1,
+        gix::object::Kind::Tree => 2,
+        gix::object::Kind::Blob => 3,
+        gix::object::Kind::Tag => 4,
+    }
+}
+
+/// An object a pack holds, with the name of the tree entry it was found
+/// under (empty for commits, tags and a commit's tree).
+struct Reached {
+    id: ObjectId,
+    kind: gix::object::Kind,
+    size: usize,
+    name: Vec<u8>,
 }
 
 /// Every object `starts` reach, each once, leaving out `known` and what
@@ -130,11 +228,11 @@ fn reach(
     starts: &[ObjectId],
     known: &HashSet<ObjectId>,
     commits_only: bool,
-) -> Result<Vec<(ObjectId, gix::object::Kind)>> {
+) -> Result<Vec<Reached>> {
     let mut order = Vec::new();
     let mut seen = HashSet::new();
-    let mut stack = starts.to_vec();
-    while let Some(id) = stack.pop() {
+    let mut stack: Vec<(ObjectId, Vec<u8>)> = starts.iter().map(|id| (*id, Vec::new())).collect();
+    while let Some((id, name)) = stack.pop() {
         if known.contains(&id) || !seen.insert(id) {
             continue;
         }
@@ -147,10 +245,12 @@ fn reach(
             gix::object::Kind::Commit => {
                 let commit = raw::parse_commit(&object.data).ok_or_else(|| bad("bad commit"))?;
                 if !commits_only {
-                    stack.push(hex_id(commit.tree).ok_or_else(|| bad("bad tree id"))?);
+                    let tree = hex_id(commit.tree).ok_or_else(|| bad("bad tree id"))?;
+                    stack.push((tree, Vec::new()));
                 }
                 for parent in commit.parents {
-                    stack.push(hex_id(parent).ok_or_else(|| bad("bad parent id"))?);
+                    let parent = hex_id(parent).ok_or_else(|| bad("bad parent id"))?;
+                    stack.push((parent, Vec::new()));
                 }
             }
             gix::object::Kind::Tree => {
@@ -158,20 +258,26 @@ fn reach(
                 for entry in entries {
                     // A submodule's commit lives in another repository.
                     if entry.mode != GITLINK_MODE {
-                        stack.push(
-                            ObjectId::try_from(entry.id.as_slice()).map_err(|_| bad("bad id"))?,
-                        );
+                        let child =
+                            ObjectId::try_from(entry.id.as_slice()).map_err(|_| bad("bad id"))?;
+                        stack.push((child, entry.name));
                     }
                 }
             }
             gix::object::Kind::Tag => {
                 let tag = raw::parse_tag(&object.data).ok_or_else(|| bad("bad tag"))?;
-                stack.push(hex_id(tag.object).ok_or_else(|| bad("bad object id"))?);
+                let target = hex_id(tag.object).ok_or_else(|| bad("bad object id"))?;
+                stack.push((target, Vec::new()));
             }
             gix::object::Kind::Blob => {}
         }
         if !commits_only || object.kind == gix::object::Kind::Commit {
-            order.push((id, object.kind));
+            order.push(Reached {
+                id,
+                kind: object.kind,
+                size: object.data.len(),
+                name,
+            });
         }
     }
     Ok(order)

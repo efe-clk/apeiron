@@ -389,3 +389,51 @@ fn served_refs_and_packs_are_read_by_git() {
         env.git(&src, &["rev-parse", "main"])
     );
 }
+
+#[test]
+fn a_changed_file_travels_as_its_changes() {
+    let Some(env) = Env::new() else { return };
+    let src = env.root.join("big");
+    fs::create_dir_all(&src).unwrap();
+    env.git(&src, &["init", "-q", "-b", "main"]);
+    // Letters zlib cannot squeeze much, changed a little in each commit.
+    let mut x = 7u64;
+    let mut text: Vec<u8> = (0..100_000)
+        .map(|_| {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            b'a' + (x % 26) as u8
+        })
+        .collect();
+    for round in 0..3 {
+        text[round * 1000] = b'#';
+        text.extend_from_slice(format!("\nround {round}\n").as_bytes());
+        fs::write(src.join("data.txt"), &text).unwrap();
+        env.git(&src, &["add", "data.txt"]);
+        env.git(&src, &["commit", "-q", "-m", &format!("round {round}")]);
+    }
+    let mut repo = init(&env.root.join("apeiron"));
+    apeiron_git::import(&mut repo, &src, "git", &mut |_| Ok(())).unwrap();
+    let cache = env.root.join("cache.git");
+    let refs = apeiron_git::serve_refs(&repo, &cache, "git").unwrap();
+
+    let mut pack = Vec::new();
+    let count =
+        apeiron_git::write_pack(&cache, std::slice::from_ref(&refs[0].id), &[], &mut pack).unwrap();
+    assert_eq!(count, 9);
+    // Three versions of 100 kB fit in little more than one.
+    assert!(pack.len() < 90_000, "{}", pack.len());
+    let empty = env.root.join("empty.git");
+    env.git(
+        &env.root,
+        &["init", "-q", "--bare", empty.to_str().unwrap()],
+    );
+    env.git_with(&empty, &["index-pack", "--stdin", "--strict"], Some(&pack));
+    env.git(&empty, &["update-ref", "refs/heads/main", &refs[0].id]);
+    env.git(&empty, &["fsck", "--no-progress"]);
+    assert_eq!(
+        env.git(&empty, &["show", "main:data.txt"]).len(),
+        env.git(&src, &["show", "main:data.txt"]).len()
+    );
+}
