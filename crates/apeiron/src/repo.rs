@@ -340,11 +340,29 @@ impl Repository {
         )?)
     }
 
+    /// The Git ids of `haves` that `wants` reach in the Git copy at `path`:
+    /// what a client already has (GIT.md §7).
+    pub fn git_common(
+        &self,
+        path: &Path,
+        wants: &[String],
+        haves: &[String],
+    ) -> Result<Vec<String>> {
+        Ok(apeiron_git::common_haves(path, wants, haves)?)
+    }
+
     /// Writes a Git pack of everything the Git ids `wants` reach in the Git
-    /// copy at `path`, made by [`Repository::git_serve_refs`]; returns the
-    /// number of objects (GIT.md §7).
-    pub fn git_pack(&self, path: &Path, wants: &[String], out: &mut dyn Write) -> Result<u64> {
-        Ok(apeiron_git::write_pack(path, wants, out)?)
+    /// copy at `path`, made by [`Repository::git_serve_refs`], and `common`
+    /// from [`Repository::git_common`] does not; returns the number of
+    /// objects (GIT.md §7).
+    pub fn git_pack(
+        &self,
+        path: &Path,
+        wants: &[String],
+        common: &[String],
+        out: &mut dyn Write,
+    ) -> Result<u64> {
+        Ok(apeiron_git::write_pack(path, wants, common, out)?)
     }
 
     /// Removes objects no ref and no recent reflog line can reach. Fails with

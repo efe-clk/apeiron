@@ -58,53 +58,40 @@ pub fn serve_refs(repo: &Repository, path: &Path, prefix: &str) -> Result<Vec<Se
     Ok(out)
 }
 
-/// Writes a Git pack, version 2 and without deltas, of every object `wants`
-/// reach in the Git copy at `path`; returns the number of objects. The
-/// caller checks that the client may have each of `wants`.
-pub fn write_pack(path: &Path, wants: &[String], out: &mut dyn Write) -> Result<u64> {
+/// The ids of `haves`, in their order, that are commits `wants` reach in
+/// the Git copy at `path`: what the client and the server have in common.
+/// Others, even if the copy holds them, do not count, so the answer tells
+/// nothing about refs the client was not offered.
+pub fn common_haves(path: &Path, wants: &[String], haves: &[String]) -> Result<Vec<String>> {
     let git = open_git(path)?;
-    let mut order = Vec::new();
-    let mut seen = HashSet::new();
-    let mut stack = Vec::new();
-    for want in wants {
-        stack.push(parse_id(want)?);
-    }
-    while let Some(id) = stack.pop() {
-        if !seen.insert(id) {
-            continue;
-        }
-        let object = git.find_object(id).map_err(|e| git_error(path, e))?;
-        let bad = |reason: &str| Error::InvalidObject {
-            id: id.to_string(),
-            reason: reason.to_owned(),
-        };
-        match object.kind {
-            gix::object::Kind::Commit => {
-                let commit = raw::parse_commit(&object.data).ok_or_else(|| bad("bad commit"))?;
-                stack.push(hex_id(commit.tree).ok_or_else(|| bad("bad tree id"))?);
-                for parent in commit.parents {
-                    stack.push(hex_id(parent).ok_or_else(|| bad("bad parent id"))?);
-                }
-            }
-            gix::object::Kind::Tree => {
-                let entries = raw::parse_tree(&object.data, 20).ok_or_else(|| bad("bad tree"))?;
-                for entry in entries {
-                    // A submodule's commit lives in another repository.
-                    if entry.mode != GITLINK_MODE {
-                        stack.push(
-                            ObjectId::try_from(entry.id.as_slice()).map_err(|_| bad("bad id"))?,
-                        );
-                    }
-                }
-            }
-            gix::object::Kind::Tag => {
-                let tag = raw::parse_tag(&object.data).ok_or_else(|| bad("bad tag"))?;
-                stack.push(hex_id(tag.object).ok_or_else(|| bad("bad object id"))?);
-            }
-            gix::object::Kind::Blob => {}
-        }
-        order.push((id, object.kind));
-    }
+    let starts = parse_ids(wants)?;
+    let commits: HashSet<ObjectId> = reach(&git, path, &starts, &HashSet::new(), true)?
+        .into_iter()
+        .map(|(id, _)| id)
+        .collect();
+    Ok(haves
+        .iter()
+        .filter(|h| parse_id(h).is_ok_and(|id| commits.contains(&id)))
+        .cloned()
+        .collect())
+}
+
+/// Writes a Git pack, version 2 and without deltas, of every object `wants`
+/// reach in the Git copy at `path` and `common` does not; returns the
+/// number of objects. The caller checks that the client may have each of
+/// `wants`, and takes `common` from [`common_haves`].
+pub fn write_pack(
+    path: &Path,
+    wants: &[String],
+    common: &[String],
+    out: &mut dyn Write,
+) -> Result<u64> {
+    let git = open_git(path)?;
+    let known: HashSet<ObjectId> = reach(&git, path, &parse_ids(common)?, &HashSet::new(), false)?
+        .into_iter()
+        .map(|(id, _)| id)
+        .collect();
+    let order = reach(&git, path, &parse_ids(wants)?, &known, false)?;
 
     let mut pack = Hashed {
         out,
@@ -133,6 +120,65 @@ pub fn write_pack(path: &Path, wants: &[String], out: &mut dyn Write) -> Result<
     let digest = pack.hasher.try_finalize().map_err(|e| git_error(path, e))?;
     pack.out.write_all(digest.as_bytes()).map_err(io)?;
     Ok(order.len() as u64)
+}
+
+/// Every object `starts` reach, each once, leaving out `known` and what
+/// only they reach; with `commits_only`, commits alone.
+fn reach(
+    git: &gix::Repository,
+    path: &Path,
+    starts: &[ObjectId],
+    known: &HashSet<ObjectId>,
+    commits_only: bool,
+) -> Result<Vec<(ObjectId, gix::object::Kind)>> {
+    let mut order = Vec::new();
+    let mut seen = HashSet::new();
+    let mut stack = starts.to_vec();
+    while let Some(id) = stack.pop() {
+        if known.contains(&id) || !seen.insert(id) {
+            continue;
+        }
+        let object = git.find_object(id).map_err(|e| git_error(path, e))?;
+        let bad = |reason: &str| Error::InvalidObject {
+            id: id.to_string(),
+            reason: reason.to_owned(),
+        };
+        match object.kind {
+            gix::object::Kind::Commit => {
+                let commit = raw::parse_commit(&object.data).ok_or_else(|| bad("bad commit"))?;
+                if !commits_only {
+                    stack.push(hex_id(commit.tree).ok_or_else(|| bad("bad tree id"))?);
+                }
+                for parent in commit.parents {
+                    stack.push(hex_id(parent).ok_or_else(|| bad("bad parent id"))?);
+                }
+            }
+            gix::object::Kind::Tree => {
+                let entries = raw::parse_tree(&object.data, 20).ok_or_else(|| bad("bad tree"))?;
+                for entry in entries {
+                    // A submodule's commit lives in another repository.
+                    if entry.mode != GITLINK_MODE {
+                        stack.push(
+                            ObjectId::try_from(entry.id.as_slice()).map_err(|_| bad("bad id"))?,
+                        );
+                    }
+                }
+            }
+            gix::object::Kind::Tag => {
+                let tag = raw::parse_tag(&object.data).ok_or_else(|| bad("bad tag"))?;
+                stack.push(hex_id(tag.object).ok_or_else(|| bad("bad object id"))?);
+            }
+            gix::object::Kind::Blob => {}
+        }
+        if !commits_only || object.kind == gix::object::Kind::Commit {
+            order.push((id, object.kind));
+        }
+    }
+    Ok(order)
+}
+
+fn parse_ids(hex: &[String]) -> Result<Vec<ObjectId>> {
+    hex.iter().map(|h| parse_id(h)).collect()
 }
 
 /// The type and size of a pack entry: 3 type bits and the size, 4 bits

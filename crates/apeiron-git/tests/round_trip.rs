@@ -360,15 +360,27 @@ fn served_refs_and_packs_are_read_by_git() {
     let main = refs.iter().find(|r| r.git == "refs/heads/main").unwrap();
     assert_eq!(main.ref_name, "git/heads/main");
 
-    // A pack of main alone, read into an empty repository by git itself.
-    let mut pack = Vec::new();
-    let count = apeiron_git::write_pack(&cache, std::slice::from_ref(&main.id), &mut pack).unwrap();
-    assert!(count > 5, "{count}");
+    // A pack of main's parent alone, read into an empty repository by git
+    // itself; then only what main adds, for a client that has the parent.
+    let parent = env.git(&src, &["rev-parse", "main^"]);
     let empty = env.root.join("empty.git");
     env.git(
         &env.root,
         &["init", "-q", "--bare", empty.to_str().unwrap()],
     );
+    let mut pack = Vec::new();
+    let all =
+        apeiron_git::write_pack(&cache, std::slice::from_ref(&parent), &[], &mut pack).unwrap();
+    env.git_with(&empty, &["index-pack", "--stdin", "--strict"], Some(&pack));
+
+    let unknown = "0123456789012345678901234567890123456789".to_owned();
+    let haves = [unknown, parent.clone()];
+    let common = apeiron_git::common_haves(&cache, std::slice::from_ref(&main.id), &haves).unwrap();
+    assert_eq!(common, [parent]);
+    let mut pack = Vec::new();
+    let new = apeiron_git::write_pack(&cache, std::slice::from_ref(&main.id), &common, &mut pack)
+        .unwrap();
+    assert!(new < all && new > 0, "{new} of {all}");
     env.git_with(&empty, &["index-pack", "--stdin", "--strict"], Some(&pack));
     env.git(&empty, &["update-ref", "refs/heads/main", &main.id]);
     env.git(&empty, &["fsck", "--no-progress"]);

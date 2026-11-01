@@ -11,6 +11,11 @@ use apeiron_server::{Audit, Role, Shares, User, Users, Web, WebOptions, hash_pas
 const PASSWORD: &str = "correct horse";
 
 fn git(dir: &Path, args: &[&str]) -> Output {
+    git_traced(dir, args, false)
+}
+
+/// With `trace`, Git writes the packets it sends and gets to its errors.
+fn git_traced(dir: &Path, args: &[&str], trace: bool) -> Output {
     Command::new("git")
         .args(args)
         .current_dir(dir)
@@ -18,6 +23,7 @@ fn git(dir: &Path, args: &[&str]) -> Output {
         .env("GIT_CONFIG_GLOBAL", dir.join("no-gitconfig"))
         .env("GIT_TERMINAL_PROMPT", "0")
         .env("GIT_ASKPASS", "")
+        .env("GIT_TRACE_PACKET", if trace { "1" } else { "0" })
         .output()
         .unwrap()
 }
@@ -66,7 +72,7 @@ fn git_clones_the_branches_a_user_sees() {
     users.add(with_code).unwrap();
     users.save(&file).unwrap();
     let server = Web::start(WebOptions {
-        repo,
+        repo: repo.clone(),
         listen: "127.0.0.1:0".parse().unwrap(),
         tls: None,
         users: file,
@@ -118,6 +124,24 @@ fn git_clones_the_branches_a_user_sees() {
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
+
+    // A new snapshot on the server comes with the next pull, which sends
+    // what the client has and gets only what is new.
+    fs::write(root.join("open/readme.txt"), "open, changed").unwrap();
+    repo.backup(BackupRequest::new(root.join("open"), "git/heads/main"))
+        .unwrap()
+        .wait()
+        .unwrap();
+    let out = git_traced(&root.join("ayse"), &["pull", "-q", "--ff-only"], true);
+    let trace = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{trace}");
+    assert!(trace.contains("< ACK "), "{trace}");
+    assert_eq!(
+        fs::read_to_string(root.join("ayse/readme.txt")).unwrap(),
+        "open, changed"
+    );
+    let fsck = git(&root.join("ayse"), &["fsck", "--no-progress"]);
+    assert!(fsck.status.success());
 
     // A wrong password, and a user whose second factor Git cannot send,
     // get nothing.

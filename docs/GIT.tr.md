@@ -100,8 +100,9 @@ Adres, sonunda `.git` olsun ya da olmasın, `/git/<prefix>`'tir. Yalnızca okuma
 1. Git her istekte kullanıcının adı ve parolasıyla (HTTP Basic) oturum açar; yanlış parolalar sayfalardaki oturum açmalar gibi bekletilir (WEB.tr.md §5). İkinci doğrulaması olan (IDENTITY.tr.md §4) ya da parolası olmayan bir kullanıcı bunu kullanamaz, çünkü Git kodu gönderemez.
 2. Sunucu önekin altındaki ref'leri, denetim kaydının klasöründeki `git/<prefix>.git` adlı kendi Git kopyasına aktarır ve her istekte, `apeiron git export`'un yaptığı gibi (bölüm 5) günceller. Kopya her an silinebilir; yeniden oluşturulur.
 3. Önekin altında kullanıcının gördüğü (USERS.tr.md §1) dalları ve etiketleri sunar; `HEAD`, `main`'i, yoksa `master`'ı, yoksa ilk dalı gösterir. Yalnızca bunlar istenebilir; böylece kullanıcıya yedeklerinin ulaşmadığı hiçbir şey gitmez.
-4. Yanıt, istenen ref'lerin ulaştığı her şeyin deltasız bir paketidir. Sunucu istemcide zaten olanı kullanmaz; bu yüzden bir fetch bütün geçmişi yeniden indirir: küçük ve orta boy projeler için yeterli, büyükler için yavaştır.
-5. Her fetch önek ve ref'lerle `git_fetch` olarak (AUDIT.tr.md §1), yanlış bir parola da `"via": "git"` ile `sign_in` olarak kaydedilir.
+4. Commit'leri zaten olan bir istemci onları adlandırır (`have`). İstenen ref'lerin ulaştığı ilki ortaktır: sunucu bunu, Git'in `multi_ack` olmadan yaptığı gibi söyler (`ACK`) ve paket ortak commit'lerin ulaştığı her şeyi dışarıda bırakır; böylece bir fetch yalnızca yeni olanı indirir. Diğer adlar geçilir; böylece yanıt, kullanıcıya sunulmayan ref'ler hakkında hiçbir şey söylemez.
+5. Yanıt bu nesnelerin deltasız bir paketidir: her nesne tek başına sıkıştırılır, bu yüzden bir paket Git'in kendi paketinden büyüktür.
+6. Her fetch önek ve ref'lerle `git_fetch` olarak (AUDIT.tr.md §1), yanlış bir parola da `"via": "git"` ile `sign_in` olarak kaydedilir.
 
 Sunucu Git'in akıllı HTTP protokolünün 0. sürümünü side-band olmadan konuşur; yeni Git sürümleri 2. sürümü ister ve buna geri döner.
 
@@ -109,7 +110,7 @@ Sunucu Git'in akıllı HTTP protokolünün 0. sürümünü side-band olmadan kon
 
 | Konu | Nerede |
 | --- | --- |
-| HTTP üzerinden push, SSH üzerinden Git, deltalı paketler ve yalnızca yeniyi gönderen bir fetch | Daha sonra; HTTP üzerinden clone ve fetch (bölüm 7) bir projeyi Apeiron'dan zaten çıkarır |
+| HTTP üzerinden push, SSH üzerinden Git, deltalı paketler | Daha sonra; HTTP üzerinden clone ve fetch (bölüm 7) bir projeyi Apeiron'dan zaten çıkarır |
 | Bir Git çalışma ağacına checkout | `apeiron restore` bir snapshot'ı bir klasöre yazar |
 | Apeiron içinde dallanma ve birleştirme | Aşama 3'ün 2. işi |
 | Kodu eklenti arayüzünün arkasına taşımak | Eklenti sistemiyle, Aşama 3 |

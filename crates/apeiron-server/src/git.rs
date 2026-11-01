@@ -126,13 +126,6 @@ pub(crate) async fn upload_pack(
     let Some(request) = parse_request(&body) else {
         return text(StatusCode::BAD_REQUEST, "not a Git upload-pack request");
     };
-    // Without `done` the client is still telling what it has: nothing in
-    // common, so it goes on until it says `done`.
-    if !request.done {
-        let mut out = Vec::new();
-        pkt(&mut out, b"NAK\n");
-        return git_response("application/x-git-upload-pack-result", Body::from(out));
-    }
     let refs = match visible_refs(&repo, &user, &cache, &prefix).await {
         Ok(refs) => refs,
         Err(e) => return Failure::from(e).into_response(),
@@ -148,6 +141,25 @@ pub(crate) async fn upload_pack(
             StatusCode::FORBIDDEN,
             &format!("{other} is not the tip of a branch or tag you can see"),
         );
+    }
+    // The first commit both sides have ends the talk, as in Git without
+    // `multi_ack`; the client then says `done`, and the pack leaves out
+    // what the common commits reach.
+    let common = {
+        let (repo, cache) = (repo.clone(), cache.clone());
+        let (wants, haves) = (request.wants.clone(), request.haves.clone());
+        match blocking(move || repo.git_common(&cache, &wants, &haves)).await {
+            Ok(common) => common,
+            Err(e) => return Failure::from(e).into_response(),
+        }
+    };
+    let mut answer = Vec::new();
+    match common.first() {
+        Some(id) => pkt(&mut answer, format!("ACK {id}\n").as_bytes()),
+        None => pkt(&mut answer, b"NAK\n"),
+    }
+    if !request.done {
+        return git_response("application/x-git-upload-pack-result", Body::from(answer));
     }
     if let Mode::Web(web) = &app.mode {
         let actor = Actor {
@@ -176,13 +188,11 @@ pub(crate) async fn upload_pack(
             sender,
             buffer: Vec::new(),
         };
-        let mut nak = Vec::new();
-        pkt(&mut nak, b"NAK\n");
         let io = |e: std::io::Error| Error::new(ErrorKind::Io, e.to_string());
         let written = out
-            .write_all(&nak)
+            .write_all(&answer)
             .map_err(io)
-            .and_then(|()| repo.git_pack(&cache, &wants, &mut out))
+            .and_then(|()| repo.git_pack(&cache, &wants, &common, &mut out))
             .and_then(|_| out.flush().map_err(io));
         if let Err(e) = written {
             // The client sees a pack cut short and fails.
@@ -276,15 +286,18 @@ fn cache_path(web: &WebState, prefix: &str) -> PathBuf {
     state.join("git").join(format!("{prefix}.git"))
 }
 
-/// What a client asks for: the ids it wants and whether it said `done`.
+/// What a client asks for: the ids it wants, those it has, and whether it
+/// said `done`.
 struct UploadRequest {
     wants: Vec<String>,
+    haves: Vec<String>,
     done: bool,
 }
 
 fn parse_request(mut data: &[u8]) -> Option<UploadRequest> {
     let mut request = UploadRequest {
         wants: Vec::new(),
+        haves: Vec::new(),
         done: false,
     };
     while data.len() >= 4 {
@@ -297,18 +310,21 @@ fn parse_request(mut data: &[u8]) -> Option<UploadRequest> {
         let line = data.get(4..len)?;
         data = &data[len..];
         let line = std::str::from_utf8(line).ok()?.trim_end_matches('\n');
-        if let Some(rest) = line.strip_prefix("want ") {
+        let id = |rest: &str| {
             let id = rest.split(' ').next()?;
-            if id.len() != 40 || !id.bytes().all(|b| b.is_ascii_hexdigit()) {
-                return None;
+            (id.len() == 40 && id.bytes().all(|b| b.is_ascii_hexdigit()))
+                .then(|| id.to_ascii_lowercase())
+        };
+        if let Some(rest) = line.strip_prefix("want ") {
+            let id = id(rest)?;
+            if !request.wants.contains(&id) {
+                request.wants.push(id);
             }
-            if !request.wants.iter().any(|w| w == id) {
-                request.wants.push(id.to_ascii_lowercase());
-            }
+        } else if let Some(rest) = line.strip_prefix("have ") {
+            request.haves.push(id(rest)?);
         } else if line == "done" {
             request.done = true;
         }
-        // `have` lines are read and passed over: the pack is always full.
     }
     (!request.wants.is_empty()).then_some(request)
 }
@@ -372,6 +388,7 @@ mod tests {
         pkt(&mut body, b"done\n");
         let request = parse_request(&body).unwrap();
         assert_eq!(request.wants, [id]);
+        assert_eq!(request.haves, ["b".repeat(40)]);
         assert!(request.done);
         assert!(parse_request(b"0000").is_none());
         assert!(parse_request(b"0009want x\n").is_none());

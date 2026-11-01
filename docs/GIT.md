@@ -100,8 +100,9 @@ The address is `/git/<prefix>`, with or without `.git` at the end. Only reading 
 1. Git signs in with the user's name and password (HTTP Basic), at every request; wrong passwords pause as sign-ins in the pages do (WEB.md §5). A user with a second factor (IDENTITY.md §4) or without a password cannot use it, because Git cannot send the code.
 2. The server exports the refs under the prefix into a Git copy of its own, `git/<prefix>.git` in the folder of its audit log, and brings it up to date at each request as `apeiron git export` does (section 5). The copy can be deleted at any time; it is made again.
 3. It offers the branches and tags under the prefix that the user sees (USERS.md §1); `HEAD` names `main`, else `master`, else the first branch. Only these may be asked for, so nothing reaches the user that its backups do not.
-4. The answer is a pack of everything the asked refs reach, without deltas. The server does not use what the client already has, so a fetch downloads the whole history again: fine for small and middle-sized projects, slow for big ones.
-5. Each fetch is recorded as `git_fetch` with the prefix and the refs (AUDIT.md §1), and a wrong password as `sign_in` with `"via": "git"`.
+4. A client that already has commits names them (`have`). The first one the asked refs reach is common: the server says so (`ACK`), as Git does without `multi_ack`, and the pack leaves out everything the common commits reach, so a fetch downloads only what is new. Other names are passed over, so the answer tells nothing about refs the user was not offered.
+5. The answer is a pack of those objects, without deltas: each object compressed on its own, so a pack is larger than Git's own.
+6. Each fetch is recorded as `git_fetch` with the prefix and the refs (AUDIT.md §1), and a wrong password as `sign_in` with `"via": "git"`.
 
 The server speaks Git's smart HTTP protocol, version 0, without side-band; newer Git asks for version 2 and falls back to it.
 
@@ -109,7 +110,7 @@ The server speaks Git's smart HTTP protocol, version 0, without side-band; newer
 
 | Item | Where |
 | --- | --- |
-| Push over HTTP, Git over SSH, packs with deltas and a fetch that sends only what is new | Later; clone and fetch over HTTP (section 7) already take a project out of Apeiron |
+| Push over HTTP, Git over SSH, packs with deltas | Later; clone and fetch over HTTP (section 7) already take a project out of Apeiron |
 | Checking out into a Git working tree | `apeiron restore` writes a snapshot into a folder |
 | Branching and merging inside Apeiron | Stage 3 work item 2 |
 | Moving the code behind the plugin interface | With the plugin system, Stage 3 |
