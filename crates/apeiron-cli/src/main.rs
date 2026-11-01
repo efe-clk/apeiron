@@ -529,6 +529,9 @@ enum TenantCommand {
         /// The most long operations it may run at once
         #[arg(long, value_name = "N")]
         max_jobs: Option<u32>,
+        /// Its admins manage the tenants in the pages
+        #[arg(long)]
+        operator: bool,
     },
     /// Set or lift the limits of a tenant; 0 lifts one
     Limit {
@@ -619,6 +622,7 @@ fn web_tenant(command: TenantCommand, out: &Output) -> Result<(), Failure> {
             replicas,
             max_bytes,
             max_jobs,
+            operator,
         } => {
             let full = |p: PathBuf| std::path::absolute(&p).unwrap_or(p);
             let tenant = apeiron_server::Tenant {
@@ -630,6 +634,7 @@ fn web_tenant(command: TenantCommand, out: &Output) -> Result<(), Failure> {
                 replicas,
                 max_bytes: max_bytes.filter(|&n| n > 0),
                 max_jobs: max_jobs.filter(|&n| n > 0),
+                operator,
             };
             tenants.add(tenant.clone())?;
             tenants.save(&file)?;
@@ -2568,9 +2573,20 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                         replicas: t.replicas,
                         standby,
                         limits,
+                        operator: t.operator,
                     });
                 }
-                apeiron_server::Web::start_tenants(listen, tls, options)?
+                let manage = apeiron_server::Manage {
+                    file: tenants_file()?,
+                    config: config.clone(),
+                    state: dirs::state_dir()
+                        .or_else(dirs::data_local_dir)
+                        .map(|d| d.join("apeiron"))
+                        .ok_or_else(|| Failure::Usage("no state folder".to_owned()))?,
+                    standby,
+                    syslog: audit_syslog.clone(),
+                };
+                apeiron_server::Web::start_tenants(listen, tls, options, Some(manage))?
             } else {
                 let files = files()?;
                 apeiron_server::Users::load(&files.users)?.need_admin()?;

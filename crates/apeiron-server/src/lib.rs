@@ -11,6 +11,7 @@ mod accounts;
 mod audit;
 mod git;
 mod oidc;
+mod operator;
 mod replicate;
 mod shares;
 mod tenants;
@@ -30,6 +31,7 @@ use std::time::Duration;
 
 pub use audit::{Actor, Audit, Event, Syslog, Verified};
 pub use oidc::{OidcConfig, Provider, check_provider};
+pub use operator::Manage;
 pub use shares::{DEFAULT_DAYS, LinkOptions, MAX_DAYS, MAX_DOWNLOADS, Share, Shares};
 pub use tenants::{Tenant, Tenants};
 pub use totp::{code as totp_code, new_secret as new_totp_secret, uri as totp_uri};
@@ -517,7 +519,7 @@ async fn start(
     let request = body(&bytes)?;
     let who = who(&app, who_)?;
     if let (Mode::Web(web), Some(who)) = (&app.mode, &who)
-        && let Some(max) = web.limits.max_jobs
+        && let Some(max) = web.limits().max_jobs
     {
         let running = lock(&app.jobs)
             .values_mut()
@@ -741,10 +743,12 @@ async fn session(State(app): State<Arc<App>>, user: Option<Extension<Who>>) -> A
             "signed_in": false,
             "oidc": web.oidc_config().is_some(),
         }),
-        (Mode::Web(_), Some(Extension(who))) => json!({
+        (Mode::Web(web), Some(Extension(who))) => json!({
             "mode": "web",
             "signed_in": true,
             "user": {"name": who.user.name, "role": who.user.role},
+            "operator": who.user.role == users::Role::Admin
+                && web.registry().is_some_and(|r| r.manage.is_some()),
         }),
     }))
 }
@@ -1267,6 +1271,9 @@ fn router(app: Arc<App>) -> Router {
         .route("/api/users", get(accounts::list).post(accounts::add))
         .route("/api/users/{name}", post(accounts::change))
         .route("/api/users/{name}/remove", post(accounts::remove))
+        .route("/api/tenants", get(operator::list).post(operator::add))
+        .route("/api/tenants/{name}/limits", post(operator::limit))
+        .route("/api/tenants/{name}/remove", post(operator::remove))
         .route("/api/shares", get(share_list).post(share_add))
         .route("/api/shares/{id}/remove", post(share_remove))
         .route("/api/shared/{secret}", get(shared_list))
@@ -1293,18 +1300,17 @@ fn host_name(host: &str) -> String {
 
 /// Sends each request to the site of the host its `Host` header names; no
 /// site answers for other hosts (TENANTS.md §3).
-fn by_host(sites: HashMap<String, Router>) -> Router {
-    let sites = Arc::new(sites);
+fn by_host(registry: Arc<operator::Registry>) -> Router {
     Router::new().fallback(move |request: Request| {
-        let sites = sites.clone();
+        let registry = registry.clone();
         async move {
             let site = request
                 .headers()
                 .get(header::HOST)
                 .and_then(|v| v.to_str().ok())
-                .and_then(|h| sites.get(&host_name(h)));
+                .and_then(|h| registry.router(h));
             match site {
-                Some(site) => match site.clone().oneshot(request).await {
+                Some(site) => match site.oneshot(request).await {
                     Ok(response) => response,
                     Err(never) => match never {},
                 },

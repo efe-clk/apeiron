@@ -222,6 +222,8 @@ pub struct TenantOptions {
     pub replicas: Vec<String>,
     pub standby: bool,
     pub limits: Limits,
+    /// Its admins manage the tenants in the pages (TENANTS.md §4.1).
+    pub operator: bool,
 }
 
 /// What a tenant may use at most (TENANTS.md §2); `None` is no limit.
@@ -331,7 +333,9 @@ pub(crate) struct WebState {
     /// Pushes to the replicas, if there are any.
     replicator: Option<Replicator>,
     standby: bool,
-    pub(crate) limits: Limits,
+    limits: Mutex<Limits>,
+    /// The tenants being served, for an operator tenant (TENANTS.md §4.1).
+    registry: std::sync::OnceLock<std::sync::Weak<crate::operator::Registry>>,
 }
 
 /// The cookie a link's password gave, if any.
@@ -1265,10 +1269,29 @@ impl WebState {
 }
 
 impl WebState {
+    pub(crate) fn limits(&self) -> Limits {
+        *self
+            .limits
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    pub(crate) fn set_limits(&self, limits: Limits) {
+        *self
+            .limits
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = limits;
+    }
+
+    /// The tenants being served, when this is an operator tenant.
+    pub(crate) fn registry(&self) -> Option<Arc<crate::operator::Registry>> {
+        self.registry.get().and_then(std::sync::Weak::upgrade)
+    }
+
     /// Fails when the repository holds `max_bytes` or more (TENANTS.md
     /// §2.1): nothing new is stored until space is freed.
     pub(crate) fn room(&self, repo: &Repository) -> Result<(), Error> {
-        let Some(max) = self.limits.max_bytes else {
+        let Some(max) = self.limits().max_bytes else {
             return Ok(());
         };
         let path = repo.info().path;
@@ -1333,19 +1356,19 @@ pub(crate) fn inside(folders: &[PathBuf], path: &Path) -> Result<PathBuf, Error>
 
 /// What one site of a web server is made of: a single server's options, or
 /// a tenant's.
-struct Site {
-    repo: Repository,
-    users: PathBuf,
-    folders: Vec<PathBuf>,
-    audit: Audit,
-    shares: Shares,
-    replicas: Vec<String>,
-    standby: bool,
-    limits: Limits,
+pub(crate) struct Site {
+    pub(crate) repo: Repository,
+    pub(crate) users: PathBuf,
+    pub(crate) folders: Vec<PathBuf>,
+    pub(crate) audit: Audit,
+    pub(crate) shares: Shares,
+    pub(crate) replicas: Vec<String>,
+    pub(crate) standby: bool,
+    pub(crate) limits: Limits,
 }
 
 /// The server of one repository and its users, files and folders.
-fn site(site: Site) -> Result<Arc<App>, Error> {
+pub(crate) fn site(site: Site) -> Result<Arc<App>, Error> {
     let mut roots = Vec::new();
     for folder in &site.folders {
         roots.push(
@@ -1387,7 +1410,8 @@ fn site(site: Site) -> Result<Arc<App>, Error> {
             oidc,
             replicator: Replicator::start(site.replicas, app.clone()),
             standby: site.standby,
-            limits: site.limits,
+            limits: Mutex::new(site.limits),
+            registry: std::sync::OnceLock::new(),
         })),
         repo: Mutex::new(Some(site.repo)),
         jobs: Mutex::new(HashMap::new()),
@@ -1425,16 +1449,23 @@ impl Web {
 
     /// Starts a web server for several tenants, each answering at its own
     /// host (TENANTS.md §3).
+    /// Serves every tenant at its host; with `manage`, the admins of an
+    /// operator tenant add, limit and remove tenants while it runs.
     pub fn start_tenants(
         listen: SocketAddr,
         tls: Option<Tls>,
         tenants: Vec<TenantOptions>,
+        manage: Option<crate::Manage>,
     ) -> Result<Self, Error> {
         if tenants.is_empty() {
             return Err(invalid(
                 "there are no tenants; add one with `apeiron web tenant add`",
             ));
         }
+        let registry = Arc::new(crate::operator::Registry {
+            manage,
+            sites: std::sync::RwLock::new(HashMap::new()),
+        });
         let mut sites = HashMap::new();
         for t in tenants {
             let app = site(Site {
@@ -1448,14 +1479,25 @@ impl Web {
                 limits: t.limits,
             })
             .map_err(|e| Error::new(e.kind, format!("tenant {}: {}", t.name, e.message)))?;
-            if sites
-                .insert(crate::host_name(&t.host), crate::router(app))
-                .is_some()
+            if t.operator
+                && let Mode::Web(web) = &app.mode
             {
+                let _ = web.registry.set(Arc::downgrade(&registry));
+            }
+            let hosted = crate::operator::Hosted {
+                name: t.name,
+                router: crate::router(app.clone()),
+                app,
+            };
+            if sites.insert(crate::host_name(&t.host), hosted).is_some() {
                 return Err(invalid(format!("two tenants have the host {}", t.host)));
             }
         }
-        Web::serve(listen, tls, crate::by_host(sites))
+        *registry
+            .sites
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = sites;
+        Web::serve(listen, tls, crate::by_host(registry))
     }
 
     fn serve(listen: SocketAddr, tls: Option<Tls>, router: axum::Router) -> Result<Self, Error> {

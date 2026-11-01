@@ -33,7 +33,7 @@ flowchart LR
     S -- "Host: globex…" --> G
 ```
 
-Bir kiracının `admin`'i yalnızca o kiracının admin'idir. Sunucuyu çalıştıran kişi kiracıları §4'teki komutlarla yönetir; hiçbir sayfa ya da JSON isteği birden fazla kiracıya ulaşmaz.
+Bir kiracının `admin`'i yalnızca o kiracının admin'idir. Sunucuyu çalıştıran kişi kiracıları §4'teki komutlarla ya da bir yönetici kiracının sayfalarıyla (§4.1) yönetir; başka hiçbir sayfa ya da JSON isteği birden fazla kiracıya ulaşmaz.
 
 ## 2. Ayarlar
 
@@ -60,6 +60,7 @@ Kiracılar, yapılandırma klasöründeki (Linux'ta `~/.config/apeiron`) `tenant
 | `replicas` | Her yedekten sonra her ref'in push edildiği, deposunun uzak depoları ([REPLICATION.tr.md](REPLICATION.tr.md) §4); boş bırakılırsa hiçbiri |
 | `max_bytes` | Deposunun en fazla tutabileceği bayt (§2.1); boş bırakılırsa sınır yok |
 | `max_jobs` | Aynı anda en fazla kaç uzun işlem çalıştırabileceği (§2.1); boş bırakılırsa sınır yok |
+| `operator` | Admin'leri kiracıları sayfalarda yöneten bir kiracı için `true` (§4.1) |
 
 Bir kiracının diğer dosyaları adıyla tutulur:
 
@@ -73,7 +74,7 @@ Bir kiracıyı kaldırmak onu yalnızca listeden çıkarır; deposu ve dosyalar�
 
 ### 2.1 Sınırlar
 
-Bir kiracının sınırları, onun diğerlerinin diskini ya da işlemcilerini almasını önler. Sunucu onları başlarken okur; bir değişiklik sunucu yeniden başlayınca geçerli olur.
+Bir kiracının sınırları, onun diğerlerinin diskini ya da işlemcilerini almasını önler. Sunucu onları başlarken okur; `apeiron web tenant limit` ile yapılan bir değişiklik sunucu yeniden başlayınca, sayfalarda (§4.1) yapılan ise hemen geçerli olur.
 
 | Sınır | Neye bakılır | Ulaşılınca |
 | --- | --- | --- |
@@ -102,7 +103,7 @@ Ana makine adları, DNS kayıtları ya da vekil sunucu üzerinden sunucuya ulaş
 
 | Komut | Ne yapar |
 | --- | --- |
-| `apeiron web tenant add <ad> --host <ana makine> --repo <yol> [--folder <yol>]... [--password-file <yol>] [--replicate <uzak>]... [--max-bytes <boyut>] [--max-jobs <n>]` | Bir kiracı ekler ve ilk admin'i için komutu yazar |
+| `apeiron web tenant add <ad> --host <ana makine> --repo <yol> [--folder <yol>]... [--password-file <yol>] [--replicate <uzak>]... [--max-bytes <boyut>] [--max-jobs <n>] [--operator]` | Bir kiracı ekler ve ilk admin'i için komutu yazar; `--operator` onun admin'lerinin kiracıları sayfalarda yönetmesini sağlar (§4.1) |
 | `apeiron web tenant limit <ad> [--max-bytes <boyut>] [--max-jobs <n>]` | §2.1'deki sınırları koyar, örneğin `--max-bytes 500G`; 0 birini kaldırır |
 | `apeiron web tenant list` | Kiracıları ana makineleri ve depolarıyla listeler |
 | `apeiron web tenant remove <ad>` | Bir kiracıyı sunmayı bırakır; dosyaları kalır |
@@ -110,6 +111,18 @@ Ana makine adları, DNS kayıtları ya da vekil sunucu üzerinden sunucuya ulaş
 | `--tenant <ad>` ile `apeiron web user …`, `audit …`, `share …`, `oidc …` | O kiracının kullanıcılarını, denetim kaydını, bağlantılarını ya da kimlik sağlayıcısını yönetir, örneğin `apeiron web user add efe --role admin --tenant acme` |
 
 `--tenants` ve `--tenant` olmadan `apeiron web` ve komutları eskisi gibi, `--repo` deposu ve WEB.tr.md'deki dosyalarla çalışır.
+
+### 4.1 Sayfalarda
+
+Bir yönetici kiracının `admin`'i bir Kiracılar sayfası görür; bu sayfa, sunucu çalışırken komutların yaptığını yapar: `tenants.json` içindeki kiracıları listeler, kiracı ekler, sınırlarını değiştirir ve kiracı kaldırır. JSON istekleri `GET /api/tenants`, `POST /api/tenants`, `POST /api/tenants/<name>/limits` ve `POST /api/tenants/<name>/remove`'dur; diğer herkes ve yönetici olmayan her kiracı `unsupported` alır.
+
+| Değişiklik | Ne olur |
+| --- | --- |
+| Ekleme | Kiracı `tenants.json`'a yazılır ve hemen sunulur. Var olmayan bir depo klasörü şifresiz olarak oluşturulur; şifreli bir depo `password_file` ister. `admin`'i olmayan bir kiracı, formda adı verilen ilk admin'i parolasıyla alır |
+| Sınırlar | `tenants.json`'a yazılır ve hemen uygulanır (§2.1); 0 birini kaldırır |
+| Kaldırma | `tenants.json`'dan çıkarılır ve artık sunulmaz; oturumları biter, dosyaları kalır. Yönetici kiracı kendini kaldıramaz |
+
+Her değişiklik yönetici kiracının denetim kaydına ve §5'teki gibi değişen kiracının kendi kaydına yazılır. Sunucu çalışırken komutlarla eklenen bir kiracı yeniden başlatınca sunulur; sayfa onu henüz sunulmuyor olarak gösterir. Kendinden imzalı bir sertifikayla (§3) tarayıcılar yeni bir kiracının ana makinesine ancak sertifikayı yeniden oluşturan bir yeniden başlatmadan sonra ulaşır; `*.backup.example.com` gibi her ana makine için geçerli bir sertifika hemen çalışır.
 
 ## 5. Denetim kaydında
 
@@ -125,12 +138,11 @@ Ana makine adları, DNS kayıtları ya da vekil sunucu üzerinden sunucuya ulaş
 | --- | --- |
 | Kiracıları ana makine yerine `/t/acme/` gibi bir yolla ayırmak | Planlanmadı: çerezlerini ayrı tutan, kiracı başına bir ana makinedir |
 | Birkaç kiracının bir depoyu ve onun tekilleştirmesini paylaşması | Planlanmadı: verilerini ayrı tutan, ayrı bir depo ve anahtardır |
-| Kiracıları sayfalarda yönetmek | Sonra; o zamana kadar §4'teki komutlar |
 | Kiracı başına arka plan hizmeti ve senkron | Sonra; işler (DAEMON.tr.md) onları çalıştıran kullanıcı için çalışır |
 
 ## 7. Crate'ler
 
 | Crate | Görevi | Durum |
 | --- | --- | --- |
-| `apeiron-server` | `tenants.json`, kiracı başına bir site, her isteği kiracısının sitesine göndermek | Tamamlandı |
+| `apeiron-server` | `tenants.json`, kiracı başına bir site, her isteği kiracısının sitesine göndermek, Kiracılar sayfası | Tamamlandı |
 | `apeiron-cli` | `apeiron web tenant`, `--tenants`, `--tenant` | Tamamlandı |

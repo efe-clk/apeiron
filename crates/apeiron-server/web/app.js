@@ -22,6 +22,8 @@ let oidc = false;
 let mode = "local";
 // The signed-in user in web mode: {name, role} (USERS.md §4).
 let user = null;
+// Whether the user manages the tenants of the server (TENANTS.md §4.1).
+let operator = false;
 const may = {
   backUp: () => user?.role !== "reader",
   restore: () => user?.role !== "reader",
@@ -29,6 +31,7 @@ const may = {
   readLog: () => user?.role === "admin",
   share: () => user !== null && user.role !== "reader",
   manageUsers: () => user?.role === "admin",
+  manageTenants: () => operator,
   // Remotes, sync, keys and plugins reach the whole repository and the
   // server's disk: on the web only for an admin (WEB.md §4).
   manage: () => mode === "local" || user?.role === "admin",
@@ -302,6 +305,7 @@ function showNav(current) {
     may.share() ? item("shares", shares) : null,
     may.readLog() ? item("activity", activity) : null,
     may.manageUsers() ? item("users", users) : null,
+    may.manageTenants() ? item("tenants", tenants) : null,
     mode === "web" ? item("sign_out", signOut) : item("close", () => start()),
     h("span", { class: "path" }, user ? `${user.name} · ${repoPath}` : repoPath),
   ].filter(Boolean));
@@ -1499,6 +1503,128 @@ function userForm(existing, folders, provider) {
   (existing ? role : name).focus();
 }
 
+// ---- Tenants (TENANTS.md §4.1) ----
+
+const gib = (bytes) => (bytes ? `${Math.round((bytes / 2 ** 30) * 10) / 10} GiB` : t("tenants_no_limit"));
+
+async function tenants() {
+  showNav("tenants");
+  show(h("p", {}, t("loading")));
+  try {
+    const { tenants: list } = await api("GET", "/api/tenants");
+    const rows = list.map((x) => h("tr", {},
+      h("td", { class: "nowrap" }, x.name, x.operator ? h("div", { class: "muted" }, t("tenants_operator")) : null),
+      h("td", {}, x.host),
+      h("td", {}, x.repo),
+      h("td", { class: "nowrap" }, gib(x.max_bytes)),
+      h("td", { class: "nowrap" }, x.max_jobs || t("tenants_no_limit")),
+      h("td", {}, x.serving ? t("yes") : t("tenants_after_restart")),
+      h("td", {},
+        h("button", { type: "button", onclick: () => tenantLimits(x) }, t("tenants_limits")),
+        x.operator ? null : h("button", { type: "button", onclick: async (e) => {
+          if (!confirm(t("tenants_remove_ask", { name: x.name }))) return;
+          e.target.disabled = true;
+          try {
+            await api("POST", `/api/tenants/${encodeURIComponent(x.name)}/remove`);
+            tenants();
+          } catch (err) {
+            main.append(errorMessage(err));
+          }
+        } }, t("remove"))),
+    ));
+    show(
+      h("h1", {}, t("tenants_heading")),
+      h("p", { class: "muted" }, t("tenants_intro")),
+      h("div", { class: "card scroll" }, h("table", {},
+        h("thead", {}, h("tr", {}, ...["tenants_name", "tenants_host", "tenants_repo", "tenants_max_bytes", "tenants_max_jobs", "tenants_serving", ""].map((k) => h("th", {}, k ? t(k) : "")))),
+        h("tbody", {}, ...rows))),
+      h("div", { class: "actions" }, h("button", { type: "button", class: "primary", onclick: tenantForm }, t("tenants_add"))),
+    );
+  } catch (err) {
+    show(h("h1", {}, t("tenants_heading")), errorMessage(err));
+  }
+}
+
+// GiB typed in a form, as bytes; empty is no limit.
+const bytesOf = (text) => Math.round(Number(text || 0) * 2 ** 30);
+
+function tenantForm() {
+  const name = h("input", { type: "text", autocomplete: "off", autocapitalize: "none", spellcheck: "false", required: true });
+  const host = h("input", { type: "text", autocomplete: "off", autocapitalize: "none", spellcheck: "false", required: true });
+  const repo = h("input", { type: "text", spellcheck: "false", autocomplete: "off", required: true });
+  const folders = h("textarea", { rows: 3, spellcheck: "false" });
+  const passwordFile = h("input", { type: "text", spellcheck: "false", autocomplete: "off" });
+  const maxBytes = h("input", { type: "number", min: 0, step: "any" });
+  const maxJobs = h("input", { type: "number", min: 0, step: 1 });
+  const admin = h("input", { type: "text", autocomplete: "off", autocapitalize: "none", spellcheck: "false" });
+  const password = h("input", { type: "password", autocomplete: "new-password", minlength: 8 });
+  const status = h("div");
+  const form = h("form", { onsubmit: async (e) => {
+    e.preventDefault();
+    status.replaceChildren();
+    try {
+      await api("POST", "/api/tenants", {
+        name: name.value.trim(),
+        host: host.value.trim(),
+        repo: repo.value.trim(),
+        folders: lines(folders.value),
+        password_file: passwordFile.value.trim() || null,
+        max_bytes: bytesOf(maxBytes.value),
+        max_jobs: Number(maxJobs.value || 0),
+        admin: admin.value.trim(),
+        password: password.value,
+      });
+      tenants();
+    } catch (err) {
+      status.replaceChildren(errorMessage(err));
+    }
+  } },
+    ...field(t("tenants_name"), name, t("users_name_hint")),
+    ...field(t("tenants_host"), host, t("tenants_host_hint")),
+    ...field(t("tenants_repo"), repo, t("tenants_repo_hint")),
+    ...field(t("tenants_folders"), folders, t("tenants_folders_hint")),
+    ...field(t("tenants_password_file"), passwordFile, t("tenants_password_file_hint")),
+    ...field(t("tenants_max_bytes"), maxBytes, t("tenants_max_bytes_hint")),
+    ...field(t("tenants_max_jobs"), maxJobs, t("tenants_max_jobs_hint")),
+    ...field(t("tenants_admin"), admin, t("tenants_admin_hint")),
+    ...field(t("password"), password, t("users_password_hint")),
+    h("div", { class: "actions" },
+      h("button", { type: "submit", class: "primary" }, t("tenants_add")),
+      h("button", { type: "button", onclick: tenants }, t("cancel"))),
+  );
+  showNav("tenants");
+  show(h("h1", {}, t("tenants_add")), h("p", { class: "muted" }, t("tenants_add_intro")), h("div", { class: "card" }, form), status);
+  name.focus();
+}
+
+function tenantLimits(x) {
+  const maxBytes = h("input", { type: "number", min: 0, step: "any", value: x.max_bytes ? x.max_bytes / 2 ** 30 : "" });
+  const maxJobs = h("input", { type: "number", min: 0, step: 1, value: x.max_jobs || "" });
+  const status = h("div");
+  const form = h("form", { onsubmit: async (e) => {
+    e.preventDefault();
+    status.replaceChildren();
+    try {
+      await api("POST", `/api/tenants/${encodeURIComponent(x.name)}/limits`, {
+        max_bytes: bytesOf(maxBytes.value),
+        max_jobs: Number(maxJobs.value || 0),
+      });
+      tenants();
+    } catch (err) {
+      status.replaceChildren(errorMessage(err));
+    }
+  } },
+    ...field(t("tenants_max_bytes"), maxBytes, t("tenants_max_bytes_hint")),
+    ...field(t("tenants_max_jobs"), maxJobs, t("tenants_max_jobs_hint")),
+    h("div", { class: "actions" },
+      h("button", { type: "submit", class: "primary" }, t("users_save")),
+      h("button", { type: "button", onclick: tenants }, t("cancel"))),
+  );
+  showNav("tenants");
+  show(h("h1", {}, t("tenants_limits_heading", { name: x.name })), h("div", { class: "card" }, form), status);
+  maxBytes.focus();
+}
+
 // ---- Signing in (WEB.md §4) ----
 
 function signIn(error = null) {
@@ -1565,6 +1691,7 @@ async function begin() {
   const session = await api("GET", "/api/session").catch(() => null);
   mode = session?.mode || "local";
   user = session?.user || null;
+  operator = session?.operator === true;
   oidc = session?.oidc === true;
   if (!session?.signed_in) return signIn(oidcError);
   const state = await api("GET", "/api/state").catch(() => null);

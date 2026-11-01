@@ -33,7 +33,7 @@ flowchart LR
     S -- "Host: globex…" --> G
 ```
 
-An `admin` of a tenant is an admin of that tenant only. Whoever runs the server manages the tenants with the commands of §4; no page or JSON request reaches more than one tenant.
+An `admin` of a tenant is an admin of that tenant only. Whoever runs the server manages the tenants with the commands of §4, or through the pages of an operator tenant (§4.1); no other page or JSON request reaches more than one tenant.
 
 ## 2. Settings
 
@@ -60,6 +60,7 @@ The tenants are listed in `tenants.json` in the configuration folder (`~/.config
 | `replicas` | Remotes of its repository every ref is pushed to after each backup ([REPLICATION.md](REPLICATION.md) §4); none if left out |
 | `max_bytes` | The most its repository may hold, in bytes (§2.1); no limit if left out |
 | `max_jobs` | The most long operations it may run at once (§2.1); no limit if left out |
+| `operator` | `true` for a tenant whose admins manage the tenants in the pages (§4.1) |
 
 The other files of a tenant are kept by its name:
 
@@ -73,7 +74,7 @@ Removing a tenant takes it off the list only; its repository and files stay, and
 
 ### 2.1 Limits
 
-A tenant's limits keep it from taking the disk or the processors of the others. The server reads them at start, so a change takes effect when it starts again.
+A tenant's limits keep it from taking the disk or the processors of the others. The server reads them at start; a change made with `apeiron web tenant limit` takes effect when it starts again, one made in the pages (§4.1) at once.
 
 | Limit | What is checked | When it is reached |
 | --- | --- | --- |
@@ -102,7 +103,7 @@ The host names must lead to the server, through DNS records or the proxy.
 
 | Command | What it does |
 | --- | --- |
-| `apeiron web tenant add <name> --host <host> --repo <path> [--folder <path>]... [--password-file <path>] [--replicate <remote>]... [--max-bytes <size>] [--max-jobs <n>]` | Adds a tenant and prints the command for its first admin |
+| `apeiron web tenant add <name> --host <host> --repo <path> [--folder <path>]... [--password-file <path>] [--replicate <remote>]... [--max-bytes <size>] [--max-jobs <n>] [--operator]` | Adds a tenant and prints the command for its first admin; `--operator` makes its admins manage the tenants in the pages (§4.1) |
 | `apeiron web tenant limit <name> [--max-bytes <size>] [--max-jobs <n>]` | Sets the limits of §2.1, such as `--max-bytes 500G`; 0 lifts one |
 | `apeiron web tenant list` | Lists the tenants with their hosts and repositories |
 | `apeiron web tenant remove <name>` | Stops serving a tenant; its files stay |
@@ -110,6 +111,18 @@ The host names must lead to the server, through DNS records or the proxy.
 | `apeiron web user …`, `audit …`, `share …`, `oidc …` with `--tenant <name>` | Manages that tenant's users, audit log, links or identity provider, for example `apeiron web user add efe --role admin --tenant acme` |
 
 Without `--tenants` and `--tenant`, `apeiron web` and its commands work as before, on the one repository of `--repo` and the files of WEB.md.
+
+### 4.1 In the pages
+
+An `admin` of an operator tenant gets a Tenants page, which does what the commands do while the server runs: it lists the tenants of `tenants.json`, adds one, changes its limits and removes one. The JSON requests are `GET /api/tenants`, `POST /api/tenants`, `POST /api/tenants/<name>/limits` and `POST /api/tenants/<name>/remove`; everyone else, and every tenant that is not an operator, gets `unsupported`.
+
+| Change | What happens |
+| --- | --- |
+| Add | The tenant is written to `tenants.json` and served at once. A repository folder that does not exist is made, unencrypted; an encrypted one needs its `password_file`. A tenant without an `admin` gets the first admin named in the form, with its password |
+| Limits | Written to `tenants.json` and applied at once (§2.1); 0 lifts one |
+| Remove | Taken off `tenants.json` and no longer served; its sessions end and its files stay. The operator tenant cannot remove itself |
+
+Each change is recorded in the operator tenant's audit log and, as in §5, in the changed tenant's own. A tenant added by the commands while the server runs is served after a restart; the page shows it as not served yet. With a self-signed certificate (§3), browsers reach a new tenant's host only after a restart, which makes the certificate again; a certificate for every host, such as `*.backup.example.com`, works at once.
 
 ## 5. In the audit log
 
@@ -125,12 +138,11 @@ Without `--tenants` and `--tenant`, `apeiron web` and its commands work as befor
 | --- | --- |
 | Tenants told apart by a path, such as `/t/acme/`, instead of a host | Not planned: one host per tenant is what keeps their cookies apart |
 | Several tenants sharing one repository and its deduplication | Not planned: a separate repository and key are what keep their data apart |
-| Managing tenants in the pages | Later; the commands of §4 until then |
 | The background service and sync per tenant | Later; jobs (DAEMON.md) run for the user who runs them |
 
 ## 7. Crates
 
 | Crate | Role | Status |
 | --- | --- | --- |
-| `apeiron-server` | `tenants.json`, a site per tenant, sending each request to its tenant's site | Done |
+| `apeiron-server` | `tenants.json`, a site per tenant, sending each request to its tenant's site, the Tenants page | Done |
 | `apeiron-cli` | `apeiron web tenant`, `--tenants`, `--tenant` | Done |

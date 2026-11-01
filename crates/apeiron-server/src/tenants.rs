@@ -36,6 +36,9 @@ pub struct Tenant {
     /// The most long operations it may run at once.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_jobs: Option<u32>,
+    /// Its admins manage the tenants in the pages (TENANTS.md §4.1).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub operator: bool,
 }
 
 impl Tenant {
@@ -198,6 +201,7 @@ mod tests {
             replicas: Vec::new(),
             max_bytes: None,
             max_jobs: None,
+            operator: false,
         }
     }
 
