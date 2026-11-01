@@ -194,13 +194,45 @@ fn git_clones_the_branches_a_user_sees() {
     };
     assert_eq!(same("again"), same("okan"));
 
-    // Refused: a reader, a ref the member does not own, and going back.
+    // Refused: a reader, and a ref the member does not own.
     let out = git(&root.join("ayse"), &["push", "-q", "origin", "main:other"]);
     assert!(!out.status.success());
     let out = git(&okan, &["push", "-q", "origin", "main:refs/heads/secret"]);
     assert!(!out.status.success());
+    // Going back is taken; the snapshot left stays in the reflog.
+    let before = repo.resolve("git/heads/main").unwrap();
     let out = git(&okan, &["push", "-q", "--force", "origin", "main~1:main"]);
-    assert!(!out.status.success());
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert_ne!(repo.resolve("git/heads/main").unwrap(), before);
+
+    // An admin deletes a branch, then pushes it again.
+    let all = root.join("all");
+    for args in [
+        &["push", "-q", "origin", "origin/secret:refs/heads/extra"][..],
+        &["push", "-q", "origin", ":extra"],
+    ] {
+        let out = git(&all, args);
+        assert!(
+            out.status.success(),
+            "{args:?} {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+    assert!(repo.resolve("git/heads/extra").is_err());
+    let out = git(
+        &all,
+        &["push", "-q", "origin", "origin/secret:refs/heads/extra"],
+    );
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(repo.resolve("git/heads/extra").is_ok());
 
     let log = fs::read_to_string(root.join("state/audit.log")).unwrap();
     assert!(log.contains("\"git_fetch\""), "{log}");

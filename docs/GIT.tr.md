@@ -110,9 +110,9 @@ Sunucu Git'in akıllı HTTP protokolünün 0. sürümünü side-band olmadan kon
 
 `git push`, yeni commit'leri `apeiron git import`'un yapacağı gibi snapshot olarak saklar ve ref'leri taşır. Yalnızca yedek alabilen bir kullanıcı (USERS.tr.md §1: `admin` ya da kendi yedekleri için bir `member`) push edebilir; bir yedek sunucuya (REPLICATION.tr.md §5) edemez.
 
-1. Sunucu kullanıcının gördüğü ref'leri sunar; dışarıdaki nesnelere dayanmayan bir paket (`no-thin`) ve ref başına bir rapor (`report-status`) ister.
+1. Sunucu kullanıcının gördüğü ref'leri sunar; dışarıdaki nesnelere dayanmayan bir paket (`no-thin`) ve ref başına bir rapor (`report-status`) ister; silmeleri (`delete-refs`) de kabul eder.
 2. Git kopyasını günceller, sonra paketin her nesnesini deltaları tabanlarına göre bütünleyerek ona yazar. Bir push en çok 256 MiB olabilir; daha büyük bir geçmiş parça parça push edilir.
-3. Her ref denetlenir: önekin altında, kullanıcının sahip olduğu bir dal ya da etiket olmalı; eski kimliği kopyadakiyle aynı olmalı (yoksa "önce fetch et") ve yeni commit'inin geçmişinde eskisi bulunmalıdır. Bir ref'i silmek ve `git push --force`'un yaptığı gibi geri almak reddedilir: sunucudaki geçmiş korunur. Bir saklama kuralının tuttuğu ref zaten yalnızca ileri gider (ARCHIVE.tr.md).
+3. Her ref denetlenir: önekin altında, kullanıcının sahip olduğu bir dal ya da etiket olmalı ve eski kimliği kopyadakiyle aynı olmalıdır (yoksa "önce fetch et"). Bir ref silinebilir (`git push origin :<branch>`) ya da geçmişinde eskisi bulunmayan bir commit'e taşınabilir (`git push --force`); gösterdiği sürümler reflog'da kalır ve `apeiron gc` onları `--keep-days` süresince tutar. Bir saklama kuralının tuttuğu ref ne silinir ne geri alınır (ARCHIVE.tr.md).
 4. Kabul edilen ref'lerin ulaştığı ve henüz saklanmamış commit'ler bölüm 2.2'deki Git alanlarıyla snapshot olur; böylece dışa aktarıldıklarında aynı kimlikleri alırlar. Sonra her ref karşılaştır-ve-değiştir ile taşınır; bu arada başka bir programın taşıdığı ref reddedilir.
 5. Git her ref için `ok` ya da nedenini gösterir. Push, her ref, yeni kimliği ve hatasıyla `git_push` olarak kaydedilir (AUDIT.tr.md §1) ve bir ref'i taşıyan push, bir yedek gibi yedek sunuculara kopyalanır (REPLICATION.tr.md §4).
 
@@ -120,7 +120,7 @@ Sunucu Git'in akıllı HTTP protokolünün 0. sürümünü side-band olmadan kon
 
 | Konu | Nerede |
 | --- | --- |
-| SSH üzerinden Git; HTTP üzerinden ref silme ve zorla push | Daha sonra; HTTP (bölüm 7) bir projeyi Apeiron'a alır ve oradan çıkarır, `apeiron ref delete` bir ref'i siler |
+| SSH üzerinden Git | Daha sonra; HTTP (bölüm 7) bir projeyi Apeiron'a alır ve oradan çıkarır |
 | Bir Git çalışma ağacına checkout | `apeiron restore` bir snapshot'ı bir klasöre yazar |
 | Apeiron içinde dallanma ve birleştirme | Aşama 3'ün 2. işi |
 | Kodu eklenti arayüzünün arkasına taşımak | Eklenti sistemiyle, Aşama 3 |

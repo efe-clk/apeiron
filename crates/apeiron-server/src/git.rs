@@ -70,7 +70,7 @@ pub(crate) async fn info_refs(
     // A push gets a report per ref, and no packs that lean on objects
     // outside them.
     let mut caps = if push {
-        format!("report-status no-thin {agent}")
+        format!("report-status delete-refs no-thin {agent}")
     } else {
         agent
     };

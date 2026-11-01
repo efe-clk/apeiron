@@ -511,14 +511,12 @@ fn pushed_commits_become_snapshots_and_refs_move_forward() {
     );
     assert!(repo.read_ref("git/heads/topic").unwrap().is_some());
 
-    // Refused: going back, a stale old id, a ref it may not write, a
-    // delete, and a remote-tracking branch.
-    let back = env.git(&src, &["rev-parse", "main~1"]);
+    // Refused: a stale old id, a ref it may not write, deleting a ref that
+    // is not there, and a remote-tracking branch.
     let refused = [
-        ("refs/heads/main", new.as_str(), back.as_str()),
         ("refs/heads/main", old.as_str(), topic.as_str()),
         ("refs/heads/locked", zero.as_str(), topic.as_str()),
-        ("refs/heads/topic", topic.as_str(), zero.as_str()),
+        ("refs/heads/gone", zero.as_str(), zero.as_str()),
         ("refs/remotes/origin/x", zero.as_str(), topic.as_str()),
     ];
     for (git, from, to) in refused {
@@ -534,4 +532,18 @@ fn pushed_commits_become_snapshots_and_refs_move_forward() {
     let main = served.iter().find(|r| r.git == "refs/heads/main").unwrap();
     assert_eq!(main.id, new);
     env.git(&cache, &["fsck", "--no-progress"]);
+
+    // Deleting a branch and moving one back are taken (GIT.md §7.1), but
+    // not past a retention rule.
+    assert_eq!(
+        push(&mut repo, "refs/heads/topic", &topic, &zero, &[]),
+        None
+    );
+    assert_eq!(repo.read_ref("git/heads/topic").unwrap(), None);
+    let served = apeiron_git::serve_refs(&repo, &cache, "git").unwrap();
+    assert!(served.iter().all(|r| r.git != "refs/heads/topic"));
+    let back = env.git(&src, &["rev-parse", "main~1"]);
+    assert_eq!(push(&mut repo, "refs/heads/main", &new, &back, &[]), None);
+    repo.add_retention_rule("git/heads/main", 1).unwrap();
+    assert!(push(&mut repo, "refs/heads/main", &back, &zero, &[]).is_some());
 }

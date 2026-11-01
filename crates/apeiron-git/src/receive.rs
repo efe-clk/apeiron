@@ -1,7 +1,7 @@
 //! Taking `git push` (GIT.md §7): the objects of a pack go into the Git
 //! copy, its commits become snapshots, and refs move forward.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::Path;
 
 use apeiron_core::Repository;
@@ -35,9 +35,10 @@ pub struct PushResult {
 }
 
 /// Stores the objects of `pack` in the Git copy at `path`, the commits the
-/// pushed refs reach as snapshots, and moves each ref under `prefix` that
-/// `may` allows, that moves forward and that still is where the client saw
-/// it. The caller holds the repository lock shared.
+/// pushed refs reach as snapshots, and moves or deletes each ref under
+/// `prefix` that `may` allows and that still is where the client saw it;
+/// retention rules are kept (ARCHIVE.md). The caller holds the repository
+/// lock shared.
 pub fn receive(
     repo: &mut Repository,
     path: &Path,
@@ -62,17 +63,19 @@ pub fn receive(
 
     let mut results = Vec::new();
     let mut wanted = Vec::new();
+    let mut deleted = Vec::new();
     for (update, before) in updates.iter().zip(before) {
         let name = match apeiron_name(prefix, update.git.as_bytes()) {
             Some(Ok(name)) if !update.git.starts_with("refs/remotes/") => Some(name),
             _ => None,
         };
         let checked = match &name {
-            Some(name) => check(repo, &git, path, before, update, name, may),
+            Some(name) => check(repo, &git, before, update, name, may),
             None => Err("only branches and tags are taken".to_owned()),
         };
         match (checked, name) {
-            (Ok(id), Some(name)) => wanted.push((
+            (Ok(None), Some(name)) => deleted.push((update, name, before)),
+            (Ok(Some(id)), Some(name)) => wanted.push((
                 Wanted {
                     git: update.git.clone(),
                     name,
@@ -110,87 +113,94 @@ pub fn receive(
             error,
         });
     }
+    for (update, name, before) in deleted {
+        let error = match repo.update_ref(&name, before, None) {
+            Ok(()) => {
+                forget(&git, path, &update.git)?;
+                None
+            }
+            Err(apeiron_core::Error::RefConflict { .. }) => {
+                Some("the ref moved meanwhile; fetch first".to_owned())
+            }
+            Err(e) => Some(e.to_string()),
+        };
+        results.push(PushResult {
+            git: update.git.clone(),
+            ref_name: Some(name),
+            error,
+        });
+    }
     // In the order the client sent them.
     results.sort_by_key(|r| updates.iter().position(|u| u.git == r.git));
     Ok(results)
 }
 
-/// The commit or tag a ref may move to, or why it may not.
+/// Removes `name` from the Git copy, so the ref can be pushed anew.
+fn forget(git: &gix::Repository, path: &Path, name: &str) -> Result<()> {
+    use gix::refs::transaction::{Change, PreviousValue, RefEdit, RefLog};
+    let name = name
+        .try_into()
+        .map_err(|e: gix::validate::reference::name::Error| git_error(path, e))?;
+    git.edit_reference(RefEdit {
+        change: Change::Delete {
+            expected: PreviousValue::Any,
+            log: RefLog::AndReference,
+        },
+        name,
+        deref: false,
+    })
+    .map_err(|e| git_error(path, e))?;
+    Ok(())
+}
+
+/// The commit or tag a ref may move to, `None` to delete it, or why it may
+/// not change.
 fn check(
     repo: &Repository,
     git: &gix::Repository,
-    path: &Path,
     before: Option<apeiron_core::ObjectId>,
     update: &PushedRef,
     name: &str,
     may: &dyn Fn(&str) -> bool,
-) -> std::result::Result<GitId, String> {
+) -> std::result::Result<Option<GitId>, String> {
     if !may(name) {
         return Err(format!("you may not write {name}"));
     }
     let new = GitId::from_hex(update.new.as_bytes()).map_err(|_| "bad id".to_owned())?;
     let old = GitId::from_hex(update.old.as_bytes()).map_err(|_| "bad id".to_owned())?;
-    if new.is_null() {
-        return Err("deleting refs is not taken; use apeiron ref delete".to_owned());
-    }
     let current = repo.read_ref(name).map_err(|e| e.to_string())?;
-    let in_copy = git
-        .try_find_reference(update.git.as_str())
-        .ok()
-        .flatten()
-        .and_then(|r| r.target().try_id().map(|id| id.to_owned()));
+    // A ref deleted from Apeiron but left in the copy counts as gone.
+    let in_copy = current.and_then(|_| {
+        git.try_find_reference(update.git.as_str())
+            .ok()
+            .flatten()
+            .and_then(|r| r.target().try_id().map(|id| id.to_owned()))
+    });
     let seen = (!old.is_null()).then_some(old);
     if current != before || in_copy != seen {
         return Err("the ref is not where you saw it; fetch first".to_owned());
     }
+    if new.is_null() {
+        return match seen {
+            Some(_) => Ok(None),
+            None => Err("there is no such ref".to_owned()),
+        };
+    }
     let object = git
         .find_object(new)
         .map_err(|_| "its object was not sent".to_owned())?;
-    let commit = match object.kind {
-        gix::object::Kind::Commit => new,
+    match object.kind {
+        gix::object::Kind::Commit => {}
         gix::object::Kind::Tag => {
             let tag = raw::parse_tag(&object.data).ok_or("a broken tag")?;
             if raw::header(tag.headers, b"type") != Some(b"commit") {
                 return Err("a tag of something other than a commit".to_owned());
             }
-            GitId::from_hex(tag.object).map_err(|_| "a broken tag".to_owned())?
+            GitId::from_hex(tag.object).map_err(|_| "a broken tag".to_owned())?;
         }
         _ => return Err("only commits and tags are taken".to_owned()),
-    };
-    if !old.is_null() && !reaches(git, path, commit, old).map_err(|e| e.to_string())? {
-        return Err("not a fast-forward; the history on the server is kept".to_owned());
     }
-    Ok(new)
-}
-
-/// Whether `old` is `from` or one of its ancestors; `old` may be a tag.
-fn reaches(git: &gix::Repository, path: &Path, from: GitId, old: GitId) -> Result<bool> {
-    let mut target = old;
-    let object = git.find_object(old).map_err(|e| git_error(path, e))?;
-    if object.kind == gix::object::Kind::Tag
-        && let Some(id) = raw::parse_tag(&object.data).and_then(|t| GitId::from_hex(t.object).ok())
-    {
-        target = id;
-    }
-    let mut seen = HashSet::new();
-    let mut stack = vec![from];
-    while let Some(id) = stack.pop() {
-        if id == target {
-            return Ok(true);
-        }
-        if !seen.insert(id) {
-            continue;
-        }
-        let object = git.find_object(id).map_err(|e| git_error(path, e))?;
-        if let Some(commit) = raw::parse_commit(&object.data) {
-            for parent in commit.parents {
-                if let Ok(p) = GitId::from_hex(parent) {
-                    stack.push(p);
-                }
-            }
-        }
-    }
-    Ok(false)
+    Ok(Some(new))
 }
 
 /// Writes every object of a pack, version 2 or 3, into the Git copy;

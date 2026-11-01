@@ -110,9 +110,9 @@ The server speaks Git's smart HTTP protocol, version 0, without side-band; newer
 
 `git push` stores new commits as snapshots, as `apeiron git import` would, and moves the refs. Only a user who may back up (USERS.md §1: `admin`, or a `member` for its own backups) may push, and not to a standby (REPLICATION.md §5).
 
-1. The server offers the refs the user sees, and asks for a pack without objects from outside it (`no-thin`) and a report per ref (`report-status`).
+1. The server offers the refs the user sees, and asks for a pack without objects from outside it (`no-thin`) and a report per ref (`report-status`); it takes deletes (`delete-refs`).
 2. It brings its Git copy up to date, then writes every object of the pack into it, making deltas whole against their base. A push may be at most 256 MiB; a larger history is pushed in parts.
-3. Each ref is checked: it must be a branch or tag under the prefix that the user owns, its old id must be the one the copy holds (else "fetch first"), and its new commit must have the old one in its history. Deleting a ref and moving one back, as `git push --force` does, are refused: the history on the server is kept. A ref kept by a retention rule only moves forward anyway (ARCHIVE.md).
+3. Each ref is checked: it must be a branch or tag under the prefix that the user owns, and its old id must be the one the copy holds (else "fetch first"). A ref may also be deleted (`git push origin :<branch>`) or moved to a commit that does not have the old one in its history (`git push --force`); the snapshots it pointed to stay in the reflog, and `apeiron gc` keeps them for its `--keep-days`. A ref kept by a retention rule is neither deleted nor moved back (ARCHIVE.md).
 4. The commits the accepted refs reach and that are not stored yet become snapshots, with the Git fields of section 2.2, so exporting them gives the same ids. Then each ref moves with compare-and-swap; one that another program moved meanwhile is refused.
 5. Git shows `ok` or the reason per ref. The push is recorded as `git_push` with each ref, its new id and its error (AUDIT.md §1), and a push that moved a ref is copied to the replicas, as a backup is (REPLICATION.md §4).
 
@@ -120,7 +120,7 @@ The server speaks Git's smart HTTP protocol, version 0, without side-band; newer
 
 | Item | Where |
 | --- | --- |
-| Git over SSH; deleting refs and force pushes over HTTP | Later; HTTP (section 7) takes a project in and out of Apeiron, and `apeiron ref delete` removes a ref |
+| Git over SSH | Later; HTTP (section 7) takes a project in and out of Apeiron |
 | Checking out into a Git working tree | `apeiron restore` writes a snapshot into a folder |
 | Branching and merging inside Apeiron | Stage 3 work item 2 |
 | Moving the code behind the plugin interface | With the plugin system, Stage 3 |

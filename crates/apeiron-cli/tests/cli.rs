@@ -813,7 +813,12 @@ fn cli_backups_and_restores_are_recorded() {
         .collect();
     assert_eq!(
         events,
-        ["start:backup", "done:backup", "start:restore", "done:restore"]
+        [
+            "start:backup",
+            "done:backup",
+            "start:restore",
+            "done:restore"
+        ]
     );
     assert_eq!(shown[0]["from"], "cli");
     assert_eq!(shown[1]["detail"]["via"], "cli");
