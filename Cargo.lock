@@ -149,6 +149,7 @@ dependencies = [
  "apeiron",
  "apeiron-daemon",
  "apeiron-server",
+ "aws-lc-rs",
  "clap",
  "ctrlc",
  "dirs 6.0.0",

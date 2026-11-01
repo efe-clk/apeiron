@@ -11,6 +11,7 @@ macro_rules! say {
 }
 
 mod format;
+mod sign;
 mod standard;
 
 use std::io::{IsTerminal, Write};
@@ -178,7 +179,17 @@ enum Command {
     },
     /// Make a compliance report of the repository and, with --web, of the web
     /// server (docs/REPORTS.md)
+    #[command(args_conflicts_with_subcommands = true)]
     Report {
+        #[command(subcommand)]
+        command: Option<ReportCommand>,
+        /// Write the report to this file instead of printing it
+        #[arg(long, value_name = "PATH")]
+        out: Option<PathBuf>,
+        /// Sign the written report with this key; the signature goes to
+        /// <out>.sig
+        #[arg(long, value_name = "KEY", requires = "out")]
+        sign: Option<PathBuf>,
         /// Also read and check every stored byte, as `verify` does
         #[arg(long)]
         verify: bool,
@@ -472,6 +483,64 @@ enum RetentionCommand {
     },
     /// List the retention rules
     List,
+}
+
+#[derive(Subcommand)]
+enum ReportCommand {
+    /// Make a key to sign reports with; prints its public key
+    Key {
+        /// The new key file; it must not exist
+        file: PathBuf,
+    },
+    /// Check the signature of a report written with --out and --sign
+    Check {
+        /// The report; its signature is <file>.sig
+        file: PathBuf,
+        /// The public key the report must be signed with, hex
+        #[arg(long)]
+        public_key: Option<String>,
+    },
+}
+
+fn report_command(out: &Output, command: ReportCommand) -> Result<u8, Failure> {
+    match command {
+        ReportCommand::Key { file } => {
+            let public = sign::new_key(&file)?;
+            out.result(&serde_json::json!({ "public_key": public }), |_| {
+                say!("Made the key {}; keep it secret.", file.display());
+                say!("Its public key, to give whoever checks the reports: {public}");
+            });
+            Ok(0)
+        }
+        ReportCommand::Check { file, public_key } => {
+            let read = |path: &Path| {
+                std::fs::read(path)
+                    .map_err(|e| Failure::Usage(format!("cannot read {}: {e}", path.display())))
+            };
+            let bytes = read(&file)?;
+            let sig_file = sign::signature_file(&file);
+            let signature: sign::Signature = serde_json::from_slice(&read(&sig_file)?)
+                .map_err(|e| Failure::Usage(format!("{}: {e}", sig_file.display())))?;
+            match sign::check(&bytes, &signature, public_key.as_deref()) {
+                Ok(()) => {
+                    out.result(
+                        &serde_json::json!({ "public_key": signature.public_key }),
+                        |_| {
+                            say!(
+                                "The report is as it was signed, by the key {}",
+                                signature.public_key
+                            );
+                        },
+                    );
+                    Ok(0)
+                }
+                Err(e) => {
+                    eprintln!("error: {}", e.message);
+                    Ok(EXIT_DAMAGED)
+                }
+            }
+        }
+    }
 }
 
 #[derive(Subcommand)]
@@ -2352,64 +2421,99 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             all_tenants,
             since,
             standard,
+            command,
+            out: file,
+            sign,
         } => {
-            let request = apeiron::ReportRequest {
-                verify,
-                remotes,
-                stale_days,
-            };
-            let since = web.then(|| {
-                since.map_or_else(
-                    || jiff::Timestamp::now() - jiff::SignedDuration::from_hours(30 * 24),
-                    |t| jiff::Timestamp::from_second(t.seconds).unwrap_or_default(),
-                )
-            });
-            let exit = |full: &FullReport| {
-                if full.report.verify.as_ref().is_some_and(|v| !v.is_ok()) {
-                    EXIT_DAMAGED
-                } else if full.report.has_problems() {
-                    EXIT_WARNINGS
-                } else {
-                    0
-                }
-            };
-            if !all_tenants {
-                let repo = open(cli.repo, password_file)?;
-                let full = make_report(out, &repo, request, since, tenant, standard)?;
-                out.result(&full, print_report);
-                return Ok(exit(&full));
+            if let Some(command) = command {
+                return report_command(out, command);
             }
-            // One report per tenant (docs/REPORTS.md §2).
-            let tenants = apeiron_server::Tenants::load(&tenants_file()?)?;
-            if tenants.tenants.is_empty() {
-                return Err(Failure::Usage(
-                    "there are no tenants; see docs/TENANTS.md".to_owned(),
-                ));
+            // Written to a file, the report is caught instead of printed.
+            if file.is_some() {
+                CAUGHT.with(|c| *c.borrow_mut() = Some(Vec::new()));
             }
-            let mut reports = Vec::new();
-            for t in &tenants.tenants {
-                let repo = open(Some(t.repo.clone()), t.password_file.as_deref())?;
-                let full = make_report(
-                    out,
-                    &repo,
-                    request.clone(),
-                    since,
-                    Some(t.name.clone()),
-                    standard,
-                )?;
-                reports.push(full);
-            }
-            out.result(&reports, |reports| {
-                for (i, full) in reports.iter().enumerate() {
-                    if i > 0 {
-                        say!("");
-                        say!("---");
-                        say!("");
+            let code = (|| -> Result<u8, Failure> {
+                let request = apeiron::ReportRequest {
+                    verify,
+                    remotes,
+                    stale_days,
+                };
+                let since = web.then(|| {
+                    since.map_or_else(
+                        || jiff::Timestamp::now() - jiff::SignedDuration::from_hours(30 * 24),
+                        |t| jiff::Timestamp::from_second(t.seconds).unwrap_or_default(),
+                    )
+                });
+                let exit = |full: &FullReport| {
+                    if full.report.verify.as_ref().is_some_and(|v| !v.is_ok()) {
+                        EXIT_DAMAGED
+                    } else if full.report.has_problems() {
+                        EXIT_WARNINGS
+                    } else {
+                        0
                     }
-                    print_report(full);
+                };
+                if !all_tenants {
+                    let repo = open(cli.repo, password_file)?;
+                    let full = make_report(out, &repo, request, since, tenant, standard)?;
+                    out.result(&full, print_report);
+                    return Ok(exit(&full));
                 }
-            });
-            Ok(reports.iter().map(exit).max().unwrap_or(0))
+                // One report per tenant (docs/REPORTS.md §2).
+                let tenants = apeiron_server::Tenants::load(&tenants_file()?)?;
+                if tenants.tenants.is_empty() {
+                    return Err(Failure::Usage(
+                        "there are no tenants; see docs/TENANTS.md".to_owned(),
+                    ));
+                }
+                let mut reports = Vec::new();
+                for t in &tenants.tenants {
+                    let repo = open(Some(t.repo.clone()), t.password_file.as_deref())?;
+                    let full = make_report(
+                        out,
+                        &repo,
+                        request.clone(),
+                        since,
+                        Some(t.name.clone()),
+                        standard,
+                    )?;
+                    reports.push(full);
+                }
+                out.result(&reports, |reports| {
+                    for (i, full) in reports.iter().enumerate() {
+                        if i > 0 {
+                            say!("");
+                            say!("---");
+                            say!("");
+                        }
+                        print_report(full);
+                    }
+                });
+                Ok(reports.iter().map(exit).max().unwrap_or(0))
+            })();
+            let Some(file) = file else { return code };
+            let caught = CAUGHT.with(|c| c.borrow_mut().take()).unwrap_or_default();
+            let code = code?;
+            std::fs::write(&file, &caught)
+                .map_err(|e| Failure::Usage(format!("cannot write {}: {e}", file.display())))?;
+            match sign {
+                Some(key) => {
+                    let signature = sign::sign(&key, &caught)?;
+                    let sig = sign::signature_file(&file);
+                    let text = serde_json::to_vec_pretty(&signature).unwrap_or_default();
+                    std::fs::write(&sig, text).map_err(|e| {
+                        Failure::Usage(format!("cannot write {}: {e}", sig.display()))
+                    })?;
+                    eprintln!(
+                        "Wrote {} and its signature {}, by the key {}",
+                        file.display(),
+                        sig.display(),
+                        signature.public_key
+                    );
+                }
+                None => eprintln!("Wrote {}", file.display()),
+            }
+            Ok(code)
         }
         Command::Retention { command } => {
             let repo = open(cli.repo, password_file)?;
@@ -3568,7 +3672,21 @@ fn watch<T>(out: &Output, mut job: Job<T>) -> Result<T, Failure> {
     }
 }
 
+thread_local! {
+    /// Output caught for a file instead of printed (`report --out`).
+    static CAUGHT: std::cell::RefCell<Option<Vec<u8>>> = const { std::cell::RefCell::new(None) };
+}
+
 fn write_line(args: std::fmt::Arguments<'_>) {
+    let caught = CAUGHT.with(|c| {
+        c.borrow_mut().as_mut().map(|buf| {
+            let _ = buf.write_fmt(args);
+            buf.push(b'\n');
+        })
+    });
+    if caught.is_some() {
+        return;
+    }
     let mut stdout = std::io::stdout().lock();
     if let Err(e) = stdout
         .write_fmt(args)

@@ -16,6 +16,7 @@ path = "src/main.rs"
 apeiron = { path = "../apeiron" }
 apeiron-daemon = { path = "../apeiron-daemon" }
 apeiron-server = { path = "../apeiron-server" }
+aws-lc-rs = "1.19.0"
 clap = { version = "4.6.7", features = ["derive", "env"] }
 ctrlc = { version = "3.5.2", features = ["termination"] }
 dirs = "6.0.0"

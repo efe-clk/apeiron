@@ -85,12 +85,29 @@ In JSON each finding has `level`, an English `text`, and a `code` with its facts
 | `report` (API.md §8) | Long operation with `verify`, `remotes` and `stale_days`; returns a `ComplianceReport` with everything of §3 but the web server's part |
 | The Report page | For an `admin` in the web interface, and in the desktop interface: findings, repository and backups of §3, with the choice to verify and to compare with the remotes; the web server's part comes from `apeiron report --web` |
 
+### 5.1 Signing a report
+
+A signed report shows the auditor that it is the one the admin made, unchanged since:
+
+```text
+apeiron report key ~/.config/apeiron/report.key
+apeiron report --verify --remotes --web --out report-2026-10.md --sign ~/.config/apeiron/report.key
+apeiron report check report-2026-10.md --public-key 3b6a…
+```
+
+| Command | What it does |
+| --- | --- |
+| `apeiron report key <file>` | Makes an Ed25519 key in a new file readable by its owner only, and prints its public key to give the auditor |
+| `apeiron report … --out <file> [--sign <key>]` | Writes the report, Markdown or with `--json` JSON, to the file instead of printing it; with `--sign` also writes `<file>.sig`: `{"algorithm": "ed25519", "public_key", "signature"}`, the signature of the file's bytes, both hex |
+| `apeiron report check <file> [--public-key <hex>]` | Checks the signature in `<file>.sig`, and that it is by the given key; exit code 4 when the report was changed or signed by another key |
+
+The signature covers the report's bytes exactly, so even a changed space breaks it; a report is checked as written, not after it was turned into a PDF. Anyone with the key file can sign, so it is kept like a password; the public key in the `.sig` file only says which key signed, and the auditor checks it against the key the admin gave them.
+
 ## 6. Not part of this work item
 
 | Item | Where |
 | --- | --- |
 | Mappings to other standards, such as SOC 2 | Later, with a pilot that names its standard; §3.1 shows the form |
-| Signing the report | Later; the snapshot ids and the audit hash it holds can already be checked |
 
 ## 7. Crates
 

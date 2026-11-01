@@ -85,12 +85,29 @@ JSON'da her bulgunun bir `level` alanı, İngilizce bir `text` alanı ve bilgile
 | `report` (API.tr.md §8) | `verify`, `remotes` ve `stale_days` ile uzun işlem; web sunucusu bölümü dışında §3'teki her şeyle bir `ComplianceReport` döndürür |
 | Rapor sayfası | Web arayüzünde bir `admin` için ve masaüstü arayüzünde: doğrulama ve uzak depolarla karşılaştırma seçeneğiyle §3'teki bulgular, depo ve yedekler; web sunucusu bölümü `apeiron report --web` ile alınır |
 
+### 5.1 Bir raporu imzalamak
+
+İmzalı bir rapor denetçiye, onun admin'in hazırladığı rapor olduğunu ve o zamandan beri değişmediğini gösterir:
+
+```text
+apeiron report key ~/.config/apeiron/report.key
+apeiron report --verify --remotes --web --out report-2026-10.md --sign ~/.config/apeiron/report.key
+apeiron report check report-2026-10.md --public-key 3b6a…
+```
+
+| Komut | Ne yapar |
+| --- | --- |
+| `apeiron report key <dosya>` | Yalnızca sahibinin okuyabildiği yeni bir dosyada bir Ed25519 anahtarı oluşturur ve denetçiye verilecek açık anahtarını yazar |
+| `apeiron report … --out <dosya> [--sign <anahtar>]` | Raporu, Markdown ya da `--json` ile JSON olarak, yazdırmak yerine dosyaya yazar; `--sign` ile `<dosya>.sig` dosyasını da yazar: `{"algorithm": "ed25519", "public_key", "signature"}`, dosyanın baytlarının imzası, ikisi de hex |
+| `apeiron report check <dosya> [--public-key <hex>]` | `<dosya>.sig` içindeki imzayı ve verilen anahtarla atıldığını denetler; rapor değiştirildiyse ya da başka bir anahtarla imzalandıysa çıkış kodu 4 |
+
+İmza raporun baytlarını tam olarak kapsar; bu yüzden değişen bir boşluk bile onu bozar; bir rapor PDF'e çevrildikten sonra değil, yazıldığı gibi denetlenir. Anahtar dosyası olan herkes imzalayabilir; bu yüzden bir parola gibi saklanır. `.sig` dosyasındaki açık anahtar yalnızca hangi anahtarın imzaladığını söyler; denetçi onu admin'in kendisine verdiği anahtarla karşılaştırır.
+
 ## 6. Bu işin parçası olmayanlar
 
 | Konu | Nerede |
 | --- | --- |
 | SOC 2 gibi başka standartlara eşlemeler | Sonra, standardını adlandıran bir pilotla; §3.1 biçimi gösterir |
-| Raporu imzalamak | Sonra; tuttuğu snapshot kimlikleri ve denetim özeti zaten denetlenebilir |
 
 ## 7. Crate'ler
 

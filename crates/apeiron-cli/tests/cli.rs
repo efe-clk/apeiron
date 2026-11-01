@@ -851,3 +851,20 @@ fn a_report_maps_to_a_standard() {
     assert!(text.contains("## ISO/IEC 27001:2022 Annex A"), "{text}");
     assert!(text.contains("## Legal holds"), "{text}");
 }
+
+/// A report written to a file can be signed and checked (REPORTS.md §5.1).
+#[test]
+fn a_signed_report_is_checked() {
+    let s = Setup::new();
+    s.ok(&["backup", &s.path("src")]);
+    let made = s.json(&["report", "key", &s.path("report.key")]);
+    let public = made["public_key"].as_str().unwrap().to_owned();
+    let report = s.path("report.md");
+    s.ok(&["report", "--out", &report, "--sign", &s.path("report.key")]);
+    assert!(fs::read_to_string(&report).unwrap().starts_with("# Compliance report"));
+    s.ok(&["report", "check", &report, "--public-key", &public]);
+    let other = s.run(&["report", "check", &report, "--public-key", "00"]);
+    assert_eq!(code(&other), Some(4));
+    fs::write(&report, "# Compliance report\n\nAll is well.\n").unwrap();
+    assert_eq!(code(&s.run(&["report", "check", &report])), Some(4));
+}
