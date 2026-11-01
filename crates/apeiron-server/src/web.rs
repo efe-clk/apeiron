@@ -223,7 +223,9 @@ const OIDC_COOKIE: &str = "apeiron_oidc";
 
 /// The users file as last read.
 struct Loaded {
-    modified: Option<SystemTime>,
+    /// Its modification time and size; two writes close together can get
+    /// the same time, on Windows in particular.
+    modified: Option<(SystemTime, u64)>,
     users: Users,
 }
 
@@ -372,7 +374,7 @@ impl WebState {
     /// The users file as it is now.
     fn users(&self) -> std::sync::MutexGuard<'_, Loaded> {
         let modified = fs::metadata(&self.users_file)
-            .and_then(|m| m.modified())
+            .and_then(|m| Ok((m.modified()?, m.len())))
             .ok();
         let mut loaded = lock(&self.users);
         if modified != loaded.modified {
