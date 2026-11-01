@@ -15,6 +15,7 @@ use jiff::{SignedDuration, Timestamp};
 use serde::Serialize;
 
 use crate::jobs::{Action, Job, load_jobs};
+use crate::notify;
 use crate::schedule::next_run;
 use crate::state::{JobState, RunResult, State};
 use crate::watch::Watches;
@@ -95,6 +96,8 @@ pub fn status(paths: &Paths) -> Result<Vec<JobStatus>> {
 pub struct Daemon {
     paths: Paths,
     _lock: File,
+    /// Shows a desktop notification when a job starts failing.
+    notify: bool,
 }
 
 impl Daemon {
@@ -113,7 +116,18 @@ impl Daemon {
             Err(fs4::TryLockError::WouldBlock) => return Err(Error::Locked(lock_path)),
             Err(fs4::TryLockError::Error(e)) => return Err(e).at(&lock_path),
         }
-        Ok(Daemon { paths, _lock: lock })
+        Ok(Daemon {
+            paths,
+            _lock: lock,
+            notify: false,
+        })
+    }
+
+    /// Shows a desktop notification when a job fails after a run that did
+    /// not (DAEMON.md §4); off unless turned on.
+    pub fn notify_failures(mut self, on: bool) -> Self {
+        self.notify = on;
+        self
     }
 
     /// Runs every job that is due now, one after another, and records each
@@ -156,8 +170,11 @@ impl Daemon {
             run.result.name(),
             run.message
         ));
-        state.jobs.insert(job.name.clone(), run.clone());
+        let previous = state.jobs.insert(job.name.clone(), run.clone());
         state.save(&self.paths.state_file())?;
+        if self.notify && notify::worth_telling(previous.as_ref(), &run) {
+            notify::show(&format!("Apeiron: {} failed", job.name), &run.message);
+        }
         Ok(RunRecord {
             job: job.name.clone(),
             run,

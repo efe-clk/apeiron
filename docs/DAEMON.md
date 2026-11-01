@@ -28,6 +28,8 @@ All three take `--jobs <file>` and `--state-dir <folder>` to use other files tha
 
 `run` and `once` run the jobs at low priority, so that a backup gives way to what the user is doing: the CPU priority of a `nice` value of 10 and the lowest disk priority of the normal class on Linux, low CPU priority and throttled disk access on macOS, and background mode on Windows. `--priority normal` runs them as fast as other programs. Network speed is limited per job with `rate_kb` (section 3).
 
+`daemon run` shows a desktop notification when a job fails after a run that did not, so a job retried every hour tells it once: with `notify-send` on Linux, `osascript` on macOS and a PowerShell balloon on Windows. The job's name and message are passed as arguments, never inside a script. A computer without the tool, such as a server, shows nothing; the log and `daemon status` still say what happened. `--no-notify` turns it off.
+
 The operating system starts `apeiron daemon run` at login: a systemd user unit on Linux, a launchd agent on macOS and a Task Scheduler task on Windows. The user guide gives the file for each ([GUIDE.md](GUIDE.md) §8); no administrator rights are needed. Only one daemon runs per user; a second one stops with a "locked" error.
 
 ## 3. The jobs file
@@ -116,7 +118,6 @@ A backup is proven only by restoring it (VISION.md). The restore test does this 
 | Item | Where |
 | --- | --- |
 | Operating the daemon from another device (remote API) | The desktop and web interfaces (Stage 4) |
-| Desktop notifications on failure | With the desktop interface (Stage 4) |
 
 ## 8. Crates and libraries
 

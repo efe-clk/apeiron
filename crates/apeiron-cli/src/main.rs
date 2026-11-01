@@ -419,7 +419,11 @@ enum PriorityArg {
 #[derive(Subcommand)]
 enum DaemonCommand {
     /// Run until stopped, starting each job when it is due
-    Run,
+    Run {
+        /// Show no desktop notification when a job fails
+        #[arg(long)]
+        no_notify: bool,
+    },
     /// Run every job that is due now, then exit
     Once,
     /// Show each job's last run, its result and the next run
@@ -2688,13 +2692,15 @@ fn run_daemon(
         paths.state_dir = state_dir;
     }
     let failed = |result: RunResult| result == RunResult::Failed;
-    let runs_jobs = matches!(command, DaemonCommand::Run | DaemonCommand::Once);
+    let runs_jobs = matches!(command, DaemonCommand::Run { .. } | DaemonCommand::Once);
     if runs_jobs && priority == PriorityArg::Low {
         apeiron_daemon::lower_priority().map_err(daemon_error)?;
     }
     match command {
-        DaemonCommand::Run => {
-            let daemon = Daemon::start(paths).map_err(daemon_error)?;
+        DaemonCommand::Run { no_notify } => {
+            let daemon = Daemon::start(paths)
+                .map_err(daemon_error)?
+                .notify_failures(!no_notify);
             let stop = Arc::new(AtomicBool::new(false));
             let flag = stop.clone();
             let _ = ctrlc::set_handler(move || flag.store(true, Ordering::Relaxed));

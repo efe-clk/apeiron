@@ -28,6 +28,8 @@ Arka plan hizmeti (daemon), yedekleri ve denetimleri kullanıcı olmadan, bir za
 
 `run` ve `once` işleri düşük öncelikle çalıştırır; böylece bir yedek kullanıcının yaptığı işe yol verir: Linux'ta 10 `nice` değerinin işlemci önceliği ve olağan sınıfın en düşük disk önceliği, macOS'ta düşük işlemci önceliği ve kısılmış disk erişimi, Windows'ta arka plan kipi. `--priority normal` onları diğer programlar kadar hızlı çalıştırır. Ağ hızı her iş için `rate_kb` ile sınırlanır (bölüm 3).
 
+`daemon run`, başarısız olmayan bir çalışmanın ardından başarısız olan bir iş için masaüstü bildirimi gösterir; böylece saatte bir yeniden denenen bir iş bunu bir kez söyler: Linux'ta `notify-send`, macOS'ta `osascript`, Windows'ta bir PowerShell balonu ile. İşin adı ve iletisi bir betiğin içine değil, argüman olarak verilir. Aracı olmayan bir bilgisayar, örneğin bir sunucu, hiçbir şey göstermez; günlük ve `daemon status` yine ne olduğunu söyler. `--no-notify` bunu kapatır.
+
 `apeiron daemon run` komutunu oturum açılınca işletim sistemi başlatır: Linux'ta bir systemd kullanıcı birimi, macOS'ta bir launchd ajanı, Windows'ta bir Görev Zamanlayıcı görevi. Kullanım rehberi her biri için dosyayı verir ([GUIDE.tr.md](GUIDE.tr.md) §8); yönetici yetkisi gerekmez. Her kullanıcı için yalnızca bir daemon çalışır; ikincisi "kilitli" hatasıyla durur.
 
 ## 3. İş dosyası
@@ -116,7 +118,6 @@ Bir yedek ancak geri yüklenerek kanıtlanır (VISION.tr.md). Geri yükleme test
 | Konu | Nerede |
 | --- | --- |
 | Daemon'u başka bir cihazdan yönetmek (uzak API) | Masaüstü ve web arayüzleri (Aşama 4) |
-| Başarısızlıkta masaüstü bildirimi | Masaüstü arayüzüyle (Aşama 4) |
 
 ## 8. Crate'ler ve kütüphaneler
 

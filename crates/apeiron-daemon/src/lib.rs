@@ -6,6 +6,7 @@
 
 mod daemon;
 mod jobs;
+mod notify;
 mod schedule;
 mod state;
 mod watch;
