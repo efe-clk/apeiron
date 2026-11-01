@@ -825,3 +825,29 @@ fn cli_backups_and_restores_are_recorded() {
     assert!(shown[1]["detail"]["snapshot"].is_string());
     run(&["web", "audit", "verify"], true);
 }
+
+/// A report maps its facts to a standard's controls and lists legal holds
+/// (REPORTS.md §3.1).
+#[test]
+fn a_report_maps_to_a_standard() {
+    let s = Setup::new();
+    s.ok(&["backup", &s.path("src")]);
+    s.ok(&["hold", "add", "main", "--reason", "Case 1"]);
+    let report = s.json(&["report", "--standard", "iso27001"]);
+    assert_eq!(report["holds"][0]["reason"], "Case 1");
+    let controls = report["standard"]["controls"].as_array().unwrap();
+    let status = |id: &str| {
+        controls
+            .iter()
+            .find(|c| c["id"] == id)
+            .map(|c| c["status"].as_str().unwrap().to_owned())
+            .unwrap()
+    };
+    assert_eq!(status("A.8.24"), "gap");
+    assert_eq!(status("A.5.33"), "evidence");
+    assert_eq!(status("A.5.15"), "not_covered");
+    assert_eq!(status("A.5.30"), "gap");
+    let text = s.ok(&["report", "--standard", "iso27001"]);
+    assert!(text.contains("## ISO/IEC 27001:2022 Annex A"), "{text}");
+    assert!(text.contains("## Legal holds"), "{text}");
+}

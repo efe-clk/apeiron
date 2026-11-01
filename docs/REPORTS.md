@@ -33,6 +33,7 @@ apeiron --json report --verify --remotes --web > report-2026-10.json
 | `--tenant <name>` | With `--web`: the tenant whose files to report on ([TENANTS.md](TENANTS.md)) | None |
 | `--all-tenants` | One report for each tenant, each on the tenant's own repository (opened with its password file) and, with `--web`, its own files; the reports follow one another, separated by `---`, or form a JSON array with a `tenant` field each. The exit code is the worst of them | Off |
 | `--since <YYYY-MM-DD>` | With `--web`: count audit events from that day | 30 days ago |
+| `--standard iso27001` | Add the facts mapped to the controls of a standard (§3.1) | None |
 
 The report reads only; it changes nothing. Its text form is Markdown, ready to keep or turn into a PDF; `--json` gives the same content for other programs. A scheduled job can make one every month ([DAEMON.md](DAEMON.md) runs commands only through its own jobs, so use the system's scheduler for this).
 
@@ -47,11 +48,25 @@ The report reads only; it changes nothing. Its text form is Markdown, ready to k
 1. **Findings**, most serious first (§4).
 2. **Repository**: format version, encryption, how many passwords and recovery keys, the result of `--verify`.
 3. **Backups**: per ref the snapshot id, the time of the newest snapshot, the number of snapshots in its history, how many days a retention rule keeps it, and its state on each remote: `current`, `behind`, `missing`, or `other` when the remote has snapshots this copy does not.
-4. **Retention rules**, with when each was added.
+4. **Retention rules**, with when each was added, and **legal holds**, with their reasons and, once lifted, the lift (ARCHIVE.md §2.1).
 5. **Remotes**, and any that did not answer.
 6. **Web server**, with `--web`: every user with role, how they sign in (and whether with an authenticator code), backups and folders; the identity provider; whether the audit log's chain of hashes is whole, its number of events and the hash of the last one; and from `--since` on the number of sign-ins, failed sign-ins, backups and restores started, share links made and failed replications.
 
 The snapshot ids are the proof: an id fixes every byte under it and all the history before it, so a later report, or `apeiron verify` on a replica, shows that the same data is still there. The hash of the last audit event does the same for the audit log: kept in the report, it shows later that no earlier event was changed (AUDIT.md §3).
+
+### 3.1 Mapped to a standard
+
+With `--standard iso27001` the report ends with the controls of ISO/IEC 27001:2022, Annex A, that a backup system bears on, each with what the report shows: `evidence` when its facts support the control, `gap` when they show something the control asks for is missing, and `not covered` when the report holds no facts on it, with the option that adds them. In JSON the section is `standard`, with `id`, `title`, `status` and `facts` per control. The mapping points an auditor to evidence; it is not a certification, and a control may need more than a backup system shows.
+
+| Control | Evidence | Gap |
+| --- | --- | --- |
+| A.5.15 Access control | With `--web`: the users and their roles | — |
+| A.5.17 Authentication information | With `--web`: password hashing, identity provider and authenticator codes | An admin who signs in with a password alone |
+| A.5.30 ICT readiness for business continuity | With `--remotes`: every backup current on every remote | No remote, a copy behind or missing, a remote that did not answer |
+| A.5.33 Protection of records | Retention rules or legal holds | Neither |
+| A.8.13 Information backup | Backups, none stale, and with `--verify` the data checked | No backups, a stale one, damaged data |
+| A.8.15 Logging | With `--web`: an audit log with a whole chain of hashes | A broken chain |
+| A.8.24 Use of cryptography | An encrypted repository | Not encrypted |
 
 ## 4. Findings
 
@@ -74,7 +89,7 @@ In JSON each finding has `level`, an English `text`, and a `code` with its facts
 
 | Item | Where |
 | --- | --- |
-| Reports mapped to the clauses of a given standard | Later, with a pilot that names its standard; the facts of §3 are what such a mapping points to |
+| Mappings to other standards, such as SOC 2 | Later, with a pilot that names its standard; §3.1 shows the form |
 | Signing the report | Later; the snapshot ids and the audit hash it holds can already be checked |
 
 ## 7. Crates

@@ -11,6 +11,7 @@ macro_rules! say {
 }
 
 mod format;
+mod standard;
 
 use std::io::{IsTerminal, Write};
 use std::path::{Path, PathBuf};
@@ -199,6 +200,9 @@ enum Command {
         /// Count audit events from this day on (YYYY-MM-DD); default 30 days ago
         #[arg(long, requires = "web", value_parser = parse_date)]
         since: Option<Time>,
+        /// Map the facts to the controls of a standard
+        #[arg(long, value_enum)]
+        standard: Option<standard::Standard>,
     },
     /// Keep refs as an archive that cannot be changed (docs/ARCHIVE.md)
     Retention {
@@ -1183,6 +1187,9 @@ struct FullReport {
     report: apeiron::ComplianceReport,
     #[serde(skip_serializing_if = "Option::is_none")]
     web: Option<WebFacts>,
+    /// With `--standard`: the facts mapped to its controls.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    standard: Option<standard::Mapping>,
 }
 
 #[derive(Serialize)]
@@ -1299,6 +1306,7 @@ fn make_report(
     request: apeiron::ReportRequest,
     since: Option<jiff::Timestamp>,
     tenant: Option<String>,
+    standard: Option<standard::Standard>,
 ) -> Result<FullReport, Failure> {
     let mut report = watch(out, repo.report(request)?)?;
     let web = match since {
@@ -1309,11 +1317,14 @@ fn make_report(
         )?),
         None => None,
     };
-    Ok(FullReport {
+    let mut full = FullReport {
         tenant,
         report,
         web,
-    })
+        standard: None,
+    };
+    full.standard = standard.map(|s| standard::map(s, &full));
+    Ok(full)
 }
 
 fn print_report(full: &FullReport) {
@@ -1419,6 +1430,30 @@ fn print_report(full: &FullReport) {
         say!("None.");
     }
     say!("");
+    say!("## Legal holds");
+    say!("");
+    let when = |seconds: u64| {
+        format::time(&apeiron::Time {
+            seconds: seconds as i64,
+            nanos: 0,
+        })
+    };
+    for h in &r.holds {
+        say!(
+            "- `{}` ({}): placed {}: {}",
+            h.hold.refs,
+            h.id,
+            when(h.hold.added),
+            h.hold.reason
+        );
+        if let Some(lift) = &h.lift {
+            say!("  lifted {}: {}", when(lift.lifted), lift.reason);
+        }
+    }
+    if r.holds.is_empty() {
+        say!("None.");
+    }
+    say!("");
     say!("## Remotes");
     say!("");
     for remote in &r.remotes {
@@ -1435,7 +1470,16 @@ fn print_report(full: &FullReport) {
     if r.remotes.is_empty() {
         say!("None.");
     }
-    let Some(web) = &full.web else { return };
+    if let Some(web) = &full.web {
+        print_web(web);
+    }
+    if let Some(mapping) = &full.standard {
+        standard::print(mapping);
+    }
+}
+
+fn print_web(web: &WebFacts) {
+    let yes = |b: bool| if b { "yes" } else { "no" };
     say!("");
     say!("## Web server");
     say!("");
@@ -2307,6 +2351,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             tenant,
             all_tenants,
             since,
+            standard,
         } => {
             let request = apeiron::ReportRequest {
                 verify,
@@ -2330,7 +2375,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             };
             if !all_tenants {
                 let repo = open(cli.repo, password_file)?;
-                let full = make_report(out, &repo, request, since, tenant)?;
+                let full = make_report(out, &repo, request, since, tenant, standard)?;
                 out.result(&full, print_report);
                 return Ok(exit(&full));
             }
@@ -2344,7 +2389,14 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             let mut reports = Vec::new();
             for t in &tenants.tenants {
                 let repo = open(Some(t.repo.clone()), t.password_file.as_deref())?;
-                let full = make_report(out, &repo, request.clone(), since, Some(t.name.clone()))?;
+                let full = make_report(
+                    out,
+                    &repo,
+                    request.clone(),
+                    since,
+                    Some(t.name.clone()),
+                    standard,
+                )?;
                 reports.push(full);
             }
             out.result(&reports, |reports| {

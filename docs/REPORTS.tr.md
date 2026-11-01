@@ -33,6 +33,7 @@ apeiron --json report --verify --remotes --web > rapor-2026-10.json
 | `--tenant <ad>` | `--web` ile: dosyaları raporlanacak kiracı ([TENANTS.tr.md](TENANTS.tr.md)) | Yok |
 | `--all-tenants` | Her kiracı için bir rapor; her biri kiracının kendi deposunda (parola dosyasıyla açılır) ve `--web` ile kendi dosyalarında. Raporlar `---` ile ayrılarak art arda gelir ya da her birinde `tenant` alanı olan bir JSON dizisi oluşturur. Çıkış kodu, içlerindeki en kötüsüdür | Kapalı |
 | `--since <YYYY-AA-GG>` | `--web` ile: denetim olaylarını o günden itibaren sayar | 30 gün önce |
+| `--standard iso27001` | Bir standardın maddelerine eşlenmiş gerçekleri ekler (§3.1) | Yok |
 
 Rapor yalnızca okur; hiçbir şeyi değiştirmez. Metin biçimi, saklanmaya ya da PDF'e dönüştürülmeye hazır Markdown'dır; `--json` aynı içeriği başka programlar için verir. Zamanlanmış bir iş her ay bir tane oluşturabilir ([DAEMON.tr.md](DAEMON.tr.md) komutları yalnızca kendi işleriyle çalıştırır; bunun için sistemin zamanlayıcısını kullanın).
 
@@ -47,11 +48,25 @@ Rapor yalnızca okur; hiçbir şeyi değiştirmez. Metin biçimi, saklanmaya ya 
 1. **Bulgular**, en ciddisi önce (§4).
 2. **Depo**: format sürümü, şifreleme, kaç parola ve kurtarma anahtarı olduğu, `--verify` sonucu.
 3. **Yedekler**: ref başına snapshot kimliği, en yeni snapshot'ın zamanı, geçmişindeki snapshot sayısı, bir saklama kuralının onu kaç gün tuttuğu ve her uzak depodaki durumu: `current` (güncel), `behind` (geride), `missing` (yok) ya da uzak depoda bu kopyada olmayan snapshot'lar varsa `other` (farklı).
-4. **Saklama kuralları**, her birinin ne zaman eklendiğiyle.
+4. **Saklama kuralları**, her birinin ne zaman eklendiğiyle, ve **yasal saklama kilitleri**, nedenleriyle ve kaldırıldıysa kaldırılışıyla (ARCHIVE.tr.md §2.1).
 5. **Uzak depolar** ve yanıt vermeyenler.
 6. **Web sunucusu**, `--web` ile: rolü, nasıl oturum açtığı (ve doğrulama koduyla olup olmadığı), yedekleri ve klasörleriyle her kullanıcı; kimlik sağlayıcısı; denetim kaydının özet zincirinin eksiksiz olup olmadığı, olay sayısı ve son olayın özeti; `--since`'ten itibaren oturum açma, başarısız oturum açma, başlatılan yedek ve geri yükleme, oluşturulan paylaşım bağlantısı ve başarısız replikasyon sayıları.
 
 Kanıt snapshot kimlikleridir: bir kimlik, altındaki her baytı ve ondan önceki tüm geçmişi sabitler; bu yüzden sonraki bir rapor ya da bir replikada `apeiron verify`, aynı verinin hâlâ orada olduğunu gösterir. Son denetim olayının özeti de denetim kaydı için aynısını yapar: raporda tutulduğunda, sonra önceki hiçbir olayın değiştirilmediğini gösterir (AUDIT.tr.md §3).
+
+### 3.1 Bir standarda eşlenmiş
+
+`--standard iso27001` ile rapor, ISO/IEC 27001:2022 Ek A'nın bir yedekleme sisteminin ilgilendiği maddeleriyle biter; her madde, raporun gösterdiğiyle birlikte: gerçekleri maddeyi destekliyorsa `evidence`, maddenin istediği bir şeyin eksik olduğunu gösteriyorsa `gap`, raporda onunla ilgili gerçek yoksa onları ekleyen seçenekle birlikte `not covered`. JSON'da bölüm `standard`'dır; her madde için `id`, `title`, `status` ve `facts` bulunur. Eşleme bir denetçiyi kanıta yönlendirir; bir sertifika değildir ve bir madde, bir yedekleme sisteminin gösterebileceğinden fazlasını isteyebilir.
+
+| Madde | Kanıt | Eksik |
+| --- | --- | --- |
+| A.5.15 Access control | `--web` ile: kullanıcılar ve rolleri | — |
+| A.5.17 Authentication information | `--web` ile: parola özetleme, kimlik sağlayıcısı ve doğrulama kodları | Yalnızca parolayla oturum açan bir admin |
+| A.5.30 ICT readiness for business continuity | `--remotes` ile: her yedeğin her uzak depoda güncel olması | Uzak depo olmaması, geride kalan ya da eksik bir kopya, yanıt vermeyen bir uzak depo |
+| A.5.33 Protection of records | Saklama kuralları ya da yasal saklama kilitleri | İkisi de yok |
+| A.8.13 Information backup | Hiçbiri eskimemiş yedekler ve `--verify` ile denetlenmiş veri | Yedek olmaması, eskimiş bir yedek, bozuk veri |
+| A.8.15 Logging | `--web` ile: özet zinciri eksiksiz bir denetim kaydı | Kırık bir zincir |
+| A.8.24 Use of cryptography | Şifreli bir depo | Şifresiz |
 
 ## 4. Bulgular
 
@@ -74,7 +89,7 @@ JSON'da her bulgunun bir `level` alanı, İngilizce bir `text` alanı ve bilgile
 
 | Konu | Nerede |
 | --- | --- |
-| Belirli bir standardın maddelerine eşlenmiş raporlar | Sonra, standardını adlandıran bir pilotla; §3'teki gerçekler böyle bir eşlemenin gösterdiği şeylerdir |
+| SOC 2 gibi başka standartlara eşlemeler | Sonra, standardını adlandıran bir pilotla; §3.1 biçimi gösterir |
 | Raporu imzalamak | Sonra; tuttuğu snapshot kimlikleri ve denetim özeti zaten denetlenebilir |
 
 ## 7. Crate'ler

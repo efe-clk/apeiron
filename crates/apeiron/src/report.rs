@@ -52,6 +52,9 @@ pub struct ComplianceReport {
     pub repository: RepositoryFacts,
     pub refs: Vec<RefFacts>,
     pub retention: Vec<RetentionRule>,
+    /// Every legal hold, lifted ones too (ARCHIVE.md §2.1).
+    #[serde(default)]
+    pub holds: Vec<crate::LegalHold>,
     /// Present when the request asked to verify.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub verify: Option<VerifyReport>,
@@ -278,6 +281,7 @@ pub(crate) fn make(
         damaged_files: info.damaged_files,
     };
     let retention = repo.retention()?;
+    let holds = repo.legal_holds()?;
     let mut findings = Vec::new();
     let mut find = |kind: FindingKind| findings.push(Finding::new(kind));
 
@@ -386,6 +390,7 @@ pub(crate) fn make(
         repository,
         refs,
         retention,
+        holds,
         verify,
         remotes,
         findings,
