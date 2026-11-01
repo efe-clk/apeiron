@@ -38,6 +38,7 @@ Sayfalar yalnızca JSON API'yi, JSON API de yalnızca herkese açık API'yi ça�
 | Karşılaştır | Bir snapshot ile bir öncekinin arasında ne değiştiği; metin eklentisi kuruluysa metin dosyalarının değişen satır ve sözcükleriyle (TEXT.tr.md §3) | Tamamlandı |
 | Denetle | Tüm depoyu denetler ve sağlam olup olmadığını sade sözcüklerle söyler | Tamamlandı |
 | Senkron | Uzak depoları listeler, ekler ve kaldırır; bir klasörün onlardan biriyle bir senkron turunu iki yönlü ya da tek yönlü çalıştırır ya da yalnızca neyin değişeceğini gösterir (SYNC.tr.md); yapılan değişiklikleri ve her çatışmayı çatışma kopyasıyla listeler; klasördeki çatışma kopyalarını bulur ve her birinin iki sürümünden birini tek düğmeyle tutar (SYNC.tr.md §4) | Tamamlandı |
+| Parolalar | Şifreli bir depo için: parolalarını ve kurtarma anahtarlarını listeler, parola ekler, bir kurtarma anahtarı oluşturup bir kez gösterir ve bir anahtarı siler ama sonuncusunu asla (FORMAT.tr.md §15) | Tamamlandı |
 | Eklentiler | Kurulu eklentileri işledikleri dosyalarla listeler, bir `.wasm` dosyasından eklenti kurar ve kaldırır; `apeiron plugin` gibi (PLUGIN.tr.md §1) | Tamamlandı |
 | Zamanlama | Arka plan hizmetinin işlerini son sonuçları ve sonraki çalışmalarıyla gösterir ve iş dosyasını düzenler; hatalı bir dosya kaydedilmez, elle bozulmuş bir dosya hatasıyla birlikte gösterilir (DAEMON.tr.md §3) | Tamamlandı |
 

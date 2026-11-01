@@ -54,8 +54,41 @@ const CALLS: &[&str] = &[
     "reflog",
     "retention",
     "add_retention",
+    "remotes",
+    "add_remote",
+    "remove_remote",
+    "keys",
+    "add_password",
+    "add_recovery_key",
+    "remove_key",
+    "plugins",
+    "plugin_add",
+    "plugin_remove",
+    "conflicts",
+    "resolve_conflict",
 ];
-const STARTS: &[&str] = &["backup", "restore", "verify", "search", "report"];
+const STARTS: &[&str] = &["backup", "restore", "verify", "search", "report", "sync"];
+/// Operations only an `admin` may use: they reach the whole repository,
+/// its keys and the server's disk and network (WEB.md §4).
+const ADMIN_ONLY: &[&str] = &[
+    "verify",
+    "report",
+    "retention",
+    "add_retention",
+    "remotes",
+    "add_remote",
+    "remove_remote",
+    "keys",
+    "add_password",
+    "add_recovery_key",
+    "remove_key",
+    "plugins",
+    "plugin_add",
+    "plugin_remove",
+    "conflicts",
+    "resolve_conflict",
+    "sync",
+];
 
 /// A certificate chain and its private key, as PEM.
 #[derive(Clone)]
@@ -849,7 +882,7 @@ impl WebState {
         if !known.contains(&operation) {
             return Err(not_here(operation));
         }
-        if self.standby && operation == "backup" {
+        if self.standby && matches!(operation, "backup" | "sync") {
             return Err(Error::new(
                 ErrorKind::Unsupported,
                 "this server is a standby and takes no backups; back up to the primary",
@@ -857,9 +890,13 @@ impl WebState {
         }
         let allowed = match operation {
             "backup" | "restore" => user.role != Role::Reader,
-            "verify" | "report" | "retention" | "add_retention" => user.role == Role::Admin,
+            _ if ADMIN_ONLY.contains(&operation) => user.role == Role::Admin,
             _ => true,
         };
+        // Plugins live in the folder of the user that runs the server.
+        if request.get("dir").is_some_and(|d| !d.is_null()) {
+            return Err(invalid("dir cannot be given here"));
+        }
         if !allowed {
             return Err(Error::new(
                 ErrorKind::Unsupported,
@@ -899,9 +936,25 @@ impl WebState {
                 )));
             }
         }
+        // A remote that is a folder of the server is a folder like any other.
+        if operation == "add_remote" {
+            let url = text(&request, "url").ok_or_else(|| invalid("url is missing"))?;
+            let local = match url.strip_prefix("file://") {
+                Some(path) => Some(path.to_owned()),
+                None if !url.contains("://") => Some(url),
+                None => None,
+            };
+            if let Some(path) = local {
+                let resolved = inside(&self.folders(user), Path::new(&path))?;
+                request["url"] = json!(resolved);
+            }
+            return Ok(request);
+        }
         let field = match operation {
             "backup" => "source",
             "restore" => "target",
+            "sync" | "conflicts" | "resolve_conflict" => "folder",
+            "plugin_add" => "file",
             _ => return Ok(request),
         };
         let path = text(&request, field).ok_or_else(|| invalid(format!("{field} is missing")))?;

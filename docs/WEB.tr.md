@@ -65,8 +65,8 @@ DESKTOP.tr.md §3'teki istekler şu farklarla kalır:
 | `POST /api/logout` | Oturumu kapatır ve unutur; bir kimlik sağlayıcısı üzerinden açılmış oturumdan sonra orada da nereden çıkılacağını söyler ([IDENTITY.tr.md](IDENTITY.tr.md) §4) |
 | `GET /api/health` | Oturum açmadan izinli: `{"ok", "role": "primary" ya da "standby"}`; depo okunamıyorsa `503` ([REPLICATION.tr.md](REPLICATION.tr.md) §5) |
 | `POST /api/open`, `POST /api/init`, `/api/schedule` | `unsupported` ile reddedilir |
-| `POST /api/call/<operation>` | Yalnızca `info`, `resolve`, `log`, `list`, `diff`, `diff_text`, `refs`, `reflog`, bir `admin` için ayrıca `retention`, `add_retention` ([ARCHIVE.tr.md](ARCHIVE.tr.md)); diğerleri `unsupported` ile reddedilir |
-| `POST /api/start/<operation>` | Yalnızca `backup`, `restore`, `verify`, `search`, `report` ([REPORTS.tr.md](REPORTS.tr.md)); bir yedeğin `source` alanı ve bir geri yüklemenin `target` alanı bir `--folder` içinde olmalıdır |
+| `POST /api/call/<operation>` | Yalnızca `info`, `resolve`, `log`, `list`, `diff`, `diff_text`, `refs`, `reflog`; bir `admin` için ayrıca `retention`, `add_retention` ([ARCHIVE.tr.md](ARCHIVE.tr.md)), `remotes`, `add_remote`, `remove_remote`, `keys`, `add_password`, `add_recovery_key`, `remove_key`, `plugins`, `plugin_add`, `plugin_remove`, `conflicts`, `resolve_conflict`; diğerleri `unsupported` ile reddedilir |
+| `POST /api/start/<operation>` | Yalnızca `backup`, `restore`, `verify`, `search`, `report` ([REPORTS.tr.md](REPORTS.tr.md)), bir `admin` için ayrıca `sync` (yedek sunucuda değil); bir yedeğin `source` alanı, bir geri yüklemenin `target` alanı, bir senkronun ya da çatışma kopyalarının `folder` alanı, bir eklentinin `.wasm` dosyası ve klasör olan bir uzak depo bir `--folder` içinde olmalıdır; eklenti klasörü (`dir`) verilemez |
 | `GET /api/folders` | Yalnızca bir `--folder` içinde; yol verilmezse ilki; bir `--folder` üzerinde `parent` boştur |
 | `GET /git/<prefix>/info/refs`, `POST /git/<prefix>/git-upload-pack`, `POST /git/<prefix>/git-receive-pack` | Oturumla değil, kullanıcının adı ve parolasıyla `git clone`, `git fetch` ve `git push` ([GIT.tr.md](GIT.tr.md) §7) |
 
@@ -82,7 +82,7 @@ Geçerli bir oturumu olmayan istek, `invalid_input` türü ve `"sign_in": true` 
 | Art arda 5 yanlış paroladan sonra her oturum açma 60 saniye reddedilir (429 durumu, `locked` türü) | Parolayı tahmin etmek çok uzun sürer; bedeli, tahmin eden birinin sahibini bir süre dışarıda tutabilmesidir |
 | `Origin` başlığı olan bir istekte o başlığın sunucusu `Host` başlığıyla aynı olmalıdır | Başka bir site API'yi çağıramaz |
 | Yollar bağlantılar ve `..` çözüldükten sonra karşılaştırılır; henüz olmayan bir geri yükleme hedefi en yakın var olan üst klasörüyle denetlenir | Kimse dolambaçlı bir yolla `--folder` dışındaki bir klasöre ulaşamaz |
-| Yalnızca §4'teki işlemler | Daha uzağa uzanan uzak hedefler, anahtarlar, dışa aktarma ve eklentiler CLI'da kalır |
+| Yalnızca §4'teki işlemler; uzak depolar, senkron, anahtarlar ve eklentiler yalnızca bir `admin` için | Bunlar bütün depoya, parolalarına, sunucunun diskine ve başka bilgisayarlara uzanır; dışa aktarma, çöp toplama ve iş dosyası CLI'da kalır. Yeni bir parola denetim kaydına asla yazılmaz |
 | DESKTOP.tr.md §4'teki başlıklar (CSP, `no-store`, `nosniff`) | Aynı sayfalar, aynı kurallar |
 
 Bir `admin` deponun her yedeğini okuyabilir ve sunucuyu çalıştıran kullanıcının haklarıyla `--folder` klasörlerine yazabilir; diğer roller daha azına ulaşır (USERS.tr.md §1). Bu yüzden sunucu root olarak değil, sıradan bir kullanıcı olarak çalıştırılmalıdır.
@@ -94,7 +94,6 @@ Bir `admin` deponun her yedeğini okuyabilir ve sunucuyu çalıştıran kullanı
 | Birden çok kullanıcı, roller ve yedek başına haklar | 3. iş ([USERS.tr.md](USERS.tr.md)) |
 | Kimin ne yaptığının kaydı | 4. iş ([AUDIT.tr.md](AUDIT.tr.md)) |
 | Let's Encrypt sertifikaları | Sonra; bugün Caddy gibi bir vekil bunu `--plain` ile yapar |
-| Sayfalarda uzak hedefler, senkron, anahtarlar ve eklentiler | Sonra |
 
 ## 7. Crate'ler
 

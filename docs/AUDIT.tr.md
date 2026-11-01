@@ -14,7 +14,7 @@ Birkaç kişi bir yedek sunucusunu paylaştığında admin, "bu klasörü kim, n
 | `git_fetch` | `git clone` ya da `git fetch`'e gönderilen her paket | Ref öneki ve istenen ref'ler |
 | `git_push` | Her `git push` | Ref öneki ve her ref'in yeni Git kimliği ve hatası; hiçbir ref taşınmadıysa sonuç `conflict`'tir |
 | `sign_out` | Oturumu kapatma | |
-| `call:<operation>` | `list` ya da `log` gibi her kısa işlem | USERS.tr.md §4'teki denetimlerden sonraki istek; snapshot'lar kimlik olarak, yollar çözülmüş olarak |
+| `call:<operation>` | `list` ya da `log` gibi her kısa işlem | USERS.tr.md §4'teki denetimlerden sonraki istek; snapshot'lar kimlik olarak, yollar çözülmüş olarak; içindeki bir `password` `null` olarak yazılır |
 | `start:<operation>` | Başlatılan her uzun işlem: `backup`, `restore`, `verify`, `search` | Aynısı |
 | `done:<operation>` | Uzun bir işlemin sonucu alındığında | İş numarası |
 | `cancel` | Bir işi durdurma isteği | İş numarası |

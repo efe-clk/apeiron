@@ -29,6 +29,9 @@ const may = {
   readLog: () => user?.role === "admin",
   share: () => user !== null && user.role !== "reader",
   manageUsers: () => user?.role === "admin",
+  // Remotes, sync, keys and plugins reach the whole repository and the
+  // server's disk: on the web only for an admin (WEB.md §4).
+  manage: () => mode === "local" || user?.role === "admin",
 };
 
 const main = document.getElementById("main");
@@ -292,8 +295,9 @@ function showNav(current) {
     may.verify() ? item("verify", verify) : null,
     may.verify() ? item("report", report) : null,
     may.verify() ? item("retention", retention) : null,
-    mode === "local" ? item("sync", () => sync()) : null,
-    mode === "local" ? item("plugins", plugins) : null,
+    may.manage() ? item("sync", () => sync()) : null,
+    may.manage() ? item("keys", keys) : null,
+    may.manage() ? item("plugins", plugins) : null,
     mode === "local" ? item("schedule", schedule) : null,
     may.share() ? item("shares", shares) : null,
     may.readLog() ? item("activity", activity) : null,
@@ -893,6 +897,88 @@ function syncView(r, dryRun) {
     out.push(message("bad", [t("warnings"), ...r.warnings.map((w) => h("div", {}, `${w.path}: ${w.message}`))]));
   }
   return out;
+}
+
+// ---- Passwords and recovery keys (FORMAT.md §15) ----
+
+async function keys() {
+  showNav("keys");
+  show(h("p", {}, t("loading")));
+  let info, list;
+  try {
+    info = await call("info");
+    list = info.encrypted ? await call("keys") : [];
+  } catch (err) {
+    show(h("h1", {}, t("keys_heading")), errorMessage(err));
+    return;
+  }
+  if (!info.encrypted) {
+    show(h("h1", {}, t("keys_heading")), message("", t("keys_not_encrypted")));
+    return;
+  }
+  const status = h("div");
+  const rows = list.map((k) => h("tr", {},
+    h("td", { class: "nowrap" }, t(`keys_kind_${k.kind}`), k.current ? h("div", { class: "muted" }, t("keys_current")) : null),
+    h("td", { class: "nowrap" }, k.created),
+    h("td", {}, h("code", {}, k.id)),
+    h("td", { class: "nowrap" }, h("button", { type: "button", disabled: list.length < 2, onclick: async (e) => {
+      if (!confirm(t("keys_remove_ask"))) return;
+      e.target.disabled = true;
+      try {
+        await call("remove_key", { id: k.id });
+        keys();
+      } catch (err) {
+        status.replaceChildren(errorMessage(err));
+        e.target.disabled = false;
+      }
+    } }, t("remove")))));
+  const password = h("input", { type: "password", autocomplete: "new-password", required: true, minlength: 8 });
+  const again = h("input", { type: "password", autocomplete: "new-password", required: true });
+  const form = h("form", { onsubmit: async (e) => {
+    e.preventDefault();
+    status.replaceChildren();
+    if (password.value !== again.value) {
+      status.replaceChildren(message("bad", t("passwords_differ")));
+      return;
+    }
+    try {
+      await call("add_password", { password: password.value });
+      await keys();
+      main.append(message("good", t("keys_password_added")));
+    } catch (err) {
+      status.replaceChildren(errorMessage(err));
+    }
+  } },
+    ...field(t("password"), password, t("keys_password_hint")),
+    ...field(t("password_again"), again),
+    h("div", { class: "actions" },
+      h("button", { type: "submit", class: "primary" }, t("keys_add_password")),
+      h("button", { type: "button", onclick: async (e) => {
+        e.target.disabled = true;
+        status.replaceChildren();
+        try {
+          const added = await call("add_recovery_key");
+          await keys();
+          main.append(h("div", { class: "card" },
+            h("h2", {}, t("recovery_heading")),
+            h("p", {}, t("recovery_text")),
+            message("key", added.recovery_key)));
+        } catch (err) {
+          status.replaceChildren(errorMessage(err));
+          e.target.disabled = false;
+        }
+      } }, t("keys_add_recovery"))),
+  );
+  show(
+    h("h1", {}, t("keys_heading")),
+    h("p", { class: "muted" }, t("keys_intro")),
+    h("div", { class: "card scroll" }, h("table", {},
+      h("thead", {}, h("tr", {}, ...["keys_kind", "keys_created", "keys_id", ""].map((k) => h("th", {}, k ? t(k) : "")))),
+      h("tbody", {}, ...rows))),
+    h("h2", {}, t("keys_add")),
+    h("div", { class: "card" }, form),
+    status,
+  );
 }
 
 // ---- Plugins (PLUGIN.md §1) ----

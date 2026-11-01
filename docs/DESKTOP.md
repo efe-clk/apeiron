@@ -38,6 +38,7 @@ The pages call only the JSON API, and the JSON API calls only the public API (AR
 | Compare | What changed between a snapshot and the one before it, with the changed lines and words of text files when the text plugin is installed (TEXT.md §3) | Done |
 | Verify | Checks the whole repository and says in plain words whether it is healthy | Done |
 | Sync | Lists, adds and removes remotes, and runs a sync round of a folder with one of them, both ways or one way, or only shows what would change (SYNC.md); lists the changes made and every conflict with its conflict copy; finds the conflict copies in the folder and keeps either version of each with one button (SYNC.md §4) | Done |
+| Passwords | For an encrypted repository: lists its passwords and recovery keys, adds a password, makes a recovery key and shows it once, and removes a key but never the last one (FORMAT.md §15) | Done |
 | Plugins | Lists the installed plugins with the files they handle, installs one from a `.wasm` file and removes one, as `apeiron plugin` does (PLUGIN.md §1) | Done |
 | Schedule | Shows the background service's jobs with their last result and next run, and edits the jobs file; a file with an error is not saved, and one broken by hand is shown with its error (DAEMON.md §3) | Done |
 

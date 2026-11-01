@@ -439,7 +439,11 @@ async fn checked<T: Send + 'static>(
         };
         let event = format!("{}:{operation}", if long { "start" } else { "call" });
         let checked = web.check(&repo, &who.user, long, &operation, request.clone());
-        let detail = checked.as_ref().map_or(request, Value::clone);
+        let mut detail = checked.as_ref().map_or(request, Value::clone);
+        // A new password of the repository is never written down.
+        if let Some(password) = detail.get_mut("password") {
+            *password = Value::Null;
+        }
         let checked = match checked {
             Err(e) => {
                 web.audit

@@ -14,7 +14,7 @@ When several people share a backup server, the admin must be able to answer "who
 | `git_fetch` | Every pack sent to `git clone` or `git fetch` | The ref prefix and the refs asked for |
 | `git_push` | Every `git push` | The ref prefix and each ref with its new Git id and error; the outcome is `conflict` when no ref moved |
 | `sign_out` | Signing out | |
-| `call:<operation>` | Every short operation, such as `list` or `log` | The request after the checks of USERS.md §4, with snapshots as ids and paths resolved |
+| `call:<operation>` | Every short operation, such as `list` or `log` | The request after the checks of USERS.md §4, with snapshots as ids and paths resolved; a `password` in it is written as `null` |
 | `start:<operation>` | Every long operation started: `backup`, `restore`, `verify`, `search` | The same |
 | `done:<operation>` | When the result of a long operation is collected | The job number |
 | `cancel` | A request to stop a job | The job number |

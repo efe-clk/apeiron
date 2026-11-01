@@ -65,8 +65,8 @@ The requests of DESKTOP.md §3 stay, with these differences:
 | `POST /api/logout` | Signs out and forgets the session; after a sign-in through an identity provider, also says where to sign out there ([IDENTITY.md](IDENTITY.md) §4) |
 | `GET /api/health` | Allowed without signing in: `{"ok", "role": "primary" or "standby"}`, `503` when the repository cannot be read ([REPLICATION.md](REPLICATION.md) §5) |
 | `POST /api/open`, `POST /api/init`, `/api/schedule` | Refused with `unsupported` |
-| `POST /api/call/<operation>` | Only `info`, `resolve`, `log`, `list`, `diff`, `diff_text`, `refs`, `reflog`, and for an `admin` `retention`, `add_retention` ([ARCHIVE.md](ARCHIVE.md)); others are refused with `unsupported` |
-| `POST /api/start/<operation>` | Only `backup`, `restore`, `verify`, `search`, `report` ([REPORTS.md](REPORTS.md)); `source` of a backup and `target` of a restore must be inside a `--folder` |
+| `POST /api/call/<operation>` | Only `info`, `resolve`, `log`, `list`, `diff`, `diff_text`, `refs`, `reflog`; for an `admin` also `retention`, `add_retention` ([ARCHIVE.md](ARCHIVE.md)), `remotes`, `add_remote`, `remove_remote`, `keys`, `add_password`, `add_recovery_key`, `remove_key`, `plugins`, `plugin_add`, `plugin_remove`, `conflicts`, `resolve_conflict`; others are refused with `unsupported` |
+| `POST /api/start/<operation>` | Only `backup`, `restore`, `verify`, `search`, `report` ([REPORTS.md](REPORTS.md)), and for an `admin` `sync` (not on a standby); `source` of a backup, `target` of a restore, `folder` of a sync or of conflict copies, the `.wasm` file of a plugin and a remote that is a folder must be inside a `--folder`; a plugin folder (`dir`) cannot be given |
 | `GET /api/folders` | Only inside a `--folder`; without a path, the first one; `parent` is empty at a `--folder` |
 | `GET /git/<prefix>/info/refs`, `POST /git/<prefix>/git-upload-pack`, `POST /git/<prefix>/git-receive-pack` | `git clone`, `git fetch` and `git push` with the user's name and password, not a session ([GIT.md](GIT.md) §7) |
 
@@ -82,7 +82,7 @@ A request without a valid session has status 401 with the kind `invalid_input` a
 | After 5 wrong passwords in a row, every sign-in is refused for 60 seconds (status 429, kind `locked`) | Guessing the password takes too long; the cost is that someone who guesses can keep the owner out for a while |
 | A request with an `Origin` header must have the same host as its `Host` header | Another site cannot call the API |
 | Paths are compared after resolving links and `..`; a restore target that does not exist yet is checked through its nearest existing parent | Nobody reaches a folder outside `--folder` by a detour |
-| Only the operations of §4 | Remotes, keys, export and plugins, which reach further, stay with the CLI |
+| Only the operations of §4; remotes, sync, keys and plugins only for an `admin` | They reach the whole repository, its passwords, the server's disk and other computers; export, garbage collection and the jobs file stay with the CLI. A new password is never written to the audit log |
 | The headers of DESKTOP.md §4 (CSP, `no-store`, `nosniff`) | The same pages, the same rules |
 
 An `admin` can read every backup of the repository and write into the `--folder` folders with the rights of the user that runs the server; other roles reach less (USERS.md §1). The server should therefore run as an ordinary user, never as root.
@@ -94,7 +94,6 @@ An `admin` can read every backup of the repository and write into the `--folder`
 | Several users, roles and rights per backup | Work item 3 ([USERS.md](USERS.md)) |
 | A record of who did what | Work item 4 ([AUDIT.md](AUDIT.md)) |
 | Certificates from Let's Encrypt | Later; a proxy such as Caddy does this today with `--plain` |
-| Remotes, sync, keys and plugins in the pages | Later |
 
 ## 7. Crates
 

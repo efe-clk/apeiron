@@ -15,6 +15,8 @@ A family or a small office shares one backup server: each person backs up and re
 | Restore | Yes | Yes | No |
 | Check the repository | Yes | No | No |
 | See and add retention rules ([ARCHIVE.md](ARCHIVE.md)) | Yes | No | No |
+| Remotes, sync, passwords and plugins in the pages ([WEB.md](WEB.md) §4) | Yes | No | No |
+| `git push` ([GIT.md](GIT.md) §7.1) | Into any branch | Into its backups | No |
 | Share with a link ([SHARE.md](SHARE.md)) | Any version | Versions it sees | No |
 | Folders of the server | Its folders, or all `--folder` folders when it has none | Its folders only | None |
 

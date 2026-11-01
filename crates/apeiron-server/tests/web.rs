@@ -380,11 +380,11 @@ fn only_the_pages_operations_and_folders() {
 
     // Operations beyond the pages are refused.
     for (kind, operation) in [
-        ("call", "add_remote"),
-        ("call", "keys"),
-        ("call", "plugins"),
+        ("call", "repair"),
+        ("call", "create_ref"),
         ("start", "export"),
         ("start", "gc"),
+        ("start", "push"),
     ] {
         let reply = c.post(&format!("/api/{kind}/{operation}"), json!({}));
         assert_eq!(reply.json()["kind"], "unsupported", "{operation}");
@@ -1240,10 +1240,10 @@ fn an_admin_adds_and_lists_retention_rules() {
         "/api/users",
         json!({"name": "ayse", "role": "member", "password": PASSWORD, "backups": ["backup/*"]}),
     );
-    // Conflict copies are files of the desktop's own computer.
+    // Conflict copies are looked for only inside the allowed folders.
     assert_eq!(
         c.kind("/api/call/conflicts", json!({"folder": "/"})).1,
-        "unsupported"
+        "invalid_input"
     );
     let ayse = c.other("ayse");
     assert_eq!(ayse.kind("/api/call/retention", json!({})).1, "unsupported");
@@ -1416,4 +1416,90 @@ fn a_link_ends_after_its_downloads() {
         404
     );
     assert_eq!(root.get("/api/shares").json(), json!([]));
+}
+
+#[test]
+fn an_admin_manages_remotes_sync_keys_and_plugins() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_server, mut root, home) = start(dir.path());
+    root.sign_in();
+    let call =
+        |c: &Client, operation: &str, body: Value| c.post(&format!("/api/call/{operation}"), body);
+
+    // A remote that is a folder must be inside the allowed folders.
+    let outside = dir.path().join("outside-remote");
+    let reply = call(&root, "add_remote", json!({"name": "far", "url": outside}));
+    assert_eq!(reply.json()["kind"], "invalid_input");
+    let reply = call(
+        &root,
+        "add_remote",
+        json!({"name": "far", "url": format!("file://{}", outside.display())}),
+    );
+    assert_eq!(reply.json()["kind"], "invalid_input");
+    let reply = call(
+        &root,
+        "add_remote",
+        json!({"name": "nas", "url": home.join("nas")}),
+    );
+    assert_eq!(reply.status, 200, "{}", reply.body);
+    assert_eq!(call(&root, "remotes", json!({})).json()[0]["name"], "nas");
+
+    // A sync round of an allowed folder with it.
+    let done = root.run("sync", json!({"folder": home.join("src"), "remote": "nas"}));
+    assert_eq!(done["result"]["action"], "sent", "{done}");
+    let reply = root.post(
+        "/api/start/sync",
+        json!({"folder": dir.path().join("outside"), "remote": "nas"}),
+    );
+    assert_eq!(reply.json()["kind"], "invalid_input");
+    let conflicts = call(&root, "conflicts", json!({"folder": home.join("src")}));
+    assert_eq!(conflicts.json(), json!([]));
+
+    // Plugins: a file outside the folders, or another plugin folder, is refused.
+    let reply = call(
+        &root,
+        "plugin_add",
+        json!({"file": dir.path().join("x.wasm")}),
+    );
+    assert_eq!(reply.json()["kind"], "invalid_input");
+    let reply = call(&root, "plugins", json!({"dir": dir.path()}));
+    assert_eq!(reply.json()["kind"], "invalid_input");
+
+    // A password given is never written to the audit log.
+    let _ = call(
+        &root,
+        "add_password",
+        json!({"password": "a secret phrase"}),
+    );
+    let log = fs::read_to_string(dir.path().join("audit.log")).unwrap();
+    assert!(
+        log.contains("add_password") && !log.contains("a secret phrase"),
+        "{log}"
+    );
+
+    // Nobody else may.
+    let file = dir.path().join("config/web.json");
+    let mut users = Users::load(&file).unwrap();
+    users
+        .add(User {
+            name: "ayse".to_owned(),
+            password: hash(),
+            role: Role::Member,
+            backups: vec!["backup/*".to_owned()],
+            folders: vec![home.clone()],
+            oidc: None,
+            totp: None,
+        })
+        .unwrap();
+    users.save(&file).unwrap();
+    let ayse = root.other("ayse");
+    for operation in ["remotes", "keys", "plugins", "add_remote", "conflicts"] {
+        let reply = call(&ayse, operation, json!({"folder": home.join("src")}));
+        assert_eq!(reply.json()["kind"], "unsupported", "{operation}");
+    }
+    let reply = ayse.post(
+        "/api/start/sync",
+        json!({"folder": home.join("src"), "remote": "nas"}),
+    );
+    assert_eq!(reply.json()["kind"], "unsupported");
 }
