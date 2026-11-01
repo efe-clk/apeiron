@@ -19,7 +19,7 @@ When several people share a backup server, the admin must be able to answer "who
 | `done:<operation>` | When the result of a long operation is collected | The job number |
 | `cancel` | A request to stop a job | The job number |
 | `share_add`, `share_remove` | Making or removing a share link | The link's id, version, path and end ([SHARE.md](SHARE.md) §6) |
-| `shared:list`, `shared:read` | Every use of a share link, without signing in | The link's id and the path; never the link's secret |
+| `shared:list`, `shared:read`, `shared:upload` | Every use of a share link, without signing in; `shared:upload` names the file sent ([SHARE.md](SHARE.md) §7) | The link's id and the path; never the link's secret |
 | `shared:unlock` | Every password given for a share link | The link's id; never the password or the secret |
 | `user_add`, `user_change`, `user_password`, `user_remove` | `apeiron web user`, or an admin on the Users page | The name, role, backups, folders and identity; never the password |
 | `user_second_factor_on`, `user_second_factor_off` | `apeiron web user second-factor` | The name; never the secret |

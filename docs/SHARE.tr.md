@@ -103,20 +103,41 @@ Masaüstü arayüzünde paylaşım yoktur: yalnızca onu kendi bilgisayarında �
 | `share_remove` | Bağlantının kimliği |
 | `shared:list`, `shared:read` | Bağlantının kimliği ve istenen yol; kullanıcı yok, bağlantının adresi var |
 | `shared:unlock` | Bağlantının kimliği ve parolanın doğru olup olmadığı (`ok`, `key`, `locked`); parolanın kendisi asla |
+| `shared:upload` | Bağlantının kimliği ve verilen dosya adı; kullanıcı yok, bağlantının adresi var |
 
 Gizli kısım asla kaydedilmez ([AUDIT.tr.md](AUDIT.tr.md)).
 
-## 7. Bu işin parçası olmayanlar
+## 7. Yükleme bağlantıları
+
+Tersi yönde: Ayşe muhasebecisinden bu yılın belgelerini ister ve muhasebeci onları hesabı olmadan Ayşe'nin yedeklerinden birine gönderir.
+
+| Kural | Ayrıntı |
+| --- | --- |
+| Ne | Bağlantı oluşturulurken adı verilen bir yedeğin, yani ref'in bir klasörüne (varsayılan `uploads`) gönderilen dosyalar; yedek var olmalıdır |
+| Kim oluşturur | Bir `admin` her yedek için, bir `member` kendi yedekleri için (USERS.tr.md §1); Genel bakış sayfasında bir yedeğin yanındaki Dosya iste düğmesi ya da `POST /api/shares` `{"upload": "<ref>", "path", "days", "password", "downloads"}` |
+| Bağlantı ne verir | Yalnızca dosya göndermek: bağlantı sahibi yedekten hiçbir şey, klasörde ne olduğunu bile görmez; §5'teki okuma istekleri "bulunamadı" yanıtı verir |
+| Her dosya | Yedeğin, ebeveyni en yeni sürüm olan ve iletisi `upload <ad> through link <kimlik>` olan yeni bir sürümü olur: yedeğin tuttuğu her şey kalır, klasörde zaten olan bir ad uzantısından önce ` (2)`, ` (3)` … alır. Hiçbir şey asla değiştirilmez ya da silinmez |
+| Boyut | Dosya başına en çok 1 GiB; dosyalar geldikçe okunur ve parçalar hâlinde saklanır, asla bütün olarak bellekte ya da sunucunun diskinde tutulmaz |
+| Adlar | Tek bir dosya adı: boş değil, `/`, `\` ya da denetim karakteri içermeyen, `.` ya da `..` olmayan, en çok 255 bayt |
+
+Bağlantı bir okuma bağlantısı gibi biter (§2): süre, kaldırılma, artık yedeğe yazamayan bir sahip ya da sınır seçildiyse aldığı dosya sayısı; bir dosya başladığı anda sayılır. Aynı şekilde parola isteyebilir. Paylaşımlar dosyasında ref'le birlikte `upload`, klasörle birlikte `path` ve bağlantı oluşturulduğunda yedeğin sahip olduğu sürümle birlikte `snapshot` bulunur; `downloads` alınan dosyaları sayar. Alınan bir dosya, bir yedek gibi yedek sunuculara kopyalanır (REPLICATION.tr.md §4).
+
+| İstek | Ne |
+| --- | --- |
+| `GET /api/shared/<gizli>` | `{"upload": true, "expires", "uploads_left", "max_size"}` |
+| `POST /api/shared/<gizli>/upload?name=<dosya adı>` | Gövde olarak dosyanın baytları; aldığı yol ve boyutuyla yanıt verir |
+
+## 8. Bu işin parçası olmayanlar
 
 | Konu | Nerede |
 | --- | --- |
-| Başkalarının yükleme yapabildiği bağlantılar | Sonra |
 | Sunucunun adı belli kullanıcılarıyla paylaşmak | Gerekmez: kullanıcılar dosyasında yedeği kullanıcıya verin (USERS.tr.md §2) |
 
-## 8. Crate'ler
+## 9. Crate'ler
 
 | Crate | Görevi | Durum |
 | --- | --- | --- |
-| `apeiron` | `Repository::read_file`: bir sürümdeki bir dosyanın içeriği, akış olarak ([API.tr.md](API.tr.md) §8.3) | Tamamlandı |
-| `apeiron-server` | Paylaşımlar dosyası, denetimler, `/api/shares`, `/api/shared`, Bağlantılar sayfası ve bağlantıyı açan kişinin sayfası | Tamamlandı |
+| `apeiron-services` | `add_file`: bir yedeğe yeni bir sürüm olarak eklenen dosya (bölüm 7) | Tamamlandı |
+| `apeiron` | `Repository::read_file`: bir sürümdeki bir dosyanın içeriği, akış olarak ([API.tr.md](API.tr.md) §8.3); `Repository::add_file` | Tamamlandı |
+| `apeiron-server` | Paylaşımlar dosyası, denetimler, `/api/shares`, `/api/shared`, Bağlantılar sayfası, bağlantıyı açan kişinin sayfası ve yükleme sayfası | Tamamlandı |
 | `apeiron-cli` | `apeiron web share` | Tamamlandı |

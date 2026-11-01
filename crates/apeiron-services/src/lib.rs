@@ -19,6 +19,7 @@ mod restore_test;
 mod search;
 mod switch;
 mod sync;
+mod upload;
 
 pub use backup::{BackupOptions, BackupOutcome, backup};
 pub use conflicts::{ConflictCopy, Keep, find_conflicts, original_name, resolve_conflict};
@@ -40,3 +41,4 @@ pub use search::{
 };
 pub use switch::{SwitchOptions, SwitchOutcome, switch};
 pub use sync::{SyncAction, SyncMode, SyncOptions, SyncOutcome, folder_ref, sync};
+pub use upload::{AddFileOptions, AddFileOutcome, add_file};

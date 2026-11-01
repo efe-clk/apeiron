@@ -19,6 +19,8 @@ pub const DEFAULT_DAYS: u32 = 7;
 pub const MAX_DAYS: u32 = 30;
 /// The most downloads a link can be limited to (SHARE.md §2).
 pub const MAX_DOWNLOADS: u32 = 1000;
+/// The largest file an upload link takes (SHARE.md §7).
+pub const MAX_UPLOAD: u64 = 1 << 30;
 
 /// How a new link works (SHARE.md §2).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -28,8 +30,11 @@ pub struct LinkOptions {
     /// Asked of whoever opens it; none when absent or empty.
     pub password: Option<String>,
     /// Downloads after which it ends, 1 to [`MAX_DOWNLOADS`]; none for no
-    /// limit.
+    /// limit. For an upload link, the files it takes.
     pub downloads: Option<u32>,
+    /// For a link that takes files instead of showing them: the ref they
+    /// go into (SHARE.md §7).
+    pub upload: Option<String>,
 }
 
 impl LinkOptions {
@@ -39,6 +44,7 @@ impl LinkOptions {
             days,
             password: None,
             downloads: None,
+            upload: None,
         }
     }
 }
@@ -68,9 +74,15 @@ pub struct Share {
     /// Downloads after which the link ends; none for no limit.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub max_downloads: Option<u32>,
-    /// Files and zip files downloaded through the link so far.
+    /// Files and zip files downloaded through the link so far; for an
+    /// upload link, the files it took.
     #[serde(default)]
     pub downloads: u32,
+    /// For an upload link, the ref the files go into; `snapshot` is then the
+    /// one the ref pointed to when the link was made, and `path` the folder
+    /// the files go into (SHARE.md §7).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub upload: Option<String>,
 }
 
 impl Share {
@@ -257,6 +269,7 @@ impl Shares {
             password,
             max_downloads: options.downloads,
             downloads: 0,
+            upload: options.upload.clone(),
         };
         self.change(|shares| {
             shares.push(share.clone());

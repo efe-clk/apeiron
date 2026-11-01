@@ -22,10 +22,11 @@ use crate::types::{
     SearchRequest, SwitchRequest, TextDiff,
 };
 use crate::{
-    ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo, ExportReport, GcReport,
-    GcRequest, GitExportReport, GitImportReport, GitPushResult, GitPushedRef, GitServedRef,
-    KeyInfo, ObjectId, Phase, ReflogEntry, Remote, RepairReport, RestoreReport, RestoreTestReport,
-    RetentionRule, SearchReport, SwitchReport, SyncReport, TransferReport, VerifyReport,
+    AddFileReport, AddFileRequest, ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo,
+    ExportReport, GcReport, GcRequest, GitExportReport, GitImportReport, GitPushResult,
+    GitPushedRef, GitServedRef, KeyInfo, ObjectId, Phase, ReflogEntry, Remote, RepairReport,
+    RestoreReport, RestoreTestReport, RetentionRule, SearchReport, SwitchReport, SyncReport,
+    TransferReport, VerifyReport,
 };
 
 /// An open repository. Cloning is cheap; clones share the same state and can
@@ -338,6 +339,26 @@ impl Repository {
             &request.path,
             &request.prefix,
         )?)
+    }
+
+    /// Stores what `reader` gives as a new file in a folder of the snapshot
+    /// a ref points to, as a new snapshot on that ref; nothing is replaced
+    /// (SHARE.md §7).
+    pub fn add_file(
+        &self,
+        request: &AddFileRequest,
+        reader: &mut dyn std::io::Read,
+    ) -> Result<AddFileReport> {
+        let _writer = self.lock_writer();
+        let _lock = core::RepoLock::shared(self.path())?;
+        let mut core = self.read().reopen()?;
+        let mut request = request.clone();
+        if request.host.is_none() {
+            request.host = gethostname::gethostname().into_string().ok();
+        }
+        let report = services::add_file(&mut core, &request, reader);
+        *self.write() = core;
+        Ok(report?)
     }
 
     /// Takes `git push` into the Git copy at `request.path`: stores the

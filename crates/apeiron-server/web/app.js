@@ -427,6 +427,7 @@ async function overview() {
         h("td", {}, h("div", { class: "actions" },
           h("button", { type: "button", onclick: () => historyOf(r.name) }, t("history")),
           source && may.backUp() ? h("button", { type: "button", onclick: () => backup(source, r.name) }, t("back_up_again")) : null,
+          may.share() ? h("button", { type: "button", onclick: () => uploadLink(r.name) }, t("upload_link")) : null,
         )),
       );
     }));
@@ -1178,6 +1179,90 @@ function share(snapshot, path) {
   );
 }
 
+// A link that lets others send files into a backup (SHARE.md §7).
+function uploadLink(ref) {
+  showNav("shares");
+  const folder = h("input", { type: "text", value: "uploads", spellcheck: "false" });
+  const days = h("select", {}, ...[1, 7, 30].map((n) => h("option", { value: n, selected: n === 7 }, t(`days_${n}`))));
+  const password = h("input", { type: "password", autocomplete: "new-password", minlength: 8 });
+  const limit = h("select", {}, ...["", 1, 10, 100, 1000].map((n) => h("option", { value: n }, n ? t("upload_files_n", { n }) : t("upload_files_any"))));
+  const status = h("div");
+  const form = h("form", { onsubmit: async (e) => {
+    e.preventDefault();
+    status.replaceChildren();
+    try {
+      const made = await api("POST", "/api/shares", { upload: ref, path: folder.value.trim(), days: Number(days.value), password: password.value, downloads: limit.value ? Number(limit.value) : null });
+      const link = h("input", { type: "text", readonly: true, value: `${location.origin}/s/${made.secret}` });
+      const copied = h("span", { class: "muted", role: "status" });
+      form.replaceChildren(
+        message("good", t(made.share.protected ? "share_made_protected" : "share_made")),
+        h("div", { class: "row" }, link, h("button", { type: "button", onclick: async () => {
+          link.select();
+          await navigator.clipboard?.writeText(link.value).catch(() => {});
+          copied.textContent = t("copied");
+        } }, t("copy"))),
+        copied,
+      );
+      link.select();
+    } catch (err) {
+      status.replaceChildren(errorMessage(err));
+    }
+  } },
+    ...field(t("upload_folder"), folder, t("upload_folder_hint")),
+    ...field(t("share_days"), days),
+    ...field(t("share_password"), password, t("share_password_hint")),
+    ...field(t("upload_files"), limit),
+    h("div", { class: "actions" }, h("button", { type: "submit", class: "primary" }, t("share_button"))),
+  );
+  show(
+    h("h1", {}, t("upload_heading")),
+    h("div", { class: "card" }, h("p", {}, t("upload_intro", { ref: ref.replace(/^backup\//, "") })), form),
+    status,
+  );
+}
+
+// What an upload link shows: a place to send files, nothing of the backup.
+function sharedUpload(secret, view) {
+  const base = `/api/shared/${encodeURIComponent(secret)}`;
+  const files = h("input", { type: "file", multiple: true, required: true });
+  const status = h("div");
+  const button = h("button", { type: "submit", class: "primary" }, t("upload_send"));
+  const form = h("form", { onsubmit: async (e) => {
+    e.preventDefault();
+    button.disabled = true;
+    const lines = h("div");
+    status.replaceChildren(lines);
+    for (const file of files.files) {
+      const line = h("div", {}, `${file.name} …`);
+      lines.append(line);
+      if (file.size > view.max_size) {
+        line.replaceChildren(message("bad", t("upload_too_large", { name: file.name })));
+        continue;
+      }
+      try {
+        const response = await fetch(`${base}/upload?name=${encodeURIComponent(file.name)}`, { method: "POST", body: file });
+        const value = await response.json().catch(() => null);
+        if (!response.ok) throw new ApiError(value);
+        line.replaceChildren(message("good", t("upload_sent", { name: file.name, size: bytes(value.size) })));
+      } catch (err) {
+        line.replaceChildren(errorMessage(err));
+      }
+    }
+    files.value = "";
+    button.disabled = false;
+  } },
+    h("label", {}, files),
+    h("div", { class: "actions" }, button),
+  );
+  const left = view.uploads_left === null || view.uploads_left === undefined ? "" : ` ${t("upload_left", { n: view.uploads_left })}`;
+  show(
+    h("h1", {}, t("upload_guest_heading")),
+    h("p", { class: "muted" }, t("upload_guest_intro", { until: until(view.expires), size: bytes(view.max_size) }), left),
+    h("div", { class: "card" }, form),
+    status,
+  );
+}
+
 const until = (time) => new Date(time).toLocaleString(lang, { dateStyle: "medium", timeStyle: "short" });
 
 async function shares() {
@@ -1187,8 +1272,10 @@ async function shares() {
     const list = await api("GET", "/api/shares");
     const owners = user?.role === "admin";
     const rows = list.map((s) => h("tr", {},
-      h("td", {}, `${s.snapshot.slice(0, 12)}:/${s.path}`, s.protected ? h("div", { class: "muted" }, t("shares_protected")) : null,
-        s.max_downloads ? h("div", { class: "muted" }, t("shares_downloads", { n: s.downloads, max: s.max_downloads })) : null),
+      h("td", {}, s.upload ? `⬆ ${s.upload}:/${s.path}` : `${s.snapshot.slice(0, 12)}:/${s.path}`,
+        s.upload ? h("div", { class: "muted" }, t("shares_upload")) : null,
+        s.protected ? h("div", { class: "muted" }, t("shares_protected")) : null,
+        s.max_downloads ? h("div", { class: "muted" }, t(s.upload ? "shares_uploads" : "shares_downloads", { n: s.downloads, max: s.max_downloads })) : null),
       owners ? h("td", {}, s.owner) : null,
       h("td", {}, until(s.expires)),
       h("td", {}, h("button", { type: "button", onclick: async (e) => {
@@ -1224,6 +1311,7 @@ async function shared(secret, path = "") {
   const download = (sub) => h("a", { class: "button", href: `${base}/file?path=${encodeURIComponent(sub)}`, download: "" }, t("download"));
   try {
     const view = await api("GET", `${base}?path=${encodeURIComponent(path)}`);
+    if (view.upload) return sharedUpload(secret, view);
     let body;
     if (view.entry && view.entry.kind !== "dir") {
       body = h("table", {}, h("tbody", {}, h("tr", {},

@@ -781,16 +781,20 @@ fn web_share(files: &WebFiles, command: ShareCommand, out: &Output) -> Result<()
                 .collect();
             out.result(&list, |list| {
                 for s in list {
+                    // An upload link names the backup it fills (SHARE.md §7).
+                    let (what, counted) = match &s.upload {
+                        Some(target) => (format!("upload into {target}"), "files"),
+                        None => (s.snapshot.to_string()[..12].to_owned(), "downloads"),
+                    };
                     say!(
-                        "{}  {}  {}:/{}  until {}{}{}",
+                        "{}  {}  {what}:/{}  until {}{}{}",
                         s.id,
                         s.owner,
-                        &s.snapshot.to_string()[..12],
                         s.path,
                         s.expires,
                         if s.protected { "  (password)" } else { "" },
                         s.max_downloads
-                            .map(|max| format!("  ({} of {max} downloads)", s.downloads))
+                            .map(|max| format!("  ({} of {max} {counted})", s.downloads))
                             .unwrap_or_default()
                     );
                 }

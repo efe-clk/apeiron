@@ -155,6 +155,26 @@ impl Client {
         (status, body, headers)
     }
 
+    /// A POST of raw bytes, as a browser sends a file, without a cookie.
+    fn post_bytes(&self, path: &str, data: &[u8]) -> Reply {
+        let mut tcp = TcpStream::connect(self.address).unwrap();
+        let head = format!(
+            "POST {path} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\nContent-Length: {}\r\nContent-Type: application/octet-stream\r\n\r\n",
+            self.address,
+            data.len()
+        );
+        tcp.write_all(head.as_bytes()).unwrap();
+        tcp.write_all(data).unwrap();
+        let mut raw = Vec::new();
+        tcp.read_to_end(&mut raw).unwrap();
+        let (status, headers, body) = split_reply(&raw);
+        Reply {
+            status,
+            headers,
+            body: String::from_utf8(body).unwrap(),
+        }
+    }
+
     fn post(&self, path: &str, body: Value) -> Reply {
         self.send("POST", path, Some(&body), &[])
     }
@@ -182,6 +202,15 @@ impl Client {
         };
         c.sign_in_as(name);
         c
+    }
+
+    /// A client of the same server without a session, as a link holder.
+    fn other_anonymous(&self) -> Client {
+        Client {
+            address: self.address,
+            tls: self.tls.clone(),
+            cookie: None,
+        }
     }
 
     fn kind(&self, path: &str, body: Value) -> (u16, String) {
@@ -1502,4 +1531,75 @@ fn an_admin_manages_remotes_sync_keys_and_plugins() {
         json!({"folder": home.join("src"), "remote": "nas"}),
     );
     assert_eq!(reply.json()["kind"], "unsupported");
+}
+
+#[test]
+fn upload_links_take_files_into_a_backup() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_server, mut root, home) = start(dir.path());
+    root.sign_in();
+    let done = root.run(
+        "backup",
+        json!({"source": home.join("src"), "ref": "backup/inbox"}),
+    );
+    assert!(done["result"]["snapshot"].is_string(), "{done}");
+
+    // A link that takes at most two files into the folder `from-guests`.
+    let made = root.post(
+        "/api/shares",
+        json!({"upload": "backup/inbox", "path": "from-guests", "days": 1, "downloads": 2}),
+    );
+    assert_eq!(made.status, 200, "{}", made.body);
+    let secret = made.json()["secret"].as_str().unwrap().to_owned();
+    let base = format!("/api/shared/{secret}");
+    let guest = root.other_anonymous();
+
+    // The guest sees nothing of the backup.
+    let view = guest.get(&base).json();
+    assert_eq!(view["upload"], true);
+    assert_eq!(view["uploads_left"], 2);
+    assert!(view.get("entries").is_none(), "{view}");
+    assert_eq!(guest.get(&format!("{base}/file?path=a.txt")).status, 404);
+
+    // A file larger than a request body usually may be is taken whole.
+    let big: Vec<u8> = (0..3_000_000u32).map(|n| (n % 251) as u8).collect();
+    let reply = guest.post_bytes(&format!("{base}/upload?name=big.bin"), &big);
+    assert_eq!(reply.status, 200, "{}", reply.body);
+    assert_eq!(reply.json()["path"], "from-guests/big.bin");
+    let reply = guest.post_bytes(&format!("{base}/upload?name=big.bin"), b"second");
+    assert_eq!(reply.json()["path"], "from-guests/big (2).bin");
+    // The limit is reached: the link is gone.
+    let reply = guest.post_bytes(&format!("{base}/upload?name=c.txt"), b"third");
+    assert_eq!(reply.status, 404);
+
+    let listing = root
+        .post(
+            "/api/call/list",
+            json!({"snapshot": "backup/inbox", "path": "from-guests"}),
+        )
+        .json();
+    let names: Vec<&str> = listing
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| e["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["big (2).bin", "big.bin"]);
+    let files = root
+        .post(
+            "/api/call/list",
+            json!({"snapshot": "backup/inbox", "path": ""}),
+        )
+        .json();
+    assert!(files.to_string().contains("a.txt"), "{files}");
+
+    // Names that are not one file name are refused.
+    let made = root.post("/api/shares", json!({"upload": "backup/inbox", "days": 1}));
+    let secret = made.json()["secret"].as_str().unwrap().to_owned();
+    for name in ["..%2Fx", "a%2Fb", ""] {
+        let reply = guest.post_bytes(&format!("/api/shared/{secret}/upload?name={name}"), b"x");
+        assert_eq!(reply.status, 400, "{name}: {}", reply.body);
+    }
+    let log = fs::read_to_string(dir.path().join("audit.log")).unwrap();
+    assert!(log.contains("shared:upload"), "{log}");
 }

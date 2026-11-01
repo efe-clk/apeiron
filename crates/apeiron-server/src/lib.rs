@@ -766,7 +766,11 @@ fn web_user(app: &App, who: Option<Extension<Who>>) -> Result<(&WebState, Who), 
 
 #[derive(Deserialize)]
 struct NewShare {
+    #[serde(default)]
     snapshot: String,
+    /// For a link that takes files: the ref they go into (SHARE.md §7).
+    #[serde(default)]
+    upload: Option<String>,
     #[serde(default)]
     path: String,
     #[serde(default = "default_days")]
@@ -797,6 +801,7 @@ async fn share_add(
             days: r.days,
             password: r.password.clone(),
             downloads: r.downloads,
+            upload: r.upload.clone(),
         };
         match web.share(&repo, &who.user, &r.snapshot, &r.path, &options) {
             Ok((share, secret)) => {
@@ -807,6 +812,7 @@ async fn share_add(
                     "expires": share.expires,
                     "protected": share.protected,
                     "max_downloads": share.max_downloads,
+                    "upload": share.upload,
                 });
                 // A link that cannot be recorded does not stay.
                 if let Err(e) = web.audit.record(&who.actor(), "share_add", detail, "ok") {
@@ -816,7 +822,7 @@ async fn share_add(
                 Ok(json!({"share": share.public(), "secret": secret}))
             }
             Err(e) => {
-                let detail = json!({"snapshot": r.snapshot, "path": r.path, "days": r.days});
+                let detail = json!({"snapshot": r.snapshot, "upload": r.upload, "path": r.path, "days": r.days});
                 web.audit
                     .record(&who.actor(), "share_add", detail, &outcome(Err(&e)))?;
                 Err(e)
@@ -960,6 +966,81 @@ async fn shared_unlock(
     };
     let repo = app.repo()?;
     web.unlock_share(&repo, &secret, bytes, &actor).await
+}
+
+#[derive(Deserialize)]
+struct UploadQuery {
+    name: String,
+}
+
+/// Takes one file through an upload link, read as it arrives, into the
+/// link's backup as a new version (SHARE.md §7).
+async fn shared_upload(
+    State(app): State<Arc<App>>,
+    UrlPath(secret): UrlPath<String>,
+    from: Option<Extension<ConnectInfo<SocketAddr>>>,
+    headers: HeaderMap,
+    Query(q): Query<UploadQuery>,
+    body: axum::body::Body,
+) -> Answer {
+    let (sender, receiver) = tokio::sync::mpsc::channel::<io::Result<Bytes>>(4);
+    tokio::spawn(async move {
+        use futures_util::StreamExt as _;
+        let mut stream = body.into_data_stream();
+        while let Some(piece) = stream.next().await {
+            let piece = piece.map_err(io::Error::other);
+            if sender.send(piece).await.is_err() {
+                break;
+            }
+        }
+    });
+    let mut reader = FromChannel {
+        receiver,
+        piece: Bytes::new(),
+        total: 0,
+    };
+    let name = q.name.clone();
+    let added = through_link(
+        app.clone(),
+        secret,
+        web::share_cookie(&headers),
+        from,
+        "shared:upload",
+        q.name,
+        move |web, repo, share| web.shared_upload(repo, share, &name, &mut reader),
+    )
+    .await?;
+    if let Mode::Web(web) = &app.mode {
+        web.replicate_now();
+    }
+    Ok(axum::Json(json!({"path": added.path, "size": added.size})))
+}
+
+/// Reads a request body that arrives through a channel; refuses more than
+/// [`shares::MAX_UPLOAD`] bytes.
+struct FromChannel {
+    receiver: tokio::sync::mpsc::Receiver<io::Result<Bytes>>,
+    piece: Bytes,
+    total: u64,
+}
+
+impl io::Read for FromChannel {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        while self.piece.is_empty() {
+            match self.receiver.blocking_recv() {
+                None => return Ok(0),
+                Some(piece) => self.piece = piece?,
+            }
+        }
+        let n = buf.len().min(self.piece.len());
+        buf[..n].copy_from_slice(&self.piece[..n]);
+        self.piece = self.piece.slice(n..);
+        self.total += n as u64;
+        if self.total > shares::MAX_UPLOAD {
+            return Err(io::Error::other("the file is larger than 1 GiB"));
+        }
+        Ok(n)
+    }
 }
 
 /// Writes into a channel, for a body read as it is written.
@@ -1168,6 +1249,7 @@ fn router(app: Arc<App>) -> Router {
         .route("/api/shared/{secret}/file", get(shared_file))
         .route("/api/shared/{secret}/zip", get(shared_zip))
         .route("/api/shared/{secret}/unlock", post(shared_unlock))
+        .route("/api/shared/{secret}/upload", post(shared_upload))
         .route("/git/{prefix}/info/refs", get(git::info_refs))
         .route("/git/{prefix}/git-upload-pack", post(git::upload_pack))
         .route("/git/{prefix}/git-receive-pack", post(git::receive_pack))

@@ -103,20 +103,41 @@ The desktop interface has no sharing: it serves only the person who runs it, on 
 | `share_remove` | The link's id |
 | `shared:list`, `shared:read` | The link's id and the path asked for; no user, the address of the connection |
 | `shared:unlock` | The link's id and whether the password was right (`ok`, `key`, `locked`); never the password |
+| `shared:upload` | The link's id and the file name given; no user, the address of the connection |
 
 The secret is never recorded ([AUDIT.md](AUDIT.md)).
 
-## 7. Not part of this work item
+## 7. Upload links
+
+The other way round: Ayşe asks her accountant for this year's papers, and the accountant sends them into one of her backups without an account.
+
+| Rule | Detail |
+| --- | --- |
+| What | Files sent into a folder (default `uploads`) of one backup, the ref named when the link is made; the backup must exist |
+| Who makes one | An `admin` for any backup, a `member` for its own (USERS.md §1); the Ask for files button beside a backup on the Overview page, or `POST /api/shares` `{"upload": "<ref>", "path", "days", "password", "downloads"}` |
+| What the link gives | Sending files only: the link holder sees nothing of the backup, not even what is in the folder; the read requests of §5 answer "not found" |
+| Each file | Becomes a new version of the backup whose parent is the newest one, with the message `upload <name> through link <id>`: everything the backup held stays, and a name already in the folder gets ` (2)`, ` (3)` … before its extension. Nothing is ever replaced or removed |
+| Size | At most 1 GiB per file; files are read as they arrive and stored in chunks, never kept whole in memory or on the server's disk |
+| Names | One file name: not empty, without `/`, `\` or control characters, not `.` or `..`, at most 255 bytes |
+
+The link ends as a read link does (§2): time, removal, an owner that may no longer write the backup, or, when a limit was chosen, the number of files it took; a file counts once it starts. It can ask for a password the same way. In the shares file it has `upload` with the ref, `path` with the folder, and `snapshot` with the version the backup had when the link was made; `downloads` counts the files taken. A file taken is copied to the replicas, as a backup is (REPLICATION.md §4).
+
+| Request | What |
+| --- | --- |
+| `GET /api/shared/<secret>` | `{"upload": true, "expires", "uploads_left", "max_size"}` |
+| `POST /api/shared/<secret>/upload?name=<file name>` | The file's bytes as the body; answers the path it got and its size |
+
+## 8. Not part of this work item
 
 | Item | Where |
 | --- | --- |
-| Links that let others upload | Later |
 | Sharing with named users of the server | Not needed: give the user the backup in the users file (USERS.md §2) |
 
-## 8. Crates
+## 9. Crates
 
 | Crate | Role | Status |
 | --- | --- | --- |
-| `apeiron` | `Repository::read_file`: the content of a file in a version, as a stream ([API.md](API.md) §8.3) | Done |
-| `apeiron-server` | The shares file, the checks, `/api/shares`, `/api/shared`, the Links page and the link holder's page | Done |
+| `apeiron-services` | `add_file`: a file added to a backup as a new version (section 7) | Done |
+| `apeiron` | `Repository::read_file`: the content of a file in a version, as a stream ([API.md](API.md) §8.3); `Repository::add_file` | Done |
+| `apeiron-server` | The shares file, the checks, `/api/shares`, `/api/shared`, the Links page, the link holder's page and the upload page | Done |
 | `apeiron-cli` | `apeiron web share` | Done |

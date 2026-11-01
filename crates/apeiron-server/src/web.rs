@@ -1069,16 +1069,24 @@ impl WebState {
                 "sharing is not allowed for the role reader",
             ));
         }
+        let path = path.trim_matches('/');
+        if path.split('/').any(|p| p == "." || p == "..") {
+            return Err(invalid(format!("{path} is not a path inside a backup")));
+        }
+        // An upload link names a backup of the user, which must exist.
+        if let Some(target) = &options.upload {
+            if !user.owns(target) {
+                return Err(hidden());
+            }
+            let snapshot = repo.resolve(target).map_err(|_| hidden())?;
+            return self.shares.add(&user.name, snapshot, path, options);
+        }
         let snapshot = repo.resolve(spec).map_err(|e| match e.kind {
             ErrorKind::NotFound if user.role != Role::Admin => hidden(),
             _ => e,
         })?;
         if user.role != Role::Admin {
             self.visible(repo, user, snapshot)?;
-        }
-        let path = path.trim_matches('/');
-        if path.split('/').any(|p| p == "." || p == "..") {
-            return Err(invalid(format!("{path} is not a path inside a backup")));
         }
         entry_at(repo, snapshot, path)?;
         self.shares.add(&user.name, snapshot, path, options)
@@ -1089,6 +1097,13 @@ impl WebState {
     pub(crate) fn shared(&self, repo: &Repository, secret: &str) -> Result<Share, Error> {
         let share = self.shares.find(secret)?;
         let owner = self.user(&share.owner).ok_or_else(gone)?;
+        if let Some(target) = &share.upload {
+            return match owner.role {
+                Role::Reader => Err(gone()),
+                _ if owner.owns(target) => Ok(share),
+                _ => Err(gone()),
+            };
+        }
         match owner.role {
             Role::Admin => {}
             Role::Member => self
@@ -1107,6 +1122,15 @@ impl WebState {
         share: &Share,
         sub: &str,
     ) -> Result<Value, Error> {
+        // An upload link shows nothing of the backup it fills.
+        if share.upload.is_some() {
+            return Ok(json!({
+                "upload": true,
+                "expires": share.expires,
+                "uploads_left": share.max_downloads.map(|max| max.saturating_sub(share.downloads)),
+                "max_size": crate::shares::MAX_UPLOAD,
+            }));
+        }
         let path = below(share, sub)?;
         let entry = entry_at(repo, share.snapshot, &path).map_err(|_| gone())?;
         let entries = match &entry {
@@ -1144,6 +1168,9 @@ impl WebState {
         share: &Share,
         sub: &str,
     ) -> Result<(String, u64), Error> {
+        if share.upload.is_some() {
+            return Err(gone());
+        }
         let path = below(share, sub)?;
         match entry_at(repo, share.snapshot, &path).map_err(|_| gone())? {
             Some(e) if e.kind == apeiron::Kind::File => {
@@ -1162,6 +1189,9 @@ impl WebState {
         share: &Share,
         sub: &str,
     ) -> Result<String, Error> {
+        if share.upload.is_some() {
+            return Err(gone());
+        }
         let path = below(share, sub)?;
         match entry_at(repo, share.snapshot, &path).map_err(|_| gone())? {
             None => {}
@@ -1170,6 +1200,36 @@ impl WebState {
         }
         self.shares.take_download(&share.id)?;
         Ok(path)
+    }
+
+    /// Adds a file through an upload link to the folder of its backup, as a
+    /// new version; the file counts against the link's limit once it starts
+    /// (SHARE.md §7).
+    pub(crate) fn shared_upload(
+        &self,
+        repo: &Repository,
+        share: &Share,
+        name: &str,
+        reader: &mut dyn std::io::Read,
+    ) -> Result<apeiron::AddFileReport, Error> {
+        let Some(target) = &share.upload else {
+            return Err(gone());
+        };
+        // A name that can never be stored does not use up the link.
+        if name.is_empty() || name.contains(['/', '\\']) || name == "." || name == ".." {
+            return Err(invalid(format!("{name:?} cannot be a file name")));
+        }
+        self.shares.take_download(&share.id)?;
+        repo.add_file(
+            &apeiron::AddFileRequest {
+                ref_name: target.clone(),
+                folder: share.path.as_str().into(),
+                name: name.to_owned(),
+                message: Some(format!("upload {name} through link {}", share.id)),
+                host: None,
+            },
+            reader,
+        )
     }
 }
 

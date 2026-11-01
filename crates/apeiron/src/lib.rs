@@ -32,9 +32,10 @@ pub use apeiron_git::{
 pub use apeiron_plugin::{Added as PluginAdded, PluginInfo};
 pub use apeiron_services::PluginMerge;
 pub use apeiron_services::{
-    ArchiveFormat, BackupOptions as BackupRequest, BackupOutcome as BackupReport, Change,
-    ChangeKind, Conflict, ConflictCopy, ConflictKind, EntryInfo, ExportOutcome as ExportReport,
-    Keep, Kind, Name, Phase, Progress, RestoreOutcome as RestoreReport, RestoreProblem,
+    AddFileOptions as AddFileRequest, AddFileOutcome as AddFileReport, ArchiveFormat,
+    BackupOptions as BackupRequest, BackupOutcome as BackupReport, Change, ChangeKind, Conflict,
+    ConflictCopy, ConflictKind, EntryInfo, ExportOutcome as ExportReport, Keep, Kind, Name, Phase,
+    Progress, RestoreOutcome as RestoreReport, RestoreProblem,
     RestoreTestOutcome as RestoreTestReport, SwitchOutcome as SwitchReport, SyncAction, SyncMode,
     SyncOutcome as SyncReport, Warning, WarningKind,
 };
