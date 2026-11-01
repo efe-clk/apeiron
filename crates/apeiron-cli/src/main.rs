@@ -1433,7 +1433,27 @@ impl From<FormatArg> for ArchiveFormat {
     }
 }
 
+/// Stack of the thread the command runs on. Windows gives the main thread
+/// 1 MiB, which the many commands outgrow in a debug build.
+const STACK: usize = 16 << 20;
+
 fn main() -> ExitCode {
+    let worker = std::thread::Builder::new()
+        .name("main".to_owned())
+        .stack_size(STACK)
+        .spawn(command_main);
+    match worker {
+        Ok(handle) => handle
+            .join()
+            .unwrap_or_else(|panic| std::panic::resume_unwind(panic)),
+        Err(e) => {
+            eprintln!("error: cannot start: {e}");
+            ExitCode::from(EXIT_ERROR)
+        }
+    }
+}
+
+fn command_main() -> ExitCode {
     let cli = Cli::parse();
     let out = Output { json: cli.json };
     match run(cli, &out) {
