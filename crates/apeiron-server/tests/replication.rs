@@ -70,6 +70,7 @@ fn serve(dir: &Path, repo: Repository, replicas: &[&str], standby: bool) -> (Web
         backups: Vec::new(),
         folders: Vec::new(),
         oidc: None,
+        totp: None,
     })
     .unwrap();
     list.save(&users).unwrap();

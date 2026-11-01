@@ -891,6 +891,15 @@ enum UserCommand {
     },
     /// Set a new password for a user; ends the user's sessions
     Password { name: String },
+    /// Make signing in with the user's password also ask for a code from an
+    /// authenticator app; shows the secret to enter there. Ends the user's
+    /// sessions
+    SecondFactor {
+        name: String,
+        /// Turn it off again
+        #[arg(long)]
+        off: bool,
+    },
     /// Remove a user
     Remove { name: String },
     /// List the users
@@ -923,6 +932,8 @@ struct UserView {
     folders: Vec<PathBuf>,
     #[serde(skip_serializing_if = "Option::is_none")]
     oidc: Option<String>,
+    /// Whether signing in with the password also needs an authenticator code.
+    second_factor: bool,
 }
 
 /// A compliance report with, on request, the web server's part
@@ -1018,6 +1029,7 @@ fn web_facts(
                 backups: u.backups.clone(),
                 folders: u.folders.clone(),
                 oidc: u.oidc.clone(),
+                second_factor: u.totp.is_some(),
             })
             .collect(),
         identity_provider: users.oidc.map(|o| o.issuer),
@@ -1246,6 +1258,7 @@ fn web_user(files: &WebFiles, command: UserCommand, out: &Output) -> Result<(), 
                     backups: u.backups,
                     folders: u.folders,
                     oidc: u.oidc,
+                    second_factor: u.totp.is_some(),
                 })
                 .collect();
             out.result(&list, |list| {
@@ -1267,6 +1280,9 @@ fn web_user(files: &WebFiles, command: UserCommand, out: &Output) -> Result<(), 
                             .map(|i| format!("  identity: {i}"))
                             .unwrap_or_default()
                     );
+                    if u.second_factor {
+                        say!("  signs in with a password and an authenticator code");
+                    }
                 }
                 if list.is_empty() {
                     say!("No users; add one with `apeiron web user add <name> --role admin`");
@@ -1299,6 +1315,7 @@ fn web_user(files: &WebFiles, command: UserCommand, out: &Output) -> Result<(), 
                 backups,
                 folders,
                 oidc,
+                totp: None,
             })?;
             users.need_admin()?;
             users.save(file)?;
@@ -1346,6 +1363,31 @@ fn web_user(files: &WebFiles, command: UserCommand, out: &Output) -> Result<(), 
             users.save(file)?;
             record("user_password", None, &name)?;
             say!("Set a new password for {name}");
+        }
+        UserCommand::SecondFactor { name, off } => {
+            let user = users.get_mut(&name)?;
+            if off {
+                user.totp = None;
+                users.save(file)?;
+                record("user_second_factor_off", None, &name)?;
+                say!("{name} signs in with the password alone again");
+            } else {
+                if user.password.is_empty() {
+                    return Err(Failure::Usage(format!(
+                        "{name} has no password; it signs in through the identity provider"
+                    )));
+                }
+                let secret = apeiron_server::new_totp_secret()?;
+                user.totp = Some(secret.clone());
+                users.save(file)?;
+                record("user_second_factor_on", None, &name)?;
+                say!("Enter this secret in {name}'s authenticator app: {secret}");
+                say!(
+                    "or open this address on the phone: {}",
+                    apeiron_server::totp_uri(&secret, &name, "Apeiron")
+                );
+                say!("From now on {name} signs in with the password and the app's code.");
+            }
         }
         UserCommand::Remove { name } => {
             users.remove(&name)?;

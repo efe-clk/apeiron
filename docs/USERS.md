@@ -54,6 +54,7 @@ The server reads the file again when it changes, so a user added, changed or rem
 | `apeiron web user add <name> --role <role> [--backup <ref>]... [--folder <path>]...` | Adds a user; asks for the password twice |
 | `apeiron web user change <name> [--role <role>] [--backup <ref>]... [--folder <path>]...` | Replaces the role, backups or folders given |
 | `apeiron web user password <name>` | Sets a new password; ends the user's sessions |
+| `apeiron web user second-factor <name> [--off]` | Makes signing in with the password also ask for a code from an authenticator app, and shows the secret to enter in the app; `--off` turns it off; ends the user's sessions ([IDENTITY.md](IDENTITY.md) §4) |
 | `apeiron web user remove <name>` | Removes a user; the last `admin` cannot be removed |
 | `apeiron web user list` | Lists users with their role, backups and folders |
 

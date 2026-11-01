@@ -54,6 +54,7 @@ Sunucu dosya değişince onu yeniden okur; böylece çalışırken eklenen, değ
 | `apeiron web user add <name> --role <role> [--backup <ref>]... [--folder <path>]...` | Bir kullanıcı ekler; parolayı iki kez sorar |
 | `apeiron web user change <name> [--role <role>] [--backup <ref>]... [--folder <path>]...` | Verilen rolü, yedekleri ya da klasörleri değiştirir |
 | `apeiron web user password <name>` | Yeni bir parola belirler; kullanıcının oturumlarını bitirir |
+| `apeiron web user second-factor <name> [--off]` | Parolayla oturum açmanın bir doğrulama uygulamasının kodunu da istemesini sağlar ve uygulamaya girilecek gizli anahtarı gösterir; `--off` kapatır; kullanıcının oturumlarını bitirir ([IDENTITY.tr.md](IDENTITY.tr.md) §4) |
 | `apeiron web user remove <name>` | Bir kullanıcıyı siler; son `admin` silinemez |
 | `apeiron web user list` | Kullanıcıları rolleri, yedekleri ve klasörleriyle listeler |
 

@@ -48,7 +48,7 @@ Rapor yalnızca okur; hiçbir şeyi değiştirmez. Metin biçimi, saklanmaya ya 
 3. **Yedekler**: ref başına snapshot kimliği, en yeni snapshot'ın zamanı, geçmişindeki snapshot sayısı, bir saklama kuralının onu kaç gün tuttuğu ve her uzak depodaki durumu: `current` (güncel), `behind` (geride), `missing` (yok) ya da uzak depoda bu kopyada olmayan snapshot'lar varsa `other` (farklı).
 4. **Saklama kuralları**, her birinin ne zaman eklendiğiyle.
 5. **Uzak depolar** ve yanıt vermeyenler.
-6. **Web sunucusu**, `--web` ile: rolü, nasıl oturum açtığı, yedekleri ve klasörleriyle her kullanıcı; kimlik sağlayıcısı; denetim kaydının özet zincirinin eksiksiz olup olmadığı, olay sayısı ve son olayın özeti; `--since`'ten itibaren oturum açma, başarısız oturum açma, başlatılan yedek ve geri yükleme, oluşturulan paylaşım bağlantısı ve başarısız replikasyon sayıları.
+6. **Web sunucusu**, `--web` ile: rolü, nasıl oturum açtığı (ve doğrulama koduyla olup olmadığı), yedekleri ve klasörleriyle her kullanıcı; kimlik sağlayıcısı; denetim kaydının özet zincirinin eksiksiz olup olmadığı, olay sayısı ve son olayın özeti; `--since`'ten itibaren oturum açma, başarısız oturum açma, başlatılan yedek ve geri yükleme, oluşturulan paylaşım bağlantısı ve başarısız replikasyon sayıları.
 
 Kanıt snapshot kimlikleridir: bir kimlik, altındaki her baytı ve ondan önceki tüm geçmişi sabitler; bu yüzden sonraki bir rapor ya da bir replikada `apeiron verify`, aynı verinin hâlâ orada olduğunu gösterir. Son denetim olayının özeti de denetim kaydı için aynısını yapar: raporda tutulduğunda, sonra önceki hiçbir olayın değiştirilmediğini gösterir (AUDIT.tr.md §3).
 

@@ -73,6 +73,7 @@ fn tenant(dir: &Path, name: &str, host: &str) -> TenantOptions {
         backups: Vec::new(),
         folders: Vec::new(),
         oidc: None,
+        totp: None,
     })
     .unwrap();
     list.save(&users).unwrap();

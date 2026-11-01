@@ -66,6 +66,10 @@ pub struct User {
     /// The value of the identity provider's claim that names this user.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oidc: Option<String>,
+    /// The secret of the user's authenticator app, in base32; signing in
+    /// with the password then also needs its code (IDENTITY.md §4).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub totp: Option<String>,
 }
 
 impl User {

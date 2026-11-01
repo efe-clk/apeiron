@@ -95,6 +95,8 @@ The session that follows is the same as after a password (WEB.md §5); it ends w
 | `apeiron web oidc show`, `check`, `remove` | Shows the settings without the secret; reads the provider's settings and keys to see it answers; turns it off |
 | `apeiron web user add <name> --role <role> --oidc <identity>` | Adds a user who signs in through the provider, without a password |
 | `apeiron web user change <name> [--oidc <identity>] [--no-password]` | Gives a user an identity, or takes its password away |
+| `apeiron web user second-factor <name> [--off]` | A second step for a password user: signing in then also needs the six-digit code of an authenticator app (TOTP, RFC 6238: HMAC-SHA1, 30 seconds); prints the secret and an `otpauth://` address to enter in the app |
+| `POST /api/login` with `code` | For such a user the right password alone is answered with `"second_factor": true` and starts no session; the pages then ask for the code. A code is accepted one step before or after the current one, for clocks that differ, and only once; a wrong code counts as a wrong password for the pause (WEB.md). The secret is kept in `web.json`, readable only by its owner |
 
 ## 5. In the audit log
 
@@ -110,7 +112,6 @@ The session that follows is the same as after a password (WEB.md §5); it ends w
 | LDAP and Active Directory directly | Not planned; providers such as Keycloak and Entra ID put a directory behind OpenID Connect |
 | SAML | Later, if a pilot needs it |
 | Creating users and roles from the provider's groups | Later; users are listed in `web.json` until then |
-| A second factor for password users | Later; users who need one sign in through the provider |
 
 ## 7. Crates
 

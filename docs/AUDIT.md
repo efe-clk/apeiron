@@ -10,7 +10,7 @@ When several people share a backup server, the admin must be able to answer "who
 
 | Event | When | Detail |
 | --- | --- | --- |
-| `sign_in` | Every sign-in, right or wrong | The name given, or for the identity provider `"via": "oidc"` with the identity ([IDENTITY.md](IDENTITY.md) §5); never the password |
+| `sign_in` | Every sign-in, right or wrong | The name given, or for the identity provider `"via": "oidc"` with the identity ([IDENTITY.md](IDENTITY.md) §5); never the password or the code. A right password that still needs the authenticator code has the outcome `code_needed` |
 | `sign_out` | Signing out | |
 | `call:<operation>` | Every short operation, such as `list` or `log` | The request after the checks of USERS.md §4, with snapshots as ids and paths resolved |
 | `start:<operation>` | Every long operation started: `backup`, `restore`, `verify`, `search` | The same |
@@ -20,6 +20,7 @@ When several people share a backup server, the admin must be able to answer "who
 | `shared:list`, `shared:read` | Every use of a share link, without signing in | The link's id and the path; never the link's secret |
 | `shared:unlock` | Every password given for a share link | The link's id; never the password or the secret |
 | `user_add`, `user_change`, `user_password`, `user_remove` | `apeiron web user`, or an admin on the Users page | The name, role, backups, folders and identity; never the password |
+| `user_second_factor_on`, `user_second_factor_off` | `apeiron web user second-factor` | The name; never the secret |
 | `oidc_set`, `oidc_remove` | `apeiron web oidc` | The provider's settings; never the client secret |
 | `replicate` | Each push to a replica by the web server | The remote, refs and objects, the refs left by a conflict, or the error ([REPLICATION.md](REPLICATION.md) §7) |
 | `tenant_add`, `tenant_remove` | `apeiron web tenant`, in that tenant's own log | The tenant's settings ([TENANTS.md](TENANTS.md) §5) |

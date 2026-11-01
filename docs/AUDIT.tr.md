@@ -10,7 +10,7 @@ Birkaç kişi bir yedek sunucusunu paylaştığında admin, "bu klasörü kim, n
 
 | Olay | Ne zaman | Ayrıntı |
 | --- | --- | --- |
-| `sign_in` | Doğru ya da yanlış, her oturum açma | Verilen ad, ya da kimlik sağlayıcısı için kimlikle birlikte `"via": "oidc"` ([IDENTITY.tr.md](IDENTITY.tr.md) §5); parola asla |
+| `sign_in` | Doğru ya da yanlış, her oturum açma | Verilen ad, ya da kimlik sağlayıcısı için kimlikle birlikte `"via": "oidc"` ([IDENTITY.tr.md](IDENTITY.tr.md) §5); parola ya da kod asla. Doğru olduğu hâlde doğrulama kodu da gereken bir parolanın sonucu `code_needed`'dır |
 | `sign_out` | Oturumu kapatma | |
 | `call:<operation>` | `list` ya da `log` gibi her kısa işlem | USERS.tr.md §4'teki denetimlerden sonraki istek; snapshot'lar kimlik olarak, yollar çözülmüş olarak |
 | `start:<operation>` | Başlatılan her uzun işlem: `backup`, `restore`, `verify`, `search` | Aynısı |
@@ -20,6 +20,7 @@ Birkaç kişi bir yedek sunucusunu paylaştığında admin, "bu klasörü kim, n
 | `shared:list`, `shared:read` | Bir paylaşım bağlantısının oturum açmadan her kullanımı | Bağlantının kimliği ve yol; bağlantının gizli kısmı asla |
 | `shared:unlock` | Bir paylaşım bağlantısı için girilen her parola | Bağlantının kimliği; parola ya da gizli kısım asla |
 | `user_add`, `user_change`, `user_password`, `user_remove` | `apeiron web user` ya da Kullanıcılar sayfasında bir admin | Ad, rol, yedekler, klasörler ve kimlik; parola asla |
+| `user_second_factor_on`, `user_second_factor_off` | `apeiron web user second-factor` | Ad; gizli anahtar asla |
 | `oidc_set`, `oidc_remove` | `apeiron web oidc` | Sağlayıcının ayarları; gizli anahtar asla |
 | `replicate` | Web sunucusunun bir replikaya yaptığı her push | Uzak depo, ref'ler ve nesneler, bir çatışmanın bıraktığı ref'ler ya da hata ([REPLICATION.tr.md](REPLICATION.tr.md) §7) |
 | `tenant_add`, `tenant_remove` | `apeiron web tenant`, o kiracının kendi kaydında | Kiracının ayarları ([TENANTS.tr.md](TENANTS.tr.md) §5) |

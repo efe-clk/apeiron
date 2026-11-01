@@ -13,6 +13,7 @@ mod oidc;
 mod replicate;
 mod shares;
 mod tenants;
+mod totp;
 mod users;
 mod web;
 
@@ -30,6 +31,7 @@ pub use audit::{Actor, Audit, Event, Verified};
 pub use oidc::{OidcConfig, Provider, check_provider};
 pub use shares::{DEFAULT_DAYS, LinkOptions, MAX_DAYS, MAX_DOWNLOADS, Share, Shares};
 pub use tenants::{Tenant, Tenants};
+pub use totp::{code as totp_code, new_secret as new_totp_secret, uri as totp_uri};
 pub use users::{MIN_PASSWORD, Role, User, Users, hash_password};
 pub use web::{TenantOptions, Tls, Web, WebOptions};
 use web::{WebState, Who};

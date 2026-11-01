@@ -173,6 +173,7 @@ pub(crate) async fn add(
                 backups: Vec::new(),
                 folders: Vec::new(),
                 oidc: None,
+                totp: None,
             };
             web.apply(&mut user, form)?;
             let detail = detail(&user);

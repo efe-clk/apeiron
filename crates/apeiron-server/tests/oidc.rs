@@ -247,6 +247,7 @@ fn start(dir: &Path, idp: &Shared) -> (Web, SocketAddr, std::path::PathBuf) {
                 backups: Vec::new(),
                 folders: Vec::new(),
                 oidc: None,
+                totp: None,
             },
             User {
                 name: "ayse".to_owned(),
@@ -255,6 +256,7 @@ fn start(dir: &Path, idp: &Shared) -> (Web, SocketAddr, std::path::PathBuf) {
                 backups: vec!["backup/ayse-*".to_owned()],
                 folders: Vec::new(),
                 oidc: Some("Ayse@Example.com".to_owned()),
+                totp: None,
             },
         ],
     };
@@ -542,6 +544,7 @@ fn settings_that_cannot_work_are_refused() {
         backups: Vec::new(),
         folders: Vec::new(),
         oidc: Some(id.to_owned()),
+        totp: None,
     };
     let users = Users {
         oidc: Some(config(ok, "https://backup.example.com")),

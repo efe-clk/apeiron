@@ -27,6 +27,7 @@ use crate::audit::{Actor, Audit};
 use crate::oidc::{Oidc, OidcConfig};
 use crate::replicate::Replicator;
 use crate::shares::{LinkOptions, Share, Shares, gone};
+use crate::totp;
 use crate::users::{Role, User, Users, hash_password};
 use crate::{App, Failure, Mode, Running, blocking, body, invalid, lock};
 
@@ -208,7 +209,12 @@ struct Attempts {
 
 /// What a session of `user` stays valid with.
 fn stamp(user: &User) -> String {
-    format!("{}\n{}", user.password, user.oidc.as_deref().unwrap_or(""))
+    format!(
+        "{}\n{}\n{}",
+        user.password,
+        user.oidc.as_deref().unwrap_or(""),
+        user.totp.as_deref().unwrap_or("")
+    )
 }
 
 /// The cookie that ties a sign-in through the identity provider to the
@@ -250,6 +256,9 @@ pub(crate) struct WebState {
     sessions: Mutex<HashMap<String, Session>>,
     /// Held while a password is checked, so guesses go one at a time.
     attempts: tokio::sync::Mutex<Attempts>,
+    /// The time step of the last authenticator code each user signed in
+    /// with; a code is used once.
+    used_codes: Mutex<HashMap<String, u64>>,
     /// The same for the passwords of share links.
     share_attempts: tokio::sync::Mutex<Attempts>,
     /// The snapshots reachable from a ref head, by head.
@@ -325,6 +334,9 @@ fn with_cookie(value: Value, cookie: &str) -> Response {
 struct Login {
     name: String,
     password: String,
+    /// The code of the authenticator app, for users who have one.
+    #[serde(default)]
+    code: Option<String>,
 }
 
 /// The fields of a request that name a snapshot (USERS.md §4).
@@ -440,6 +452,7 @@ impl WebState {
         }
         let user = self.user(&r.name);
         let decoy = self.decoy.clone();
+        let code = r.code.clone();
         let user = blocking(move || {
             Ok(match user {
                 Some(user) if user.verify(&r.password) => Some(user),
@@ -453,15 +466,44 @@ impl WebState {
             })
         })
         .await?;
-        let Some(user) = user else {
-            record(None, "key")?;
+        let mut wrong = |message: &str| -> Result<Response, Failure> {
             attempts.wrong += 1;
             if attempts.wrong >= TRIES {
                 attempts.wrong = 0;
                 attempts.paused_until = Some(Instant::now() + PAUSE);
             }
-            return Err(Error::new(ErrorKind::Key, "wrong name or password").into());
+            Err(Error::new(ErrorKind::Key, message).into())
         };
+        let Some(user) = user else {
+            record(None, "key")?;
+            return wrong("wrong name or password");
+        };
+        // The second step (IDENTITY.md §4): the right password alone only
+        // asks for the code.
+        if let Some(secret) = &user.totp {
+            let Some(code) = code.filter(|c| !c.trim().is_empty()) else {
+                record(None, "code_needed")?;
+                return Err(Failure(
+                    StatusCode::UNAUTHORIZED,
+                    json!({"code": 12, "kind": "key", "second_factor": true,
+                           "message": "enter the code from your authenticator app"}),
+                ));
+            };
+            let now = jiff::Timestamp::now().as_second().max(0) as u64;
+            let step = totp::check(secret, &code, now);
+            let mut used = lock(&self.used_codes);
+            let last = used.get(&user.name).copied();
+            match step {
+                Some(step) if last.is_none_or(|l| step > l) => {
+                    used.insert(user.name.clone(), step);
+                }
+                _ => {
+                    drop(used);
+                    record(None, "key")?;
+                    return wrong("wrong code");
+                }
+            }
+        }
         record(Some(&user.name), "ok")?;
         *attempts = Attempts::default();
         Ok(with_cookie(json!({}), &self.new_session(&user, None)?))
@@ -1083,6 +1125,7 @@ fn site(site: Site) -> Result<Arc<App>, Error> {
             roots,
             sessions: Mutex::new(HashMap::new()),
             attempts: tokio::sync::Mutex::new(Attempts::default()),
+            used_codes: Mutex::default(),
             share_attempts: tokio::sync::Mutex::new(Attempts::default()),
             reachable: Mutex::new(HashMap::new()),
             decoy,

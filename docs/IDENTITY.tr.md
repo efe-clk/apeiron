@@ -95,6 +95,8 @@ Ardından gelen oturum, bir paroladan sonrakiyle aynıdır (WEB.tr.md §5); kull
 | `apeiron web oidc show`, `check`, `remove` | Ayarları gizli anahtar olmadan gösterir; sağlayıcının yanıt verdiğini görmek için ayarlarını ve anahtarlarını okur; kapatır |
 | `apeiron web user add <name> --role <role> --oidc <kimlik>` | Sağlayıcı üzerinden, parolasız oturum açan bir kullanıcı ekler |
 | `apeiron web user change <name> [--oidc <kimlik>] [--no-password]` | Bir kullanıcıya kimlik verir ya da parolasını kaldırır |
+| `apeiron web user second-factor <name> [--off]` | Parola kullanıcısı için ikinci adım: oturum açmak bundan sonra bir doğrulama uygulamasının altı haneli kodunu da ister (TOTP, RFC 6238: HMAC-SHA1, 30 saniye); uygulamaya girilecek gizli anahtarı ve bir `otpauth://` adresini yazar |
+| `code` ile `POST /api/login` | Böyle bir kullanıcı için tek başına doğru parola `"second_factor": true` ile yanıtlanır ve oturum başlatmaz; sayfalar o zaman kodu sorar. Saatlerin farklı olabilmesi için kod, geçerli adımdan bir önceki ve bir sonraki adımda da kabul edilir, ama yalnızca bir kez; yanlış bir kod, bekleme için yanlış bir parola sayılır (WEB.tr.md). Gizli anahtar, yalnızca sahibinin okuyabildiği `web.json` dosyasında tutulur |
 
 ## 5. Denetim kaydında
 
@@ -110,7 +112,6 @@ Ardından gelen oturum, bir paroladan sonrakiyle aynıdır (WEB.tr.md §5); kull
 | Doğrudan LDAP ve Active Directory | Planlanmadı; Keycloak ve Entra ID gibi sağlayıcılar bir dizini OpenID Connect'in arkasına koyar |
 | SAML | Sonra, bir pilot gerektirirse |
 | Kullanıcıları ve rolleri sağlayıcının gruplarından oluşturmak | Sonra; o zamana kadar kullanıcılar `web.json` içinde listelenir |
-| Parola kullanıcıları için ikinci adım | Sonra; ihtiyacı olan kullanıcılar sağlayıcı üzerinden oturum açar |
 
 ## 7. Crate'ler
 

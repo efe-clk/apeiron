@@ -48,7 +48,7 @@ The report reads only; it changes nothing. Its text form is Markdown, ready to k
 3. **Backups**: per ref the snapshot id, the time of the newest snapshot, the number of snapshots in its history, how many days a retention rule keeps it, and its state on each remote: `current`, `behind`, `missing`, or `other` when the remote has snapshots this copy does not.
 4. **Retention rules**, with when each was added.
 5. **Remotes**, and any that did not answer.
-6. **Web server**, with `--web`: every user with role, how they sign in, backups and folders; the identity provider; whether the audit log's chain of hashes is whole, its number of events and the hash of the last one; and from `--since` on the number of sign-ins, failed sign-ins, backups and restores started, share links made and failed replications.
+6. **Web server**, with `--web`: every user with role, how they sign in (and whether with an authenticator code), backups and folders; the identity provider; whether the audit log's chain of hashes is whole, its number of events and the hash of the last one; and from `--since` on the number of sign-ins, failed sign-ins, backups and restores started, share links made and failed replications.
 
 The snapshot ids are the proof: an id fixes every byte under it and all the history before it, so a later report, or `apeiron verify` on a replica, shows that the same data is still there. The hash of the last audit event does the same for the audit log: kept in the report, it shows later that no earlier event was changed (AUDIT.md §3).
 

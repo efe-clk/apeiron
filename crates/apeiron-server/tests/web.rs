@@ -35,6 +35,7 @@ fn users_file(dir: &Path) -> PathBuf {
             backups: Vec::new(),
             folders: Vec::new(),
             oidc: None,
+            totp: None,
         })
         .unwrap();
     users.save(&file).unwrap();
@@ -307,6 +308,60 @@ fn guessing_pauses_sign_ins() {
 }
 
 #[test]
+fn a_second_step_asks_for_the_authenticator_code() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_server, mut c, _) = start(dir.path());
+    c.sign_in();
+    let file = dir.path().join("config/web.json");
+    let secret = apeiron_server::new_totp_secret().unwrap();
+    let mut users = Users::load(&file).unwrap();
+    users.get_mut("root").unwrap().totp = Some(secret.clone());
+    users.save(&file).unwrap();
+    // Turning it on ends the sessions.
+    assert_eq!(c.get("/api/state").status, 401);
+    c.cookie = None;
+
+    // The right password alone asks for the code and starts no session.
+    let asked = c.post("/api/login", json!({"name": "root", "password": PASSWORD}));
+    assert_eq!(asked.status, 401);
+    assert_eq!(asked.json()["second_factor"], true);
+    assert!(asked.cookie().is_none());
+
+    let now = || jiff::Timestamp::now().as_second() as u64;
+    let wrong = c.post(
+        "/api/login",
+        json!({"name": "root", "password": PASSWORD, "code": "000000"}),
+    );
+    // A one in a million chance that 000000 is the code right now.
+    if apeiron_server::totp_code(&secret, now()).as_deref() != Some("000000") {
+        assert_eq!(wrong.status, 401);
+        assert_eq!(wrong.json()["message"], "wrong code");
+    }
+
+    let code = apeiron_server::totp_code(&secret, now()).unwrap();
+    let ok = c.post(
+        "/api/login",
+        json!({"name": "root", "password": PASSWORD, "code": code}),
+    );
+    assert_eq!(ok.status, 200, "{}", ok.body);
+    assert!(ok.cookie().is_some());
+
+    // A code is used once.
+    let again = c.post(
+        "/api/login",
+        json!({"name": "root", "password": PASSWORD, "code": code}),
+    );
+    assert_eq!(again.status, 401);
+
+    // A wrong password with a right code is still wrong.
+    let bad = c.post(
+        "/api/login",
+        json!({"name": "root", "password": "guess", "code": code}),
+    );
+    assert_eq!(bad.json()["message"], "wrong name or password");
+}
+
+#[test]
 fn only_the_pages_operations_and_folders() {
     let dir = tempfile::tempdir().unwrap();
     let (_server, mut c, home) = start(dir.path());
@@ -489,6 +544,7 @@ fn the_users_file() {
         backups: vec!["backup/a-*".to_owned()],
         folders: Vec::new(),
         oidc: None,
+        totp: None,
     };
     assert!(users.add(user("Bad Name")).is_err());
     assert!(users.add(user("root")).is_err());
@@ -525,6 +581,7 @@ fn each_user_sees_and_uses_only_their_own() {
         backups: backups.iter().map(|b| (*b).to_owned()).collect(),
         folders,
         oidc: None,
+        totp: None,
     };
     users
         .add(user(
@@ -774,6 +831,7 @@ fn every_request_is_recorded() {
             backups: vec!["backup/src".to_owned()],
             folders: Vec::new(),
             oidc: None,
+            totp: None,
         })
         .unwrap();
     users.save(&dir.path().join("config/web.json")).unwrap();
@@ -821,6 +879,7 @@ fn share_links() {
                 backups: vec!["backup/ayse-*".to_owned()],
                 folders: Vec::new(),
                 oidc: None,
+                totp: None,
             })
             .unwrap();
     }

@@ -41,6 +41,7 @@ class ApiError extends Error {
     super(value?.message || t("error"));
     this.kind = value?.kind || "internal";
     this.signIn = value?.sign_in === true;
+    this.secondFactor = value?.second_factor === true;
   }
 }
 
@@ -1330,21 +1331,36 @@ function signIn(error = null) {
   nav.hidden = true;
   const name = h("input", { type: "text", autocomplete: "username", autocapitalize: "none", spellcheck: "false", required: true });
   const password = h("input", { type: "password", autocomplete: "current-password", required: true });
+  // Shown once the server asks for the authenticator app's code
+  // (IDENTITY.md §4).
+  const code = h("input", { type: "text", inputmode: "numeric", autocomplete: "one-time-code", pattern: "[0-9]{6}", maxlength: "6" });
+  const codeField = h("div", { hidden: true }, ...field(t("second_factor_code"), code, t("second_factor_hint")));
   const status = h("div");
   const form = h("form", { onsubmit: async (e) => {
     e.preventDefault();
     status.replaceChildren();
+    const request = { name: name.value.trim(), password: password.value };
+    if (!codeField.hidden) request.code = code.value.trim();
     try {
-      await api("POST", "/api/login", { name: name.value.trim(), password: password.value });
+      await api("POST", "/api/login", request);
       begin();
     } catch (err) {
-      const text = err.kind === "key" ? t("wrong_password") : err.kind === "locked" ? t("too_many_tries") : null;
+      if (err.secondFactor) {
+        codeField.hidden = false;
+        code.required = true;
+        code.focus();
+        return;
+      }
+      const text = err.kind === "key" ? (codeField.hidden ? t("wrong_password") : t("wrong_password_or_code"))
+        : err.kind === "locked" ? t("too_many_tries") : null;
       status.replaceChildren(text ? message("bad", text) : errorMessage(err));
-      password.select();
+      if (codeField.hidden) password.select();
+      else code.select();
     }
   } },
     ...field(t("user_name"), name),
     ...field(t("password"), password),
+    codeField,
     h("div", { class: "actions" }, h("button", { type: "submit", class: "primary" }, t("sign_in_button"))),
   );
   const provider = oidc
