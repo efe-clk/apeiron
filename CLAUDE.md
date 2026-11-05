@@ -82,3 +82,29 @@ Apeiron; sürüm kontrolü, arşivleme, yedekleme, senkronizasyon ve bütünlük
 5. ~~Uyumluluk raporları (`docs/REPORTS.md`).~~ Tamamlandı (2026-10-30).
 
 Aşama 5'in bütün işleri tamamlandı; aşama, çıkış kriteri olan ilk kurumsal pilot kurulumla biter.
+
+**Belgelerdeki "sonra" işleri.** Proje sahibi 2026-11-02'de belgelerdeki (`docs/*.md`, "Not part of this work item" tabloları) bekleyen bütün işlerin sırayla yapılmasını istedi. Sıra ve durum:
+
+1. ~~Syslog'a kopya (`--audit-syslog`), CLI yedeklerinin denetim kaydı, HTTP üzerinden Git'te dal silme ve force push.~~ Tamamlandı.
+2. ~~Kiracı sınırları, yönetici kiracının sayfalardan kiracı yönetmesi, kiracı başına zamanlanmış işler.~~ Tamamlandı.
+3. ~~OIDC gruplarından kullanıcı oluşturma.~~ Tamamlandı.
+4. ~~Yedek sunucuya bağlantılar ve denetim kaydı kopyası (`apeiron/web` ref'i).~~ Tamamlandı.
+5. ~~Yasal saklama kilitleri (FORMAT.md §17).~~ Tamamlandı.
+6. ~~Raporun ISO/IEC 27001 maddelerine eşlenmesi ve Ed25519 ile imzalanması.~~ Tamamlandı.
+7. ~~Dosyalarda etiketler (`user.xdg.tags`, yalnızca Linux).~~ Tamamlandı.
+8. Eklentiler: ~~YAML birleştirme~~, ~~depoda taşınan eklentiler (`apeiron/plugins` ref'i)~~; kalan: eklenti mağazası, diğer eklenti türleri (depolama, içe aktarıcı, hook, entegrasyon).
+9. SSH üzerinden Git.
+10. SAML.
+11. Sunucusuz, cihazdan cihaza senkron.
+12. Let's Encrypt (ACME).
+13. İlk sürüm: kurulum dosyaları, simgeler, indirilebilir metin eklentisi.
+
+## Çalışma düzeni
+
+- Proje `efe-clk/apeiron` reposuyla eşzamanlı ilerler: yapılan iş commit edilir, `master`'a push edilir, CI arka planda beklenir; CI kırılırsa önce o düzeltilir. Push'tan sonra `cargo install --locked --path crates/apeiron-cli`.
+- Küçük işler 2-3'lü gruplar halinde yapılır: her biri ayrı commit, sonra tek push, tek CI beklemesi, tek kısa Türkçe rapor.
+- Her commit öncesi: `cargo fmt --all`, `cargo clippy --all-targets -- -D warnings`, `cargo test`; belgelerde X.md ile X.tr.md aynı başlıklara ve tablo satır sayılarına sahip olmalıdır.
+- Metin eklentisi ayrı bir workspace'tir: `plugins/text` (`--manifest-path` ile; wasm `--target wasm32-wasip2`).
+- Python SDK testi: `cargo build -p apeiron-ffi && APEIRON_LIB=target/debug/libapeiron.so PYTHONPATH=sdk/python/src python3 -m unittest discover -s sdk/python/tests`.
+- FFI belge yorumları değişince C başlığı `APEIRON_BLESS=1 cargo test -p apeiron-ffi` ile yeniden üretilir.
+- Proje sahibinin kararını gerektiren işler atlanır ve not edilir; parolalar ve kişisel bilgiler hiçbir dosyaya yazılmaz.
