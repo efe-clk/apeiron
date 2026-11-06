@@ -460,6 +460,26 @@ fn try_run(job: &Job, stop: &AtomicBool) -> apeiron::Result<(RunResult, String)>
             };
             (result, text)
         }
+        Action::Repair { remote } => {
+            let request = RemoteRequest {
+                remote: remote.clone(),
+                rate: job.rate,
+            };
+            let report = wait(repo.repair_from(request)?, stop)?;
+            let message = format!(
+                "{} damaged packs; {} objects kept, {} copied from {remote}, {} not held whole by any copy",
+                report.damaged_packs,
+                report.salvaged_objects,
+                report.copied_objects,
+                report.unrecoverable.len()
+            );
+            let result = if report.is_ok() {
+                RunResult::Ok
+            } else {
+                RunResult::Failed
+            };
+            (result, message)
+        }
         Action::Gc => {
             let report = wait(repo.gc(GcRequest::default())?, stop)?;
             (

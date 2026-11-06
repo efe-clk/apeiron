@@ -156,6 +156,7 @@ Her işlem tek bir düz istek değeri alır ve tek bir düz sonuç değeri dönd
 | `resolve` | snapshot belirteci (bölüm 8.4) | snapshot kimliği | Hayır |
 | `delete_ref` | ref adı, beklenen snapshot | — | Hayır |
 | `repair` | — | `RepairReport`: kaldırılan kilitler, onarılan reflog'lar, yeniden indekslenen paketler, silinen bozuk indeksler | Hayır |
+| `repair_from` | uzak depo adı, isteğe bağlı hız sınırı | `CopyRepairReport`: `repair`'in yaptıkları, bozuk paketler, onlardan korunan ve uzak depodan kopyalanan nesneler, kaldırılan paketler, hiçbir kopyada sağlam olmayan nesneler ([FORMAT.tr.md](FORMAT.tr.md) §8.3) | Evet |
 | `gc` | saklanacak reflog günü (varsayılan 90), deneme çalıştırması | `GcReport`: canlı nesneler; silinen nesneler, baytlar ve paketler; yazılan paketler | Evet |
 | `gc_remote` | uzak depo adı, deneme çalıştırması | Uzak depo için `GcReport` ([FORMAT.tr.md](FORMAT.tr.md) §15.8); orada başka bir temizlik çalışırken `locked` | Evet |
 | `keys` | — | `Vec<KeyInfo>`: kimlik, tür (`password` ya da `recovery`), eklendiği zaman, depoyu onun açıp açmadığı | Hayır |

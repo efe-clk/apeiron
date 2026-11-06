@@ -1233,3 +1233,235 @@ mod transfer {
         }
     }
 }
+
+/// Repairing damaged packs from another copy (FORMAT.md §8.3).
+mod repair {
+    use std::path::PathBuf;
+
+    use super::*;
+    use crate::object::{EntryKind, Snapshot, Time, Tree, TreeEntry};
+    use crate::remote::FolderStore;
+
+    struct RepairFixture {
+        _dir: TempDir,
+        base: PathBuf,
+        copy: PathBuf,
+        main: ObjectId,
+    }
+
+    fn fixture_of(encrypted: bool) -> RepairFixture {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().join("repo");
+        let copy = dir.path().join("copy");
+        let mut repo = init(&base, encrypted);
+        let mut writer = repo.writer();
+        let (size, blob) = writer.put_file(&b"file content"[..]).unwrap();
+        let tree = writer
+            .put_tree(&Tree {
+                entries: vec![TreeEntry {
+                    name: b"a.txt".to_vec(),
+                    kind: EntryKind::File { size, blob },
+                    mode: None,
+                    mtime: None,
+                    uid: None,
+                    gid: None,
+                    xattrs: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let main = writer
+            .put_snapshot(&Snapshot {
+                tree,
+                parents: Vec::new(),
+                time: Time {
+                    seconds: 1,
+                    nanos: 0,
+                },
+                author: None,
+                host: None,
+                message: None,
+                meta: Vec::new(),
+            })
+            .unwrap();
+        writer.finish().unwrap();
+        repo.update_ref("main", None, Some(main)).unwrap();
+        fs::create_dir(&copy).unwrap();
+        let store = FolderStore::open(&copy).unwrap();
+        repo.push(&store, "main", &mut |_| Ok(())).unwrap();
+        RepairFixture {
+            _dir: dir,
+            base,
+            copy,
+            main,
+        }
+    }
+
+    fn pack_of(repo: &Path) -> PathBuf {
+        let mut found: Vec<PathBuf> = files(&repo.join("packs"))
+            .into_iter()
+            .map(|p| repo.join("packs").join(p))
+            .collect();
+        assert_eq!(found.len(), 1);
+        found.remove(0)
+    }
+
+    /// Flips a bit in many places of a file: its objects, table or both.
+    fn damage(path: &Path) {
+        let mut bytes = fs::read(path).unwrap();
+        for at in (20..bytes.len()).step_by(16) {
+            bytes[at] ^= 1;
+        }
+        fs::write(path, bytes).unwrap();
+    }
+
+    fn assert_whole(path: &Path, main: ObjectId) {
+        let repo = open(path).unwrap();
+        assert_eq!(repo.read_ref("main").unwrap(), Some(main));
+        let snapshot = repo.read_snapshot(&main).unwrap();
+        let tree = repo.read_tree(&snapshot.tree).unwrap();
+        let EntryKind::File {
+            blob: Some(blob), ..
+        } = tree.entries[0].kind
+        else {
+            panic!("expected a file");
+        };
+        let mut out = Vec::new();
+        repo.read_file(&blob, &mut out).unwrap();
+        assert_eq!(out, b"file content");
+        assert!(repo.verify().unwrap().is_ok());
+    }
+
+    fn repair_from(path: &Path, copy: &Path) -> Result<crate::repo::CopyRepairReport> {
+        let store = FolderStore::open(copy).unwrap();
+        open(path).unwrap().repair_from(&store, &mut |_| Ok(()))
+    }
+
+    #[test]
+    fn a_damaged_pack_is_replaced_from_the_copy() {
+        for encrypted in [false, true] {
+            let f = fixture_of(encrypted);
+            let pack = pack_of(&f.base);
+            damage(&pack);
+            assert!(!open(&f.base).unwrap().verify().unwrap().is_ok());
+            let report = repair_from(&f.base, &f.copy).unwrap();
+            assert!(report.is_ok(), "{report:?}");
+            assert_eq!(report.damaged_packs, 1);
+            assert!(report.copied_objects > 0);
+            assert_eq!(report.removed_packs, std::slice::from_ref(&pack));
+            assert!(!pack.exists());
+            assert_whole(&f.base, f.main);
+        }
+    }
+
+    #[test]
+    fn a_missing_pack_is_replaced_from_the_copy() {
+        let f = fixture_of(false);
+        fs::remove_file(pack_of(&f.base)).unwrap();
+        let report = repair_from(&f.base, &f.copy).unwrap();
+        assert!(report.is_ok(), "{report:?}");
+        assert_eq!(report.damaged_packs, 1);
+        assert_whole(&f.base, f.main);
+    }
+
+    #[test]
+    fn whole_objects_of_a_damaged_pack_need_no_copy() {
+        let f = fixture_of(false);
+        // A bit flipped in the footer leaves every object whole.
+        let pack = pack_of(&f.base);
+        let mut bytes = fs::read(&pack).unwrap();
+        let last = bytes.len() - 1;
+        bytes[last] ^= 1;
+        fs::write(&pack, bytes).unwrap();
+        let report = repair_from(&f.base, &f.copy).unwrap();
+        assert!(report.is_ok(), "{report:?}");
+        assert!(report.salvaged_objects > 0);
+        assert_eq!(report.copied_objects, 0);
+        assert_whole(&f.base, f.main);
+    }
+
+    #[test]
+    fn a_copy_of_another_repository_is_refused() {
+        let f = fixture_of(false);
+        let pack = pack_of(&f.base);
+        damage(&pack);
+        let other = fixture_of(false);
+        assert!(repair_from(&f.base, &other.copy).is_err());
+        assert!(pack.exists());
+    }
+
+    #[test]
+    fn a_pack_with_an_object_nobody_holds_is_kept() {
+        let f = fixture_of(false);
+        damage(&pack_of(&f.copy));
+        let pack = pack_of(&f.base);
+        damage(&pack);
+        let report = repair_from(&f.base, &f.copy).unwrap();
+        assert!(!report.is_ok());
+        assert!(report.removed_packs.is_empty());
+        assert!(pack.exists());
+    }
+
+    #[test]
+    fn a_healthy_repository_is_left_alone() {
+        let f = fixture_of(true);
+        let stored = |repo: &Path| (files(&repo.join("packs")), files(&repo.join("index")));
+        let before = stored(&f.base);
+        let report = repair_from(&f.base, &f.copy).unwrap();
+        assert_eq!(report, crate::repo::CopyRepairReport::default());
+        assert_eq!(stored(&f.base), before);
+    }
+
+    #[test]
+    fn stopping_it_deletes_nothing() {
+        let f = fixture_of(false);
+        let pack = pack_of(&f.base);
+        damage(&pack);
+        let store = FolderStore::open(&f.copy).unwrap();
+        let stopped = open(&f.base)
+            .unwrap()
+            .repair_from(&store, &mut |_| Err(Error::Cancelled));
+        assert!(matches!(stopped, Err(Error::Cancelled)));
+        assert!(pack.exists());
+    }
+
+    #[test]
+    fn every_crash_during_a_repair_can_be_repaired_again() {
+        let f = fixture_of(false);
+        damage(&pack_of(&f.base));
+        let states = crash_states_of(&f.base, |repo| {
+            let store = FolderStore::open(&f.copy).unwrap();
+            repo.repair_from(&store, &mut |_| Ok(())).map(drop)
+        });
+        assert!(states.len() > 3, "only {} checkpoints", states.len());
+        for state in &states {
+            let report = repair_from(&repo_path(state), &f.copy).unwrap();
+            assert!(report.is_ok(), "{report:?}");
+            assert_whole(&repo_path(state), f.main);
+        }
+    }
+
+    #[test]
+    fn a_full_disk_during_a_repair_can_be_repaired_again() {
+        let f = fixture_of(false);
+        damage(&pack_of(&f.base));
+        for n in 0.. {
+            let (work, result, fired) = run_on(
+                &f.base,
+                n,
+                |_| Fault::DiskFull,
+                |repo| {
+                    let store = FolderStore::open(&f.copy).unwrap();
+                    repo.repair_from(&store, &mut |_| Ok(())).map(drop)
+                },
+            );
+            if !fired {
+                result.unwrap();
+                break;
+            }
+            assert!(result.is_err());
+            let report = repair_from(&repo_path(&work), &f.copy).unwrap();
+            assert!(report.is_ok(), "{report:?}");
+            assert_whole(&repo_path(&work), f.main);
+        }
+    }
+}

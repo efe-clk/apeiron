@@ -227,7 +227,7 @@ impl Repository {
     }
 }
 
-fn remove(path: &std::path::Path) -> Result<()> {
+pub(super) fn remove(path: &std::path::Path) -> Result<()> {
     fsutil::checkpoint()
         .and_then(|()| std::fs::remove_file(path))
         .at(path)

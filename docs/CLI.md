@@ -64,7 +64,7 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | `apeiron daemon run\|once\|status [--priority low\|normal] [--tenant <name>]` | Runs scheduled jobs, at low CPU and disk priority unless `--priority normal`; `run` shows a desktop notification when a job starts failing, unless `--no-notify` ([DAEMON.md](DAEMON.md) §2); `--tenant` runs the jobs of a web server's tenant (§3.1) | Done |
 | `apeiron refs` | Lists all refs and the snapshots they point to | Done |
 | `apeiron verify` | Reads and checks every pack, index and object | Done |
-| `apeiron repair` | Removes stale ref locks, adds lost reflog lines and replaces damaged index files | Done |
+| `apeiron repair [--from <remote> [--rate <speed>]]` | Removes stale ref locks, adds lost reflog lines and replaces damaged index files; `--from` also replaces damaged or missing data from a whole copy ([FORMAT.md](FORMAT.md) §8.3), with exit code 4 when no copy holds some of it whole | Done |
 | `apeiron gc [--keep-days <days>] [--dry-run]` | Deletes data no ref and no reflog line of the last 90 days (or `--keep-days`) can reach; `--dry-run` only reports | Done |
 | `apeiron gc --remote <remote> [--dry-run]` | Deletes from a remote the data its refs cannot reach, such as on a replica; only for a remote this repository alone writes to ([FORMAT.md](FORMAT.md) §15.8) | Done |
 | `apeiron key list` | Lists the passwords and recovery keys of an encrypted repository | Done |
@@ -129,7 +129,7 @@ A file that changes while it is being read is stored as read and reported as a w
 | 1 | Error; nothing was changed in the repository |
 | 2 | Usage error (wrong command or option) |
 | 3 | Finished with warnings (for example skipped files), or `sync` or `merge` found conflicts, or `sync` left files for the next round |
-| 4 | Damage found by `verify`, `restore-test` or `report --verify`; a changed report or audit log (`report check`, `web audit verify`); a failed job in `daemon once` or `daemon status` |
+| 4 | Damage found by `verify`, `restore-test` or `report --verify`; data `repair --from` could not replace; a changed report or audit log (`report check`, `web audit verify`); a failed job in `daemon once` or `daemon status` |
 | 130 | Cancelled with Ctrl+C |
 
 ## 6. Example session

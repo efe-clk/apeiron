@@ -153,8 +153,15 @@ enum Command {
     Refs,
     /// Read and check every pack, index and object
     Verify,
-    /// Remove stale ref locks and add lost reflog lines
-    Repair,
+    /// Remove stale ref locks, add lost reflog lines and replace damaged index files
+    Repair {
+        /// Also replace damaged or missing objects from this remote, a whole copy
+        #[arg(long, value_name = "REMOTE")]
+        from: Option<String>,
+        /// The most bytes per second to read from the remote, such as 500K or 2M
+        #[arg(long, value_parser = parse_rate, requires = "from")]
+        rate: Option<u64>,
+    },
     /// Delete data that no ref and no recent reflog line can reach
     Gc {
         /// Snapshots a ref pointed to within this many days are kept; 0 keeps only what refs point to now
@@ -3296,7 +3303,35 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             out.result(&report, |r| say!("{}", transferred(r, &ref_name, &remote)));
             Ok(0)
         }
-        Command::Repair => {
+        Command::Repair {
+            from: Some(remote),
+            rate,
+        } => {
+            let repo = open(cli.repo, password_file)?;
+            let request = apeiron::RemoteRequest {
+                remote: remote.clone(),
+                rate,
+            };
+            let report = watch(out, repo.repair_from(request)?)?;
+            out.result(&report, |r| {
+                if r.damaged_packs == 0 && r.unrecoverable.is_empty() {
+                    say!("Nothing to replace");
+                } else {
+                    say!(
+                        "{} damaged; {} kept from them, {} copied from {remote}, {} removed",
+                        format::count(r.damaged_packs, "pack"),
+                        format::count(r.salvaged_objects, "object"),
+                        format::count(r.copied_objects, "object"),
+                        format::count(r.removed_packs.len() as u64, "pack"),
+                    );
+                }
+                for id in &r.unrecoverable {
+                    say!("not held whole by any copy: {id}");
+                }
+            });
+            Ok(if report.is_ok() { 0 } else { EXIT_DAMAGED })
+        }
+        Command::Repair { .. } => {
             let repo = open(cli.repo, password_file)?;
             let report = repo.repair()?;
             out.result(&report, |r| {

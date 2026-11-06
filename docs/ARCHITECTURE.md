@@ -159,7 +159,7 @@ sequenceDiagram
     S-->>U: Report: restored, skipped, failed
 ```
 
-A chunk that fails verification is never written to the target; the error is reported. Automatic repair from another verified copy is not written yet ([ROADMAP.md](ROADMAP.md) §8); until then, restore from the copy itself ([GUIDE.md](GUIDE.md) §6.1).
+A chunk that fails verification is never written to the target; the error is reported. `apeiron repair --from <remote>` replaces it from another copy ([FORMAT.md](FORMAT.md) §8.3).
 
 ### 5.3 Synchronising
 

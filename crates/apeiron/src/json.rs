@@ -266,6 +266,7 @@ pub fn start(repo: &Repository, operation: &str, request: Value) -> Result<Box<d
         "push_all" => boxed(repo.push_all(parse(request)?)?),
         "pull_all" => boxed(repo.pull_all(parse(request)?)?),
         "report" => boxed(repo.report(parse(request)?)?),
+        "repair_from" => boxed(repo.repair_from(parse(request)?)?),
         "restore_test" => boxed(repo.restore_test(parse(request)?)?),
         "search" => boxed(repo.search(parse(request)?)?),
         "sync" => boxed(repo.sync(parse(request)?)?),

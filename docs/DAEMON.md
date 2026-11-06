@@ -65,16 +65,16 @@ every = "week"
 | --- | --- |
 | `repo` | The repository the job works on; a folder remote can be named here directly to test that copy |
 | `password_file` | The first line is the password or recovery key of an encrypted repository |
-| `do` | `backup`, `push`, `pull`, `verify`, `restore-test`, `gc` or `sync` ([SYNC.md](SYNC.md)) |
+| `do` | `backup`, `push`, `pull`, `verify`, `restore-test`, `gc`, `repair` ([FORMAT.md](FORMAT.md) §8.3) or `sync` ([SYNC.md](SYNC.md)) |
 | `folder`, `ref`, `message` | For `backup`: what to store and which ref to move; for `sync`: the folder and the ref, by default `sync/<folder name>` |
-| `remote`, `mode` | For `sync`: the remote, and `two-way` (default), `send` or `receive`; for `pull`: the remote |
+| `remote`, `mode` | For `sync`: the remote, and `two-way` (default), `send` or `receive`; for `pull` and `repair`: the remote |
 | `ref = "*"` | For `push` and `pull`: every ref, to keep a replica or a standby ([REPLICATION.md](REPLICATION.md) §3) |
 | `push` | For `backup`: remotes to push the ref to after a successful backup; for `push`: the remotes |
 | `every` | `hour`, `day`, `week`, or a number of minutes, hours or days: `15m`, `6h`, `2d` |
 | `at` | For `day` and `week`: the earliest local time of day, `HH:MM` |
 | `sample_mb` | For `restore-test`: how much to restore, default 100 |
 | `on_change` | For `backup` and `sync`: also run after a change to the folder, once it has been quiet this long: a number with `s`, `m` or `h`, from `5s` to `24h` (section 4) |
-| `rate_kb` | For `backup`, `push`, `pull` and `sync`: the most kibibytes per second moved to or from remotes, on average ([SYNC.md](SYNC.md) §2); no limit by default |
+| `rate_kb` | For `backup`, `push`, `pull`, `repair` and `sync`: the most kibibytes per second moved to or from remotes, on average ([SYNC.md](SYNC.md) §2); no limit by default |
 
 `~` at the start of a path is the home folder. A job name follows the ref name rules without `/`. An invalid file stops `daemon run` and `daemon once` with an error that names the line; the daemon reads the file again when it changes and keeps the old jobs if the new file is invalid. The Schedule page of the desktop interface shows the jobs and edits this file, and saves only a valid one (DESKTOP.md §2).
 

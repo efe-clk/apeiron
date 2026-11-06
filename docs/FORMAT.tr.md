@@ -13,7 +13,7 @@ Uygulama durumu (`apeiron-core`):
 | 2–5 | Disk düzeni, `config`, nesne kimliği, nesne türleri | Tamamlandı |
 | 6 | Blob, tree ve snapshot için kanonik CBOR | Tamamlandı |
 | 7 | Chunk bölme (FastCDC) | Tamamlandı |
-| 8 | Paket ve indeks dosyaları | Tamamlandı |
+| 8 | Paket ve indeks dosyaları, bir kopyadan onarım | Tamamlandı |
 | 9 | Kalıcı yazma, ref ve reflog | Tamamlandı |
 | 10 | Güç kesintisi testleri | Tamamlandı |
 | 12 | Depo kilidi | Tamamlandı |
@@ -273,7 +273,21 @@ Kurallar:
 - Dosya adı = `BLAKE3(dosyanın tüm baytları)`, hex.
 - Okuyucu tüm indeks dosyalarını birleştirir. Bir paket hiçbir indekste yoksa (yarıda kalan yazma), okuyucu onun girdi tablosunu doğrudan okuyabilir.
 - Doğrulamadan geçemeyen bir indeks dosyası (adı baytlarına uymuyor ya da yapısı geçersiz) deponun açılmasını engellemez. Okuyucu onu yok sayar, kapsadığı paketleri indekssiz paket olarak okur ve bozuk dosyayı bildirir. Adı baytlarına uymayan indekssiz bir paket bildirilir ve atlanır; nesnelerine, başka bir kopyadan onarılana kadar ulaşılamaz.
-- Onarım komutu, sağlam bir indeksi olmayan her paket için tek bir yeni indeks yazar ve ardından bozuk indeks dosyalarını siler. Hiçbir zaman paket silmez.
+- Onarım komutu, sağlam bir indeksi olmayan her paket için tek bir yeni indeks yazar ve ardından bozuk indeks dosyalarını siler. Kendisine bir kopya verilmedikçe (bölüm 8.3) hiçbir zaman paket silmez.
+
+### 8.3 Bir kopyadan onarım
+
+Dosya özeti yanlış olan ya da bir indeksin listelediği halde yok olan bir paket, deponun bir kopyasından (bölüm 15) yerine konabilir. Bu, hiçbir dosya biçimini değiştirmez.
+
+1. Depo kilidi özel olarak alınır (bölüm 12), bölüm 8.2'nin onarımı çalıştırılır ve kopyanın `config` dosyasının yerel `id`'ye sahip olduğu denetlenir.
+2. Her paketin dosya özeti denetlenir. Geçen paket sağlıklıdır; nesnelerinin hiçbir şeye ihtiyacı yoktur.
+3. Yerine konacaklar bulunur: bir indeksin sağlıklı paketlerin dışında gösterdiği her nesne ve sağlıklı bir pakette olmayıp bir ref'in ya da reflog satırının ulaştığı her nesne; gezinmek için gereken nesneler sağlam oldukları yerden okunur.
+4. Her biri için, kimlik sırasıyla, saklanan baytlar kimliğine çözülüyorsa (bölüm 8.1 kural 5) bozuk paketten, değilse aynı denetimle kopyadan alınır ve yeni paketlere yazılır (bölüm 9.1). "Sağlam olarak bulunmuyor" dışındaki bir hata, örneğin kopan bağlantı, burada durdurur ve hiçbir şey silinmemiştir.
+5. Bir ref'in ya da reflog satırının ulaştığı veya bir reflog satırının adını verdiği ve bir indeksin listelediği nesne gereklidir. Hiçbir yerde sağlam olmayan gerekli nesne kurtarılamaz. Hiçbir yerde sağlam olmayan diğer nesneler bırakılır: ya hiçbir şey onlara ulaşamaz ya da çöp toplama onları bilerek silmiştir.
+6. Her sağlıklı ve yeni paketi, her bozuk paketi de yalnızca kurtarılamayan nesneleriyle listeleyen tek bir yeni indeks yazılır. Diğer tüm indeks dosyaları silinir, ardından `index/` diske sabitlenir.
+7. Bozuk paketler silinir ve klasörleri diske sabitlenir; ancak içinde kurtarılamayan bir nesne listelenen paket ve herhangi bir nesne kurtarılamaz durumdayken hiçbir indeksin listelemediği bozuk paket silinmez: o nesneyi tutuyor olabilir.
+
+6. adımdan önceki bir kesinti, sonraki çalışmanın sağlıklı bulacağı yeni paketler bırakır. Sonraki bir kesinti, yeni indeksin listelemediği bozuk paketler bırakır; açılış onları bildirir ve sonraki çalışma siler. Hiçbir durumda bir nesnenin son sağlam kopyası silinmez.
 
 ## 9. Yazma ve atomik güncelleme kuralları
 
@@ -369,7 +383,7 @@ Aşağıdaki tablo, Aşama 0'ın güç kesintisi testlerinin beklenen sonuçlar�
 | Ref kilidi alındı, taşınmadı | Ref eski snapshot'ı gösterir | Bayat kilit `repair` ile kaldırılır |
 | Ref taşındı, reflog yazılmadı | Ref yeni snapshot'ı gösterir | Sonraki güncellemede `repair` satırı eklenir |
 | Disk doldu (herhangi bir adımda) | Değişiklik yok; hata ref taşındıktan sonra gelirse bir üstteki satırdaki gibi | Hata raporlanır, geçici dosya silinir |
-| Paket içinde bit bozulması | Okuma "bozulma" hatası verir | Henüz otomatik değil ([ROADMAP.tr.md](ROADMAP.tr.md) §8): başka bir kopyadan geri yüklenir (bölüm 15) |
+| Paket içinde bit bozulması | Okuma "bozulma" hatası verir | `apeiron repair --from <remote>` (bölüm 8.3) |
 | İndeks dosyası içinde bit bozulması | Depo açılır; bozuk indeks bildirilir ve paketleri doğrudan okunur | `repair` yeni bir indeks yazar ve bozuk olanı siler |
 
 Hiçbir satırda "ref, var olmayan veya yarım yazılmış bir nesneyi gösteriyor" durumu oluşmamalıdır.

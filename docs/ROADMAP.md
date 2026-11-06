@@ -121,7 +121,6 @@ Every work item is done (2026-10-30); the stage ends with its exit criterion, th
 
 | Need | Asked for in | What happens today |
 | --- | --- | --- |
-| Repairing a damaged object from another copy | [VISION.md](VISION.md), [FORMAT.md](FORMAT.md) §10 | `verify` reports it; `pull` and `repair` do not replace it. A copy can be restored from directly |
 | Rules that prune old backups (7 daily, 4 weekly, 12 monthly) | [VISION.md](VISION.md) | `gc` removes only what no ref reaches; the history of a ref grows without limit |
 | Exclusion rules and selective sync | [VISION.md](VISION.md), [SYNC.md](SYNC.md) §7 | A backup or sync takes the whole folder |
 | Measuring the performance targets on a Raspberry Pi 4 | [VISION.md](VISION.md), [API.md](API.md) §4 | Not measured |

@@ -1078,6 +1078,30 @@ impl Repository {
         core.refresh_index()?;
         Ok(core.repair()?)
     }
+
+    /// Replaces damaged or missing objects from a whole copy on a remote and
+    /// deletes the packs no longer needed (FORMAT.md §8.3). Fails with
+    /// [`ErrorKind::Locked`] while any other operation uses the repository.
+    pub fn repair_from(&self, request: RemoteRequest) -> Result<Job<core::CopyRepairReport>> {
+        let remote = self.read().remote(&request.remote)?;
+        let repo = self.clone();
+        Job::spawn("repair", move |ctl| {
+            let _writer = repo.lock_writer();
+            ctl.update(|p| p.phase = Phase::Copying);
+            let store = open_store(&remote, repo.info().encrypted, request.rate)?;
+            let mut core = repo.read().reopen()?;
+            let report = core.repair_from(&*store, &mut |objects| {
+                ctl.update(|p| p.items_done = objects);
+                if ctl.is_cancelled() {
+                    return Err(core::Error::Cancelled);
+                }
+                Ok(())
+            })?;
+            *repo.write() = core;
+            ctl.update(|p| p.phase = Phase::Done);
+            Ok(report)
+        })
+    }
 }
 
 /// The last part of a folder's path, lowercased, with other characters

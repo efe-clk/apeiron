@@ -45,6 +45,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [035](#adr-035-compliance-reports-are-made-on-demand-from-the-repository-and-the-web-servers-files) | Compliance reports | Read-only, on demand; facts and findings from refs, retention, keys, verify, remotes and, with `--web`, users and the audit log; Markdown or JSON; snapshot ids and the audit hash as proof | Accepted |
 | [036](#adr-036-aws-lc-rs-for-signatures-beside-rustcrypto) | Signatures | `aws-lc-rs` checks and makes signatures; RustCrypto stays for repository data and passwords; changes ADR-017 | Accepted |
 | [037](#adr-037-changes-to-earlier-decisions-up-to-2026-11-06) | Later changes | One table of what changed in ADR-018, 022, 025, 029–035, and legal holds and tags | Accepted |
+| [038](#adr-038-repairing-from-a-copy-is-an-explicit-command-that-deletes-only-what-it-replaced) | Repair | `apeiron repair --from <remote>` under the exclusive lock; damaged packs go only when nothing in them is lost | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28. ADR-036 and ADR-037 record on 2026-11-06 decisions made earlier without a record of their own, including what changed in older ADRs.
 
@@ -814,3 +815,23 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | ADR-021: the Git crate moves behind the plugin interface once that exists | Not done; still a crate of its own | It needs an importer plugin type | [ROADMAP.md](ROADMAP.md) §8 |
 
 **Consequences.** A reader of an older ADR checks this table first. A later change gets its own ADR.
+
+## ADR-038: Repairing from a copy is an explicit command that deletes only what it replaced
+
+**Status:** Accepted (2026-11-06)
+
+**Context.** The vision asks for repairing a corrupt object from another verified copy. A damaged pack stayed damaged even with a whole copy beside it: `pull` skips objects the index lists, and `repair` never deleted a pack (FORMAT.md §8.2). Replacing data is the opposite of what every other command may do to a pack, so it needs its own rules.
+
+**Decision.** `apeiron repair --from <remote>`, and the background service's job `do = "repair"`, follow FORMAT.md §8.3: under the exclusive repository lock, check every pack's hash, take whole objects from the damaged pack or the copy, write a new index, and delete a damaged pack unless it may still hold an object nothing else holds whole. A remote is never changed. Objects no ref or reflog line reaches and no copy holds are dropped.
+
+**Rationale.** Every object is checked against its id before it is used, so a copy needs no trust: a damaged or foreign copy can only fail to help. Taking the whole objects of the damaged pack first keeps data the copy may not have yet, such as a backup not pushed. The exclusive lock and the write order are those of garbage collection, so its crash tests apply to the same steps.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| Repairing during every read, without a command | A read would then write and delete, and needs the network; a failing disk is better met by a person told about it |
+| Making `pull` replace damaged objects | `pull` holds the lock shared, cannot delete packs, and would have to check every pack's hash on each run |
+| Pushing whole objects back to a damaged remote | A remote is repaired by running the command on it as a repository, where that is possible; the case of a remote without a shell is left for later |
+
+**Consequences.** The command reads every stored pack, as `verify` does. It needs a copy holding the same repository. An object held whole nowhere stays reported, with exit code 4, on each run.

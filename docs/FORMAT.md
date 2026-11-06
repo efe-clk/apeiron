@@ -13,7 +13,7 @@ Implementation status (`apeiron-core`):
 | 2–5 | Disk layout, `config`, object id, object types | Done |
 | 6 | Canonical CBOR for blob, tree and snapshot | Done |
 | 7 | Chunking (FastCDC) | Done |
-| 8 | Pack and index files | Done |
+| 8 | Pack and index files, repairing from a copy | Done |
 | 9 | Durable writes, refs and reflogs | Done |
 | 10 | Power-failure tests | Done |
 | 12 | Repository lock | Done |
@@ -273,7 +273,21 @@ An index answers "which object is in which pack, and where" without opening pack
 - File name = `BLAKE3(all bytes of the file)`, hex.
 - A reader merges all index files. If a pack is in no index (an interrupted write), the reader may read its entry table directly.
 - An index file that fails verification (its name does not match its bytes, or its structure is invalid) does not stop the repository from opening. The reader ignores it, reads the packs it covered as packs without an index, and reports the damaged file. A pack without an index whose name does not match its bytes is reported and skipped; its objects are unavailable until it is repaired from another copy.
-- The repair command writes one new index for every pack without a healthy index and then deletes the damaged index files. It never deletes a pack.
+- The repair command writes one new index for every pack without a healthy index and then deletes the damaged index files. It never deletes a pack, unless it is given a copy (section 8.3).
+
+### 8.3 Repairing from a copy
+
+A pack whose file hash is wrong, or that an index lists and is gone, can be replaced from a copy of the repository (section 15). This changes no file format.
+
+1. Take the repository lock exclusive (section 12), run the repair of section 8.2, and check that the copy's `config` has the local `id`.
+2. Check the file hash of every pack. A pack that passes is healthy; its objects need nothing.
+3. Find what to replace: every object an index places outside the healthy packs, and every object not in a healthy pack that a ref or a reflog line reaches, reading what is needed to walk from wherever it is whole.
+4. For each, in order of id, take its stored bytes from the damaged pack if they decode to its id (section 8.1 rule 5), otherwise from the copy under the same check; write them into new packs (section 9.1). An error other than "not held whole", such as a broken connection, stops here, and nothing was deleted.
+5. An object that a ref or a reflog line reaches, or that a reflog line names and an index lists, is required. A required object held whole nowhere is unrecoverable. Any other object held whole nowhere is dropped: nothing can reach it, or garbage collection already removed it on purpose.
+6. Write one new index that lists every healthy and new pack, and each damaged pack only with its unrecoverable objects. Delete all other index files, then flush `index/`.
+7. Delete the damaged packs, then flush their folders, except a pack an unrecoverable object is listed in and, while any object is unrecoverable, a damaged pack no index listed: it may hold that object.
+
+An interruption before step 6 leaves new packs that the next run finds healthy. One after it leaves damaged packs that the new index does not list; opening reports them and the next run deletes them. In no case is the last whole copy of an object deleted.
 
 ## 9. Writing and atomic update rules
 
@@ -369,7 +383,7 @@ The table below lists the expected results of the Stage 0 power-failure tests. E
 | Ref lock taken, not moved | Ref points to the old snapshot | The stale lock is removed with `repair` |
 | Ref moved, reflog not written | Ref points to the new snapshot | A `repair` line is appended on the next update |
 | Disk full (at any step) | No change; if the error comes after the ref was moved, as in the row above | The error is reported, the temporary file is deleted |
-| Bit corruption inside a pack | Reading gives a "corruption" error | Not automatic yet ([ROADMAP.md](ROADMAP.md) §8): restore from another copy (section 15) |
+| Bit corruption inside a pack | Reading gives a "corruption" error | `apeiron repair --from <remote>` (section 8.3) |
 | Bit corruption inside an index file | The repository opens; the damaged index is reported and its packs are read directly | `repair` writes a new index and deletes the damaged one |
 
 In no row may the state "a ref points to a missing or half-written object" arise.

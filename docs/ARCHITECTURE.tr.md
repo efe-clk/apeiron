@@ -159,7 +159,7 @@ sequenceDiagram
     S-->>U: Rapor: geri yüklenen, atlanan, başarısız
 ```
 
-Doğrulamadan geçemeyen bir chunk hedefe hiçbir zaman yazılmaz; hata raporlanır. Başka bir doğrulanmış kopyadan otomatik onarım henüz yazılmadı ([ROADMAP.tr.md](ROADMAP.tr.md) §8); o zamana kadar doğrudan kopyadan geri yüklenir ([GUIDE.tr.md](GUIDE.tr.md) §6.1).
+Doğrulamadan geçemeyen bir chunk hedefe hiçbir zaman yazılmaz; hata raporlanır. `apeiron repair --from <remote>` onu başka bir kopyadan yerine koyar ([FORMAT.tr.md](FORMAT.tr.md) §8.3).
 
 ### 5.3 Senkronlama
 

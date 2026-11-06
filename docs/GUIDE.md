@@ -372,7 +372,7 @@ The one-month test of Stage 1 was skipped by the owner's decision ([ROADMAP.md](
 | `no repository given` | Set `APEIRON_REPO` (section 3) or pass `--repo` |
 | `invalid repository … no config file` | The path is wrong or the external disk is not mounted |
 | `the repository is locked by another program` | `gc` runs only when nothing else uses the repository, and other commands cannot start during `gc`. Wait and try again |
-| `warning: damaged file …` | Run `apeiron verify` for details and `apeiron repair` to rebuild damaged index files. Damaged packs cannot be repaired yet, and `pull` does not replace them; if you have a copy (section 6.1), restore from it with `--repo` |
+| `warning: damaged file …` | Run `apeiron verify` for details and `apeiron repair` to rebuild damaged index files. Damaged data is replaced from a copy (section 6.1) with `apeiron repair --from disk`; `pull` does not replace it |
 | `wrong password or recovery key` | Type the password again; the recovery key works too, with or without dashes. With a password file, check that its first line is the password |
 | `already exists and is not an empty folder` | `restore` and `export` never overwrite; choose a new target |
 | Exit code 130 | The command was cancelled with Ctrl+C; nothing half-done is visible |

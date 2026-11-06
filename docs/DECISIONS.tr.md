@@ -45,6 +45,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [035](#adr-035-uyumluluk-raporları-istek-üzerine-depodan-ve-web-sunucusunun-dosyalarından-oluşturulur) | Uyumluluk raporları | Salt okunur, istek üzerine; ref'lerden, saklamadan, anahtarlardan, doğrulamadan, uzak depolardan ve `--web` ile kullanıcılar ve denetim kaydından gerçekler ve bulgular; Markdown ya da JSON; kanıt olarak snapshot kimlikleri ve denetim özeti | Kabul edildi |
 | [036](#adr-036-rustcrypto-yanında-imzalar-için-aws-lc-rs) | İmzalar | İmzaları `aws-lc-rs` denetler ve üretir; RustCrypto depo verisi ve parolalar için kalır; ADR-017'yi değiştirir | Kabul edildi |
 | [037](#adr-037-önceki-kararlardaki-değişiklikler-2026-11-06ya-kadar) | Sonraki değişiklikler | ADR-018, 022, 025, 029–035'te değişenlerin ve yasal saklama kilitleri ile etiketlerin tek tablosu | Kabul edildi |
+| [038](#adr-038-bir-kopyadan-onarım-yalnızca-yerine-koyduğunu-silen-açık-bir-komuttur) | Onarım | Özel kilit altında `apeiron repair --from <remote>`; bozuk paketler ancak içlerinden hiçbir şey kaybolmayacaksa silinir | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı. ADR-036 ve ADR-037, kendi kayıtları olmadan daha önce alınan kararları ve eski ADR'lerde değişenleri 2026-11-06'da kaydeder.
 
@@ -814,3 +815,23 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | ADR-021: Git crate'i eklenti arayüzü olunca onun arkasına geçer | Yapılmadı; hâlâ kendi crate'idir | İçe aktarıcı eklenti türü gerekir | [ROADMAP.tr.md](ROADMAP.tr.md) §8 |
 
 **Sonuçlar.** Eski bir ADR'yi okuyan önce bu tabloya bakar. Sonraki bir değişiklik kendi ADR'sini alır.
+
+## ADR-038: Bir kopyadan onarım, yalnızca yerine koyduğunu silen açık bir komuttur
+
+**Durum:** Kabul edildi (2026-11-06)
+
+**Bağlam.** Vizyon, bozuk bir nesnenin başka bir doğrulanmış kopyadan onarılmasını ister. Bozuk bir paket, yanında sağlam kopya olsa bile bozuk kalıyordu: `pull` indeksin listelediği nesneleri atlar, `repair` de hiçbir zaman paket silmezdi (FORMAT.tr.md §8.2). Veriyi değiştirmek, diğer her komutun bir pakete yapabileceğinin tersidir; bu yüzden kendi kurallarına ihtiyaç duyar.
+
+**Karar.** `apeiron repair --from <remote>` ve arka plan hizmetinin `do = "repair"` işi FORMAT.tr.md §8.3'ü izler: özel depo kilidi altında her paketin özetini denetler, sağlam nesneleri bozuk paketten ya da kopyadan alır, yeni bir indeks yazar ve başka hiçbir yerde sağlam olmayan bir nesneyi hâlâ tutuyor olabilecek paketler dışındaki bozuk paketleri siler. Uzak depo hiçbir zaman değiştirilmez. Hiçbir ref'in ya da reflog satırının ulaşmadığı ve hiçbir kopyanın tutmadığı nesneler bırakılır.
+
+**Gerekçe.** Her nesne kullanılmadan önce kimliğine karşı denetlenir, bu yüzden kopyaya güvenmek gerekmez: bozuk ya da yabancı bir kopya yalnızca yardım edemez. Önce bozuk paketin sağlam nesnelerini almak, kopyada henüz olmayan veriyi, örneğin push edilmemiş bir yedeği korur. Özel kilit ve yazma sırası çöp toplamanınkidir; onun kesinti testleri aynı adımlar için geçerlidir.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Komut olmadan her okumada onarmak | Okuma yazıp silmeye başlar ve ağ ister; arızalanan bir diski, haberdar edilen bir kişinin ele alması daha iyidir |
+| `pull`'un bozuk nesneleri değiştirmesi | `pull` kilidi paylaşımlı tutar, paket silemez ve her çalışmada her paketin özetini denetlemek zorunda kalır |
+| Sağlam nesneleri bozuk uzak depoya geri göndermek | Uzak depo, mümkünse komut onun üzerinde depo olarak çalıştırılarak onarılır; kabuğu olmayan uzak depo durumu sonraya kaldı |
+
+**Sonuçlar.** Komut, `verify` gibi saklanan her paketi okur. Aynı depoyu tutan bir kopyaya ihtiyaç duyar. Hiçbir yerde sağlam olmayan bir nesne her çalışmada çıkış kodu 4 ile bildirilmeye devam eder.

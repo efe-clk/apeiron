@@ -23,9 +23,11 @@ use crate::retention;
 
 mod gc;
 mod remote_gc;
+mod repair;
 mod transfer;
 
 pub use gc::{GcOptions, GcReport};
+pub use repair::CopyRepairReport;
 pub use transfer::{OnCopy, RefOutcome, TransferReport};
 
 const CONFIG: &str = "config";

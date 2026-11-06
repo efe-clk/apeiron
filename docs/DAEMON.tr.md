@@ -65,16 +65,16 @@ every = "week"
 | --- | --- |
 | `repo` | İşin çalıştığı depo; bir klasör uzak deposu, o kopyayı test etmek için doğrudan burada yazılabilir |
 | `password_file` | İlk satırı, şifreli bir deponun parolası ya da kurtarma anahtarıdır |
-| `do` | `backup`, `push`, `pull`, `verify`, `restore-test`, `gc` ya da `sync` ([SYNC.tr.md](SYNC.tr.md)) |
+| `do` | `backup`, `push`, `pull`, `verify`, `restore-test`, `gc`, `repair` ([FORMAT.tr.md](FORMAT.tr.md) §8.3) ya da `sync` ([SYNC.tr.md](SYNC.tr.md)) |
 | `folder`, `ref`, `message` | `backup` için: neyin saklanacağı ve hangi ref'in taşınacağı; `sync` için: klasör ve ref, varsayılan `sync/<klasör adı>` |
-| `remote`, `mode` | `sync` için: uzak depo ve `two-way` (varsayılan), `send` ya da `receive`; `pull` için: uzak depo |
+| `remote`, `mode` | `sync` için: uzak depo ve `two-way` (varsayılan), `send` ya da `receive`; `pull` ve `repair` için: uzak depo |
 | `ref = "*"` | `push` ve `pull` için: bir replikayı ya da yedek sunucuyu güncel tutmak için her ref ([REPLICATION.tr.md](REPLICATION.tr.md) §3) |
 | `push` | `backup` için: başarılı bir yedekten sonra ref'in push edileceği uzak depolar; `push` için: uzak depolar |
 | `every` | `hour`, `day`, `week` ya da dakika, saat veya gün sayısı: `15m`, `6h`, `2d` |
 | `at` | `day` ve `week` için: günün en erken yerel saati, `HH:MM` |
 | `sample_mb` | `restore-test` için: ne kadarının geri yükleneceği, varsayılan 100 |
 | `on_change` | `backup` ve `sync` için: klasördeki bir değişiklikten sonra, klasör bu kadar süre sessiz kalınca da çalış: `s`, `m` ya da `h` ile bir sayı, `5s` ile `24h` arası (bölüm 4) |
-| `rate_kb` | `backup`, `push`, `pull` ve `sync` için: uzak depolara giden ya da onlardan gelen, saniyede ortalama en çok kibibayt ([SYNC.tr.md](SYNC.tr.md) §2); varsayılan olarak sınır yoktur |
+| `rate_kb` | `backup`, `push`, `pull`, `repair` ve `sync` için: uzak depolara giden ya da onlardan gelen, saniyede ortalama en çok kibibayt ([SYNC.tr.md](SYNC.tr.md) §2); varsayılan olarak sınır yoktur |
 
 Bir yolun başındaki `~` ev klasörüdür. Bir iş adı, `/` içermeyen ref adı kurallarına uyar. Geçersiz bir dosya, `daemon run` ve `daemon once` komutlarını satırı belirten bir hatayla durdurur; daemon dosya değişince onu yeniden okur ve yeni dosya geçersizse eski işleri korur. Masaüstü arayüzünün Zamanlama sayfası işleri gösterir ve bu dosyayı düzenler; yalnızca geçerli bir dosyayı kaydeder (DESKTOP.tr.md §2).
 

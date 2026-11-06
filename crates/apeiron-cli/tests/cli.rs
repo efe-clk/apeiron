@@ -918,3 +918,38 @@ fn tags_are_kept_found_and_restored() {
     s.ok(&["tag", &file, "--remove", "fatura", "--remove", "2026"]);
     assert_eq!(s.json(&["tag", &file])[0]["tags"], serde_json::json!([]));
 }
+
+#[test]
+fn damaged_data_is_replaced_from_a_copy() {
+    let s = Setup::new();
+    let copy = s.root.join("copy");
+    s.ok(&["backup", s.root.join("src").to_str().unwrap()]);
+    s.ok(&["remote", "add", "disk", copy.to_str().unwrap()]);
+    s.ok(&["push", "disk"]);
+    assert_eq!(code(&s.run(&["repair", "--from", "disk"])), Some(0));
+
+    let shard = fs::read_dir(s.repo().join("packs"))
+        .unwrap()
+        .next()
+        .unwrap()
+        .unwrap()
+        .path();
+    let pack = fs::read_dir(shard).unwrap().next().unwrap().unwrap().path();
+    let mut bytes = fs::read(&pack).unwrap();
+    for byte in bytes.iter_mut().skip(16) {
+        *byte ^= 1;
+    }
+    fs::write(&pack, bytes).unwrap();
+    assert_eq!(code(&s.run(&["verify"])), Some(4));
+    // A pull finds nothing new and changes nothing.
+    s.ok(&["pull", "disk"]);
+    assert_eq!(code(&s.run(&["verify"])), Some(4));
+
+    let repaired = s.ok(&["repair", "--from", "disk"]);
+    assert!(repaired.contains("1 pack damaged"), "{repaired}");
+    assert!(!pack.exists());
+    s.ok(&["verify"]);
+    let restored = s.root.join("restored");
+    s.ok(&["restore", "main", restored.to_str().unwrap()]);
+    assert_eq!(fs::read(restored.join("a.txt")).unwrap(), b"first");
+}

@@ -572,6 +572,9 @@ class Repository:
     def pull_all(self, remote: str, rate: Optional[int] = None) -> Job:
         return self.start("pull_all", **_drop_none({"remote": remote, "rate": rate}))
 
+    def repair_from(self, remote: str, rate: Optional[int] = None) -> Job:
+        return self.start("repair_from", **_drop_none({"remote": remote, "rate": rate}))
+
     def report(self, **options: Any) -> Job:
         return self.start("report", **options)
 

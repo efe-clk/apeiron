@@ -405,7 +405,7 @@ impl Repository {
 
     /// Checks that `store` holds a copy of this repository and reads its
     /// index files.
-    fn open_remote(&self, store: &dyn Store) -> Result<HashMap<ObjectId, Location>> {
+    pub(super) fn open_remote(&self, store: &dyn Store) -> Result<HashMap<ObjectId, Location>> {
         super::remote_gc::check_gc_lock(store)?;
         match store.read(CONFIG)? {
             Some(bytes) => self.check_remote_config(store, &bytes)?,

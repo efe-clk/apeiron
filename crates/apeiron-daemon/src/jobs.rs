@@ -82,6 +82,10 @@ pub enum Action {
         sample_bytes: u64,
     },
     Gc,
+    /// Replaces damaged objects from a remote (FORMAT.md §8.3).
+    Repair {
+        remote: String,
+    },
     Sync {
         folder: PathBuf,
         remote: String,
@@ -100,6 +104,7 @@ impl Action {
             Action::Verify => "verify",
             Action::RestoreTest { .. } => "restore-test",
             Action::Gc => "gc",
+            Action::Repair { .. } => "repair",
             Action::Sync { .. } => "sync",
         }
     }
@@ -259,6 +264,20 @@ fn to_job(name: &str, raw: RawJob, scope: Option<&Scope>) -> std::result::Result
                 ref_name: some_ref,
             }
         }
+        "repair" => {
+            for (key, present) in [
+                ("folder", raw.folder.is_some()),
+                ("ref", raw.ref_name.is_some()),
+                ("message", raw.message.is_some()),
+                ("push", raw.push.is_some()),
+                ("sample_mb", raw.sample_mb.is_some()),
+            ] {
+                not_here(key, present)?;
+            }
+            Action::Repair {
+                remote: raw.remote.clone().ok_or("`remote` is missing")?,
+            }
+        }
         "verify" | "gc" => {
             for (key, present) in [
                 ("folder", raw.folder.is_some()),
@@ -305,7 +324,7 @@ fn to_job(name: &str, raw: RawJob, scope: Option<&Scope>) -> std::result::Result
         }
         other => {
             return Err(format!(
-                "unknown `do = {other:?}`; use backup, push, pull, verify, restore-test, gc or sync"
+                "unknown `do = {other:?}`; use backup, push, pull, verify, restore-test, gc, repair or sync"
             ));
         }
     };

@@ -372,7 +372,7 @@ Aşama 1'in bir aylık denemesi proje sahibinin kararıyla atlandı ([ROADMAP.tr
 | `no repository given` | `APEIRON_REPO`'yu ayarlayın (bölüm 3) ya da `--repo` verin |
 | `invalid repository … no config file` | Yol yanlış ya da harici disk bağlı değil |
 | `the repository is locked by another program` | `gc` yalnızca depoyu başka hiçbir şey kullanmıyorken çalışır ve `gc` sürerken diğer komutlar başlayamaz. Bekleyip yeniden deneyin |
-| `warning: damaged file …` | Ayrıntı için `apeiron verify`, bozuk indeks dosyalarını yeniden kurmak için `apeiron repair` çalıştırın. Bozuk paketler henüz onarılamaz ve `pull` onları değiştirmez; bir kopyanız varsa (bölüm 6.1) `--repo` ile doğrudan ondan geri yükleyin |
+| `warning: damaged file …` | Ayrıntı için `apeiron verify`, bozuk indeks dosyalarını yeniden kurmak için `apeiron repair` çalıştırın. Bozuk veri bir kopyadan (bölüm 6.1) `apeiron repair --from disk` ile yerine konur; `pull` onu değiştirmez |
 | `wrong password or recovery key` | Parolayı yeniden yazın; kurtarma anahtarı da tireli ya da tiresiz çalışır. Parola dosyası kullanıyorsanız ilk satırının parola olduğunu denetleyin |
 | `already exists and is not an empty folder` | `restore` ve `export` asla üzerine yazmaz; yeni bir hedef seçin |
 | Çıkış kodu 130 | Komut Ctrl+C ile iptal edildi; yarım kalmış hiçbir şey görünmez |

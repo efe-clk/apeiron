@@ -64,7 +64,7 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | `apeiron daemon run\|once\|status [--priority low\|normal] [--tenant <name>]` | Zamanlanmış işleri, `--priority normal` verilmedikçe düşük işlemci ve disk önceliğiyle çalıştırır; `run`, `--no-notify` verilmedikçe bir iş başarısız olmaya başlayınca masaüstü bildirimi gösterir ([DAEMON.tr.md](DAEMON.tr.md) §2); `--tenant` bir web sunucusu kiracısının işlerini çalıştırır (§3.1) | Tamamlandı |
 | `apeiron refs` | Tüm ref'leri ve gösterdikleri snapshot'ları listeler | Tamamlandı |
 | `apeiron verify` | Her paketi, indeksi ve nesneyi okuyup denetler | Tamamlandı |
-| `apeiron repair` | Bayat ref kilitlerini kaldırır, kaybolan reflog satırlarını ekler ve bozuk indeks dosyalarını yeniler | Tamamlandı |
+| `apeiron repair [--from <remote> [--rate <hız>]]` | Bayat ref kilitlerini kaldırır, kaybolan reflog satırlarını ekler ve bozuk indeks dosyalarını yeniler; `--from` ayrıca bozuk ya da eksik veriyi tam bir kopyadan yerine koyar ([FORMAT.tr.md](FORMAT.tr.md) §8.3), bir kısmı hiçbir kopyada sağlam değilse çıkış kodu 4'tür | Tamamlandı |
 | `apeiron gc [--keep-days <days>] [--dry-run]` | Hiçbir ref'in ve son 90 günün (ya da `--keep-days`) hiçbir reflog satırının ulaşamadığı veriyi siler; `--dry-run` yalnızca raporlar | Tamamlandı |
 | `apeiron gc --remote <remote> [--dry-run]` | Bir uzak depodan, örneğin bir replikadan, ref'lerinin ulaşamadığı veriyi siler; yalnızca bu deponun tek başına yazdığı bir uzak depo için ([FORMAT.tr.md](FORMAT.tr.md) §15.8) | Tamamlandı |
 | `apeiron key list` | Şifreli bir deponun parolalarını ve kurtarma anahtarlarını listeler | Tamamlandı |
@@ -129,7 +129,7 @@ Okunurken değişen bir dosya okunduğu hâliyle saklanır ve uyarı olarak rapo
 | 1 | Hata; depoda hiçbir şey değişmedi |
 | 2 | Kullanım hatası (yanlış komut ya da seçenek) |
 | 3 | Uyarılarla bitti (ör. atlanan dosyalar) ya da `sync` veya `merge` çatışma buldu ya da `sync` dosyaları sonraki tura bıraktı |
-| 4 | `verify`, `restore-test` ya da `report --verify` bozulma buldu; rapor ya da denetim kaydı değişmiş (`report check`, `web audit verify`); `daemon once` ya da `daemon status` içinde başarısız bir iş |
+| 4 | `verify`, `restore-test` ya da `report --verify` bozulma buldu; `repair --from` veriyi yerine koyamadı; rapor ya da denetim kaydı değişmiş (`report check`, `web audit verify`); `daemon once` ya da `daemon status` içinde başarısız bir iş |
 | 130 | Ctrl+C ile iptal edildi |
 
 ## 6. Örnek oturum

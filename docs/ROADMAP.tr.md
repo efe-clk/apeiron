@@ -121,7 +121,6 @@ Her iş tamamlandı (2026-10-30); aşama, çıkış kriteri olan ilk kurumsal pi
 
 | İhtiyaç | İsteyen belge | Bugün ne oluyor |
 | --- | --- | --- |
-| Bozuk bir nesneyi başka bir kopyadan onarmak | [VISION.tr.md](VISION.tr.md), [FORMAT.tr.md](FORMAT.tr.md) §10 | `verify` bildirir; `pull` ve `repair` onu değiştirmez. Doğrudan kopyadan geri yüklenebilir |
 | Eski yedekleri budayan kurallar (7 günlük, 4 haftalık, 12 aylık) | [VISION.tr.md](VISION.tr.md) | `gc` yalnızca hiçbir ref'in ulaşmadığını siler; bir ref'in geçmişi sınırsız büyür |
 | Dışlama kuralları ve seçmeli senkron | [VISION.tr.md](VISION.tr.md), [SYNC.tr.md](SYNC.tr.md) §7 | Yedek ya da senkron bütün klasörü alır |
 | Performans hedeflerini Raspberry Pi 4'te ölçmek | [VISION.tr.md](VISION.tr.md), [API.tr.md](API.tr.md) §4 | Ölçülmedi |

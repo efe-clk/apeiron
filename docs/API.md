@@ -156,6 +156,7 @@ Every operation takes one plain request value and returns one plain result value
 | `resolve` | snapshot spec (section 8.4) | snapshot id | No |
 | `delete_ref` | ref name, expected snapshot | — | No |
 | `repair` | — | `RepairReport`: removed locks, repaired reflogs, packs indexed anew, damaged indexes removed | No |
+| `repair_from` | remote name, optional speed limit | `CopyRepairReport`: what `repair` did, damaged packs, objects kept from them and copied from the remote, packs removed, objects no copy holds whole ([FORMAT.md](FORMAT.md) §8.3) | Yes |
 | `gc` | days of reflog to keep (default 90), dry run | `GcReport`: live objects, removed objects, bytes and packs, packs written | Yes |
 | `gc_remote` | remote name, dry run | `GcReport` for the remote ([FORMAT.md](FORMAT.md) §15.8); `locked` while another cleanup runs there | Yes |
 | `keys` | — | `Vec<KeyInfo>`: id, kind (`password` or `recovery`), when it was added, whether it opened the repository | No |
