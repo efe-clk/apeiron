@@ -94,3 +94,29 @@ jobs:
           APEIRON_S3_LOCKED_URL: s3://apeiron-locked?endpoint=http://127.0.0.1:4566&region=us-east-1
           AWS_ACCESS_KEY_ID: test
           AWS_SECRET_ACCESS_KEY: test
+
+  # A real certificate from Pebble, Let's Encrypt's test service (docs/WEB.md).
+  acme:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - run: |
+          docker run -d --name challtestsrv --network host ghcr.io/letsencrypt/pebble-challtestsrv:2.10.1 \
+            -defaultIPv4 127.0.0.1 -defaultIPv6 "" -dns01 :8053 -http01 "" -https01 "" -tlsalpn01 "" -doh ""
+          docker run -d --name pebble --network host -e PEBBLE_VA_NOSLEEP=1 ghcr.io/letsencrypt/pebble:2.10.1 \
+            -config test/config/pebble-config.json -dnsserver 127.0.0.1:8053
+          curl -sSf -o "$RUNNER_TEMP/minica.pem" \
+            https://raw.githubusercontent.com/letsencrypt/pebble/v2.10.1/test/certs/pebble.minica.pem
+          for i in $(seq 1 30); do curl -sf --cacert "$RUNNER_TEMP/minica.pem" https://localhost:14000/dir && break; sleep 1; done
+          curl -skSf -o "$RUNNER_TEMP/root.pem" https://localhost:15000/roots/0
+      - run: cargo test --locked -p apeiron-server-rs --test acme -- --nocapture
+        env:
+          APEIRON_ACME_TEST_URL: https://localhost:14000/dir
+          APEIRON_ACME_TEST_CA: ${{ runner.temp }}/minica.pem
+          APEIRON_ACME_TEST_ROOT: ${{ runner.temp }}/root.pem
+          APEIRON_ACME_TEST_LISTEN: 127.0.0.1:5001
+          APEIRON_ACME_TEST_DOMAIN: apeiron.test
+      - if: failure()
+        run: docker logs pebble; docker logs challtestsrv
+

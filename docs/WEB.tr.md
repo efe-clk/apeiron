@@ -35,6 +35,8 @@ apeiron web --repo /srv/backup --listen 0.0.0.0:8443 --folder /home/efe
 | `--listen` | Adres ve kapı | `0.0.0.0:8443` |
 | `--cert`, `--key` | Sertifika zinciri ve özel anahtar, PEM dosyaları | Kendinden imzalı bir sertifika |
 | `--plain` | Düz HTTP, yalnızca TLS ekleyen bir vekilin arkasında | Kapalı |
+| `--acme`, `--acme-domain` | Sertifikayı Let's Encrypt'ten alır ve yeniler: hizmetin yazabileceği e-posta adresi ve sertifikadaki her ad (bölüm 2.1) | Kapalı |
+| `--acme-directory`, `--acme-ca` | Let's Encrypt dışında bir hizmet: dizin adresi ve ona güvenilen sertifikalar, PEM | Let's Encrypt |
 | `--folder` | Sunucunun kullanıcılara verilebilen bir klasörü (USERS.tr.md §1); birden çok kez verilebilir | Ev klasörü |
 | `--replicate` | Her yedekten sonra her ref'in push edildiği bir uzak depo ([REPLICATION.tr.md](REPLICATION.tr.md) §4); birden çok kez verilebilir | Yok |
 | `--standby` | Bir yedek sunucu kopyası sunar: yedek almak dışında her şey ([REPLICATION.tr.md](REPLICATION.tr.md) §5) | Kapalı |
@@ -43,6 +45,18 @@ apeiron web --repo /srv/backup --listen 0.0.0.0:8443 --folder /home/efe
 `--cert` ve `--key` verilmezse, `localhost` ve dinlenen adres için kendinden imzalı bir sertifika bir kez oluşturulur ve yapılandırma klasöründe tutulur (`web-cert.pem`, `web-key.pem` ve oluşturulduğu adlarla `web-cert.names`); yalnızca yeni bir kiracının ana makinesi gibi yeni bir ad gerektiğinde yeniden oluşturulur ([TENANTS.tr.md](TENANTS.tr.md) §3). SHA-256 parmak izi başlarken yazılır; tarayıcı bir kez uyarır ve gösterdiği parmak izi yazılanla aynı olmalıdır.
 
 Kullanıcılar ve parolalarının Argon2id özetleri, yapılandırma klasöründeki (Linux'ta `~/.config/apeiron`) `web.json` dosyasında, yalnızca sahibinin okuyabileceği biçimde tutulur (USERS.tr.md §2). Bir `admin` yoksa sunucu başlamaz.
+
+### 2.1 Let's Encrypt'ten sertifika
+
+> **Durum: Devam ediyor.** Ayarlar ve sunucunun sertifikasız davranışı sınandı. Gerçek sertifika almayı, bir test hizmeti isteyen bir test kapsar; bu test henüz çalışmadı.
+
+```text
+apeiron web --repo /srv/backup --listen 0.0.0.0:443 --acme admin@example.com --acme-domain backup.example.com
+```
+
+Sunucu sertifikayı başlarken kendisi ister, süresi bitmeden de yenisini alır. Tarayıcılar ona uyarısız güvenir ve parmak izi yazılmaz. Hizmet, sunucuyu o adla 443 kapısına bağlanarak sınar (TLS-ALPN-01); bu yüzden ad internetten bu sunucuya ulaşmalı, 443 kapısı da ona varmalıdır; bir yönlendirici onu başka bir kapıya aktarabilir. `--tenants` ile her kiracının adresi sertifikaya girer; sunucu çalışırken eklenen kiracı sonraki başlatmada eklenir.
+
+Sertifika gelene kadar bağlantılar başarısız olur; sorun hata çıktısına yazılır ve yeniden denenir. Sertifika ve hesabın özel anahtarı, yapılandırma klasöründeki yalnızca sahibinin girebildiği `acme` klasöründe tutulur. İçindeki anahtar her anahtar kadar gizlidir.
 
 ## 3. Masaüstü arayüzünden farkları
 
@@ -95,7 +109,7 @@ Bir `admin` deponun her yedeğini okuyabilir ve sunucuyu çalıştıran kullanı
 | --- | --- |
 | Birden çok kullanıcı, roller ve yedek başına haklar | 3. iş ([USERS.tr.md](USERS.tr.md)) |
 | Kimin ne yaptığının kaydı | 4. iş ([AUDIT.tr.md](AUDIT.tr.md)) |
-| Let's Encrypt sertifikaları | Sonra; bugün Caddy gibi bir vekil bunu `--plain` ile yapar |
+| Bir sertifika hizmetinin HTTP-01 ve DNS-01 sınamaları | Gerekirse sonra; Caddy gibi bir vekil bunları `--plain` ile yapar |
 
 ## 7. Crate'ler
 

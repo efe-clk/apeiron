@@ -50,6 +50,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [040](#adr-040-pruning-rewrites-a-linear-history-and-remotes-follow-only-when-asked) | Pruning | `apeiron prune` copies the kept snapshots with new parents; protected refs, sync and merges are refused; `push --replace` for remotes | Accepted |
 | [041](#adr-041-transfers-resume-by-pack-and-unchanged-files-are-not-read) | Transfers and backups | An index after each pack, children before parents; a pull trusts only what indexes list; size and time spare reading a file | Accepted |
 | [042](#adr-042-text-inside-documents-comes-from-a-plugin-in-the-sandbox) | Text in documents | `extract-text` in the plugin interface, version 0.2; PDF and office files read by `plugins/documents`, called only for files it names | Accepted |
+| [043](#adr-043-the-server-gets-its-own-certificate-with-tls-alpn-01) | Certificates | `--acme` with `rustls-acme`, TLS-ALPN-01 on the port the server listens on; changes ADR-027 | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28. ADR-036 and ADR-037 record on 2026-11-06 decisions made earlier without a record of their own, including what changed in older ADRs.
 
@@ -922,3 +923,24 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Keeping the extracted text in an index | ADR-023 chose no stored index; a copy of the text would need encrypting and keeping in step |
 
 **Consequences.** Plugins built for version 0.1 stop working and must be rebuilt; a merge then makes a conflict copy, as with any failed plugin. Searching many documents is slower than text, as each runs in a new instance. Scanned PDF files and old `.doc` and `.xls` files give no text.
+
+## ADR-043: The server gets its own certificate, with TLS-ALPN-01
+
+**Status:** Accepted (2026-11-06)
+
+**Context.** ADR-027 left certificates from Let's Encrypt to a proxy. A proxy is one more program for a home user to set up and look after, and this work is on the list the owner asked for.
+
+**Decision.** `apeiron web --acme` gets and renews a certificate with `rustls-acme`, which works with the `rustls` the server already uses. The test is TLS-ALPN-01, answered on the server's own port. Certificate and account key are kept in a folder only the owner can enter. Other services can be named, with the certificates they are trusted by. `--cert`, `--plain` and the self-signed certificate stay.
+
+**Rationale.** TLS-ALPN-01 needs no second port and no change to the routes of the server. A library keeps the protocol's many steps out of this project; OpenID Connect fitted one small module (ADR-031), ACME does not.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| HTTP-01 | Needs port 80 open too, and a second listener |
+| DNS-01 | Needs access to the DNS provider's account, different for each provider |
+| `instant-acme` with our own renewal | More code to get wrong for the same result |
+| Only a proxy, as before | A home user must then learn another program |
+
+**Consequences.** Port 443 must reach the server, so a server only on a home network cannot use it. The library adds about 250 lines of dependencies to `Cargo.lock`. It writes its files with default permissions, which is why the folder is private.

@@ -35,6 +35,8 @@ apeiron web --repo /srv/backup --listen 0.0.0.0:8443 --folder /home/efe
 | `--listen` | Address and port | `0.0.0.0:8443` |
 | `--cert`, `--key` | Certificate chain and private key, PEM files | A self-signed certificate |
 | `--plain` | Plain HTTP, only behind a proxy that adds TLS | Off |
+| `--acme`, `--acme-domain` | Get the certificate from Let's Encrypt and renew it: the e-mail address the service may write to, and each name on the certificate (section 2.1) | Off |
+| `--acme-directory`, `--acme-ca` | Another service than Let's Encrypt: its directory address, and the certificates, PEM, it is trusted by | Let's Encrypt |
 | `--folder` | A folder of the server that users may be given (USERS.md §1); can be given more than once | The home folder |
 | `--replicate` | A remote every ref is pushed to after each backup ([REPLICATION.md](REPLICATION.md) §4); can be given more than once | None |
 | `--standby` | Serve a standby copy: everything but backups ([REPLICATION.md](REPLICATION.md) §5) | Off |
@@ -43,6 +45,18 @@ apeiron web --repo /srv/backup --listen 0.0.0.0:8443 --folder /home/efe
 Without `--cert` and `--key`, a self-signed certificate for `localhost` and the listen address is made once and kept in the configuration folder (`web-cert.pem`, `web-key.pem`, and `web-cert.names` with the names it was made for); it is made again only when a new name is needed, such as a new tenant's host ([TENANTS.md](TENANTS.md) §3). Its SHA-256 fingerprint is printed at start; the browser warns about it once, and the fingerprint it shows must be the printed one.
 
 The users and the Argon2id hashes of their passwords are kept in `web.json` in the configuration folder (`~/.config/apeiron` on Linux), readable only by its owner (USERS.md §2). Without an `admin` the server does not start.
+
+### 2.1 A certificate from Let's Encrypt
+
+> **Status: In progress.** The settings and the server's behaviour without a certificate are tested. Getting a real certificate is covered by a test that needs a test service, which has not run yet.
+
+```text
+apeiron web --repo /srv/backup --listen 0.0.0.0:443 --acme admin@example.com --acme-domain backup.example.com
+```
+
+The server asks for the certificate itself when it starts and for a new one before it ends. Browsers then trust it without a warning, and no fingerprint is printed. The service tests the server by connecting to the name on port 443 (TLS-ALPN-01), so the name must lead to this server from the internet, and port 443 must reach it; a router can forward it to another port. With `--tenants`, the host of every tenant goes on the certificate; a tenant added while the server runs is added at the next start.
+
+Until the certificate is here, connections fail; a problem is written to the error output and tried again. The certificate and the account's private key are kept in the folder `acme` in the configuration folder, which only its owner can enter. A key in it is as secret as any other.
 
 ## 3. What changes from the desktop interface
 
@@ -95,7 +109,7 @@ An `admin` can read every backup of the repository and write into the `--folder`
 | --- | --- |
 | Several users, roles and rights per backup | Work item 3 ([USERS.md](USERS.md)) |
 | A record of who did what | Work item 4 ([AUDIT.md](AUDIT.md)) |
-| Certificates from Let's Encrypt | Later; a proxy such as Caddy does this today with `--plain` |
+| HTTP-01 and DNS-01 tests of a certificate service | Later, if needed; a proxy such as Caddy does them with `--plain` |
 
 ## 7. Crates
 

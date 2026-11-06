@@ -415,6 +415,19 @@ enum Command {
         /// Plain HTTP, only behind a proxy that adds TLS
         #[arg(long, conflicts_with = "cert")]
         plain: bool,
+        /// Get the certificate from Let's Encrypt and renew it; the address
+        /// the service may write to (docs/WEB.md)
+        #[arg(long, value_name = "EMAIL", conflicts_with_all = ["cert", "plain"])]
+        acme: Option<String>,
+        /// A name on that certificate; can be given more than once
+        #[arg(long = "acme-domain", value_name = "NAME", requires = "acme")]
+        acme_domains: Vec<String>,
+        /// Another service than Let's Encrypt: its directory address
+        #[arg(long, value_name = "URL", requires = "acme")]
+        acme_directory: Option<String>,
+        /// The certificates, PEM, that service is trusted by
+        #[arg(long, value_name = "PATH", requires = "acme_directory")]
+        acme_ca: Option<PathBuf>,
         /// A folder users may be given; default the home folder
         #[arg(long = "folder", value_name = "PATH")]
         folders: Vec<PathBuf>,
@@ -3038,6 +3051,10 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             cert,
             key,
             plain,
+            acme,
+            acme_domains,
+            acme_directory,
+            acme_ca,
             folders,
             tenants,
             replicas,
@@ -3084,6 +3101,24 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             };
             let tls = match (cert, key) {
                 _ if plain => None,
+                _ if acme.is_some() => {
+                    let ca_pem = match &acme_ca {
+                        Some(path) => Some(std::fs::read(path).map_err(|e| {
+                            Failure::Usage(format!("cannot read {}: {e}", path.display()))
+                        })?),
+                        None => None,
+                    };
+                    let mut domains = acme_domains;
+                    domains.extend(listed.iter().map(|t| t.host.clone()));
+                    Some(apeiron_server::Tls::acme(apeiron_server::Acme {
+                        domains,
+                        contact: acme.clone().unwrap_or_default(),
+                        directory: acme_directory
+                            .unwrap_or_else(|| apeiron_server::LETS_ENCRYPT.to_owned()),
+                        ca_pem,
+                        cache: config.join("acme"),
+                    }))
+                }
                 (Some(cert), Some(key)) => {
                     let read = |path: &Path| {
                         std::fs::read(path).map_err(|e| {
@@ -3093,6 +3128,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     Some(apeiron_server::Tls {
                         cert_pem: read(&cert)?,
                         key_pem: read(&key)?,
+                        acme: None,
                     })
                 }
                 _ => {
@@ -3111,6 +3147,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             };
             let fingerprint = tls
                 .as_ref()
+                .filter(|t| t.acme.is_none())
                 .map(apeiron_server::Tls::fingerprint)
                 .transpose()?;
             let server = if tenants {
@@ -3183,6 +3220,9 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             }
             if plain {
                 say!("Plain HTTP: use this only behind a proxy that adds TLS.");
+            }
+            if acme.is_some() {
+                say!("Getting the certificate; connections wait until it is here.");
             }
             if standby {
                 say!("Standby: backups are refused until the server is started without --standby.");

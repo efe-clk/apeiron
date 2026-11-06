@@ -50,6 +50,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [040](#adr-040-budama-doğrusal-bir-geçmişi-yeniden-yazar-uzak-depolar-yalnızca-istenince-izler) | Budama | `apeiron prune`, tutulan snapshot'ları yeni ebeveynlerle kopyalar; korunan ref'ler, senkron ve birleştirmeler reddedilir; uzak depolar için `push --replace` | Kabul edildi |
 | [041](#adr-041-aktarımlar-paket-paket-devam-eder-değişmeyen-dosyalar-okunmaz) | Aktarımlar ve yedekler | Her paketten sonra indeks, ebeveynden önce çocuk; pull yalnızca indekslerin listelediğine güvenir; boyut ve zaman dosyayı okumaktan kurtarır | Kabul edildi |
 | [042](#adr-042-belgelerin-içindeki-metin-yalıtılmış-ortamda-bir-eklentiden-gelir) | Belgelerde metin | Eklenti arayüzünde `extract-text`, sürüm 0.2; PDF ve ofis dosyalarını `plugins/documents` okur, yalnızca adlandırdığı dosyalar için çağrılır | Kabul edildi |
+| [043](#adr-043-sunucu-kendi-sertifikasını-tls-alpn-01-ile-alır) | Sertifikalar | `rustls-acme` ile `--acme`, sunucunun dinlediği kapıda TLS-ALPN-01; ADR-027'yi değiştirir | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı. ADR-036 ve ADR-037, kendi kayıtları olmadan daha önce alınan kararları ve eski ADR'lerde değişenleri 2026-11-06'da kaydeder.
 
@@ -922,3 +923,24 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Çıkarılan metni bir indekste tutmak | ADR-023 saklanan indeks istemedi; metnin kopyası şifrelenmeli ve güncel tutulmalıydı |
 
 **Sonuçlar.** 0.1 sürümü için derlenmiş eklentiler çalışmaz ve yeniden derlenmelidir; o zaman birleştirme, başarısız her eklentide olduğu gibi çatışma kopyası yapar. Çok sayıda belgede arama metinden yavaştır, çünkü her biri yeni bir örnekte çalışır. Taranmış PDF'ler ile eski `.doc` ve `.xls` dosyaları metin vermez.
+
+## ADR-043: Sunucu kendi sertifikasını TLS-ALPN-01 ile alır
+
+**Durum:** Kabul edildi (2026-11-06)
+
+**Bağlam.** ADR-027, Let's Encrypt sertifikalarını bir vekile bırakmıştı. Vekil, ev kullanıcısının kurup bakacağı bir program daha demektir ve bu iş proje sahibinin istediği listededir.
+
+**Karar.** `apeiron web --acme`, sunucunun zaten kullandığı `rustls` ile çalışan `rustls-acme` ile sertifika alır ve yeniler. Sınama, sunucunun kendi kapısında yanıtlanan TLS-ALPN-01'dir. Sertifika ve hesap anahtarı yalnızca sahibinin girebildiği bir klasörde tutulur. Başka hizmetler, güvenildikleri sertifikalarla adlandırılabilir. `--cert`, `--plain` ve kendinden imzalı sertifika kalır.
+
+**Gerekçe.** TLS-ALPN-01 ikinci bir kapı ve sunucunun yollarında değişiklik istemez. Bir kütüphane, protokolün birçok adımını bu projenin dışında tutar; OpenID Connect küçük bir modüle sığmıştı (ADR-031), ACME sığmaz.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| HTTP-01 | 80 kapısının da açık olmasını ve ikinci bir dinleyici ister |
+| DNS-01 | Her sağlayıcıda farklı olan DNS hesabına erişim ister |
+| `instant-acme` ve kendi yenilememiz | Aynı sonuç için yanlış yapılabilecek daha çok kod |
+| Eskisi gibi yalnızca vekil | Ev kullanıcısı başka bir program öğrenmek zorunda kalır |
+
+**Sonuçlar.** 443 kapısı sunucuya ulaşmalıdır, bu yüzden yalnızca ev ağındaki bir sunucu bunu kullanamaz. Kütüphane `Cargo.lock`'a yaklaşık 250 satır bağımlılık ekler. Dosyalarını varsayılan izinlerle yazar; klasörün özel olmasının nedeni budur.

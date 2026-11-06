@@ -36,7 +36,7 @@ pub use shares::{DEFAULT_DAYS, LinkOptions, MAX_DAYS, MAX_DOWNLOADS, Share, Shar
 pub use tenants::{Tenant, Tenants};
 pub use totp::{code as totp_code, new_secret as new_totp_secret, uri as totp_uri};
 pub use users::{MIN_PASSWORD, Role, User, Users, hash_password};
-pub use web::{Limits, TenantOptions, Tls, Web, WebOptions};
+pub use web::{Acme, LETS_ENCRYPT, Limits, TenantOptions, Tls, Web, WebOptions};
 use web::{WebState, Who};
 
 use apeiron::json::{self, JsonJob};
@@ -1368,6 +1368,7 @@ impl Running {
         listener: TcpListener,
         router: Router,
         tls: Option<Arc<rustls::ServerConfig>>,
+        background: Option<std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>>,
     ) -> io::Result<Self> {
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .enable_io()
@@ -1380,6 +1381,9 @@ impl Running {
             .name("apeiron-server".to_owned())
             .spawn(move || {
                 runtime.block_on(async move {
+                    if let Some(work) = background {
+                        tokio::spawn(work);
+                    }
                     match tls {
                         None => {
                             let serve = axum::serve(
@@ -1425,6 +1429,9 @@ impl Drop for Running {
     }
 }
 
+/// What a certificate service asks for when it tests a server (RFC 8737).
+pub(crate) const ACME_ALPN: &[u8] = b"acme-tls/1";
+
 /// How long a client may take to finish the TLS handshake.
 const HANDSHAKE: Duration = Duration::from_secs(10);
 
@@ -1449,6 +1456,10 @@ async fn serve_tls(
             let Ok(Ok(stream)) = tokio::time::timeout(HANDSHAKE, acceptor.accept(tcp)).await else {
                 return;
             };
+            // The handshake was the certificate service's test; it asks no more.
+            if stream.get_ref().1.alpn_protocol() == Some(ACME_ALPN) {
+                return;
+            }
             let _ = hyper::server::conn::http1::Builder::new()
                 .serve_connection(hyper_util::rt::TokioIo::new(stream), service)
                 .await;
@@ -1481,7 +1492,7 @@ impl Local {
             memory: options.memory,
             schedule: options.schedule,
         });
-        let running = Running::start(listener, router(app), None)?;
+        let running = Running::start(listener, router(app), None, None)?;
         Ok(Local { url, running })
     }
 

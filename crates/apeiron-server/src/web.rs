@@ -101,9 +101,117 @@ const ADMIN_ONLY: &[&str] = &[
 pub struct Tls {
     pub cert_pem: Vec<u8>,
     pub key_pem: Vec<u8>,
+    /// Gets the certificate from an ACME service instead; the two above are
+    /// then empty (WEB.md §2.1).
+    pub acme: Option<Acme>,
+}
+
+/// Where a certificate comes from automatically, such as Let's Encrypt.
+#[derive(Clone, Debug)]
+pub struct Acme {
+    /// The names on the certificate; each must lead to this server.
+    pub domains: Vec<String>,
+    /// An e-mail address the service may write to about the certificate.
+    pub contact: String,
+    /// The service's directory address.
+    pub directory: String,
+    /// Certificates, PEM, of a private service; none trusts the public ones.
+    pub ca_pem: Option<Vec<u8>>,
+    /// Holds the certificate and the account key; made readable by its owner
+    /// only.
+    pub cache: PathBuf,
+}
+
+/// The directory address of Let's Encrypt.
+pub const LETS_ENCRYPT: &str = "https://acme-v02.api.letsencrypt.org/directory";
+
+/// Background work a TLS configuration needs, such as renewing a certificate.
+type Background = std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>;
+
+impl Acme {
+    fn config(&self) -> Result<(Arc<rustls::ServerConfig>, Background), Error> {
+        use futures_util::StreamExt;
+
+        if self.domains.is_empty() {
+            return Err(invalid("name at least one domain for the certificate"));
+        }
+        if self.contact.is_empty() || self.contact.contains(char::is_whitespace) {
+            return Err(invalid(format!(
+                "{:?} is not an e-mail address",
+                self.contact
+            )));
+        }
+        make_private_dir(&self.cache)
+            .map_err(|e| Error::new(ErrorKind::Io, format!("{}: {e}", self.cache.display())))?;
+        let provider = Arc::new(rustls::crypto::aws_lc_rs::default_provider());
+        let domains = self.domains.clone();
+        let acme = match &self.ca_pem {
+            None => rustls_acme::AcmeConfig::new_with_provider(domains, provider.clone()),
+            Some(pem) => {
+                let mut roots = rustls::RootCertStore::empty();
+                for certificate in CertificateDer::pem_slice_iter(pem) {
+                    let certificate =
+                        certificate.map_err(|e| invalid(format!("service certificate: {e}")))?;
+                    roots
+                        .add(certificate)
+                        .map_err(|e| invalid(format!("service certificate: {e}")))?;
+                }
+                let client = rustls::ClientConfig::builder_with_provider(provider.clone())
+                    .with_safe_default_protocol_versions()
+                    .map_err(|e| invalid(format!("service certificate: {e}")))?
+                    .with_root_certificates(roots)
+                    .with_no_client_auth();
+                rustls_acme::AcmeConfig::new_with_client_config(domains, Arc::new(client))
+            }
+        };
+        let mut state = acme
+            .contact_push(format!("mailto:{}", self.contact))
+            .directory(&self.directory)
+            .cache(rustls_acme::caches::DirCache::new(self.cache.clone()))
+            .state();
+        let mut config = rustls::ServerConfig::builder_with_provider(provider)
+            .with_safe_default_protocol_versions()
+            .map_err(|e| invalid(format!("certificate: {e}")))?
+            .with_no_client_auth()
+            .with_cert_resolver(state.resolver());
+        config.alpn_protocols = vec![b"http/1.1".to_vec(), crate::ACME_ALPN.to_vec()];
+        // Asks for the certificate, and for a new one before it ends.
+        let background = Box::pin(async move {
+            while let Some(event) = state.next().await {
+                match event {
+                    Ok(rustls_acme::EventOk::DeployedNewCert) => {
+                        eprintln!("Certificate: a new one is in use");
+                    }
+                    Ok(_) => {}
+                    Err(e) => eprintln!("warning: certificate: {e}"),
+                }
+            }
+        });
+        Ok((Arc::new(config), background))
+    }
+}
+
+/// Makes a folder only its owner can enter, as what it holds is secret.
+fn make_private_dir(dir: &Path) -> io::Result<()> {
+    fs::create_dir_all(dir)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(dir, fs::Permissions::from_mode(0o700))?;
+    }
+    Ok(())
 }
 
 impl Tls {
+    /// A certificate from an ACME service, such as Let's Encrypt.
+    pub fn acme(acme: Acme) -> Tls {
+        Tls {
+            cert_pem: Vec::new(),
+            key_pem: Vec::new(),
+            acme: Some(acme),
+        }
+    }
+
     /// A new self-signed certificate for `names` (host names or addresses).
     pub fn self_signed(names: Vec<String>) -> Result<Tls, Error> {
         let made = rcgen::generate_simple_self_signed(names)
@@ -111,6 +219,7 @@ impl Tls {
         Ok(Tls {
             cert_pem: made.cert.pem().into_bytes(),
             key_pem: made.signing_key.serialize_pem().into_bytes(),
+            acme: None,
         })
     }
 
@@ -139,6 +248,7 @@ impl Tls {
                 return Ok(Tls {
                     cert_pem: fs::read(&cert).map_err(|e| io_error(&cert, e))?,
                     key_pem: fs::read(&key).map_err(|e| io_error(&key, e))?,
+                    acme: None,
                 });
             }
         }
@@ -171,7 +281,11 @@ impl Tls {
             .map_err(|e| invalid(format!("certificate: {e}")))
     }
 
-    fn config(&self) -> Result<Arc<rustls::ServerConfig>, Error> {
+    fn config(&self) -> Result<(Arc<rustls::ServerConfig>, Option<Background>), Error> {
+        if let Some(acme) = &self.acme {
+            let (config, background) = acme.config()?;
+            return Ok((config, Some(background)));
+        }
         let key = PrivateKeyDer::from_pem_slice(&self.key_pem)
             .map_err(|e| invalid(format!("private key: {e}")))?;
         let certificates = self.certificates()?;
@@ -181,7 +295,7 @@ impl Tls {
             .and_then(|b| b.with_no_client_auth().with_single_cert(certificates, key))
             .map_err(|e| invalid(format!("certificate: {e}")))?;
         config.alpn_protocols = vec![b"http/1.1".to_vec()];
-        Ok(Arc::new(config))
+        Ok((Arc::new(config), None))
     }
 }
 
@@ -1624,12 +1738,15 @@ impl Web {
 
     fn serve(listen: SocketAddr, tls: Option<Tls>, router: axum::Router) -> Result<Self, Error> {
         let io_error = |e: io::Error| Error::new(ErrorKind::Io, e.to_string());
-        let tls = tls.as_ref().map(Tls::config).transpose()?;
+        let (tls, background) = match tls.as_ref().map(Tls::config).transpose()? {
+            Some((config, background)) => (Some(config), background),
+            None => (None, None),
+        };
         let listener = std::net::TcpListener::bind(listen)
             .map_err(|e| Error::new(ErrorKind::Io, format!("cannot listen on {listen}: {e}")))?;
         listener.set_nonblocking(true).map_err(io_error)?;
         let address = listener.local_addr().map_err(io_error)?;
-        let running = Running::start(listener, router, tls).map_err(io_error)?;
+        let running = Running::start(listener, router, tls, background).map_err(io_error)?;
         Ok(Web { address, running })
     }
 
