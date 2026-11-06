@@ -1,4 +1,4 @@
-//! Bringing a tar or zip archive in as a snapshot (CLI.md §4.2).
+//! Bringing a tar, zip or 7z archive in as a snapshot (CLI.md §4.2).
 //!
 //! An archive may come from anyone. Nothing here writes to a folder, and a
 //! name that climbs out of the archive is left out with a warning, so a tree
@@ -38,10 +38,13 @@ pub enum ImportFormat {
     TarGz,
     #[serde(rename = "zip")]
     Zip,
+    #[serde(rename = "7z")]
+    SevenZ,
 }
 
 impl ImportFormat {
-    /// The format named by a file name (`.tar`, `.tar.gz`, `.tgz`, `.zip`).
+    /// The format named by a file name (`.tar`, `.tar.gz`, `.tgz`, `.zip`,
+    /// `.7z`).
     pub fn from_path(path: &Path) -> Option<Self> {
         let name = path.file_name()?.to_str()?.to_ascii_lowercase();
         if name.ends_with(".tar.gz") || name.ends_with(".tgz") {
@@ -50,6 +53,8 @@ impl ImportFormat {
             Some(ImportFormat::Tar)
         } else if name.ends_with(".zip") {
             Some(ImportFormat::Zip)
+        } else if name.ends_with(".7z") {
+            Some(ImportFormat::SevenZ)
         } else {
             None
         }
@@ -466,6 +471,74 @@ fn read_zip(import: &mut Import<'_, '_>, file: File) -> Result<()> {
     Ok(())
 }
 
+fn read_7z(import: &mut Import<'_, '_>, file: File) -> Result<()> {
+    let mut archive =
+        sevenz_rust2::ArchiveReader::new(file, sevenz_rust2::Password::empty()).map_err(damaged)?;
+    // The reader's own errors cannot carry ours, so an error stops it here.
+    let mut failure = None;
+    let read = archive.for_each_entries(|entry, content| {
+        let done = read_7z_entry(import, entry, content);
+        let more = done.is_ok();
+        failure = done.err();
+        Ok(more)
+    });
+    match failure {
+        Some(e) => Err(e),
+        None => read.map_err(damaged),
+    }
+}
+
+fn read_7z_entry(
+    import: &mut Import<'_, '_>,
+    entry: &sevenz_rust2::ArchiveEntry,
+    content: &mut dyn Read,
+) -> Result<()> {
+    const UNIX_EXTENSION: u32 = 0x8000;
+    import.ctl.check()?;
+    let path = entry.name.as_bytes();
+    let Some(parts) = import.check_path(path) else {
+        return Ok(());
+    };
+    let unix = (entry.has_windows_attributes && entry.windows_attributes & UNIX_EXTENSION != 0)
+        .then_some(entry.windows_attributes >> 16);
+    let attrs = Attrs {
+        mode: unix.map(|m| (m & 0o7777) as u16),
+        mtime: entry
+            .has_last_modified_date
+            .then(|| os::to_time(SystemTime::from(entry.last_modified_date))),
+        uid: None,
+        gid: None,
+    };
+    // The reader marks every folder as an entry that removes one, so folders
+    // come first; at worst a real one leaves an empty folder.
+    if entry.is_directory {
+        import.add_dir(&parts, attrs);
+    } else if entry.is_anti_item {
+        import.warn(
+            path,
+            WarningKind::Unsupported,
+            "an entry that removes a file",
+        );
+    } else if parts.is_empty() {
+        // Nothing to name it by.
+    } else if unix.is_some_and(|m| m & S_IFMT == S_IFLNK) {
+        let mut target = Vec::new();
+        content
+            .take(MAX_LINK)
+            .read_to_end(&mut target)
+            .map_err(damaged)?;
+        if target.is_empty() {
+            import.warn(path, WarningKind::Unsupported, "a link without a target");
+        } else {
+            import.add_item(&parts, item(EntryKind::Symlink { target }, attrs));
+        }
+    } else {
+        let stored = import.store(content)?;
+        import.add_item(&parts, item(stored, attrs));
+    }
+    Ok(())
+}
+
 /// Stores the archive as a new snapshot and moves the ref to it. If it is
 /// damaged, or the operation fails or is cancelled, the ref is not moved.
 pub fn import(
@@ -500,6 +573,7 @@ pub fn import(
         ImportFormat::Tar => read_tar(&mut state, file)?,
         ImportFormat::TarGz => read_tar(&mut state, flate2::read::GzDecoder::new(file))?,
         ImportFormat::Zip => read_zip(&mut state, file)?,
+        ImportFormat::SevenZ => read_7z(&mut state, file)?,
     }
     if state.entries == 0 {
         return Err(Error::InvalidInput(format!(
@@ -576,6 +650,7 @@ mod tests {
         assert_eq!(f("a.TAR.GZ"), Some(ImportFormat::TarGz));
         assert_eq!(f("a.tgz"), Some(ImportFormat::TarGz));
         assert_eq!(f("a.zip"), Some(ImportFormat::Zip));
+        assert_eq!(f("a.7Z"), Some(ImportFormat::SevenZ));
         assert_eq!(f("a.rar"), None);
     }
 

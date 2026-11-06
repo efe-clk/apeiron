@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use apeiron_core::Repository;
 use apeiron_services::{
     ArchiveFormat, BackupOptions, Control, Error, ImportFormat, ImportOptions, WarningKind, backup,
-    export, import, restore,
+    export, import, restore, split_archive,
 };
 
 struct Setup {
@@ -60,7 +60,11 @@ fn fill(src: &Path) {
 
 #[test]
 fn what_export_writes_comes_back_the_same() {
-    for (format, name) in [(ArchiveFormat::Tar, "x.tar"), (ArchiveFormat::Zip, "x.zip")] {
+    for (format, name) in [
+        (ArchiveFormat::Tar, "x.tar"),
+        (ArchiveFormat::Zip, "x.zip"),
+        (ArchiveFormat::SevenZ, "x.7z"),
+    ] {
         let mut s = setup();
         let src = s.root.join("src");
         fill(&src);
@@ -237,6 +241,9 @@ fn damage_leaves_the_ref_where_it_was() {
     let garbage = s.root.join("garbage.zip");
     fs::write(&garbage, b"this is not a zip file at all").unwrap();
     assert!(matches!(s.import(&garbage), Err(Error::InvalidInput(_))));
+    let garbage = s.root.join("garbage.7z");
+    fs::write(&garbage, b"this is not a 7z file either").unwrap();
+    assert!(matches!(s.import(&garbage), Err(Error::InvalidInput(_))));
     let garbage = s.root.join("garbage.tar");
     fs::write(&garbage, vec![b'x'; 2048]).unwrap();
     assert!(matches!(s.import(&garbage), Err(Error::InvalidInput(_))));
@@ -276,4 +283,55 @@ fn the_format_can_be_named_and_a_stop_moves_nothing() {
     // A second import adds to the history.
     let again = import(&mut s.repo, &options, &Control::new()).unwrap();
     assert_eq!(again.parent, Some(out.snapshot));
+}
+
+#[test]
+fn a_split_archive_joins_back_and_never_overwrites() {
+    let mut s = setup();
+    let src = s.root.join("src");
+    fill(&src);
+    let snapshot = backup(
+        &mut s.repo,
+        &BackupOptions::new(&src, "main"),
+        &Control::new(),
+    )
+    .unwrap()
+    .snapshot;
+    let file = s.root.join("x.tar");
+    export(
+        &s.repo,
+        &snapshot,
+        b"",
+        &file,
+        ArchiveFormat::Tar,
+        &Control::new(),
+    )
+    .unwrap();
+    let whole = fs::read(&file).unwrap();
+
+    // A part in the way stops it, and the archive stays.
+    let in_the_way = s.root.join("x.tar.002");
+    fs::write(&in_the_way, b"keep").unwrap();
+    assert!(matches!(
+        split_archive(&file, 1 << 20, &Control::new()),
+        Err(Error::AlreadyExists(_))
+    ));
+    assert_eq!(fs::read(&file).unwrap(), whole);
+    assert_eq!(fs::read(&in_the_way).unwrap(), b"keep");
+    assert!(!s.root.join("x.tar.001").exists());
+    fs::remove_file(&in_the_way).unwrap();
+
+    let parts = split_archive(&file, 1 << 20, &Control::new()).unwrap();
+    assert!(parts.len() > 1);
+    assert!(!file.exists());
+    assert_eq!(fs::metadata(&parts[0]).unwrap().len(), 1 << 20);
+    let mut joined = Vec::new();
+    for part in &parts {
+        joined.extend(fs::read(part).unwrap());
+    }
+    assert_eq!(joined, whole);
+    let back = s.root.join("joined.tar");
+    fs::write(&back, joined).unwrap();
+    assert_eq!(s.import(&back).unwrap().files, 2);
+    assert!(split_archive(&back, 0, &Control::new()).is_err());
 }

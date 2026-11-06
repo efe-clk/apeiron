@@ -99,7 +99,7 @@ Aşama 5'in bütün işleri tamamlandı; aşama, çıkış kriteri olan ilk kuru
 12. Let's Encrypt (ACME).
 13. İlk sürüm: kurulum dosyaları, simgeler, indirilebilir metin eklentisi.
 
-Bu listede olmayan, belgelerin istediği ama yazılmamış işler `docs/ROADMAP.md` §8'dedir. Proje sahibi 2026-11-06'da sırayı Claude'a bıraktı: ~~bozuk nesneyi kopyadan onarma~~, ~~dışlama kuralları~~, ~~eski yedekleri budama~~, ~~performans ölçümü (bu makinede, `docs/PERFORMANCE.md`; Raspberry Pi 4 için cihaz gerekir)~~ (tamamlandı), ~~tar ve zip içe aktarma~~, ardından §8'in kalanı küçükten büyüğe.
+Bu listede olmayan, belgelerin istediği ama yazılmamış işler `docs/ROADMAP.md` §8'dedir. Proje sahibi 2026-11-06'da sırayı Claude'a bıraktı: ~~bozuk nesneyi kopyadan onarma~~, ~~dışlama kuralları~~, ~~eski yedekleri budama~~, ~~performans ölçümü (bu makinede, `docs/PERFORMANCE.md`; Raspberry Pi 4 için cihaz gerekir)~~ (tamamlandı), ~~tar, zip ve 7z içe aktarma, dışa aktarımı bölme~~, ardından §8'in kalanı küçükten büyüğe.
 
 ## Çalışma düzeni
 

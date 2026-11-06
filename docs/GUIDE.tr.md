@@ -141,7 +141,7 @@ Apeiron var olan dosyaların üzerine asla yazmaz. Hedef klasör var olmamalı y
 
 Ardından ihtiyacınız olanı `~/restored`'dan yerine kopyalayın. İzinler ve zamanlar geri yüklenir; sahipler yalnızca onları ayarlama hakkınız varsa.
 
-Bir yedeği Apeiron'u olmayan birine vermek için onu bir arşive yazın: `apeiron export backup/documents ~/documents.zip` (`.tar` ve `.7z` de çalışır). Eski bir `.tar`, `.tar.gz` ya da `.zip` arşivi `apeiron import ~/eski.zip --ref archive/eski` ile içeri alınır ([CLI.tr.md](CLI.tr.md) §4.2).
+Bir yedeği Apeiron'u olmayan birine vermek için onu bir arşive yazın: `apeiron export backup/documents ~/documents.zip` (`.tar` ve `.7z` de çalışır). Eski bir `.tar`, `.tar.gz`, `.zip` ya da `.7z` arşivi `apeiron import ~/eski.zip --ref archive/eski` ile içeri alınır ([CLI.tr.md](CLI.tr.md) §4.2).
 
 ### 6.1 Harici diskte ikinci bir kopya
 

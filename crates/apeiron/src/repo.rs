@@ -243,7 +243,7 @@ impl Repository {
         })
     }
 
-    /// Stores a tar or zip archive as a new snapshot of a ref (CLI.md §4.2).
+    /// Stores a tar, zip or 7z archive as a new snapshot of a ref (CLI.md §4.2).
     /// If it is damaged, the ref does not move.
     pub fn import_archive(&self, request: ImportRequest) -> Result<Job<ImportReport>> {
         let repo = self.clone();
@@ -637,14 +637,18 @@ impl Repository {
         let repo = self.clone();
         Job::spawn("export", move |ctl| {
             let core = repo.view()?;
-            Ok(services::export(
+            let mut report = services::export(
                 &core,
                 &snapshot,
                 request.path.as_bytes(),
                 &request.output,
                 format,
                 ctl,
-            )?)
+            )?;
+            if let Some(size) = request.split {
+                report.parts = services::split_archive(&request.output, size, ctl)?;
+            }
+            Ok(report)
         })
     }
 

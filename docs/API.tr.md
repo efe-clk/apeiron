@@ -143,8 +143,8 @@ Her işlem tek bir düz istek değeri alır ve tek bir düz sonuç değeri dönd
 | --- | --- | --- | --- |
 | `backup` (`exclude`: dışarıda bırakılacak kalıplar, [CLI.tr.md](CLI.tr.md) §4.1; `reread`: değişmemiş görünenleri de okur; sonuçta `excluded`, `unchanged`) | kaynak klasör, ref adı, açıklama, yazar, cihaz, meta | `BackupReport`: snapshot kimliği, dosya, klasör ve bayt sayıları, yeni saklanan baytlar, uyarılar | Evet |
 | `restore` | snapshot, hedef klasör, isteğe bağlı snapshot içi yol | `RestoreReport`: sayılar, uyarılar | Evet |
-| `export` | snapshot, çıktı dosyası, biçim (`tar`, `zip` ya da `7z`; verilmezse uzantıdan), isteğe bağlı yol | `ExportReport`: sayılar, uyarılar | Evet |
-| `import_archive` | arşiv dosyası, ref adı, format (`tar`, `tar.gz` ya da `zip`; yoksa addan), ileti, yazar, ana makine | `ImportReport`: snapshot, ebeveyn, dosya, klasör ve bağlantı sayıları, baytlar, yeni saklanan baytlar, uyarı olarak dışarıda kalanlar ([CLI.tr.md](CLI.tr.md) §4.2) | Evet |
+| `export` (`split`: parça boyutu; sonuçta bölündüyse `parts`) | snapshot, çıktı dosyası, biçim (`tar`, `zip` ya da `7z`; verilmezse uzantıdan), isteğe bağlı yol | `ExportReport`: sayılar, uyarılar | Evet |
+| `import_archive` | arşiv dosyası, ref adı, format (`tar`, `tar.gz`, `zip` ya da `7z`; yoksa addan), ileti, yazar, ana makine | `ImportReport`: snapshot, ebeveyn, dosya, klasör ve bağlantı sayıları, baytlar, yeni saklanan baytlar, uyarı olarak dışarıda kalanlar ([CLI.tr.md](CLI.tr.md) §4.2) | Evet |
 | `verify` | — | `VerifyReport`: denetlenen nesneler, bozuk dosyalar ve nesneler | Evet |
 | `restore_test` | snapshot, geri yüklenecek bayt (varsayılan 100 MiB) | `RestoreTestReport`: geri yüklenip denetlenen dosyalar ve baytlar, bozuk dosyalar | Evet |
 | `log` | başlangıç snapshot'ı, en fazla sayı, isteğe bağlı olarak mesajın, yazarın, makinenin ya da üst verinin içermesi gereken metin (büyük-küçük harf ayrılmaz; sayı o zaman eşleşenleri sayar) | `LogPage`: en yeniden başlayan snapshot'lar ve sonraki sayfanın başladığı yer | Hayır |

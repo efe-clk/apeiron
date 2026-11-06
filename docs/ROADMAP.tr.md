@@ -123,7 +123,6 @@ Her iş tamamlandı (2026-10-30); aşama, çıkış kriteri olan ilk kurumsal pi
 | --- | --- | --- |
 | Performans hedeflerini Raspberry Pi 4'te ölçmek | [VISION.tr.md](VISION.tr.md), [API.tr.md](API.tr.md) §4 | Daha güçlü bir bilgisayarda ölçüldü ([PERFORMANCE.tr.md](PERFORMANCE.tr.md)); cihaz gerekir |
 | İşlem günlüğü | [ARCHITECTURE.tr.md](ARCHITECTURE.tr.md) §2 | Reflog'lar ref değişikliklerini kaydeder; web arayüzü dışındaki diğer işlemleri hiçbir şey kaydetmez |
-| Arşiv paketleri: parçalara bölme, açmadan inceleme; 7z içe aktarma | [VISION.tr.md](VISION.tr.md) | tar, zip ve 7z dışa aktarılır; tar ve zip içe aktarılır ([CLI.tr.md](CLI.tr.md) §4.2) |
 | API'nin uzak kullanımı ve daemon'u başka bir cihazdan yönetmek | [API.tr.md](API.tr.md) §2, [DAEMON.tr.md](DAEMON.tr.md) §7 | Yalnızca sayfaların JSON API'si; bir kiracının işleri Zamanlama sayfasında |
 | Git'in eklenti arayüzünün arkasına geçmesi; diğer eklenti türleri ve eklenti mağazası | [DECISIONS.tr.md](DECISIONS.tr.md) ADR-021, [PLUGIN.tr.md](PLUGIN.tr.md) §6 | `apeiron-git` kendi crate'idir; eklentiler yalnızca tür sürücüsüdür |
 | PDF ve ofis dosyalarının içindeki metin; macOS ve Windows'ta etiketler; raporlarda başka standartlar | [SEARCH.tr.md](SEARCH.tr.md) §7, [REPORTS.tr.md](REPORTS.tr.md) §6 | Yalnızca UTF-8 metin; etiketler yalnızca Linux'ta; yalnızca ISO/IEC 27001 |

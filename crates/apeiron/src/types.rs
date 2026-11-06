@@ -67,6 +67,9 @@ pub struct ExportRequest {
     /// A path inside the snapshot; empty or absent for everything.
     #[serde(default)]
     pub path: Name,
+    /// Cuts the archive into parts of this many bytes (CLI.md §3).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub split: Option<u64>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

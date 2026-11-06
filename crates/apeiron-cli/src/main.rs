@@ -146,8 +146,11 @@ enum Command {
         /// Path inside the snapshot to export
         #[arg(long, default_value = "")]
         path: String,
+        /// Cut the archive into parts of this size, such as 700M
+        #[arg(long, value_name = "SIZE", value_parser = parse_rate)]
+        split: Option<u64>,
     },
-    /// Store a tar or zip archive as a new snapshot of a ref
+    /// Store a tar, zip or 7z archive as a new snapshot of a ref
     Import {
         /// The archive; its name chooses the format
         file: PathBuf,
@@ -1947,6 +1950,8 @@ enum ImportFormatArg {
     #[value(name = "tar.gz")]
     TarGz,
     Zip,
+    #[value(name = "7z")]
+    SevenZ,
 }
 
 impl From<ImportFormatArg> for apeiron::ImportFormat {
@@ -1955,6 +1960,7 @@ impl From<ImportFormatArg> for apeiron::ImportFormat {
             ImportFormatArg::Tar => apeiron::ImportFormat::Tar,
             ImportFormatArg::TarGz => apeiron::ImportFormat::TarGz,
             ImportFormatArg::Zip => apeiron::ImportFormat::Zip,
+            ImportFormatArg::SevenZ => apeiron::ImportFormat::SevenZ,
         }
     }
 }
@@ -2399,6 +2405,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             file,
             format,
             path,
+            split,
         } => {
             let repo = open(cli.repo, password_file)?;
             let report = watch(
@@ -2408,6 +2415,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     output: file.clone(),
                     format: format.map(ArchiveFormat::from),
                     path: Name::from(path.as_str()),
+                    split,
                 })?,
             )?;
             out.result(&report, |r| {
@@ -2418,6 +2426,9 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     format::bytes(r.bytes),
                     file.display()
                 );
+                if !r.parts.is_empty() {
+                    say!("Split into {} parts", r.parts.len());
+                }
             });
             Ok(warnings_exit(out, &report.warnings))
         }

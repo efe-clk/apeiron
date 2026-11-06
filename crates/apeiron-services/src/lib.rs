@@ -31,7 +31,7 @@ pub use control::{Control, Phase, Progress, Warning, WarningKind};
 pub use diff::{Change, ChangeKind, diff};
 pub use error::{Error, Result};
 pub use exclude::IGNORE_FILE;
-pub use export::{ArchiveFormat, ExportOutcome, export, export_zip_to};
+pub use export::{ArchiveFormat, ExportOutcome, export, export_zip_to, split_archive};
 pub use import::{ImportFormat, ImportOptions, ImportOutcome, import};
 pub use list::{EntryInfo, Kind, list, read_path, read_to};
 pub use merge::{

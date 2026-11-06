@@ -120,6 +120,7 @@ fn backup_log_list_diff_restore_verify() {
             output: s.root.join("out.7z"),
             format: None,
             path: Default::default(),
+            split: None,
         })
         .unwrap();
     assert_eq!(job.wait().unwrap().files, 2);
@@ -130,6 +131,7 @@ fn backup_log_list_diff_restore_verify() {
             output: s.root.join("out.rar"),
             format: None,
             path: Default::default(),
+            split: None,
         })
         .unwrap_err();
     assert_eq!(err.kind, ErrorKind::InvalidInput);

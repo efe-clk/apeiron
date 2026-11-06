@@ -44,7 +44,55 @@ pub struct ExportOutcome {
     pub dirs: u64,
     pub symlinks: u64,
     pub bytes: u64,
+    /// The files the archive was split into, if it was (CLI.md §3).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub parts: Vec<PathBuf>,
     pub warnings: Vec<Warning>,
+}
+
+/// Cuts a finished archive into `<file>.001`, `<file>.002` … of `size` bytes
+/// and removes it; joining them in order gives it back. If that fails, the
+/// parts written so far are removed and the archive stays.
+pub fn split_archive(file: &Path, size: u64, ctl: &Control) -> Result<Vec<PathBuf>> {
+    if size == 0 {
+        return Err(Error::InvalidInput(
+            "a part must be larger than nothing".to_owned(),
+        ));
+    }
+    let mut parts = Vec::new();
+    let result = write_parts(file, size, ctl, &mut parts);
+    if let Err(e) = result {
+        for part in &parts {
+            let _ = fs::remove_file(part);
+        }
+        return Err(e);
+    }
+    fs::remove_file(file).at(file)?;
+    Ok(parts)
+}
+
+fn write_parts(file: &Path, size: u64, ctl: &Control, parts: &mut Vec<PathBuf>) -> Result<()> {
+    let mut input = File::open(file).at(file)?;
+    let mut left = input.metadata().at(file)?.len();
+    while left > 0 {
+        ctl.check()?;
+        let mut name = file.as_os_str().to_owned();
+        name.push(format!(".{:03}", parts.len() + 1));
+        let path = PathBuf::from(name);
+        let mut part = match File::create_new(&path) {
+            Ok(part) => part,
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+                return Err(Error::AlreadyExists(path));
+            }
+            Err(e) => return Err(e).at(&path),
+        };
+        parts.push(path.clone());
+        let take = left.min(size);
+        io::copy(&mut (&mut input).take(take), &mut part).at(&path)?;
+        part.sync_all().at(&path)?;
+        left -= take;
+    }
+    Ok(())
 }
 
 /// Writes `path` of `snapshot` (everything for an empty path) into a new
