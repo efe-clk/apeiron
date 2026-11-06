@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Apeiron
+Comment=Back up, sync and keep versions of your files
+Comment[tr]=Dosyalarınızı yedekleyin, eşitleyin ve sürümlerini saklayın
+Exec=apeiron-desktop
+Icon=apeiron
+Terminal=false
+Categories=Utility;Archiving;

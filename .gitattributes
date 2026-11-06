@@ -1,0 +1,2 @@
+# Bash reads these on Windows too, where Git would otherwise give them CRLF.
+*.sh text eol=lf

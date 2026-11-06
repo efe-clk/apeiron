@@ -1,0 +1,171 @@
+name: Release
+
+# By hand: builds, installs and tries every package, and keeps them as
+# artifacts of the run. On a tag such as v0.1.0: also makes a draft release,
+# which is public only once someone publishes it.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: read
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "the tag $GITHUB_REF_NAME does not match version $version"; exit 1
+          fi
+
+  plugins:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+      - run: |
+          mkdir -p dist
+          for plugin in text documents; do
+            cargo build --locked --release --target wasm32-wasip2 --manifest-path "plugins/$plugin/Cargo.toml"
+            cp "plugins/$plugin/target/wasm32-wasip2/release/apeiron_$plugin.wasm" dist/
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plugins
+          path: dist/
+
+  linux:
+    needs: [version, plugins]
+    strategy:
+      fail-fast: false
+      matrix:
+        # The oldest system that has the web view, so that newer ones run it too.
+        os: [ubuntu-22.04, ubuntu-22.04-arm]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev xvfb
+      - run: cargo build --locked --release -p apeiron-cli-rs -p apeiron-desktop-rs
+      - run: packaging/linux.sh "${{ needs.version.outputs.version }}" dist
+      - name: Install on clean systems
+        run: |
+          for image in ubuntu:22.04 ubuntu:24.04 debian:12; do
+            docker run --rm -v "$PWD:/work" -w /work "$image" bash -euc '
+              apt-get update -qq
+              apt-get install -y -qq ./dist/*.deb > /dev/null
+              if ldd /usr/bin/apeiron-desktop | grep "not found"; then exit 1; fi
+              packaging/try.sh apeiron
+              apt-get remove -y -qq apeiron > /dev/null
+              if command -v apeiron; then exit 1; fi
+            '
+          done
+      - name: Install here and open the app
+        run: |
+          sudo dpkg -i dist/*.deb
+          test -f /usr/share/icons/hicolor/256x256/apps/apeiron.png
+          xvfb-run -a packaging/try_desktop.sh apeiron-desktop
+      - uses: actions/download-artifact@v4
+        with:
+          name: plugins
+          path: plugins-built
+      - name: The plugins load in the installed program
+        run: |
+          apeiron plugin add plugins-built/apeiron_text.wasm
+          apeiron plugin add plugins-built/apeiron_documents.wasm
+          test "$(apeiron plugin list | wc -l)" -ge 2
+          sudo dpkg -r apeiron
+      - name: Try the archive
+        run: |
+          mkdir unpacked && tar -C unpacked -xzf dist/*.tar.gz
+          packaging/try.sh unpacked/*/apeiron
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.os }}
+          path: dist/
+
+  macos:
+    needs: version
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --locked --release -p apeiron-cli-rs -p apeiron-desktop-rs
+      - run: packaging/macos.sh "${{ needs.version.outputs.version }}" dist
+      - name: Open the image and try the app
+        run: |
+          hdiutil attach dist/*.dmg -mountpoint /tmp/apeiron
+          test -f /tmp/apeiron/Apeiron.app/Contents/Resources/apeiron.icns
+          plutil -lint /tmp/apeiron/Apeiron.app/Contents/Info.plist
+          test -x /tmp/apeiron/Apeiron.app/Contents/MacOS/apeiron-desktop
+          packaging/try.sh /tmp/apeiron/Apeiron.app/Contents/MacOS/apeiron
+          packaging/try_desktop.sh /tmp/apeiron/Apeiron.app/Contents/MacOS/apeiron-desktop
+          hdiutil detach /tmp/apeiron
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/
+
+  windows:
+    needs: version
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --locked --release -p apeiron-cli-rs -p apeiron-desktop-rs
+      - run: python packaging/make_icons.py target/icons
+      - run: choco install nsis --no-progress -y
+      - name: Build the installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $version = "${{ needs.version.outputs.version }}"
+          & "C:\Program Files (x86)\NSIS\makensis.exe" /DVERSION=$version "/DOUT=$PWD\dist\Apeiron-$version-windows-x86_64.exe" packaging\windows.nsi
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install
+        shell: pwsh
+        run: |
+          $installer = (Get-ChildItem dist\*.exe).FullName
+          Start-Process -Wait -FilePath $installer -ArgumentList '/S','/D=C:\ApeironTest'
+      - name: Try what was installed
+        shell: bash
+        run: |
+          packaging/try.sh /c/ApeironTest/apeiron.exe
+          packaging/try_desktop.sh /c/ApeironTest/apeiron-desktop.exe
+      - name: Uninstall
+        shell: pwsh
+        run: |
+          Start-Process -Wait -FilePath C:\ApeironTest\uninstall.exe -ArgumentList '/S','_?=C:\ApeironTest'
+          if (Test-Path C:\ApeironTest\apeiron.exe) { exit 1 }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/
+
+  draft:
+    if: github.ref_type == 'tag'
+    needs: [plugins, linux, macos, windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - run: |
+          mkdir dist
+          find artifacts -type f -exec mv {} dist/ \;
+          (cd dist && sha256sum * > SHA256SUMS)
+          gh release create "$GITHUB_REF_NAME" dist/* --draft --verify-tag --generate-notes --repo "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ github.token }}
