@@ -51,6 +51,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [041](#adr-041-aktarımlar-paket-paket-devam-eder-değişmeyen-dosyalar-okunmaz) | Aktarımlar ve yedekler | Her paketten sonra indeks, ebeveynden önce çocuk; pull yalnızca indekslerin listelediğine güvenir; boyut ve zaman dosyayı okumaktan kurtarır | Kabul edildi |
 | [042](#adr-042-belgelerin-içindeki-metin-yalıtılmış-ortamda-bir-eklentiden-gelir) | Belgelerde metin | Eklenti arayüzünde `extract-text`, sürüm 0.2; PDF ve ofis dosyalarını `plugins/documents` okur, yalnızca adlandırdığı dosyalar için çağrılır | Kabul edildi |
 | [043](#adr-043-sunucu-kendi-sertifikasını-tls-alpn-01-ile-alır) | Sertifikalar | `rustls-acme` ile `--acme`, sunucunun dinlediği kapıda TLS-ALPN-01; ADR-027'yi değiştirir | Kabul edildi |
+| [044](#adr-044-paketleri-küçük-betikler-yapar-ve-etiket-yalnızca-taslak-oluşturur) | Paketler | `dpkg-deb`, `hdiutil` ve NSIS kullanan, her sistemde denenen betikler; etiket sürüm değil taslak oluşturur | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı. ADR-036 ve ADR-037, kendi kayıtları olmadan daha önce alınan kararları ve eski ADR'lerde değişenleri 2026-11-06'da kaydeder.
 
@@ -944,3 +945,23 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Eskisi gibi yalnızca vekil | Ev kullanıcısı başka bir program öğrenmek zorunda kalır |
 
 **Sonuçlar.** 443 kapısı sunucuya ulaşmalıdır, bu yüzden yalnızca ev ağındaki bir sunucu bunu kullanamaz. Kütüphane `Cargo.lock`'a yaklaşık 250 satır bağımlılık ekler. Dosyalarını varsayılan izinlerle yazar; klasörün özel olmasının nedeni budur.
+
+## ADR-044: Paketleri küçük betikler yapar ve etiket yalnızca taslak oluşturur
+
+**Durum:** Kabul edildi (2026-11-06)
+
+**Bağlam.** İlk sürüm, üç sistem için kurulum dosyaları, bir simge ve hazır eklentiler ister. Yayımlama gerçekte geri alınamaz: insanlar çıkanı indirir.
+
+**Karar.** `packaging/` her sistem için, sistemin kendi araçlarını kullanan bir betik tutar: `dpkg-deb`, `hdiutil` ve `iconutil`, Windows'ta NSIS. Simgeyi bir Python betiği çizer, böylece depoda ikili görüntü tutulmaz. `Release` iş akışı her paketi kurar, onunla yedekler ve geri yükler, uygulamayı başlatır; `.deb` ayrıca temiz Ubuntu 22.04, Ubuntu 24.04 ve Debian 12 üzerine kurulup kaldırılır, Windows kurulumu da yeniden kaldırılır. Sürüm oluşturmadan elle çalışır; etiket yalnızca bir kişinin yayımlayacağı taslağı oluşturur. Paketler imzalı değildir.
+
+**Gerekçe.** Betikler kısadır, her adım okunup denenebilir. Ubuntu 22.04'te derlemek programın yeni sistemlerde de çalışmasını sağlar; eski C kütüphanesi buna izin verir, yenisi vermez.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| `cargo-dist` ya da Tauri paketleyicisi | Kendi kurulumlarını ve değişikliklerini getirirler; paketleyici bir Tauri uygulaması bekler |
+| Etikette doğrudan yayımlama | Bir hata, kimse bakmadan kullanıcılara ulaşır |
+| Şimdi imzalamak | Apple ve Windows sertifikaları para ister ve proje sahibinin kimliğini taşır; kararı proje sahibi verir |
+
+**Sonuçlar.** macOS ve Windows imzasız paketler için uyarı verir. Intel macOS ve Arm Windows paketi yoktur. Deneme, uygulamanın başlayıp çalışmayı sürdürdüğünü gösterir, penceresinin nasıl göründüğünü göstermez.

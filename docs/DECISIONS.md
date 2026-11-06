@@ -51,6 +51,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [041](#adr-041-transfers-resume-by-pack-and-unchanged-files-are-not-read) | Transfers and backups | An index after each pack, children before parents; a pull trusts only what indexes list; size and time spare reading a file | Accepted |
 | [042](#adr-042-text-inside-documents-comes-from-a-plugin-in-the-sandbox) | Text in documents | `extract-text` in the plugin interface, version 0.2; PDF and office files read by `plugins/documents`, called only for files it names | Accepted |
 | [043](#adr-043-the-server-gets-its-own-certificate-with-tls-alpn-01) | Certificates | `--acme` with `rustls-acme`, TLS-ALPN-01 on the port the server listens on; changes ADR-027 | Accepted |
+| [044](#adr-044-packages-are-made-by-small-scripts-and-a-tag-only-makes-a-draft) | Packages | Scripts with `dpkg-deb`, `hdiutil` and NSIS, tried on each system; a tag makes a draft, not a release | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28. ADR-036 and ADR-037 record on 2026-11-06 decisions made earlier without a record of their own, including what changed in older ADRs.
 
@@ -944,3 +945,23 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Only a proxy, as before | A home user must then learn another program |
 
 **Consequences.** Port 443 must reach the server, so a server only on a home network cannot use it. The library adds about 250 lines of dependencies to `Cargo.lock`. It writes its files with default permissions, which is why the folder is private.
+
+## ADR-044: Packages are made by small scripts, and a tag only makes a draft
+
+**Status:** Accepted (2026-11-06)
+
+**Context.** The first release needs installers for three systems, an icon and ready-built plugins. Publishing cannot really be undone: people download what is out.
+
+**Decision.** `packaging/` holds a script for each system, using the system's own tools: `dpkg-deb`, `hdiutil` and `iconutil`, and NSIS on Windows. A Python script draws the icon, so no binary image is kept in the repository. The `Release` workflow installs each package, backs up and restores with it and starts the app; the `.deb` is also installed and removed on clean Ubuntu 22.04, Ubuntu 24.04 and Debian 12, and the Windows installer is uninstalled again. It runs by hand with no release, and a tag makes only a draft that a person publishes. The packages are not signed.
+
+**Rationale.** The scripts are short and each step can be read and tried. Building on Ubuntu 22.04 makes the program run on newer systems, which an older C library allows and a newer one does not.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| `cargo-dist` or the Tauri bundler | They bring their own setup and changes; the bundler expects a Tauri app |
+| Publishing directly on a tag | A mistake reaches users before anyone has looked |
+| Signing now | Apple and Windows certificates cost money and hold the owner's identity; the owner decides |
+
+**Consequences.** macOS and Windows warn about the unsigned packages. There is no Intel macOS or Arm Windows package. The trial shows that the app starts and keeps running, not what its window looks like.

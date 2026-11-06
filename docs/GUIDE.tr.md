@@ -16,6 +16,8 @@ Bu rehber kurulumdan harici diske günlük yedeğe, dosyaları geri yüklemeye v
 
 ## 2. Kurulum
 
+Hazır paketler araç istemez (bölüm 2.4). 2.1 ile 2.3 arasındaki bölümler programı kaynağından derler.
+
 ### 2.1 Araçlar
 
 Apeiron Rust ile yazılmıştır. Rust araçları, Git ve bir C derleyicisi gerekir.
@@ -41,6 +43,21 @@ apeiron --version
 ```bash
 cargo install --locked --force --git https://github.com/efe-clk/apeiron apeiron-cli-rs
 ```
+
+### 2.4 Hazır paketler
+
+Paketler her sürümle birlikte [sürümler sayfasında](https://github.com/efe-clk/apeiron/releases) yer alır. Henüz yayımlanmış bir sürüm yoktur.
+
+| Sistem | Dosya | Kurulumdan sonra |
+| --- | --- | --- |
+| Debian, Ubuntu | `apeiron_<sürüm>_<mimari>.deb`: `sudo apt install ./<dosya>` | `apeiron` ve uygulama menüsünde uygulama |
+| Linux sunucu | `apeiron-<sürüm>-linux-<mimari>.tar.gz` | Yalnızca komut; istediğiniz yere kopyalanır |
+| Apple işlemcili macOS | `Apeiron-<sürüm>-macos-arm64.dmg`: uygulamayı Applications klasörüne sürükleyin | Uygulama; komut onun içinde, `Contents/MacOS` altındadır |
+| Windows, 64 bit | `Apeiron-<sürüm>-windows-x86_64.exe` | Başlat menüsünde uygulama; komut programın klasöründedir |
+
+Paketler henüz imzalı değildir, bu yüzden sistem uyarı verir. macOS'ta uygulamaya sağ tıklayıp Aç'ı seçin. Windows'ta Ek bilgi'yi, ardından Yine de çalıştır'ı seçin. Bir dosyayı önce denetlemek için aynı sayfadaki `SHA256SUMS` ile karşılaştırın.
+
+Metin ve belge eklentileri aynı sayfadadır: `apeiron plugin add apeiron_text.wasm`. Kaldırma yalnızca programı siler; yedekleriniz ve ayarlarınız kalır.
 
 ## 3. Depoyu oluşturma
 

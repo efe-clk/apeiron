@@ -16,6 +16,8 @@ This guide takes you from installation to a daily backup on an external disk, re
 
 ## 2. Installation
 
+Ready-made packages need no tools (section 2.4). Sections 2.1 to 2.3 build the program from its source.
+
 ### 2.1 Tools
 
 Apeiron is written in Rust. You need the Rust tools, Git and a C compiler.
@@ -41,6 +43,21 @@ apeiron --version
 ```bash
 cargo install --locked --force --git https://github.com/efe-clk/apeiron apeiron-cli-rs
 ```
+
+### 2.4 Ready-made packages
+
+Packages come with each release on [the releases page](https://github.com/efe-clk/apeiron/releases). No release is published yet.
+
+| System | File | After installing |
+| --- | --- | --- |
+| Debian, Ubuntu | `apeiron_<version>_<architecture>.deb`: `sudo apt install ./<file>` | `apeiron` and the app in the application menu |
+| Linux server | `apeiron-<version>-linux-<architecture>.tar.gz` | The command alone, to copy where you want it |
+| macOS on Apple silicon | `Apeiron-<version>-macos-arm64.dmg`: drag the app to Applications | The app; the command is inside it, in `Contents/MacOS` |
+| Windows, 64-bit | `Apeiron-<version>-windows-x86_64.exe` | The app in the Start menu; the command is in the folder of the program |
+
+The packages are not signed yet, so the system warns about them. On macOS, right-click the app and choose Open. On Windows, choose More info, then Run anyway. To check a file first, compare it with `SHA256SUMS` on the same page.
+
+The plugins for text and documents are on the same page: `apeiron plugin add apeiron_text.wasm`. Uninstalling removes the program; your backups and settings stay.
 
 ## 3. Creating the repository
 

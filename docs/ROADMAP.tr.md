@@ -129,4 +129,4 @@ Her iş tamamlandı (2026-10-30); aşama, çıkış kriteri olan ilk kurumsal pi
 | C++ SDK'sı, C ABI üzerinden akış | [SDK.tr.md](SDK.tr.md) §1, §7 | C ABI üzerinde Python SDK'sı; kütüphane Cargo ile derlenir |
 | İnceleme, onay ve yorumlar | [VISION.tr.md](VISION.tr.md) | Yazılmadı |
 | Format yükseltme aracı | [FORMAT.tr.md](FORMAT.tr.md) §18 | Format 1. sürümde |
-| SSH üzerinden Git, SAML, uzak depo olmadan senkron, kurulum dosyaları ve ilk sürüm | [GIT.tr.md](GIT.tr.md) §8, [IDENTITY.tr.md](IDENTITY.tr.md) §6, [SYNC.tr.md](SYNC.tr.md) §7, [DESKTOP.tr.md](DESKTOP.tr.md) §5 | HTTP üzerinden Git, OpenID Connect, uzak depo üzerinden senkron, kaynaktan derleme |
+| SSH üzerinden Git, SAML, uzak depo olmadan senkron, ilk sürümün yayımlanması | [GIT.tr.md](GIT.tr.md) §8, [IDENTITY.tr.md](IDENTITY.tr.md) §6, [SYNC.tr.md](SYNC.tr.md) §7, [DESKTOP.tr.md](DESKTOP.tr.md) §5 | HTTP üzerinden Git, OpenID Connect, uzak depo üzerinden senkron, kaynaktan derleme |
