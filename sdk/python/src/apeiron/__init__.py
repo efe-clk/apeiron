@@ -566,6 +566,15 @@ class Repository:
     def pull(self, remote: str, ref: str = "main", rate: Optional[int] = None) -> Job:
         return self.start("pull", **_drop_none({"remote": remote, "ref": ref, "rate": rate}))
 
+    def push_all(self, remote: str, rate: Optional[int] = None) -> Job:
+        return self.start("push_all", **_drop_none({"remote": remote, "rate": rate}))
+
+    def pull_all(self, remote: str, rate: Optional[int] = None) -> Job:
+        return self.start("pull_all", **_drop_none({"remote": remote, "rate": rate}))
+
+    def report(self, **options: Any) -> Job:
+        return self.start("report", **options)
+
     def restore_test(self, snapshot: str, **options: Any) -> Job:
         return self.start("restore_test", snapshot=snapshot, **options)
 

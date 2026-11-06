@@ -130,6 +130,17 @@ class Sdk(unittest.TestCase):
             with self.assertRaises(apeiron.InvalidInputError):
                 copy.push("origin", rate=0).wait()
 
+    def test_every_ref_and_the_report(self):
+        with apeiron.Repository.init(self.root / "repo") as repo:
+            repo.backup(self.root / "src").wait()
+            repo.add_remote("disk", str(self.root / "disk"))
+            pushed = repo.push_all("disk", rate=1 << 30).wait()
+            self.assertEqual(pushed.refs[0].name, "main")
+            pulled = repo.pull_all("disk").wait()
+            self.assertEqual(pulled.refs[0].name, "main")
+            report = repo.report(stale_days=0).wait()
+            self.assertEqual(report.refs[0].name, "main")
+
 
 if __name__ == "__main__":
     unittest.main()
