@@ -48,7 +48,7 @@ The users and the Argon2id hashes of their passwords are kept in `web.json` in t
 
 ### 2.1 A certificate from Let's Encrypt
 
-> **Status: In progress.** The settings and the server's behaviour without a certificate are tested. Getting a real certificate is covered by a test that needs a test service, which has not run yet.
+> **Status: Done.** CI gets a real certificate from Pebble, Let's Encrypt's test service, connects with it and restarts with the one kept. Let's Encrypt itself was not tried: it needs a public name that leads to the server. Its staging service is a safe first try: `--acme-directory https://acme-staging-v02.api.letsencrypt.org/directory`.
 
 ```text
 apeiron web --repo /srv/backup --listen 0.0.0.0:443 --acme admin@example.com --acme-domain backup.example.com

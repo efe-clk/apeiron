@@ -129,4 +129,4 @@ Every work item is done (2026-10-30); the stage ends with its exit criterion, th
 | The C++ SDK, streaming through the C ABI | [SDK.md](SDK.md) §1, §7 | Python SDK over the C ABI, with the library built with Cargo |
 | Review, approval and comments | [VISION.md](VISION.md) | Not written |
 | Format upgrade tool | [FORMAT.md](FORMAT.md) §18 | The format is at version 1 |
-| Git over SSH, SAML, sync without a remote, Let's Encrypt, installers and the first release | [GIT.md](GIT.md) §8, [IDENTITY.md](IDENTITY.md) §6, [SYNC.md](SYNC.md) §7, [WEB.md](WEB.md) §6, [DESKTOP.md](DESKTOP.md) §5 | Git over HTTP, OpenID Connect, sync through a remote, a TLS proxy, building from source |
+| Git over SSH, SAML, sync without a remote, installers and the first release | [GIT.md](GIT.md) §8, [IDENTITY.md](IDENTITY.md) §6, [SYNC.md](SYNC.md) §7, [DESKTOP.md](DESKTOP.md) §5 | Git over HTTP, OpenID Connect, sync through a remote, building from source |

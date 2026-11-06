@@ -48,7 +48,7 @@ Kullanıcılar ve parolalarının Argon2id özetleri, yapılandırma klasöründ
 
 ### 2.1 Let's Encrypt'ten sertifika
 
-> **Durum: Devam ediyor.** Ayarlar ve sunucunun sertifikasız davranışı sınandı. Gerçek sertifika almayı, bir test hizmeti isteyen bir test kapsar; bu test henüz çalışmadı.
+> **Durum: Tamamlandı.** CI, Let's Encrypt'in test hizmeti Pebble'dan gerçek bir sertifika alır, onunla bağlanır ve saklananla yeniden başlar. Let's Encrypt'in kendisi denenmedi: sunucuya ulaşan herkese açık bir ad ister. Güvenli ilk deneme onun deneme hizmetidir: `--acme-directory https://acme-staging-v02.api.letsencrypt.org/directory`.
 
 ```text
 apeiron web --repo /srv/backup --listen 0.0.0.0:443 --acme admin@example.com --acme-domain backup.example.com

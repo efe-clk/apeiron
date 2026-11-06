@@ -96,7 +96,7 @@ Aşama 5'in bütün işleri tamamlandı; aşama, çıkış kriteri olan ilk kuru
 9. SSH üzerinden Git.
 10. SAML.
 11. Sunucusuz, cihazdan cihaza senkron.
-12. Let's Encrypt (ACME).
+12. ~~Let's Encrypt (ACME).~~ Tamamlandı; CI Pebble ile sınar, gerçek Let's Encrypt denenmedi.
 13. İlk sürüm: kurulum dosyaları, simgeler, indirilebilir metin eklentisi.
 
 Bu listede olmayan, belgelerin istediği ama yazılmamış işler `docs/ROADMAP.md` §8'dedir. Proje sahibi 2026-11-06'da sırayı Claude'a bıraktı: ~~bozuk nesneyi kopyadan onarma~~, ~~dışlama kuralları~~, ~~eski yedekleri budama~~, ~~performans ölçümü (bu makinede, `docs/PERFORMANCE.md`; Raspberry Pi 4 için cihaz gerekir)~~ (tamamlandı), ~~tar, zip ve 7z içe aktarma, dışa aktarımı bölme~~, ~~JSON şemaları~~, ~~Cargo ile kurulum (`cargo install --git`; proje sahibi Python wheel ve tipli sınıf istemedi)~~, ~~macOS etiketleri~~, ~~PDF ve ofis dosyalarında metin arama (`plugins/documents`)~~, ardından §8'in kalanı küçükten büyüğe. Paket adları `-rs` ile biter (`apeiron-rs`, `apeiron-cli-rs` ...; proje sahibinin kararı, 2026-11-06); klasör ve kod adları, `apeiron` komutu ve `libapeiron` değişmez. `cargo -p` paket adını ister. crates.io'ya yayımlamak geri alınamaz, ayrıca onay ister; proje sahibi 2026-11-06'da sonraya bıraktı.
