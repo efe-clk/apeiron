@@ -118,6 +118,7 @@ mod tests {
                 ref_name: "main".to_owned(),
                 message: None,
                 push: Vec::new(),
+                exclude: Vec::new(),
             },
             every: Every::Days(1),
             at: None,

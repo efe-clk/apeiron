@@ -21,7 +21,7 @@ Sync keeps the same folder, such as `~/Documents`, equal on several devices. It 
 | Command | What it does | Status |
 | --- | --- | --- |
 | `apeiron clone <url> <path>` | Creates a local repository that is a copy of a remote one: the same config and keys, then pulls every ref; the remote is then named `origin` | Done |
-| `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run]` | Runs one sync round (section 3); the default ref is `sync/<folder name>`, lowercased, with other characters than `a-z 0-9 . _ -` replaced by `-`; exit code 3 when there are conflicts or files left for the next round | Done |
+| `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run] [--exclude <pattern>]...` | Runs one sync round (section 3); the default ref is `sync/<folder name>`, lowercased, with other characters than `a-z 0-9 . _ -` replaced by `-`; exit code 3 when there are conflicts or files left for the next round | Done |
 
 The background service runs sync as a job (`do = "sync"`, [DAEMON.md](DAEMON.md)), for example every 15 minutes. A second device starts with `apeiron clone`, then `apeiron sync`. `--dry-run` stores the folder's new content in the repository, where garbage collection removes it, but moves no ref and changes neither the folder nor the remote.
 
@@ -89,6 +89,15 @@ The folder may change while a round runs. Every step is checked against L, the s
 
 The folder ref moves only after the folder has been applied. An interrupted apply leaves some files new and some old; the next round backs that up as a new L, and the merge finds that those files changed the same way on both sides.
 
+### 5.1 Paths left alone
+
+`--exclude <pattern>` and the folder's `.apeironignore` ([CLI.md](CLI.md) §4.1) name paths this device leaves alone, which also gives selective sync: other devices keep such a file, and this one neither receives it nor removes it.
+
+- L takes the entry of a left-out path from the snapshot of the folder ref instead of from the disk, so leaving it out is not a deletion and spreads to nobody. A folder gone from the disk keeps only its left-out paths in L. A path no earlier snapshot holds stays only on this device.
+- Applying a snapshot skips left-out paths: what is on the disk there is neither replaced nor removed, and nothing is written there. A folder another device removed stays while a left-out file is in it, and is reported as left for the next round.
+- `.apeironignore` is synced as any file, so a rule added on one device reaches the others in the next round; `--exclude` holds for the device that gives it, which is the way to choose per device.
+- `apeiron switch` leaves alone what the folder's `.apeironignore` names in the same way.
+
 ## 6. Clone
 
 `apeiron clone` creates a new local repository from a remote (FORMAT.md §15.6): it copies `config` and `keys/`, creates the folders of a repository, then pulls every ref of the remote and names it `origin`. The password of the remote repository opens the clone. This is the only operation that copies keys from a remote.
@@ -98,7 +107,7 @@ The folder ref moves only after the folder has been applied. An interrupted appl
 | Item | Where |
 | --- | --- |
 | Peer-to-peer sync without a remote | Later; a remote covers Stage 2 |
-| Exclusion rules and selective sync | Not written; not scheduled ([ROADMAP.md](ROADMAP.md) §8) |
+| Choosing per device with a file that does not sync | `--exclude` covers it for now |
 | Operating the daemon from another device (remote API) | Not written, except a tenant's jobs on the Schedule page ([DAEMON.md](DAEMON.md) §3.1) |
 
 ## 8. Crates

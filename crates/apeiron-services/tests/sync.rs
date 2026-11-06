@@ -66,6 +66,7 @@ fn options(device: &Device) -> SyncOptions {
         mode: SyncMode::TwoWay,
         dry_run: false,
         host: Some(device.host.to_owned()),
+        exclude: Vec::new(),
     }
 }
 
@@ -387,4 +388,85 @@ fn a_round_interrupted_while_changing_the_folder_is_finished_by_the_next() {
     assert_eq!(files(&s.b.folder), files(&s.a.folder));
     round(&mut s.a, &s.remote);
     assert_eq!(files(&s.b.folder), files(&s.a.folder));
+}
+
+fn round_excluding(device: &mut Device, remote: &Path, pattern: &str) -> SyncOutcome {
+    let mut options = options(device);
+    options.exclude = vec![pattern.to_owned()];
+    round_with(device, &FolderStore::open(remote).unwrap(), options)
+}
+
+#[test]
+fn a_path_left_alone_is_neither_received_nor_deleted() {
+    let mut s = setup();
+    write(&s.a.folder, "videos/big.bin", "video");
+    round(&mut s.a, &s.remote);
+
+    // b does not take the videos.
+    round_excluding(&mut s.b, &s.remote, "videos");
+    assert_eq!(names(&s.b.folder), ["notes.txt", "sub/plan.md"]);
+    // A change of b goes out without deleting them at a.
+    write(&s.b.folder, "notes.txt", "from b");
+    let out = round_excluding(&mut s.b, &s.remote, "videos");
+    assert_eq!(out.action, SyncAction::Sent);
+    round(&mut s.a, &s.remote);
+    assert_eq!(
+        files(&s.a.folder),
+        [
+            ("notes.txt".to_owned(), "from b".to_owned()),
+            ("sub/plan.md".to_owned(), "plan".to_owned()),
+            ("videos/big.bin".to_owned(), "video".to_owned()),
+        ]
+    );
+
+    // A new version at a does not reach b either, and is not undone.
+    write(&s.a.folder, "videos/big.bin", "new video");
+    round(&mut s.a, &s.remote);
+    round_excluding(&mut s.b, &s.remote, "videos");
+    assert!(!s.b.folder.join("videos").exists());
+    write(&s.b.folder, "more.txt", "more");
+    round_excluding(&mut s.b, &s.remote, "videos");
+    round(&mut s.a, &s.remote);
+    assert_eq!(
+        fs::read_to_string(s.a.folder.join("videos/big.bin")).unwrap(),
+        "new video"
+    );
+    assert!(s.a.folder.join("more.txt").exists());
+}
+
+#[test]
+fn a_local_file_left_out_stays_on_its_device_untouched() {
+    let mut s = setup();
+    round(&mut s.b, &s.remote);
+    write(&s.b.folder, ".apeironignore", "*.tmp\n");
+    write(&s.b.folder, "sub/work.tmp", "private");
+    let out = round(&mut s.b, &s.remote);
+    assert_eq!(out.action, SyncAction::Sent);
+    round(&mut s.a, &s.remote);
+    // The rule travels; the file does not.
+    assert!(s.a.folder.join(".apeironignore").exists());
+    assert!(!s.a.folder.join("sub/work.tmp").exists());
+    // A file of that name made at a stays there as well.
+    write(&s.a.folder, "sub/work.tmp", "other");
+    round(&mut s.a, &s.remote);
+    round(&mut s.b, &s.remote);
+    assert_eq!(
+        fs::read_to_string(s.b.folder.join("sub/work.tmp")).unwrap(),
+        "private"
+    );
+    assert_eq!(
+        fs::read_to_string(s.a.folder.join("sub/work.tmp")).unwrap(),
+        "other"
+    );
+}
+
+#[test]
+fn a_rule_added_later_keeps_what_was_recorded_elsewhere() {
+    let mut s = setup();
+    round(&mut s.b, &s.remote);
+    // b deletes the folder locally but says it leaves the file alone.
+    fs::remove_dir_all(s.b.folder.join("sub")).unwrap();
+    round_excluding(&mut s.b, &s.remote, "plan.md");
+    round(&mut s.a, &s.remote);
+    assert_eq!(names(&s.a.folder), ["notes.txt", "sub/plan.md"]);
 }

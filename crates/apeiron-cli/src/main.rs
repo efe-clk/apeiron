@@ -95,6 +95,9 @@ enum Command {
         /// Which device the snapshot is taken on
         #[arg(long)]
         host: Option<String>,
+        /// Leave out what matches this pattern; can be given more than once
+        #[arg(long, value_name = "PATTERN")]
+        exclude: Vec<String>,
     },
     /// List the snapshots of a ref, newest first
     Log {
@@ -444,6 +447,9 @@ enum Command {
         /// Move at most this much per second on average, such as 500K or 2M
         #[arg(long, value_parser = parse_rate)]
         rate: Option<u64>,
+        /// Leave alone on this device what matches this pattern; can be given more than once
+        #[arg(long, value_name = "PATTERN")]
+        exclude: Vec<String>,
     },
     /// Copy the snapshots of a ref to a remote and move the ref there
     Push {
@@ -2155,6 +2161,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             message,
             author,
             host,
+            exclude,
         } => {
             let audit = CliAudit::find(cli.repo.as_deref())?;
             let repo = open(cli.repo, password_file)?;
@@ -2162,6 +2169,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             request.message = message;
             request.author = author;
             request.host = host;
+            request.exclude = exclude;
             let detail = serde_json::json!({
                 "source": request.source,
                 "ref": request.ref_name,
@@ -3230,9 +3238,11 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             mode,
             dry_run,
             rate,
+            exclude,
         } => {
             let repo = open(cli.repo, password_file)?;
             let mut request = SyncRequest::new(folder, remote.clone());
+            request.exclude = exclude;
             request.ref_name = ref_name;
             request.rate = rate;
             request.mode = mode.into();

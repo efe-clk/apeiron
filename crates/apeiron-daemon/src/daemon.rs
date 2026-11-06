@@ -322,9 +322,11 @@ fn try_run(job: &Job, stop: &AtomicBool) -> apeiron::Result<(RunResult, String)>
             ref_name,
             message,
             push,
+            exclude,
         } => {
             let mut request = BackupRequest::new(folder.clone(), ref_name.clone());
             request.message = message.clone();
+            request.exclude = exclude.clone();
             let report = wait(repo.backup(request)?, stop)?;
             let mut text = format!(
                 "snapshot {}: {} files, {} new bytes",
@@ -423,8 +425,10 @@ fn try_run(job: &Job, stop: &AtomicBool) -> apeiron::Result<(RunResult, String)>
             remote,
             ref_name,
             mode,
+            exclude,
         } => {
             let mut request = SyncRequest::new(folder.clone(), remote.clone());
+            request.exclude = exclude.clone();
             request.ref_name = ref_name.clone();
             request.mode = *mode;
             request.rate = job.rate;

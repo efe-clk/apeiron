@@ -112,6 +112,8 @@ apeiron backup ~/Pictures  --ref backup/pictures
 
 Ref adlarında yalnızca küçük harf, rakam, `.`, `_`, `-` ve `/` kullanılır (`Belgelerim` değil, `backup/documents`).
 
+Bir şeyleri dışarıda bırakmak için onları klasördeki `.apeironignore` dosyasına satır satır yazın (`*.tmp`, `node_modules`) ya da `--exclude '*.tmp'` verin. Kalıplar [CLI.tr.md](CLI.tr.md) §4.1'de açıklanır.
+
 ## 5. Yedeklere bakma
 
 | İş | Komut |

@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::control::{Control, Phase, Warning, WarningKind};
 use crate::error::{Error, IoContext, Result};
+use crate::exclude::Exclude;
 use crate::name::Name;
 use crate::os;
 use crate::sync;
@@ -29,6 +30,10 @@ pub struct BackupOptions {
     /// Free key-value pairs; sorted and checked when the snapshot is stored.
     #[serde(default)]
     pub meta: Vec<(String, String)>,
+    /// Patterns of what to leave out, beside the folder's `.apeironignore`
+    /// (CLI.md §4.1).
+    #[serde(default)]
+    pub exclude: Vec<String>,
 }
 
 impl BackupOptions {
@@ -40,6 +45,7 @@ impl BackupOptions {
             author: None,
             host: None,
             meta: Vec::new(),
+            exclude: Vec::new(),
         }
     }
 }
@@ -56,6 +62,9 @@ pub struct BackupOutcome {
     pub bytes: u64,
     /// File content bytes that were not already in the repository.
     pub new_bytes: u64,
+    /// Files and folders left out by a pattern.
+    #[serde(default)]
+    pub excluded: u64,
     pub warnings: Vec<Warning>,
 }
 
@@ -71,7 +80,14 @@ pub fn backup(
     apeiron_core::validate_ref_name(&options.ref_name)?;
     let parent = repo.read_ref(&options.ref_name)?;
     let mut writer = repo.writer();
-    let stored = store_folder(&mut writer, &options.source, false, ctl)?;
+    let stored = store_folder(
+        &mut writer,
+        &options.source,
+        false,
+        &options.exclude,
+        None,
+        ctl,
+    )?;
     let tree = stored.tree;
     let mut meta = options.meta.clone();
     meta.sort();
@@ -100,6 +116,7 @@ pub fn backup(
         symlinks: stored.symlinks,
         bytes: stored.bytes,
         new_bytes,
+        excluded: stored.excluded,
         warnings: stored.warnings,
     })
 }
@@ -111,16 +128,22 @@ pub(crate) struct Stored {
     pub(crate) dirs: u64,
     pub(crate) symlinks: u64,
     pub(crate) bytes: u64,
+    pub(crate) excluded: u64,
     pub(crate) warnings: Vec<Warning>,
 }
 
 /// Stores the folder `source` through `writer`. With `for_sync`, the
 /// temporary files of a sync (`sync::TMP_PREFIX`) are left out, and those
-/// left behind by an interrupted one are removed.
+/// left behind by an interrupted one are removed. What `exclude` and the
+/// folder's `.apeironignore` match is not read; with `keep`, a tree the
+/// folder was recorded as, what that tree holds at such paths stays in the
+/// new tree, so that leaving a path out does not delete it (SYNC.md §5.1).
 pub(crate) fn store_folder(
     writer: &mut ObjectWriter<'_>,
     source: &Path,
     for_sync: bool,
+    exclude: &[String],
+    keep: Option<ObjectId>,
     ctl: &Control,
 ) -> Result<Stored> {
     if !fs::metadata(source).at(source)?.is_dir() {
@@ -132,18 +155,25 @@ pub(crate) fn store_folder(
     // Fail early when the root itself cannot be listed.
     fs::read_dir(source).at(source)?;
 
+    let exclude = Exclude::for_folder(source, exclude)?;
     ctl.set_phase(Phase::Scanning);
     let mut totals = (0, 0);
-    scan(source, ctl, &mut totals)?;
+    scan(source, &Name::default(), &exclude, ctl, &mut totals)?;
     ctl.update(|p| {
         p.phase = Phase::Storing;
         p.items_total = Some(totals.0);
         p.bytes_total = Some(totals.1);
     });
 
+    let keep = match keep {
+        Some(tree) if !exclude.is_empty() => Some(writer.read_tree(&tree)?),
+        _ => None,
+    };
     let mut walk = Walk {
         ctl,
         for_sync,
+        exclude: &exclude,
+        excluded: 0,
         warnings: Vec::new(),
         files: 0,
         dirs: 0,
@@ -151,7 +181,7 @@ pub(crate) fn store_folder(
         bytes: 0,
     };
     let tree = walk
-        .store_dir(writer, source, &Name::default())?
+        .store_dir(writer, source, &Name::default(), keep.as_ref())?
         .ok_or_else(|| Error::InvalidInput(format!("{} cannot be read", source.display())))?;
     Ok(Stored {
         tree,
@@ -159,18 +189,32 @@ pub(crate) fn store_folder(
         dirs: walk.dirs,
         symlinks: walk.symlinks,
         bytes: walk.bytes,
+        excluded: walk.excluded,
         warnings: walk.warnings,
     })
 }
 
 /// Counts regular files and their bytes below `dir`; errors are ignored
 /// here and reported when the entry is stored.
-fn scan(dir: &Path, ctl: &Control, totals: &mut (u64, u64)) -> Result<()> {
+fn scan(
+    dir: &Path,
+    rel: &Name,
+    exclude: &Exclude,
+    ctl: &Control,
+    totals: &mut (u64, u64),
+) -> Result<()> {
     let Ok(entries) = fs::read_dir(dir) else {
         return Ok(());
     };
     for entry in entries.flatten() {
         ctl.check()?;
+        let Some(name) = os::name_bytes(&entry.file_name()) else {
+            continue;
+        };
+        let child = rel.join(&name);
+        if exclude.matches(&child, &name) {
+            continue;
+        }
         let Ok(md) = fs::symlink_metadata(entry.path()) else {
             continue;
         };
@@ -178,7 +222,7 @@ fn scan(dir: &Path, ctl: &Control, totals: &mut (u64, u64)) -> Result<()> {
             totals.0 += 1;
             totals.1 += md.len();
         } else if md.is_dir() {
-            scan(&entry.path(), ctl, totals)?;
+            scan(&entry.path(), &child, exclude, ctl, totals)?;
         }
     }
     Ok(())
@@ -187,6 +231,8 @@ fn scan(dir: &Path, ctl: &Control, totals: &mut (u64, u64)) -> Result<()> {
 struct Walk<'c> {
     ctl: &'c Control,
     for_sync: bool,
+    exclude: &'c Exclude,
+    excluded: u64,
     warnings: Vec<Warning>,
     files: u64,
     dirs: u64,
@@ -203,12 +249,42 @@ impl Walk<'_> {
         });
     }
 
-    /// Stores a folder; `None` if it cannot be listed.
+    /// What `tree` holds at paths that are left out, as a tree; `None` if
+    /// nothing. For a folder of `previous` that is gone from the disk.
+    fn kept_part(
+        &mut self,
+        writer: &mut ObjectWriter<'_>,
+        tree: &ObjectId,
+        rel: &Name,
+    ) -> Result<Option<ObjectId>> {
+        let mut entries = Vec::new();
+        for entry in writer.read_tree(tree)?.entries {
+            let child = rel.join(&entry.name);
+            if self.exclude.matches(&child, &entry.name) {
+                entries.push(entry);
+            } else if let EntryKind::Directory { tree } = entry.kind
+                && let Some(tree) = self.kept_part(writer, &tree, &child)?
+            {
+                entries.push(TreeEntry {
+                    kind: EntryKind::Directory { tree },
+                    ..entry
+                });
+            }
+        }
+        if entries.is_empty() {
+            return Ok(None);
+        }
+        Ok(Some(writer.put_tree(&Tree { entries })?))
+    }
+
+    /// Stores a folder; `None` if it cannot be listed. `previous` is what
+    /// the folder was recorded as, whose left-out paths stay.
     fn store_dir(
         &mut self,
         writer: &mut ObjectWriter<'_>,
         dir: &Path,
         rel: &Name,
+        previous: Option<&Tree>,
     ) -> Result<Option<ObjectId>> {
         let listing = match fs::read_dir(dir) {
             Ok(listing) => listing,
@@ -238,6 +314,10 @@ impl Walk<'_> {
         for (name, path) in children {
             self.ctl.check()?;
             let child = rel.join(&name);
+            if self.exclude.matches(&child, &name) {
+                self.excluded += 1;
+                continue;
+            }
             let md = match fs::symlink_metadata(&path) {
                 Ok(md) => md,
                 Err(e) => {
@@ -248,7 +328,12 @@ impl Walk<'_> {
             let kind = if md.is_file() {
                 self.store_file(writer, &path, &child, &md)?
             } else if md.is_dir() {
-                let tree = self.store_dir(writer, &path, &child)?;
+                let before = previous.and_then(|p| p.entries.iter().find(|e| e.name == name));
+                let before = match before.map(|e| &e.kind) {
+                    Some(EntryKind::Directory { tree }) => Some(writer.read_tree(tree)?),
+                    _ => None,
+                };
+                let tree = self.store_dir(writer, &path, &child, before.as_ref())?;
                 tree.map(|tree| EntryKind::Directory { tree })
             } else if md.file_type().is_symlink() {
                 self.store_symlink(&path, &child)
@@ -279,6 +364,23 @@ impl Walk<'_> {
                 xattrs,
             });
         }
+        for entry in previous.map_or(&[][..], |p| &p.entries) {
+            if entries.iter().any(|e: &TreeEntry| e.name == entry.name) {
+                continue;
+            }
+            let child = rel.join(&entry.name);
+            if self.exclude.matches(&child, &entry.name) {
+                entries.push(entry.clone());
+            } else if let EntryKind::Directory { tree } = entry.kind
+                && let Some(tree) = self.kept_part(writer, &tree, &child)?
+            {
+                entries.push(TreeEntry {
+                    kind: EntryKind::Directory { tree },
+                    ..entry.clone()
+                });
+            }
+        }
+        entries.sort_by(|a, b| a.name.cmp(&b.name));
         // The source folder itself is not counted, as in restore and export.
         if !rel.as_bytes().is_empty() {
             self.dirs += 1;

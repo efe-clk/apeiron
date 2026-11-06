@@ -378,3 +378,31 @@ fn names_serialise_as_text_or_hex() {
     assert_eq!(serde_json::to_string(&Name::from("ok")).unwrap(), r#""ok""#);
     assert!(serde_json::from_str::<Name>(r#"{"hex":"abc"}"#).is_err());
 }
+
+#[test]
+fn a_backup_leaves_out_what_the_patterns_and_the_file_name() {
+    let mut s = Setup::new();
+    fs::create_dir_all(s.src.join("node_modules/deep")).unwrap();
+    fs::create_dir_all(s.src.join("docs/old")).unwrap();
+    fs::write(s.src.join("node_modules/deep/a.js"), "a").unwrap();
+    fs::write(s.src.join("docs/old/b.txt"), "b").unwrap();
+    fs::write(s.src.join("docs/c.txt"), "c").unwrap();
+    fs::write(s.src.join("d.TMP"), "d").unwrap();
+    fs::write(
+        s.src.join(apeiron_services::IGNORE_FILE),
+        "# build output\nnode_modules\n*.tmp\n",
+    )
+    .unwrap();
+    let mut options = BackupOptions::new(s.src.clone(), "main");
+    options.exclude = vec!["docs/old".to_owned()];
+    let out = backup(&mut s.repo, &options, &Control::new()).unwrap();
+    assert_eq!(out.excluded, 3);
+    assert_eq!(out.files, 2);
+    let target = s.root.join("out");
+    restore(&s.repo, &out.snapshot, b"", &target, &Control::new()).unwrap();
+    assert!(target.join("docs/c.txt").exists());
+    assert!(target.join(apeiron_services::IGNORE_FILE).exists());
+    assert!(!target.join("node_modules").exists());
+    assert!(!target.join("docs/old").exists());
+    assert!(!target.join("d.TMP").exists());
+}

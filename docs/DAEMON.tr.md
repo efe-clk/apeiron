@@ -70,6 +70,7 @@ every = "week"
 | `remote`, `mode` | `sync` için: uzak depo ve `two-way` (varsayılan), `send` ya da `receive`; `pull` ve `repair` için: uzak depo |
 | `ref = "*"` | `push` ve `pull` için: bir replikayı ya da yedek sunucuyu güncel tutmak için her ref ([REPLICATION.tr.md](REPLICATION.tr.md) §3) |
 | `push` | `backup` için: başarılı bir yedekten sonra ref'in push edileceği uzak depolar; `push` için: uzak depolar |
+| `exclude` | `backup` ve `sync` için: dışarıda bırakılacak kalıpların listesi ([CLI.tr.md](CLI.tr.md) §4.1, [SYNC.tr.md](SYNC.tr.md) §5.1) |
 | `every` | `hour`, `day`, `week` ya da dakika, saat veya gün sayısı: `15m`, `6h`, `2d` |
 | `at` | `day` ve `week` için: günün en erken yerel saati, `HH:MM` |
 | `sample_mb` | `restore-test` için: ne kadarının geri yükleneceği, varsayılan 100 |

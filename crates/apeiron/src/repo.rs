@@ -258,6 +258,7 @@ impl Repository {
             mode: request.mode,
             dry_run: request.dry_run,
             host: gethostname::gethostname().into_string().ok(),
+            exclude: request.exclude,
         };
         let repo = self.clone();
         Job::spawn("sync", move |ctl| {

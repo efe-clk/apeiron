@@ -54,7 +54,7 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | Komut | Ne yapar | Durum |
 | --- | --- | --- |
 | `apeiron init <path> [--encrypt]` | Boş bir depo oluşturur; `--encrypt` onu bir parolayla şifreler (bölüm 2.1) | Tamamlandı |
-| `apeiron backup <folder> [--ref <name>] [--message <text>] [--author <text>] [--host <text>]` | Klasörü yeni bir snapshot olarak saklar ve ref'i ona taşır (varsayılan ref: `main`) | Tamamlandı |
+| `apeiron backup <folder> [--ref <name>] [--message <text>] [--author <text>] [--host <text>] [--exclude <pattern>]...` | Klasörü yeni bir snapshot olarak saklar ve ref'i ona taşır (varsayılan ref: `main`) | Tamamlandı |
 | `apeiron log [<ref>] [--grep <metin>]` | Bir ref'in snapshot'larını en yeniden başlayarak listeler; `--grep`, mesajı, yazarı, makinesi ya da üst verisi metni büyük-küçük harf ayırmadan içerenleri bırakır | Tamamlandı |
 | `apeiron ls <snapshot> [<path>]` | Bir snapshot'taki dosya ve klasörleri listeler | Tamamlandı |
 | `apeiron diff <snapshot> <snapshot> [--text]` | İki snapshot arasında eklenen, silinen ve değişen dosyaları listeler; `--text` bir eklentinin işlediği dosyaların değişen satırlarını da gösterir ([TEXT.tr.md](TEXT.tr.md)) | Tamamlandı |
@@ -73,7 +73,7 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | `apeiron remote list` | Uzak depoları listeler | Tamamlandı |
 | `apeiron remote remove <name>` | Bir uzak depoyu unutur; kopyanın kendisine dokunulmaz | Tamamlandı |
 | `apeiron clone <url> <path> [--rate <hız>]` | Bir uzak kopyadan aynı parolayla yeni bir depo oluşturur, her ref'i pull eder ve uzak depoya `origin` adını verir; ikinci bir cihazı kurmanın yolu | Tamamlandı |
-| `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run] [--rate <hız>]` | Bir klasörü bir uzak depo üzerinden birkaç cihazda eşit tutar: yedekler, pull eder, birleştirir, klasörü değiştirir ve push eder ([SYNC.tr.md](SYNC.tr.md)); eklenen, silinen ve değişen dosyalar için `+`, `-` ve `~`, her çatışma için bir satır yazar | Tamamlandı |
+| `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run] [--rate <hız>] [--exclude <pattern>]...` | Bir klasörü bir uzak depo üzerinden birkaç cihazda eşit tutar: yedekler, pull eder, birleştirir, klasörü değiştirir ve push eder ([SYNC.tr.md](SYNC.tr.md)); eklenen, silinen ve değişen dosyalar için `+`, `-` ve `~`, her çatışma için bir satır yazar | Tamamlandı |
 | `apeiron ref create <name> [<snapshot>]` | Bir snapshot'ta (varsayılan `main`) dal gibi bir ref oluşturur ([BRANCH.tr.md](BRANCH.tr.md)) | Tamamlandı |
 | `apeiron ref delete <name>` | Bir ref'i siler; `apeiron reflog <name>` onun nereye işaret ettiğini yine gösterir | Tamamlandı |
 | `apeiron merge <from> [--into <ref>] [--message <text>] [--dry-run]` | Bir snapshot'ı, genellikle bir dalı, bir ref'e (varsayılan `main`) birleştirir; çatışma varsa çıkış kodu 3'tür | Tamamlandı |
@@ -120,6 +120,18 @@ Bir `<snapshot>`; ref adı (`main`), tam snapshot kimliği ya da tek bir snapsho
 | Aygıt dosyaları, soketler, borular | Hayır; atlanır ve raporlanır | Tamamlandı |
 
 Okunurken değişen bir dosya okunduğu hâliyle saklanır ve uyarı olarak raporlanır. Geri yükleme izinleri ve zamanları yeniden oluşturur; sahipleri yalnızca bunları ayarlama yetkisiyle çalıştırıldığında.
+
+### 4.1 Dışarıda bırakmak
+
+`--exclude <pattern>` ve yedeklenen klasördeki `.apeironignore` dosyasının her satırı, yedeğin okumadığı şeyleri adlandırır. Eşleşen dosya ya da klasör içindekilerle birlikte dışarıda kalır; `--json` çıktısındaki `excluded` alanı onları sayar.
+
+| Kalıp | Eşleştiği |
+| --- | --- |
+| `*.tmp`, `node_modules`, `build/` | Her derinlikte o ad, büyük küçük harf ayrımı olmadan; `*` herhangi karakterler, `?` tek karakter yerine geçer |
+| `docs/old`, `/notes.txt` | Klasörün kökünden o yol; orada `*` `/` üzerinden de geçer |
+| `# metin`, boş satır | Dosyada hiçbir şey |
+
+`.apeironignore` sıradan bir dosyadır: diğerleri gibi yedeklenir, geri yüklenir ve eşitlenir. Yeni bir yedeğin dışında bırakılan yol eski yedeklerde durur. Senkron böyle yolları silmek yerine onlara dokunmaz ([SYNC.tr.md](SYNC.tr.md) §5.1).
 
 ## 5. Çıkış kodları
 

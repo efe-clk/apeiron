@@ -835,6 +835,11 @@ impl ObjectWriter<'_> {
         Ok(chunks)
     }
 
+    /// Reads a tree that was stored before this batch.
+    pub fn read_tree(&self, id: &ObjectId) -> Result<Tree> {
+        self.repo.read_tree(id)
+    }
+
     /// Bytes of file content (chunks) this batch stored that were not
     /// stored before.
     pub fn new_bytes(&self) -> u64 {

@@ -21,7 +21,7 @@ Senkron, `~/Documents` gibi aynı klasörü birden fazla cihazda eşit tutar. Va
 | Komut | Ne yapar | Durum |
 | --- | --- | --- |
 | `apeiron clone <url> <path>` | Bir uzak deponun kopyası olan yerel bir depo oluşturur: aynı config ve anahtarlar, ardından her ref pull edilir; uzak depo artık `origin` adını taşır | Tamamlandı |
-| `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run]` | Bir senkron turu çalıştırır (bölüm 3); varsayılan ref `sync/<klasör adı>`'dır; ad küçük harfe çevrilir ve `a-z 0-9 . _ -` dışındaki karakterler `-` olur; çatışma ya da sonraki tura bırakılan dosya varsa çıkış kodu 3'tür | Tamamlandı |
+| `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run] [--exclude <pattern>]...` | Bir senkron turu çalıştırır (bölüm 3); varsayılan ref `sync/<klasör adı>`'dır; ad küçük harfe çevrilir ve `a-z 0-9 . _ -` dışındaki karakterler `-` olur; çatışma ya da sonraki tura bırakılan dosya varsa çıkış kodu 3'tür | Tamamlandı |
 
 Arka plan hizmeti senkronu bir iş olarak çalıştırır (`do = "sync"`, [DAEMON.tr.md](DAEMON.tr.md)), örneğin 15 dakikada bir. İkinci bir cihaz `apeiron clone`, ardından `apeiron sync` ile başlar. `--dry-run`, klasörün yeni içeriğini depoya kaydeder (çöp toplama onu siler), ama hiçbir ref'i taşımaz; ne klasörü ne de uzak depoyu değiştirir.
 
@@ -89,6 +89,15 @@ Klasör, bir tur çalışırken değişebilir. Her adım, klasörü 1. adımda k
 
 Klasör ref'i ancak klasör uygulandıktan sonra taşınır. Yarıda kalan bir uygulama, bazı dosyaları yeni, bazılarını eski bırakır; sonraki tur bunu yeni bir L olarak yedekler ve birleştirme, bu dosyaların iki tarafta aynı şekilde değiştiğini bulur.
 
+### 5.1 Dokunulmayan yollar
+
+`--exclude <pattern>` ve klasörün `.apeironignore` dosyası ([CLI.tr.md](CLI.tr.md) §4.1), bu cihazın dokunmadığı yolları adlandırır; bu aynı zamanda seçmeli senkron sağlar: diğer cihazlar böyle bir dosyayı tutar, bu cihaz onu ne alır ne de siler.
+
+- L, dışarıda bırakılan bir yolun girdisini diskten değil, klasör ref'inin snapshot'ından alır; böylece dışarıda bırakmak silme sayılmaz ve kimseye yayılmaz. Diskten kaybolan bir klasör L'de yalnızca dışarıda bırakılan yollarını tutar. Daha önceki hiçbir snapshot'ın tutmadığı yol yalnızca bu cihazda kalır.
+- Bir snapshot uygulanırken dışarıda bırakılan yollar atlanır: diskte orada olan değiştirilmez ya da silinmez ve oraya bir şey yazılmaz. Başka bir cihazın sildiği klasör, içinde dışarıda bırakılan dosya oldukça kalır ve sonraki tura bırakılmış olarak bildirilir.
+- `.apeironignore` her dosya gibi eşitlenir, bu yüzden bir cihaza eklenen kural sonraki turda diğerlerine ulaşır; `--exclude`, onu veren cihaz için geçerlidir ve cihaz başına seçimin yoludur.
+- `apeiron switch`, klasörün `.apeironignore` dosyasının adlandırdıklarına aynı şekilde dokunmaz.
+
 ## 6. Klon
 
 `apeiron clone`, bir uzak depodan yeni bir yerel depo oluşturur (FORMAT.tr.md §15.6): `config`'i ve `keys/`'i kopyalar, bir deponun klasörlerini oluşturur, ardından uzak deponun her ref'ini pull eder ve ona `origin` adını verir. Uzak deponun parolası klonu açar. Uzak depodan anahtar kopyalayan tek işlem budur.
@@ -98,7 +107,7 @@ Klasör ref'i ancak klasör uygulandıktan sonra taşınır. Yarıda kalan bir u
 | Konu | Nerede |
 | --- | --- |
 | Uzak depo olmadan eşler arası senkron | Daha sonra; Aşama 2 için bir uzak depo yeterlidir |
-| Dışlama kuralları ve seçmeli senkron | Yazılmadı; zamanlanmadı ([ROADMAP.tr.md](ROADMAP.tr.md) §8) |
+| Eşitlenmeyen bir dosyayla cihaz başına seçim | Şimdilik `--exclude` karşılar |
 | Daemon'u başka bir cihazdan yönetmek (uzak API) | Yazılmadı; yalnızca bir kiracının işleri Zamanlama sayfasındadır ([DAEMON.tr.md](DAEMON.tr.md) §3.1) |
 
 ## 8. Crate'ler

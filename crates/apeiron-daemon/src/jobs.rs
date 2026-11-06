@@ -65,6 +65,8 @@ pub enum Action {
         message: Option<String>,
         /// Remotes to push the ref to after a successful backup.
         push: Vec<String>,
+        /// What to leave out (CLI.md §4.1).
+        exclude: Vec<String>,
     },
     Push {
         /// `None` for every ref (`ref = "*"`, REPLICATION.md §3).
@@ -92,6 +94,8 @@ pub enum Action {
         /// `None` for `sync/<folder name>`.
         ref_name: Option<String>,
         mode: SyncMode,
+        /// What this device leaves alone (SYNC.md §5.1).
+        exclude: Vec<String>,
     },
 }
 
@@ -143,6 +147,7 @@ struct RawJob {
     on_change: Option<String>,
     remote: Option<String>,
     mode: Option<String>,
+    exclude: Option<Vec<String>>,
 }
 
 /// Reads the jobs file; jobs come sorted by name, the order they run in.
@@ -238,6 +243,7 @@ fn to_job(name: &str, raw: RawJob, scope: Option<&Scope>) -> std::result::Result
                 ref_name,
                 message: raw.message.clone(),
                 push: raw.push.clone().unwrap_or_default(),
+                exclude: raw.exclude.clone().unwrap_or_default(),
             }
         }
         "push" => {
@@ -320,6 +326,7 @@ fn to_job(name: &str, raw: RawJob, scope: Option<&Scope>) -> std::result::Result
                 remote: raw.remote.clone().ok_or("`remote` is missing")?,
                 ref_name: raw.ref_name.clone(),
                 mode,
+                exclude: raw.exclude.clone().unwrap_or_default(),
             }
         }
         other => {
@@ -328,6 +335,9 @@ fn to_job(name: &str, raw: RawJob, scope: Option<&Scope>) -> std::result::Result
             ));
         }
     };
+    if !matches!(action, Action::Backup { .. } | Action::Sync { .. }) {
+        not_here("exclude", raw.exclude.is_some())?;
+    }
     if matches!(
         action,
         Action::Verify | Action::Gc | Action::RestoreTest { .. }
@@ -557,6 +567,7 @@ mod tests {
                 ref_name: "main".to_owned(),
                 message: None,
                 push: vec!["nas".to_owned()],
+                exclude: Vec::new(),
             }
         );
         assert_eq!(

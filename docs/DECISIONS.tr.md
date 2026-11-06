@@ -46,6 +46,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [036](#adr-036-rustcrypto-yanında-imzalar-için-aws-lc-rs) | İmzalar | İmzaları `aws-lc-rs` denetler ve üretir; RustCrypto depo verisi ve parolalar için kalır; ADR-017'yi değiştirir | Kabul edildi |
 | [037](#adr-037-önceki-kararlardaki-değişiklikler-2026-11-06ya-kadar) | Sonraki değişiklikler | ADR-018, 022, 025, 029–035'te değişenlerin ve yasal saklama kilitleri ile etiketlerin tek tablosu | Kabul edildi |
 | [038](#adr-038-bir-kopyadan-onarım-yalnızca-yerine-koyduğunu-silen-açık-bir-komuttur) | Onarım | Özel kilit altında `apeiron repair --from <remote>`; bozuk paketler ancak içlerinden hiçbir şey kaybolmayacaksa silinir | Kabul edildi |
+| [039](#adr-039-dışarıda-bırakılan-yola-dokunulmaz-silinmez) | Dışlama | `--exclude` ve `.apeironignore` kalıpları; yedek bu yolları okumaz, senkron onları kaydedildiği gibi tutar | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı. ADR-036 ve ADR-037, kendi kayıtları olmadan daha önce alınan kararları ve eski ADR'lerde değişenleri 2026-11-06'da kaydeder.
 
@@ -835,3 +836,23 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Sağlam nesneleri bozuk uzak depoya geri göndermek | Uzak depo, mümkünse komut onun üzerinde depo olarak çalıştırılarak onarılır; kabuğu olmayan uzak depo durumu sonraya kaldı |
 
 **Sonuçlar.** Komut, `verify` gibi saklanan her paketi okur. Aynı depoyu tutan bir kopyaya ihtiyaç duyar. Hiçbir yerde sağlam olmayan bir nesne her çalışmada çıkış kodu 4 ile bildirilmeye devam eder.
+
+## ADR-039: Dışarıda bırakılan yola dokunulmaz, silinmez
+
+**Durum:** Kabul edildi (2026-11-06)
+
+**Bağlam.** Yedek ve senkron bütün klasörü alıyordu. Bir yolu dışarıda bırakmak yedek için basittir: snapshot'ta o yol yoktur. Senkronda ise snapshot'ta bir yolun olmaması silindiği anlamına gelir ve bu diğer bütün cihazlara yayılırdı.
+
+**Karar.** Kalıplar `--exclude` seçeneğinden ve klasördeki `.apeironignore` dosyasından gelir ([CLI.tr.md](CLI.tr.md) §4.1). Yedek, eşleşeni okumaz. Senkron, eşleşen yolun girdisini klasör ref'inin snapshot'ından yeni snapshot'a kopyalar ve böyle bir yolu diskte asla değiştirmez ([SYNC.tr.md](SYNC.tr.md) §5.1). Format değişmez: snapshot sıradan bir tree'dir.
+
+**Gerekçe.** Kaydedilmiş girdiyi korumak, bir cihazın seçimini yerel kılar: diğer cihazlar değişiklik görmez, böylece tek kural seçmeli senkronu da sağlar. Kalıplar aramadan bilinenlerdir (SEARCH.tr.md §1). Eşitlenen bir dosya kuralları her cihaza taşır; seçenek tek bir cihazın seçimine hizmet eder.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Senkronda dışarıda bırakılan yolu silinmiş saymak | Bir cihaza kural eklemek diğerlerindeki dosyaları silerdi |
+| Olumsuzlama içeren `.gitignore` dili | Öğrenilecek ve sınanacak daha çok şey; kişisel klasörlerin yedeği için adlar ve yollar yeter |
+| Kuralları deponun ayarlarında tutmak | Bir klasörü ikinci cihaza ya da yeni depoya izlemezdi |
+
+**Sonuçlar.** Senkronun yaptığı bir snapshot, cihazında olmayan bir dosyayı tutabilir. Böyle bir snapshot geri yüklendiğinde o dosya yazılır. Başka yerde silinen klasör, içinde dışarıda bırakılan dosya oldukça burada kalır.

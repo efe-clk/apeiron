@@ -122,7 +122,6 @@ Her iş tamamlandı (2026-10-30); aşama, çıkış kriteri olan ilk kurumsal pi
 | İhtiyaç | İsteyen belge | Bugün ne oluyor |
 | --- | --- | --- |
 | Eski yedekleri budayan kurallar (7 günlük, 4 haftalık, 12 aylık) | [VISION.tr.md](VISION.tr.md) | `gc` yalnızca hiçbir ref'in ulaşmadığını siler; bir ref'in geçmişi sınırsız büyür |
-| Dışlama kuralları ve seçmeli senkron | [VISION.tr.md](VISION.tr.md), [SYNC.tr.md](SYNC.tr.md) §7 | Yedek ya da senkron bütün klasörü alır |
 | Performans hedeflerini Raspberry Pi 4'te ölçmek | [VISION.tr.md](VISION.tr.md), [API.tr.md](API.tr.md) §4 | Ölçülmedi |
 | İşlem günlüğü | [ARCHITECTURE.tr.md](ARCHITECTURE.tr.md) §2 | Reflog'lar ref değişikliklerini kaydeder; web arayüzü dışındaki diğer işlemleri hiçbir şey kaydetmez |
 | Arşiv paketleri: parçalara bölme, açmadan inceleme; tar ve zip içe aktarma | [VISION.tr.md](VISION.tr.md) | tar, zip ve 7z yalnızca dışa aktarılır |

@@ -355,6 +355,10 @@ pub struct SyncRequest {
     /// (SYNC.md §2); no limit when absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rate: Option<u64>,
+    /// Patterns of what this device leaves alone, beside the folder's
+    /// `.apeironignore` (SYNC.md §5.1).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exclude: Vec<String>,
 }
 
 impl SyncRequest {
@@ -366,6 +370,7 @@ impl SyncRequest {
             mode: SyncMode::TwoWay,
             dry_run: false,
             rate: None,
+            exclude: Vec::new(),
         }
     }
 }

@@ -141,7 +141,7 @@ Every operation takes one plain request value and returns one plain result value
 
 | Operation | Request | Result | Long |
 | --- | --- | --- | --- |
-| `backup` | source folder, ref name, message, author, host, meta | `BackupReport`: snapshot id, counts of files, folders and bytes, bytes newly stored, warnings | Yes |
+| `backup` | source folder, ref name, message, author, host, meta, patterns to leave out ([CLI.md](CLI.md) §4.1) | `BackupReport`: snapshot id, counts of files, folders and bytes, bytes newly stored, entries left out, warnings | Yes |
 | `restore` | snapshot, target folder, optional path inside the snapshot | `RestoreReport`: counts, warnings | Yes |
 | `export` | snapshot, output file, format (`tar`, `zip` or `7z`; from the extension when absent), optional path | `ExportReport`: counts, warnings | Yes |
 | `verify` | — | `VerifyReport`: objects checked, damaged files and objects | Yes |
@@ -187,7 +187,7 @@ Every operation takes one plain request value and returns one plain result value
 | `push_all`, `pull_all` | remote name | `MirrorReport`: per ref its name and either a `TransferReport` or the `conflict` that left it; other errors stop them all ([REPLICATION.md](REPLICATION.md) §2, [FORMAT.md](FORMAT.md) §15.7) | Yes |
 | `git_import` | Git repository path, ref prefix (default `git`) | `GitImportReport`: commits and tags stored, refs moved (Git name, ref, Git id, snapshot, previous), skipped refs with the reason, stale refs ([GIT.md](GIT.md)) | Yes |
 | `git_export` | Git repository path (created bare if missing), ref prefix | `GitExportReport`: commits and tags written, refs updated, skipped refs, Git ids not reproduced | Yes |
-| `sync` | folder, remote name, ref name (default `sync/<folder name>`), mode (`two-way`, `send` or `receive`), dry run, speed limit | `SyncReport`: ref, action (`up_to_date`, `sent`, `received` or `merged`), snapshot, the backup made, what was fetched and pushed, folder changes, conflicts with their copies, files merged by plugins, paths left for the next round, warnings, rounds run ([SYNC.md](SYNC.md)); `conflict` in `send` mode when the remote has snapshots this copy does not | Yes |
+| `sync` | folder, remote name, ref name (default `sync/<folder name>`), mode (`two-way`, `send` or `receive`), dry run, speed limit, patterns to leave alone ([SYNC.md](SYNC.md) §5.1) | `SyncReport`: ref, action (`up_to_date`, `sent`, `received` or `merged`), snapshot, the backup made, what was fetched and pushed, folder changes, conflicts with their copies, files merged by plugins, paths left for the next round, warnings, rounds run ([SYNC.md](SYNC.md)); `conflict` in `send` mode when the remote has snapshots this copy does not | Yes |
 | `switch` | snapshot spec, folder, dry run | `SwitchReport`: the folder ref, the snapshot, the snapshot that recorded the folder first, folder changes, files changed during the switch with their copies, paths left alone, warnings ([BRANCH.md](BRANCH.md) §6) | Yes |
 | `add_file`, `export_zip_to` (Rust only) | a file added to a backup as a new version; a snapshot or a path in it written as a zip file to a `Write` | The file's new path and version; counts ([SHARE.md](SHARE.md)) | No |
 | `share_plugin`, `unshare_plugin`, `shared_plugins`, `install_shared_plugin` (Rust only) | plugin name | Plugins carried in the ref `apeiron/plugins` ([PLUGIN.md](PLUGIN.md) §5) | No |

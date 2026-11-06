@@ -70,6 +70,7 @@ every = "week"
 | `remote`, `mode` | For `sync`: the remote, and `two-way` (default), `send` or `receive`; for `pull` and `repair`: the remote |
 | `ref = "*"` | For `push` and `pull`: every ref, to keep a replica or a standby ([REPLICATION.md](REPLICATION.md) §3) |
 | `push` | For `backup`: remotes to push the ref to after a successful backup; for `push`: the remotes |
+| `exclude` | For `backup` and `sync`: a list of patterns to leave out ([CLI.md](CLI.md) §4.1, [SYNC.md](SYNC.md) §5.1) |
 | `every` | `hour`, `day`, `week`, or a number of minutes, hours or days: `15m`, `6h`, `2d` |
 | `at` | For `day` and `week`: the earliest local time of day, `HH:MM` |
 | `sample_mb` | For `restore-test`: how much to restore, default 100 |

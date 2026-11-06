@@ -54,7 +54,7 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | Command | What it does | Status |
 | --- | --- | --- |
 | `apeiron init <path> [--encrypt]` | Creates an empty repository; `--encrypt` encrypts it with a password (section 2.1) | Done |
-| `apeiron backup <folder> [--ref <name>] [--message <text>] [--author <text>] [--host <text>]` | Stores the folder as a new snapshot and moves the ref to it (default ref: `main`) | Done |
+| `apeiron backup <folder> [--ref <name>] [--message <text>] [--author <text>] [--host <text>] [--exclude <pattern>]...` | Stores the folder as a new snapshot and moves the ref to it (default ref: `main`) | Done |
 | `apeiron log [<ref>] [--grep <text>]` | Lists the snapshots of a ref, newest first; `--grep` keeps those whose message, author, host or metadata hold the text, ignoring case | Done |
 | `apeiron ls <snapshot> [<path>]` | Lists the files and folders inside a snapshot | Done |
 | `apeiron diff <snapshot> <snapshot> [--text]` | Lists files added, removed and changed between two snapshots; `--text` also shows the changed lines of files a plugin handles ([TEXT.md](TEXT.md)) | Done |
@@ -73,7 +73,7 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | `apeiron remote list` | Lists the remotes | Done |
 | `apeiron remote remove <name>` | Forgets a remote; the copy itself is not touched | Done |
 | `apeiron clone <url> <path> [--rate <speed>]` | Makes a new repository from a remote copy, with the same password, pulls every ref and names the remote `origin`; the way to set up a second device | Done |
-| `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run] [--rate <speed>]` | Keeps a folder equal on several devices through a remote: backs it up, pulls, merges, changes the folder and pushes ([SYNC.md](SYNC.md)); prints `+`, `-` and `~` for added, removed and changed files and one line per conflict | Done |
+| `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run] [--rate <speed>] [--exclude <pattern>]...` | Keeps a folder equal on several devices through a remote: backs it up, pulls, merges, changes the folder and pushes ([SYNC.md](SYNC.md)); prints `+`, `-` and `~` for added, removed and changed files and one line per conflict | Done |
 | `apeiron ref create <name> [<snapshot>]` | Creates a ref, such as a branch, at a snapshot (default `main`) ([BRANCH.md](BRANCH.md)) | Done |
 | `apeiron ref delete <name>` | Deletes a ref; `apeiron reflog <name>` still shows where it pointed | Done |
 | `apeiron merge <from> [--into <ref>] [--message <text>] [--dry-run]` | Merges a snapshot, usually a branch, into a ref (default `main`); exit code 3 when there are conflicts | Done |
@@ -120,6 +120,18 @@ A `<snapshot>` can be written as a ref name (`main`), a full snapshot id, or the
 | Device files, sockets, pipes | No; skipped and reported | Done |
 
 A file that changes while it is being read is stored as read and reported as a warning. Restore recreates permissions and times; owners only when run with permission to set them.
+
+### 4.1 Leaving things out
+
+`--exclude <pattern>`, and each line of a file `.apeironignore` in the folder backed up, name what a backup does not read. A file or folder that matches is left out with everything in it, and the `excluded` field of `--json` counts them.
+
+| Pattern | Matches |
+| --- | --- |
+| `*.tmp`, `node_modules`, `build/` | That name at any depth, ignoring case; `*` stands for any characters, `?` for one |
+| `docs/old`, `/notes.txt` | That path from the root of the folder; there `*` also crosses `/` |
+| `# text`, an empty line | Nothing, in the file |
+
+`.apeironignore` is an ordinary file: it is backed up, restored and synced like any other. A path left out of a new backup is still in the older ones. A sync leaves such paths alone instead of removing them ([SYNC.md](SYNC.md) §5.1).
 
 ## 5. Exit codes
 

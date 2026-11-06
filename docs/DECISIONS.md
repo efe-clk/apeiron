@@ -46,6 +46,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [036](#adr-036-aws-lc-rs-for-signatures-beside-rustcrypto) | Signatures | `aws-lc-rs` checks and makes signatures; RustCrypto stays for repository data and passwords; changes ADR-017 | Accepted |
 | [037](#adr-037-changes-to-earlier-decisions-up-to-2026-11-06) | Later changes | One table of what changed in ADR-018, 022, 025, 029–035, and legal holds and tags | Accepted |
 | [038](#adr-038-repairing-from-a-copy-is-an-explicit-command-that-deletes-only-what-it-replaced) | Repair | `apeiron repair --from <remote>` under the exclusive lock; damaged packs go only when nothing in them is lost | Accepted |
+| [039](#adr-039-a-left-out-path-is-left-alone-not-deleted) | Exclusion | Patterns from `--exclude` and `.apeironignore`; a backup does not read such paths, and a sync keeps them as they were recorded | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28. ADR-036 and ADR-037 record on 2026-11-06 decisions made earlier without a record of their own, including what changed in older ADRs.
 
@@ -835,3 +836,23 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Pushing whole objects back to a damaged remote | A remote is repaired by running the command on it as a repository, where that is possible; the case of a remote without a shell is left for later |
 
 **Consequences.** The command reads every stored pack, as `verify` does. It needs a copy holding the same repository. An object held whole nowhere stays reported, with exit code 4, on each run.
+
+## ADR-039: A left-out path is left alone, not deleted
+
+**Status:** Accepted (2026-11-06)
+
+**Context.** Backups and sync took a whole folder. Leaving a path out is simple for a backup, where a snapshot just lacks it. In sync, a snapshot that lacks a path means the path was deleted, and that would spread to every other device.
+
+**Decision.** Patterns come from `--exclude` and from a file `.apeironignore` in the folder ([CLI.md](CLI.md) §4.1). A backup does not read what matches. A sync copies the entry of a matching path from the snapshot of the folder ref into the new snapshot and never changes such a path on the disk ([SYNC.md](SYNC.md) §5.1). The format does not change: a snapshot is an ordinary tree.
+
+**Rationale.** Keeping the recorded entry makes a device's choice local: the other devices see no change, so one rule also gives selective sync. The patterns are those people know from search (SEARCH.md §1). A file that syncs carries the rules to every device; the option serves the choice of one device.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| Treating a left-out path as deleted in sync | Adding a rule on one device would delete files on the others |
+| Git's `.gitignore` language with negation | More to learn and to test; backups of personal folders need names and paths |
+| Rules kept in the repository's settings | They would not follow a folder to a second device or a new repository |
+
+**Consequences.** A snapshot made by sync can hold a file its device does not have. Restoring such a snapshot writes that file. A folder removed elsewhere stays here while a left-out file is in it.

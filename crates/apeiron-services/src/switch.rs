@@ -68,7 +68,7 @@ pub fn switch(
 
     let mut writer = repo.writer();
     let (folder_tree, warnings) = if options.folder.exists() {
-        let stored = backup::store_folder(&mut writer, &options.folder, true, ctl)?;
+        let stored = backup::store_folder(&mut writer, &options.folder, true, &[], None, ctl)?;
         (stored.tree, stored.warnings)
     } else {
         (
@@ -142,6 +142,7 @@ pub fn switch(
         mode: SyncMode::Receive,
         dry_run: options.dry_run,
         host: options.host.clone(),
+        exclude: Vec::new(),
     };
     let suffix = format!(" (conflict {})", options.target_name.replace('/', "-"));
     apply_tree(

@@ -122,7 +122,6 @@ Every work item is done (2026-10-30); the stage ends with its exit criterion, th
 | Need | Asked for in | What happens today |
 | --- | --- | --- |
 | Rules that prune old backups (7 daily, 4 weekly, 12 monthly) | [VISION.md](VISION.md) | `gc` removes only what no ref reaches; the history of a ref grows without limit |
-| Exclusion rules and selective sync | [VISION.md](VISION.md), [SYNC.md](SYNC.md) §7 | A backup or sync takes the whole folder |
 | Measuring the performance targets on a Raspberry Pi 4 | [VISION.md](VISION.md), [API.md](API.md) §4 | Not measured |
 | Operation log | [ARCHITECTURE.md](ARCHITECTURE.md) §2 | Reflogs record ref changes; nothing records other operations outside the web interface |
 | Archive packages: splitting into parts, inspecting without unpacking; importing tar and zip | [VISION.md](VISION.md) | tar, zip and 7z are export only |

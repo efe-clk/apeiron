@@ -112,6 +112,8 @@ apeiron backup ~/Pictures  --ref backup/pictures
 
 Ref names use only lowercase letters, digits, `.`, `_`, `-` and `/` (`backup/documents`, not `Belgelerim`).
 
+To leave things out, write them one per line in a file `.apeironignore` in the folder (`*.tmp`, `node_modules`), or give `--exclude '*.tmp'`. Patterns are explained in [CLI.md](CLI.md) §4.1.
+
 ## 5. Looking at backups
 
 | Task | Command |

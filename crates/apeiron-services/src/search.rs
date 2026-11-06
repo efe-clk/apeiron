@@ -416,7 +416,7 @@ pub fn name_matches(pattern: &str, name: &[u8]) -> bool {
 
 /// Whether `subject` matches `pattern`, where `*` stands for any characters
 /// and `?` for one.
-fn wildcard(pattern: &[char], subject: &[char]) -> bool {
+pub(crate) fn wildcard(pattern: &[char], subject: &[char]) -> bool {
     let (mut p, mut s) = (0, 0);
     // Where the last `*` was, and the subject position it was tried at.
     let mut star: Option<(usize, usize)> = None;

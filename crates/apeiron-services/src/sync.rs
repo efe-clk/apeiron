@@ -15,6 +15,7 @@ use crate::backup;
 use crate::control::{Control, Phase, Warning, WarningKind};
 use crate::diff::{Change, ChangeKind};
 use crate::error::{Error, IoContext, Result};
+use crate::exclude::Exclude;
 use crate::merge::{
     Conflict, ConflictKind, ContentMerger, Merge, PluginMerge, by_name, describe, free_name,
     is_dir, is_file, same, same_content, tree_of, write_items,
@@ -59,6 +60,10 @@ pub struct SyncOptions {
     /// of conflict copies made on other devices.
     #[serde(default)]
     pub host: Option<String>,
+    /// Patterns of what this device leaves alone, beside the folder's
+    /// `.apeironignore` (section 5.1).
+    #[serde(default)]
+    pub exclude: Vec<String>,
 }
 
 /// What a round did.
@@ -171,7 +176,14 @@ fn round(
         .map(|id| repo.read_snapshot(&id).map(|s| s.tree))
         .transpose()?;
     let mut writer = repo.writer();
-    let stored = backup::store_folder(&mut writer, &options.folder, true, ctl)?;
+    let stored = backup::store_folder(
+        &mut writer,
+        &options.folder,
+        true,
+        &options.exclude,
+        previous_tree,
+        ctl,
+    )?;
     outcome.warnings = stored.warnings;
     let local_tree = stored.tree;
     let local = if previous_tree != Some(local_tree) && !dry_run {
@@ -381,9 +393,11 @@ pub(crate) fn apply_tree(
     ctl: &Control,
 ) -> Result<()> {
     ctl.set_phase(Phase::Restoring);
+    let exclude = Exclude::for_folder(&options.folder, &options.exclude)?;
     let mut apply = Apply {
         repo,
         ctl,
+        exclude: &exclude,
         suffix,
         dry_run: options.dry_run,
         outcome,
@@ -463,6 +477,7 @@ fn utc(t: Time) -> (i64, u32, u32, u32, u32) {
 struct Apply<'a> {
     repo: &'a Repository,
     ctl: &'a Control,
+    exclude: &'a Exclude,
     suffix: &'a str,
     dry_run: bool,
     outcome: &'a mut SyncOutcome,
@@ -486,6 +501,9 @@ impl Apply<'_> {
             self.ctl.check()?;
             let Some(any) = t.or(f) else { continue };
             let child = rel.join(&any.name);
+            if self.exclude.matches(&child, &any.name) {
+                continue;
+            }
             let Some(os_name) = os::os_name(&any.name) else {
                 self.warn(&child, "the name cannot be used on this system");
                 continue;
@@ -738,7 +756,7 @@ mod tests {
 
     fn store(repo: &mut Repository, folder: &Path) -> ObjectId {
         let mut writer = repo.writer();
-        let tree = backup::store_folder(&mut writer, folder, true, &Control::new())
+        let tree = backup::store_folder(&mut writer, folder, true, &[], None, &Control::new())
             .unwrap()
             .tree;
         writer.finish().unwrap();
@@ -773,6 +791,7 @@ mod tests {
             mode: SyncMode::TwoWay,
             dry_run: false,
             host: None,
+            exclude: Vec::new(),
         };
         let mut outcome = SyncOutcome {
             ref_name: "sync/test".to_owned(),
