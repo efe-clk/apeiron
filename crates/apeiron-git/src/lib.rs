@@ -50,7 +50,7 @@ pub(crate) fn git_error(path: &Path, e: impl std::fmt::Display) -> Error {
 }
 
 /// A ref that was moved, with its Git and Apeiron names.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct RefUpdate {
     /// The full Git name, such as `refs/heads/main`.
     pub git: String,
@@ -65,13 +65,13 @@ pub struct RefUpdate {
 }
 
 /// A ref or object that was left out, and why.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Skipped {
     pub name: String,
     pub reason: String,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ImportReport {
     /// Commits stored as new snapshots.
     pub commits: u64,
@@ -85,7 +85,7 @@ pub struct ImportReport {
     pub stale: Vec<String>,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ExportReport {
     /// Commits written.
     pub commits: u64,

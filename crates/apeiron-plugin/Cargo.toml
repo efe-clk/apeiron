@@ -11,6 +11,7 @@ publish = false
 [dependencies]
 apeiron-services = { path = "../apeiron-services" }
 dirs = "6.0.0"
+schemars = "1.2.1"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 thiserror = "2.0.21"

@@ -16,7 +16,7 @@ use crate::os;
 const ATTEMPTS: u32 = 3;
 
 /// Where a file goes and what is written with it.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct AddFileOptions {
     #[serde(rename = "ref")]
     pub ref_name: String,
@@ -32,7 +32,7 @@ pub struct AddFileOptions {
     pub host: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct AddFileOutcome {
     pub snapshot: ObjectId,
     /// Where the file is in it.

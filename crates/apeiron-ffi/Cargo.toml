@@ -20,4 +20,5 @@ serde_json = "1.0.154"
 
 [dev-dependencies]
 cbindgen = "0.29"
+jsonschema = { version = "0.33", default-features = false }
 tempfile = "3.27.0"

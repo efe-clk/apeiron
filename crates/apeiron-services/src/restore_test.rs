@@ -14,7 +14,7 @@ use crate::control::{Control, Phase};
 use crate::error::{Error, IoContext, Result};
 use crate::name::Name;
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct RestoreTestOutcome {
     /// Files restored and checked.
     pub files: u64,
@@ -29,7 +29,7 @@ impl RestoreTestOutcome {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct RestoreProblem {
     pub path: Name,
     pub message: String,

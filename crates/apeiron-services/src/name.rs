@@ -53,6 +53,26 @@ enum Repr {
     Bytes { hex: String },
 }
 
+impl schemars::JsonSchema for Name {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "Name".into()
+    }
+
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "description": "A path or name: text when its bytes are UTF-8, else the bytes in hexadecimal.",
+            "anyOf": [
+                {"type": "string"},
+                {
+                    "type": "object",
+                    "properties": {"hex": {"type": "string"}},
+                    "required": ["hex"]
+                }
+            ]
+        })
+    }
+}
+
 impl Serialize for Name {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match std::str::from_utf8(&self.0) {

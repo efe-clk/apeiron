@@ -19,7 +19,7 @@ use crate::refs::RepairReport;
 use crate::remote::Store;
 
 /// What [`Repository::repair_from`] did.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct CopyRepairReport {
     /// What the repair without a copy did first.
     pub repair: RepairReport,

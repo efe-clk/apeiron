@@ -15,7 +15,7 @@ use crate::lock::RepoLock;
 use crate::refs::{RefStore, validate_ref_name};
 
 /// A named remote copy of the repository.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Remote {
     pub name: String,
     pub url: String,

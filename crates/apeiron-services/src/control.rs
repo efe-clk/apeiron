@@ -9,7 +9,9 @@ use crate::error::{Error, Result};
 use crate::name::Name;
 
 /// What a long operation is doing.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Phase {
     #[default]
@@ -28,7 +30,7 @@ pub enum Phase {
 }
 
 /// A copy of the progress of a long operation.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Progress {
     pub phase: Phase,
     pub items_done: u64,
@@ -87,14 +89,14 @@ impl Control {
 }
 
 /// A problem that did not stop the operation.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Warning {
     pub path: Name,
     pub kind: WarningKind,
     pub message: String,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum WarningKind {

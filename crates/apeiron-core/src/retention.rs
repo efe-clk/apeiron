@@ -16,7 +16,7 @@ pub const MAX_DAYS: u32 = 36_500;
 const SECONDS_PER_DAY: u64 = 24 * 60 * 60;
 
 /// One rule file (FORMAT.md §16.1).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Rule {
     /// A ref name, or a prefix followed by `*`.

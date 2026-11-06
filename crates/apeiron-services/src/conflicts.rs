@@ -10,7 +10,7 @@ use crate::error::{Error, IoContext, Result};
 
 /// A conflict copy and the file it stands beside, both relative to the
 /// folder, with `/` between names.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ConflictCopy {
     pub path: String,
     pub copy: String,
@@ -19,7 +19,7 @@ pub struct ConflictCopy {
 }
 
 /// Which version of a conflict to keep.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Keep {
     /// The file at the path; the copy is deleted.

@@ -67,7 +67,7 @@ struct RawSealed {
 }
 
 /// What a password or recovery key is.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum KeyKind {
     Password,
@@ -75,7 +75,7 @@ pub enum KeyKind {
 }
 
 /// A key file of an encrypted repository.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct KeyInfo {
     /// The name of the key file without `.key`.
     pub id: String,

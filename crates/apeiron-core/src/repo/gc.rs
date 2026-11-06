@@ -16,7 +16,7 @@ use crate::pack::{self, FileHash, PackEntry, PackWriter};
 
 const SECONDS_PER_DAY: u64 = 86_400;
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(default)]
 pub struct GcOptions {
     /// Reflog lines younger than this many days keep their snapshots alive;
@@ -35,7 +35,7 @@ impl Default for GcOptions {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct GcReport {
     pub dry_run: bool,
     pub live_objects: u64,

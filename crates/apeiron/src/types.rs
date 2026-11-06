@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::Error;
 
 /// Facts about an open repository.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct RepoInfo {
     pub path: PathBuf,
     pub format_version: u32,
@@ -23,7 +23,7 @@ pub struct RepoInfo {
     pub damaged_files: Vec<PathBuf>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct RestoreRequest {
     /// A snapshot spec (API.md §8.4).
     pub snapshot: String,
@@ -35,7 +35,7 @@ pub struct RestoreRequest {
 }
 
 /// Which remote to clean (FORMAT.md §15.8).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct RemoteGcRequest {
     /// The name of a remote this repository alone writes to.
     pub remote: String,
@@ -45,7 +45,7 @@ pub struct RemoteGcRequest {
 }
 
 /// Which snapshot a working folder is to hold (BRANCH.md §6).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct SwitchRequest {
     /// A snapshot spec (API.md §8.4), usually a branch.
     pub snapshot: String,
@@ -55,7 +55,7 @@ pub struct SwitchRequest {
     pub dry_run: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ExportRequest {
     /// A snapshot spec (API.md §8.4).
     pub snapshot: String,
@@ -72,7 +72,7 @@ pub struct ExportRequest {
     pub split: Option<u64>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct LogRequest {
     /// A snapshot spec where the history starts.
     pub start: String,
@@ -90,14 +90,14 @@ fn default_limit() -> usize {
 }
 
 /// One page of history, newest first.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct LogPage {
     pub snapshots: Vec<SnapshotInfo>,
     /// Where the next page starts; `None` at the first snapshot.
     pub next: Option<ObjectId>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct SnapshotInfo {
     pub id: ObjectId,
     pub tree: ObjectId,
@@ -136,21 +136,21 @@ impl SnapshotInfo {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ListRequest {
     pub snapshot: String,
     #[serde(default)]
     pub path: Name,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct DiffRequest {
     pub from: String,
     pub to: String,
 }
 
 /// A changed path with the difference a plugin shows for it (TEXT.md §3).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct TextDiff {
     pub path: Name,
     pub kind: ChangeKind,
@@ -162,13 +162,13 @@ pub struct TextDiff {
     pub error: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct RefInfo {
     pub name: String,
     pub snapshot: ObjectId,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct DeleteRefRequest {
     pub name: String,
     /// The snapshot the ref must still point to.
@@ -176,7 +176,7 @@ pub struct DeleteRefRequest {
 }
 
 /// A new ref and the snapshot it starts at.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct CreateRefRequest {
     pub name: String,
     /// A snapshot spec (API.md §8.4).
@@ -184,7 +184,7 @@ pub struct CreateRefRequest {
 }
 
 /// Which snapshot to merge into which ref.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct MergeRequest {
     /// A snapshot spec (API.md §8.4), usually a branch name.
     pub from: String,
@@ -216,7 +216,7 @@ impl MergeRequest {
 }
 
 /// A password or recovery key added to an encrypted repository.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct AddedKey {
     pub id: String,
     /// The new recovery key, shown to the user once; absent for a password.
@@ -224,7 +224,7 @@ pub struct AddedKey {
     pub recovery_key: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct RestoreTestRequest {
     /// A snapshot spec (API.md §8.4).
     pub snapshot: String,
@@ -247,7 +247,7 @@ impl RestoreTestRequest {
 }
 
 /// Which ref to push to or pull from which remote.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct TransferRequest {
     /// The name of a remote.
     pub remote: String,
@@ -281,7 +281,7 @@ impl TransferRequest {
 
 /// Which remote to push every ref to or pull every ref from
 /// ([REPLICATION.md](REPLICATION.md) §2).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct RemoteRequest {
     /// The name of a remote.
     pub remote: String,
@@ -292,7 +292,7 @@ pub struct RemoteRequest {
 }
 
 /// What pushing or pulling every ref did, ref by ref.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct MirrorReport {
     pub refs: Vec<MirroredRef>,
 }
@@ -307,7 +307,7 @@ impl MirrorReport {
 
 /// One ref of a [`MirrorReport`]: what was copied, or the conflict that
 /// kept it.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct MirroredRef {
     pub name: String,
     #[serde(flatten, default, skip_serializing_if = "Option::is_none")]
@@ -317,7 +317,7 @@ pub struct MirroredRef {
 }
 
 /// Where to clone a remote copy from and to.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct CloneRequest {
     /// A folder path or an `sftp://` or `s3://` URL, as for a remote.
     pub url: String,
@@ -333,12 +333,12 @@ pub struct CloneRequest {
 }
 
 /// What `clone` copied, ref by ref.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct CloneReport {
     pub refs: Vec<ClonedRef>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ClonedRef {
     pub name: String,
     #[serde(flatten)]
@@ -346,7 +346,7 @@ pub struct ClonedRef {
 }
 
 /// Which folder to sync with which remote.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct SyncRequest {
     pub folder: PathBuf,
     /// The name of a remote.
@@ -385,7 +385,7 @@ impl SyncRequest {
 }
 
 /// Which Git repository to import from or export to.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct GitRequest {
     pub path: PathBuf,
     /// The folder of refs for the repository; `git` by default.
@@ -407,7 +407,7 @@ impl GitRequest {
 }
 
 /// Which snapshot to look for duplicate files in (SEARCH.md §5).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct DuplicatesRequest {
     /// A snapshot spec (API.md §8.4).
     pub snapshot: String,
@@ -417,7 +417,7 @@ pub struct DuplicatesRequest {
 }
 
 /// What to search for and where (SEARCH.md).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct SearchRequest {
     /// A snapshot spec (API.md §8.4); when absent, `main`, or with
     /// `history` every ref.

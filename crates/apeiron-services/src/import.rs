@@ -30,7 +30,7 @@ const S_IFMT: u32 = 0o170_000;
 const S_IFLNK: u32 = 0o120_000;
 
 /// Archive formats `import` can read.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum ImportFormat {
     #[serde(rename = "tar")]
     Tar,
@@ -61,7 +61,7 @@ impl ImportFormat {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ImportOptions {
     pub archive: PathBuf,
     #[serde(rename = "ref")]
@@ -91,7 +91,7 @@ impl ImportOptions {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ImportOutcome {
     pub snapshot: ObjectId,
     pub parent: Option<ObjectId>,

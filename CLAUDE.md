@@ -99,7 +99,7 @@ Aşama 5'in bütün işleri tamamlandı; aşama, çıkış kriteri olan ilk kuru
 12. Let's Encrypt (ACME).
 13. İlk sürüm: kurulum dosyaları, simgeler, indirilebilir metin eklentisi.
 
-Bu listede olmayan, belgelerin istediği ama yazılmamış işler `docs/ROADMAP.md` §8'dedir. Proje sahibi 2026-11-06'da sırayı Claude'a bıraktı: ~~bozuk nesneyi kopyadan onarma~~, ~~dışlama kuralları~~, ~~eski yedekleri budama~~, ~~performans ölçümü (bu makinede, `docs/PERFORMANCE.md`; Raspberry Pi 4 için cihaz gerekir)~~ (tamamlandı), ~~tar, zip ve 7z içe aktarma, dışa aktarımı bölme~~, ardından §8'in kalanı küçükten büyüğe.
+Bu listede olmayan, belgelerin istediği ama yazılmamış işler `docs/ROADMAP.md` §8'dedir. Proje sahibi 2026-11-06'da sırayı Claude'a bıraktı: ~~bozuk nesneyi kopyadan onarma~~, ~~dışlama kuralları~~, ~~eski yedekleri budama~~, ~~performans ölçümü (bu makinede, `docs/PERFORMANCE.md`; Raspberry Pi 4 için cihaz gerekir)~~ (tamamlandı), ~~tar, zip ve 7z içe aktarma, dışa aktarımı bölme~~, ~~JSON şemaları~~, ardından §8'in kalanı küçükten büyüğe.
 
 ## Çalışma düzeni
 
@@ -110,5 +110,5 @@ Bu listede olmayan, belgelerin istediği ama yazılmamış işler `docs/ROADMAP.
 - Metin eklentisi ayrı bir workspace'tir: `plugins/text` (`--manifest-path` ile; wasm `--target wasm32-wasip2`). `cargo test`'in eklenti testleri `rustup target add wasm32-wasip2` ister.
 - Belgelerin uyumunu `crates/apeiron-cli/tests/docs.rs` denetler; yeni komut, seçenek, işlem veya crate belgelenmeden `cargo test` geçmez.
 - Python SDK testi: `cargo build -p apeiron-ffi && APEIRON_LIB=target/debug/libapeiron.so PYTHONPATH=sdk/python/src python3 -m unittest discover -s sdk/python/tests`.
-- FFI belge yorumları değişince C başlığı `APEIRON_BLESS=1 cargo test -p apeiron-ffi` ile yeniden üretilir.
+- FFI belge yorumları ya da istek ve sonuç türleri değişince C başlığı ve `sdk/schema/apeiron.schema.json` `APEIRON_BLESS=1 cargo test -p apeiron-ffi` ile yeniden üretilir.
 - Proje sahibinin kararını gerektiren işler atlanır ve not edilir; parolalar ve kişisel bilgiler hiçbir dosyaya yazılmaz.

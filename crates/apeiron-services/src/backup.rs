@@ -18,7 +18,7 @@ use crate::os;
 use crate::sync;
 
 /// What to back up and how to describe the snapshot.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct BackupOptions {
     pub source: PathBuf,
     #[serde(rename = "ref")]
@@ -57,7 +57,7 @@ impl BackupOptions {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct BackupOutcome {
     pub snapshot: ObjectId,
     /// The snapshot the ref pointed to before, now the first parent.

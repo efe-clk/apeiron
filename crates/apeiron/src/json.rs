@@ -63,45 +63,45 @@ fn boxed<T: Serialize + Send + 'static>(job: Job<T>) -> Box<dyn JsonJob> {
     Box::new(job)
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 struct Spec {
     spec: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 struct Named {
     name: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 struct Password {
     password: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 struct KeyId {
     id: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 struct Folder {
     folder: PathBuf,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 struct Resolve {
     folder: PathBuf,
     copy: String,
     keep: crate::Keep,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 struct SearchesFile {
     #[serde(default)]
     file: Option<PathBuf>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 struct SaveSearch {
     #[serde(flatten)]
     saved: crate::SavedSearch,
@@ -109,52 +109,52 @@ struct SaveSearch {
     file: Option<PathBuf>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 struct SearchName {
     name: String,
     #[serde(default)]
     file: Option<PathBuf>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 struct PluginDir {
     #[serde(default)]
     dir: Option<PathBuf>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 struct PluginFile {
     file: PathBuf,
     #[serde(default)]
     dir: Option<PathBuf>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 struct PluginName {
     name: String,
     #[serde(default)]
     dir: Option<PathBuf>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 struct NewRemote {
     name: String,
     url: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 struct NewRetention {
     refs: String,
     days: u32,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 struct NewHold {
     refs: String,
     reason: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, schemars::JsonSchema)]
 struct LiftHold {
     id: String,
     reason: String,
@@ -282,4 +282,97 @@ pub fn start(repo: &Repository, operation: &str, request: Value) -> Result<Box<d
 /// Starts `clone`, which makes a new repository from a remote.
 pub fn clone(request: Value) -> Result<Box<dyn JsonJob>> {
     Ok(boxed(Repository::clone_from(parse(request)?)?))
+}
+
+/// The request of an operation that takes none.
+#[derive(schemars::JsonSchema)]
+struct NoRequest {}
+
+/// Every operation with its request and result, and the values shared by all
+/// (SDK.md §3): `sdk/schema/apeiron.schema.json` is this.
+pub fn schema() -> Value {
+    use crate::*;
+    let mut generator = schemars::SchemaGenerator::default();
+    let mut operations = serde_json::Map::new();
+    macro_rules! ops {
+        ($long:literal: $($name:literal $request:ty => $result:ty,)*) => {$(
+            operations.insert($name.to_owned(), serde_json::json!({
+                "long": $long,
+                "request": generator.subschema_for::<$request>(),
+                "result": generator.subschema_for::<$result>(),
+            }));
+        )*};
+    }
+    ops!(false:
+        "info" NoRequest => RepoInfo,
+        "resolve" Spec => ObjectId,
+        "log" LogRequest => LogPage,
+        "list" ListRequest => Vec<EntryInfo>,
+        "diff" DiffRequest => Vec<Change>,
+        "diff_text" DiffRequest => Vec<TextDiff>,
+        "duplicates" DuplicatesRequest => Vec<Duplicate>,
+        "refs" NoRequest => Vec<RefInfo>,
+        "reflog" Named => Vec<ReflogEntry>,
+        "create_ref" CreateRefRequest => ObjectId,
+        "delete_ref" DeleteRefRequest => (),
+        "merge" MergeRequest => MergeReport,
+        "cherry_pick" MergeRequest => MergeReport,
+        "rebase" MergeRequest => MergeReport,
+        "prune" PruneRequest => PruneReport,
+        "repair" NoRequest => RepairReport,
+        "keys" NoRequest => Vec<KeyInfo>,
+        "add_password" Password => AddedKey,
+        "add_recovery_key" NoRequest => AddedKey,
+        "remove_key" KeyId => String,
+        "remotes" NoRequest => Vec<Remote>,
+        "add_remote" NewRemote => Remote,
+        "remove_remote" Named => (),
+        "holds" NoRequest => Vec<LegalHold>,
+        "add_hold" NewHold => LegalHold,
+        "lift_hold" LiftHold => LegalHold,
+        "retention" NoRequest => Vec<RetentionRule>,
+        "add_retention" NewRetention => RetentionRule,
+        "plugins" PluginDir => Vec<PluginInfo>,
+        "plugin_add" PluginFile => PluginAdded,
+        "plugin_remove" PluginName => PluginInfo,
+        "saved_searches" SearchesFile => Vec<SavedSearch>,
+        "save_search" SaveSearch => (),
+        "forget_search" SearchName => SavedSearch,
+        "conflicts" Folder => Vec<ConflictCopy>,
+        "resolve_conflict" Resolve => ConflictCopy,
+    );
+    ops!(true:
+        "backup" BackupRequest => BackupReport,
+        "restore" RestoreRequest => RestoreReport,
+        "export" ExportRequest => ExportReport,
+        "import_archive" ImportRequest => ImportReport,
+        "verify" NoRequest => VerifyReport,
+        "gc" GcRequest => GcReport,
+        "gc_remote" RemoteGcRequest => GcReport,
+        "push" TransferRequest => TransferReport,
+        "pull" TransferRequest => TransferReport,
+        "push_all" RemoteRequest => MirrorReport,
+        "pull_all" RemoteRequest => MirrorReport,
+        "report" ReportRequest => ComplianceReport,
+        "repair_from" RemoteRequest => CopyRepairReport,
+        "restore_test" RestoreTestRequest => RestoreTestReport,
+        "search" SearchRequest => SearchReport,
+        "sync" SyncRequest => SyncReport,
+        "switch" SwitchRequest => SwitchReport,
+        "git_import" GitRequest => GitImportReport,
+        "git_export" GitRequest => GitExportReport,
+        "clone" CloneRequest => CloneReport,
+    );
+    let progress = generator.subschema_for::<Progress>();
+    let error = generator.subschema_for::<Error>();
+    let definitions = generator.take_definitions(true);
+    serde_json::json!({
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "title": "Apeiron operations",
+        "version": crate::API_VERSION,
+        "progress": progress,
+        "error": error,
+        "operations": operations,
+        "$defs": definitions,
+    })
 }

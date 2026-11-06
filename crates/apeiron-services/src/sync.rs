@@ -32,7 +32,9 @@ const TMP_MAX_AGE: Duration = Duration::from_secs(3600);
 const MAX_ATTEMPTS: u32 = 3;
 
 /// Which way a sync goes (SYNC.md §3).
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum SyncMode {
     #[default]
@@ -44,7 +46,7 @@ pub enum SyncMode {
 }
 
 /// What to sync, and how.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct SyncOptions {
     pub folder: PathBuf,
     /// The ref on this device and on the remote.
@@ -67,7 +69,7 @@ pub struct SyncOptions {
 }
 
 /// What a round did.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SyncAction {
     /// The folder, the local ref and the remote were already equal.
@@ -80,7 +82,7 @@ pub enum SyncAction {
     Merged,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct SyncOutcome {
     #[serde(rename = "ref")]
     pub ref_name: String,

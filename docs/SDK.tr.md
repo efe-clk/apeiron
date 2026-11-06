@@ -2,7 +2,7 @@
 
 # Apeiron C ABI ve SDK'lar
 
-> **Durum: Devam ediyor.** Aşama 3'ün 4. işi ([ROADMAP.tr.md](ROADMAP.tr.md) §5) tamamlandı: C ABI, Python SDK'sı ve ortak uygunluk test paketi. C++ SDK'sı, JSON şemaları ve sonraki dalganın SDK'ları daha sonra gelir. Arkasındaki kararlar ADR-015, ADR-016 ve ADR-024'tür ([DECISIONS.tr.md](DECISIONS.tr.md)).
+> **Durum: Devam ediyor.** Aşama 3'ün 4. işi ([ROADMAP.tr.md](ROADMAP.tr.md) §5) tamamlandı: C ABI, Python SDK'sı ve ortak uygunluk test paketi. JSON şemaları tamamlandı; C++ SDK'sı ve sonraki dalganın SDK'ları daha sonra gelir. Arkasındaki kararlar ADR-015, ADR-016 ve ADR-024'tür ([DECISIONS.tr.md](DECISIONS.tr.md)).
 
 Apeiron, tek bir C arayüzü (C ABI) üzerinden birçok dilden kullanılır. Her SDK bu arayüzün üzerinde ince bir katmandır; hiçbiri Apeiron'un mantığını yeniden yazmaz. Böylece aynı işlem her dilde aynı sonucu verir.
 
@@ -26,7 +26,7 @@ flowchart TB
 | `apeiron-ffi` | `libapeiron`'u (paylaşılan ve statik kütüphane) üretir; C başlık dosyası `crates/apeiron-ffi/include/apeiron.h`'dir | Tamamlandı |
 | Python SDK | `sdk/python`; C ABI'yi `ctypes` ile kullanır | Tamamlandı |
 | Uygunluk test paketi | `sdk/conformance`; Rust'tan C ABI üzerinden ve Python üzerinden çalıştırılır (bölüm 6) | Tamamlandı |
-| JSON şemaları | Her istek, sonuç, ilerleme ve hata değerinin makinece okunabilir tanımı | Planlandı |
+| JSON şemaları | `sdk/schema/apeiron.schema.json`: her istek, sonuç, ilerleme ve hata değerinin makinece okunabilir tanımı (bölüm 3) | Tamamlandı |
 | Diğer SDK'lar | Her dilde o dile uygun sarmalayıcılar; bir kısmı şemalardan üretilir | Planlandı |
 
 ## 2. C ABI tasarımı
@@ -97,7 +97,7 @@ apeiron_repo_free(repo);
 
 ## 3. Şemalar
 
-ABI'yi geçen her değer, Rust türlerinden üretilen ve depoya eklenen bir JSON Schema ile tanımlanacak; böylece SDK'lar tipli sınıflarını elle yazmak yerine üretebilecek. O zamana kadar değerleri [API.tr.md](API.tr.md) §8'deki Rust türleri ve uygunluk senaryoları tanımlar. Eklemeli olmayan bir şema değişikliği, 1.0'dan önce API'nin ara sürümünü, sonra ana sürümünü yükseltir ([API.tr.md](API.tr.md) §6).
+`sdk/schema/apeiron.schema.json`, ABI'yi geçen her değeri Rust türlerinden üretilen ve depoya eklenen JSON Schema olarak tanımlar; böylece SDK'lar tipli sınıflarını elle yazmak yerine üretebilir: `operations` içinde her işlem için `long` olup olmadığı, `request` ve `result`, ardından `progress` ve `error`, türler de `$defs` içinde. Dosya türlerden farklıysa bir test başarısız olur (`APEIRON_BLESS=1 cargo test -p apeiron-ffi` onu yeniden yazar) ve uygunluk paketi karşılaştığı her isteği, sonucu ve hatayı ona karşı denetler. Eklemeli olmayan bir şema değişikliği, 1.0'dan önce API'nin ara sürümünü, sonra ana sürümünü yükseltir ([API.tr.md](API.tr.md) §6).
 
 ## 4. SDK kuralları
 
@@ -105,7 +105,7 @@ ABI'yi geçen her değer, Rust türlerinden üretilen ve depoya eklenen bir JSON
 | --- | --- |
 | Kendi mantığı yok | Bir SDK yalnızca değerleri dönüştürür ve C ABI'yi çağırır |
 | Dile uygun | Her SDK kendi dilinin alışkanlıklarına uyar: Python ve C++'ta hata türü başına istisna, Python'da context manager, C++'ta RAII |
-| Tipli | İstekler ve sonuçlar şemalardan üretilen tipli sınıflar olur; şemalar gelene kadar Python, alan adıyla ya da anahtarla okunan kayıtlar döndürür |
+| Tipli | İstekler ve sonuçlar şemalardan üretilen tipli sınıflar olur; üretilene kadar Python, alan adıyla ya da anahtarla okunan kayıtlar döndürür |
 | İşler | Her SDK `progress()`, `cancel()` ve zaman aşımlı `wait()` sunar; ayrıca sorgulamanın üzerine, ilerlemeyi dilin kendi yöntemiyle (yineleyici, geri çağrı, olay) bildiren bir kolaylık ekler |
 | Paketleme | Her SDK yerel kütüphaneyi kendi olağan paketinin içinde (Python wheel, CMake paketi, …) Linux, macOS ve Windows için dağıtacak; o zamana kadar kütüphane Cargo ile derlenir ve `APEIRON_LIB` ile bulunur |
 | Aynı testler | Her SDK ortak uygunluk test paketinden geçer (bölüm 6) |
@@ -146,5 +146,5 @@ Her işlemin aynı adlı bir yöntemi vardır (`repo.search("*.pdf", history=Tru
 | Sınır | Plan |
 | --- | --- |
 | Dosya içeriği ABI'den geçmez; işlemler yollar üzerinde çalışır | Sonraki bir ABI ara sürümünde akışlı okuma ve yazma tutamaçları |
-| Python'da tipli sınıflar ve wheel yok | JSON şemaları ve paketlemeyle |
+| Python'da tipli sınıflar ve wheel yok | JSON şemalarından üretilerek, paketlemeyle |
 | Uzak kullanım yok | Aynı JSON değerler arka plan hizmetine gönderilecek |

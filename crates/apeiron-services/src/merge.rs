@@ -12,7 +12,7 @@ use crate::diff::{Change, ChangeKind};
 use crate::error::{Error, Result};
 use crate::name::Name;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ConflictKind {
     /// Both devices changed the file differently; the other version is the
@@ -29,7 +29,7 @@ pub enum ConflictKind {
     ChangedDuringSync,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Conflict {
     pub path: Name,
     pub kind: ConflictKind,
@@ -65,7 +65,7 @@ pub trait ContentMerger {
 }
 
 /// A file a plugin merged instead of making a conflict copy.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct PluginMerge {
     pub path: Name,
     pub plugin: String,
@@ -425,7 +425,7 @@ pub(crate) fn free_name(name: &[u8], suffix: &str, taken: impl Fn(&[u8]) -> bool
 }
 
 /// What a merge did (BRANCH.md §2).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum MergeAction {
     /// The ref already holds everything the other snapshot has.
@@ -443,7 +443,7 @@ pub enum MergeAction {
 }
 
 /// What to merge into which ref.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct MergeOptions {
     /// The snapshot to merge.
     pub from: ObjectId,
@@ -462,7 +462,7 @@ pub struct MergeOptions {
     pub dry_run: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct MergeOutcome {
     pub action: MergeAction,
     /// What the ref points to now (would point to, in a dry run).

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 /// Kind of an error. The numbers are shared with the C ABI and every SDK
 /// and never change meaning.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 #[repr(u16)]
@@ -36,7 +36,7 @@ impl ErrorKind {
 }
 
 /// An error: a kind with a stable code, a message and, when it applies, a path.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Error {
     pub code: u16,
     pub kind: ErrorKind,

@@ -17,7 +17,7 @@ use crate::os;
 use crate::sync::{SyncAction, SyncMode, SyncOptions, SyncOutcome, apply_tree, folder_ref};
 
 /// Which folder to turn into which snapshot.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct SwitchOptions {
     pub folder: PathBuf,
     /// The snapshot the folder is to hold.
@@ -33,7 +33,7 @@ pub struct SwitchOptions {
     pub host: Option<String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct SwitchOutcome {
     /// The ref that records the folder.
     #[serde(rename = "ref")]

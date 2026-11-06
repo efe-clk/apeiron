@@ -15,7 +15,7 @@ use crate::error::{Error, ErrorKind, Result};
 const NAME_CHARS: usize = 64;
 
 /// A search kept under a name.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct SavedSearch {
     pub name: String,
     #[serde(flatten)]

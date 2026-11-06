@@ -60,7 +60,7 @@ fn io_at(path: &Path) -> impl FnOnce(io::Error) -> Error + '_ {
 }
 
 /// What a plugin says about itself (PLUGIN.md §2).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct PluginInfo {
     pub name: String,
     pub version: String,
@@ -109,7 +109,7 @@ impl PluginInfo {
 }
 
 /// The result of installing a plugin.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Added {
     pub info: PluginInfo,
     /// A plugin of the same name was replaced.

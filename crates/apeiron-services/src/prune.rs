@@ -11,7 +11,7 @@ use crate::sync::folder_ref;
 const SECONDS_PER_DAY: i64 = 86_400;
 
 /// Which snapshots of a ref to keep. The newest is always kept.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct PruneOptions {
     #[serde(rename = "ref")]
     pub ref_name: String,
@@ -34,7 +34,7 @@ pub struct PruneOptions {
 }
 
 /// A snapshot that stays, with the rules that keep it.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct PrunedKept {
     pub snapshot: ObjectId,
     /// Its id now that its parent changed; `snapshot` when nothing older went.
@@ -44,13 +44,13 @@ pub struct PrunedKept {
 }
 
 /// A snapshot that left the history.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct PrunedRemoved {
     pub snapshot: ObjectId,
     pub time: Time,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct PruneOutcome {
     #[serde(rename = "ref")]
     pub ref_name: String,

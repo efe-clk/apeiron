@@ -16,7 +16,7 @@ use crate::{
 const SECONDS_PER_DAY: i64 = 24 * 60 * 60;
 
 /// FindingKind a report covers (REPORTS.md §2).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ReportRequest {
     /// Read and check every stored byte, as `verify` does.
     #[serde(default)]
@@ -45,7 +45,7 @@ impl Default for ReportRequest {
 }
 
 /// A compliance report of one repository (REPORTS.md §3).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ComplianceReport {
     /// When the report was made.
     pub time: Time,
@@ -64,7 +64,7 @@ pub struct ComplianceReport {
     pub findings: Vec<Finding>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct RepositoryFacts {
     pub path: std::path::PathBuf,
     pub format_version: u32,
@@ -75,7 +75,7 @@ pub struct RepositoryFacts {
     pub damaged_files: Vec<std::path::PathBuf>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct RefFacts {
     pub name: String,
     /// The snapshot the ref points to; its id fixes every byte under it and
@@ -95,13 +95,13 @@ pub struct RefFacts {
 }
 
 /// How a ref stands on a remote.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct CopyState {
     pub remote: String,
     pub state: CopyKind,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum CopyKind {
     /// The remote has the same snapshot.
@@ -114,7 +114,7 @@ pub enum CopyKind {
     Other,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct RemoteFacts {
     pub name: String,
     pub url: String,
@@ -125,7 +125,7 @@ pub struct RemoteFacts {
 
 /// Something that needs attention (REPORTS.md §4): `text` in English, and
 /// `kind` for a program or a page that says it in another language.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Finding {
     pub level: Level,
     pub text: String,
@@ -134,7 +134,7 @@ pub struct Finding {
 }
 
 /// FindingKind a finding is about; its `code` and fields in JSON.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(tag = "code", rename_all = "snake_case")]
 pub enum FindingKind {
     /// `verify` found damaged data.
@@ -234,7 +234,9 @@ impl Finding {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Level {
     /// Data is damaged, missing on a copy or cannot be checked.

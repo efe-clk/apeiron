@@ -13,7 +13,7 @@ use crate::list::{Node, lookup};
 use crate::name::Name;
 use crate::os::{self, Attrs};
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct RestoreOutcome {
     pub files: u64,
     pub dirs: u64,

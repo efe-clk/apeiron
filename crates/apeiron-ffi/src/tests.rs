@@ -1,6 +1,7 @@
 //! The C ABI called the way a C program calls it, the shared conformance
 //! scenarios (SDK.md §6) and the check that `apeiron.h` is up to date.
 
+use std::collections::BTreeSet;
 use std::ffi::{CStr, CString, c_char};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -146,6 +147,7 @@ fn expand(value: &Value, tmp: &str) -> Value {
 
 fn run_scenario(file: &Path) {
     let scenario: Value = serde_json::from_str(&fs::read_to_string(file).unwrap()).unwrap();
+    let schema = api::json::schema();
     let dir = tempfile::tempdir().unwrap();
     let tmp = dir.path().to_str().unwrap().to_owned();
     let mut repo: Option<Repo> = None;
@@ -188,12 +190,25 @@ fn run_scenario(file: &Path) {
             panic!("{at}: unknown step");
         };
         match (step.get("error").and_then(Value::as_str), result) {
-            (Some(kind), Err(got)) => assert_eq!(got, kind, "{at}"),
+            (Some(kind), Err(got)) => {
+                assert_eq!(got, kind, "{at}");
+                check_against(&schema, &schema["error"], &last_error(), &at);
+            }
             (Some(kind), Ok(v)) => panic!("{at}: expected error {kind}, got {v}"),
             (None, Err(got)) => panic!("{at}: failed with {got}: {}", last_error()),
             (None, Ok(v)) => {
                 if let Some(expected) = step.get("expect") {
                     assert!(holds(&v, expected), "{at}\ngot {v}");
+                }
+                let op = step
+                    .get("call")
+                    .or(step.get("start"))
+                    .and_then(Value::as_str);
+                if let Some(op) = op {
+                    let entry = &schema["operations"][op];
+                    assert!(entry.is_object(), "{at}: not in the schema");
+                    check_against(&schema, &entry["request"], &request, &at);
+                    check_against(&schema, &entry["result"], &v, &at);
                 }
             }
         }
@@ -213,9 +228,35 @@ fn conformance_scenarios() {
         .collect();
     files.sort();
     assert!(files.len() >= 4);
-    for file in files {
-        run_scenario(&file);
+    let mut used = BTreeSet::new();
+    for file in &files {
+        run_scenario(file);
+        let scenario: Value = serde_json::from_str(&fs::read_to_string(file).unwrap()).unwrap();
+        for step in scenario["steps"].as_array().unwrap() {
+            let op = step.get("call").or(step.get("start"));
+            if let (Some(op), None) = (op.and_then(Value::as_str), step.get("error")) {
+                used.insert(op.to_owned());
+            }
+        }
     }
+    // These need what a scenario cannot make: an id it cannot know, a plugin
+    // file, or no repository (`clone_needs_no_repository_handle`).
+    let elsewhere = [
+        "clone",
+        "delete_ref",
+        "lift_hold",
+        "plugin_add",
+        "plugin_remove",
+        "remove_key",
+    ];
+    let schema = api::json::schema();
+    let missing: Vec<&String> = schema["operations"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .filter(|op| !used.contains(*op) && !elsewhere.contains(&op.as_str()))
+        .collect();
+    assert!(missing.is_empty(), "no scenario runs {missing:?}");
 }
 
 #[test]
@@ -332,6 +373,70 @@ fn clone_needs_no_repository_handle() {
         copy.call("remotes", &Value::Null).unwrap()[0]["name"],
         "origin"
     );
+}
+
+fn schema_file() -> PathBuf {
+    sdk_dir().join("schema/apeiron.schema.json")
+}
+
+/// `sdk/schema/apeiron.schema.json` matches the Rust types. Run with
+/// `APEIRON_BLESS=1` to write it anew after a change.
+#[test]
+fn the_schema_is_up_to_date() {
+    let path = schema_file();
+    let generated = serde_json::to_string_pretty(&api::json::schema()).unwrap() + "\n";
+    if std::env::var_os("APEIRON_BLESS").is_some() {
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, &generated).unwrap();
+    }
+    let current = fs::read_to_string(&path)
+        .unwrap_or_default()
+        .replace("\r\n", "\n");
+    assert!(
+        current == generated,
+        "the schema is out of date; run APEIRON_BLESS=1 cargo test -p apeiron-ffi"
+    );
+}
+
+/// Every operation the dispatch knows has an entry, and only those.
+#[test]
+fn the_schema_names_every_operation() {
+    let source =
+        fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../apeiron/src/json.rs"))
+            .unwrap();
+    let mut known: Vec<String> = source
+        .lines()
+        .filter_map(|line| {
+            let rest = line.trim_start().strip_prefix('"')?;
+            let (name, tail) = rest.split_once('"')?;
+            tail.trim_start().starts_with("=>").then(|| name.to_owned())
+        })
+        .chain(["clone".to_owned()])
+        .collect();
+    known.sort();
+    known.dedup();
+    let schema = api::json::schema();
+    let mut named: Vec<String> = schema["operations"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .cloned()
+        .collect();
+    named.sort();
+    assert_eq!(named, known);
+}
+
+/// Checks a value against one reference of the schema.
+fn check_against(schema: &Value, reference: &Value, value: &Value, at: &str) {
+    let mut whole = reference.clone();
+    whole["$defs"] = schema["$defs"].clone();
+    whole["$schema"] = schema["$schema"].clone();
+    let validator = jsonschema::validator_for(&whole).unwrap();
+    let errors: Vec<String> = validator
+        .iter_errors(value)
+        .map(|e| e.to_string())
+        .collect();
+    assert!(errors.is_empty(), "{at}: {errors:?}\nvalue: {value}");
 }
 
 /// `apeiron.h` matches the functions above. Run with `APEIRON_BLESS=1` to

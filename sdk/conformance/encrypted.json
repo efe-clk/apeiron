@@ -6,6 +6,8 @@
     {"call": "info", "expect": {"encrypted": true}},
     {"start": "backup", "request": {"source": "$TMP/src", "ref": "main"}, "expect": {"files": 1}},
     {"call": "keys"},
+    {"call": "add_recovery_key"},
+    {"call": "add_password", "request": {"password": "another good password"}},
     {"open": "repo", "error": "key"},
     {"open": "repo", "password": "wrong", "error": "key"},
     {"open": "repo", "password": "correct horse"},

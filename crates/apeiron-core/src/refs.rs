@@ -36,7 +36,9 @@ pub fn validate_ref_name(name: &str) -> Result<()> {
 }
 
 /// What [`crate::Repository::repair`] did.
-#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
 pub struct RepairReport {
     /// Stale ref lock files that were removed.
     pub removed_locks: Vec<PathBuf>,
@@ -51,7 +53,9 @@ pub struct RepairReport {
 }
 
 /// Kind of change recorded in a reflog line.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum RefOp {
     Create,
@@ -82,7 +86,9 @@ impl RefOp {
 }
 
 /// One line of a reflog.
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
 pub struct ReflogEntry {
     pub old: Option<ObjectId>,
     pub new: Option<ObjectId>,

@@ -16,7 +16,7 @@ const TEXT_LIMIT: u64 = 16 << 20;
 const LINE_CHARS: usize = 200;
 
 /// What an entry must match; every criterion given must hold (SEARCH.md §1).
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Query {
     /// A name, or with `/` a whole path; `*` and `?` as wildcards, ignoring case.
     #[serde(default)]
@@ -73,7 +73,7 @@ pub struct SearchOptions {
 }
 
 /// The first line of a file holding the text searched for.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct TextLine {
     /// Counted from 1.
     pub number: u64,
@@ -81,7 +81,7 @@ pub struct TextLine {
 }
 
 /// One version of a path that matched.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct SearchHit {
     pub path: Name,
     pub entry: EntryInfo,
@@ -91,7 +91,7 @@ pub struct SearchHit {
     pub line: Option<TextLine>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct SearchOutcome {
     /// Newest snapshot first, then by path.
     pub hits: Vec<SearchHit>,
@@ -149,7 +149,7 @@ pub fn search(repo: &Repository, options: &SearchOptions, ctl: &Control) -> Resu
 }
 
 /// Paths in one snapshot that hold the same content (SEARCH.md §5).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Duplicate {
     /// The size of each copy, in bytes.
     pub size: u64,

@@ -748,7 +748,9 @@ impl Repository {
 }
 
 /// Result of [`Repository::verify`].
-#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize, schemars::JsonSchema,
+)]
 pub struct VerifyReport {
     pub objects_checked: u64,
     /// Pack and index files whose hash or structure is wrong.

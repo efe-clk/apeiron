@@ -45,6 +45,20 @@ impl serde::Serialize for ObjectId {
     }
 }
 
+impl schemars::JsonSchema for ObjectId {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "ObjectId".into()
+    }
+
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        schemars::json_schema!({
+            "description": "An object id: 64 lowercase hexadecimal characters.",
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+        })
+    }
+}
+
 impl<'de> serde::Deserialize<'de> for ObjectId {
     fn deserialize<D: serde::Deserializer<'de>>(
         deserializer: D,

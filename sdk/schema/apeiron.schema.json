@@ -1,0 +1,4240 @@
+{
+  "$defs": {
+    "Added": {
+      "description": "The result of installing a plugin.",
+      "properties": {
+        "info": {
+          "$ref": "#/$defs/PluginInfo"
+        },
+        "replaced": {
+          "description": "A plugin of the same name was replaced.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "info",
+        "replaced"
+      ],
+      "type": "object"
+    },
+    "AddedKey": {
+      "description": "A password or recovery key added to an encrypted repository.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "recovery_key": {
+          "description": "The new recovery key, shown to the user once; absent for a password.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "ArchiveFormat": {
+      "description": "Archive formats `export` can write.",
+      "enum": [
+        "tar",
+        "zip",
+        "7z"
+      ],
+      "type": "string"
+    },
+    "BackupOptions": {
+      "description": "What to back up and how to describe the snapshot.",
+      "properties": {
+        "author": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "exclude": {
+          "default": [],
+          "description": "Patterns of what to leave out, beside the folder's `.apeironignore`\n(CLI.md §4.1).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "host": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "message": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "meta": {
+          "default": [],
+          "description": "Free key-value pairs; sorted and checked when the snapshot is stored.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "ref": {
+          "type": "string"
+        },
+        "reread": {
+          "default": false,
+          "description": "Reads every file, also those whose size and time say they did not\nchange (CLI.md §4).",
+          "type": "boolean"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "ref"
+      ],
+      "type": "object"
+    },
+    "BackupOutcome": {
+      "properties": {
+        "bytes": {
+          "description": "Size of all files read.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "dirs": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "excluded": {
+          "default": 0,
+          "description": "Files and folders left out by a pattern.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "files": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "new_bytes": {
+          "description": "File content bytes that were not already in the repository.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The snapshot the ref pointed to before, now the first parent."
+        },
+        "snapshot": {
+          "$ref": "#/$defs/ObjectId"
+        },
+        "symlinks": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unchanged": {
+          "default": 0,
+          "description": "Files whose size and time said they did not change; not read.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "snapshot",
+        "files",
+        "dirs",
+        "symlinks",
+        "bytes",
+        "new_bytes",
+        "warnings"
+      ],
+      "type": "object"
+    },
+    "Change": {
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ChangeKind"
+        },
+        "path": {
+          "$ref": "#/$defs/Name"
+        }
+      },
+      "required": [
+        "path",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "ChangeKind": {
+      "oneOf": [
+        {
+          "enum": [
+            "added",
+            "removed"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "modified",
+          "description": "Content, link target or attributes changed.",
+          "type": "string"
+        }
+      ]
+    },
+    "CloneReport": {
+      "description": "What `clone` copied, ref by ref.",
+      "properties": {
+        "refs": {
+          "items": {
+            "$ref": "#/$defs/ClonedRef"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "refs"
+      ],
+      "type": "object"
+    },
+    "CloneRequest": {
+      "description": "Where to clone a remote copy from and to.",
+      "properties": {
+        "path": {
+          "description": "The new repository: a folder that does not exist or is empty.",
+          "type": "string"
+        },
+        "rate": {
+          "description": "The most bytes per second moved to or from the remote, on average\n(SYNC.md §2); no limit when absent.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "secret": {
+          "description": "The password or recovery key of an encrypted copy.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "url": {
+          "description": "A folder path or an `sftp://` or `s3://` URL, as for a remote.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "path"
+      ],
+      "type": "object"
+    },
+    "ClonedRef": {
+      "description": "What a push or pull did.",
+      "properties": {
+        "bytes": {
+          "description": "Their stored (compressed, encrypted) size.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "objects": {
+          "description": "Objects copied.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "previous": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The snapshot it pointed to before; `None` if the ref was new."
+        },
+        "snapshot": {
+          "$ref": "#/$defs/ObjectId",
+          "description": "The snapshot the ref points to on the target now."
+        }
+      },
+      "required": [
+        "name",
+        "snapshot",
+        "objects",
+        "bytes"
+      ],
+      "type": "object"
+    },
+    "ComplianceReport": {
+      "description": "A compliance report of one repository (REPORTS.md §3).",
+      "properties": {
+        "findings": {
+          "description": "FindingKind needs attention, most serious first.",
+          "items": {
+            "$ref": "#/$defs/Finding"
+          },
+          "type": "array"
+        },
+        "holds": {
+          "default": [],
+          "description": "Every legal hold, lifted ones too (ARCHIVE.md §2.1).",
+          "items": {
+            "$ref": "#/$defs/LegalHold"
+          },
+          "type": "array"
+        },
+        "refs": {
+          "items": {
+            "$ref": "#/$defs/RefFacts"
+          },
+          "type": "array"
+        },
+        "remotes": {
+          "description": "Every remote, and with `remotes` whether it answered.",
+          "items": {
+            "$ref": "#/$defs/RemoteFacts"
+          },
+          "type": "array"
+        },
+        "repository": {
+          "$ref": "#/$defs/RepositoryFacts"
+        },
+        "retention": {
+          "items": {
+            "$ref": "#/$defs/Rule"
+          },
+          "type": "array"
+        },
+        "time": {
+          "$ref": "#/$defs/Time",
+          "description": "When the report was made."
+        },
+        "verify": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VerifyReport"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Present when the request asked to verify."
+        }
+      },
+      "required": [
+        "time",
+        "repository",
+        "refs",
+        "retention",
+        "remotes",
+        "findings"
+      ],
+      "type": "object"
+    },
+    "Conflict": {
+      "properties": {
+        "copy": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Name"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where the other version was put."
+        },
+        "kind": {
+          "$ref": "#/$defs/ConflictKind"
+        },
+        "path": {
+          "$ref": "#/$defs/Name"
+        }
+      },
+      "required": [
+        "path",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "ConflictCopy": {
+      "description": "A conflict copy and the file it stands beside, both relative to the\nfolder, with `/` between names.",
+      "properties": {
+        "copy": {
+          "type": "string"
+        },
+        "exists": {
+          "description": "Whether the file at `path` still exists.",
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "copy",
+        "exists"
+      ],
+      "type": "object"
+    },
+    "ConflictKind": {
+      "oneOf": [
+        {
+          "const": "both_changed",
+          "description": "Both devices changed the file differently; the other version is the\nconflict copy.",
+          "type": "string"
+        },
+        {
+          "const": "deleted_here",
+          "description": "Deleted here and changed on the other device; the changed file is\nkept.",
+          "type": "string"
+        },
+        {
+          "const": "deleted_there",
+          "description": "Changed here and deleted on the other device; the changed file is\nkept.",
+          "type": "string"
+        },
+        {
+          "const": "changed_during_sync",
+          "description": "Changed here while the round ran; the incoming version is the\nconflict copy.",
+          "type": "string"
+        }
+      ]
+    },
+    "CopyKind": {
+      "oneOf": [
+        {
+          "const": "current",
+          "description": "The remote has the same snapshot.",
+          "type": "string"
+        },
+        {
+          "const": "behind",
+          "description": "The remote has an older snapshot of the same history.",
+          "type": "string"
+        },
+        {
+          "const": "missing",
+          "description": "The remote has no such ref.",
+          "type": "string"
+        },
+        {
+          "const": "other",
+          "description": "The remote has snapshots this copy does not.",
+          "type": "string"
+        }
+      ]
+    },
+    "CopyRepairReport": {
+      "description": "What [`Repository::repair_from`] did.",
+      "properties": {
+        "copied_objects": {
+          "description": "Objects taken from the copy.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "damaged_packs": {
+          "description": "Pack files found damaged or missing.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "removed_packs": {
+          "description": "Damaged packs deleted because everything in them has a whole copy.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "repair": {
+          "$ref": "#/$defs/RepairReport",
+          "description": "What the repair without a copy did first."
+        },
+        "salvaged_objects": {
+          "description": "Objects still whole in a damaged pack, moved to a new one.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unrecoverable": {
+          "description": "Objects neither this repository nor the copy holds whole. Their packs\nare kept.",
+          "items": {
+            "$ref": "#/$defs/ObjectId"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "repair",
+        "damaged_packs",
+        "salvaged_objects",
+        "copied_objects",
+        "removed_packs",
+        "unrecoverable"
+      ],
+      "type": "object"
+    },
+    "CopyState": {
+      "description": "How a ref stands on a remote.",
+      "properties": {
+        "remote": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/CopyKind"
+        }
+      },
+      "required": [
+        "remote",
+        "state"
+      ],
+      "type": "object"
+    },
+    "CreateRefRequest": {
+      "description": "A new ref and the snapshot it starts at.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "snapshot": {
+          "description": "A snapshot spec (API.md §8.4).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "snapshot"
+      ],
+      "type": "object"
+    },
+    "DeleteRefRequest": {
+      "properties": {
+        "expected": {
+          "$ref": "#/$defs/ObjectId",
+          "description": "The snapshot the ref must still point to."
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "expected"
+      ],
+      "type": "object"
+    },
+    "DiffRequest": {
+      "properties": {
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "Duplicate": {
+      "description": "Paths in one snapshot that hold the same content (SEARCH.md §5).",
+      "properties": {
+        "paths": {
+          "description": "Two or more paths, sorted.",
+          "items": {
+            "$ref": "#/$defs/Name"
+          },
+          "type": "array"
+        },
+        "size": {
+          "description": "The size of each copy, in bytes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "size",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "DuplicatesRequest": {
+      "description": "Which snapshot to look for duplicate files in (SEARCH.md §5).",
+      "properties": {
+        "smallest": {
+          "default": 0,
+          "description": "Files smaller than this many bytes are left out; empty files always are.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "snapshot": {
+          "description": "A snapshot spec (API.md §8.4).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "snapshot"
+      ],
+      "type": "object"
+    },
+    "EntryInfo": {
+      "description": "One entry of a listing.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/Kind"
+        },
+        "mode": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "mtime": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "$ref": "#/$defs/Name"
+        },
+        "size": {
+          "description": "Size of a file.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tags": {
+          "description": "Tags of a file (FORMAT.md §6.3).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Name"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Target of a symbolic link."
+        }
+      },
+      "required": [
+        "name",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "Error": {
+      "description": "An error: a kind with a stable code, a message and, when it applies, a path.",
+      "properties": {
+        "code": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/ErrorKind"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "code",
+        "kind",
+        "message"
+      ],
+      "type": "object"
+    },
+    "ErrorKind": {
+      "description": "Kind of an error. The numbers are shared with the C ABI and every SDK\nand never change meaning.",
+      "oneOf": [
+        {
+          "enum": [
+            "io",
+            "not_found",
+            "already_exists",
+            "invalid_input",
+            "ambiguous",
+            "corrupt",
+            "locked",
+            "conflict",
+            "cancelled",
+            "unsupported",
+            "internal"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "key",
+          "description": "The repository is encrypted and the password or recovery key is\nmissing or wrong.",
+          "type": "string"
+        }
+      ]
+    },
+    "ExportOutcome": {
+      "properties": {
+        "bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "dirs": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "files": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "parts": {
+          "description": "The files the archive was split into, if it was (CLI.md §3).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "symlinks": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "files",
+        "dirs",
+        "symlinks",
+        "bytes",
+        "warnings"
+      ],
+      "type": "object"
+    },
+    "ExportReport": {
+      "properties": {
+        "commits": {
+          "description": "Commits written.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "inexact": {
+          "description": "Git ids that a rebuilt object did not get again (GIT.md §5).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "refs": {
+          "description": "Branches and tags pointed at their objects.",
+          "items": {
+            "$ref": "#/$defs/RefUpdate"
+          },
+          "type": "array"
+        },
+        "skipped": {
+          "items": {
+            "$ref": "#/$defs/Skipped"
+          },
+          "type": "array"
+        },
+        "tags": {
+          "description": "Annotated tags written.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "commits",
+        "tags",
+        "refs",
+        "skipped",
+        "inexact"
+      ],
+      "type": "object"
+    },
+    "ExportRequest": {
+      "properties": {
+        "format": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ArchiveFormat"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "`tar`, `zip` or `7z`; taken from the file extension when absent."
+        },
+        "output": {
+          "description": "The archive file to create; it must not exist.",
+          "type": "string"
+        },
+        "path": {
+          "$ref": "#/$defs/Name",
+          "default": "",
+          "description": "A path inside the snapshot; empty or absent for everything."
+        },
+        "snapshot": {
+          "description": "A snapshot spec (API.md §8.4).",
+          "type": "string"
+        },
+        "split": {
+          "description": "Cuts the archive into parts of this many bytes (CLI.md §3).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "snapshot",
+        "output"
+      ],
+      "type": "object"
+    },
+    "Finding": {
+      "description": "Something that needs attention (REPORTS.md §4): `text` in English, and\n`kind` for a program or a page that says it in another language.",
+      "oneOf": [
+        {
+          "description": "`verify` found damaged data.",
+          "properties": {
+            "code": {
+              "const": "damaged",
+              "type": "string"
+            },
+            "files": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "objects": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "code",
+            "files",
+            "objects"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Damaged files were found when the repository was opened.",
+          "properties": {
+            "code": {
+              "const": "damaged_on_open",
+              "type": "string"
+            },
+            "files": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "code",
+            "files"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A remote did not answer.",
+          "properties": {
+            "code": {
+              "const": "remote_down",
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "remote": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "remote",
+            "message"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A ref is behind, missing or different on a remote.",
+          "properties": {
+            "code": {
+              "const": "copy",
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "remote": {
+              "type": "string"
+            },
+            "state": {
+              "$ref": "#/$defs/CopyKind"
+            }
+          },
+          "required": [
+            "code",
+            "name",
+            "remote",
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A ref has had no new snapshot for more than `days` days.",
+          "properties": {
+            "code": {
+              "const": "stale",
+              "type": "string"
+            },
+            "days": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "name",
+            "days"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "code": {
+              "const": "not_encrypted",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "code": {
+              "const": "no_recovery_key",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "code": {
+              "const": "no_remote",
+              "type": "string"
+            }
+          },
+          "required": [
+            "code"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "The audit log's parts before event `first` were removed.",
+          "properties": {
+            "code": {
+              "const": "audit_trimmed",
+              "type": "string"
+            },
+            "first": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "code",
+            "first"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "The audit log's chain of hashes is broken.",
+          "properties": {
+            "code": {
+              "const": "audit_broken",
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "code",
+            "message"
+          ],
+          "type": "object"
+        }
+      ],
+      "properties": {
+        "level": {
+          "$ref": "#/$defs/Level"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "level",
+        "text"
+      ],
+      "type": "object"
+    },
+    "Folder": {
+      "properties": {
+        "folder": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "folder"
+      ],
+      "type": "object"
+    },
+    "GcOptions": {
+      "properties": {
+        "dry_run": {
+          "default": false,
+          "description": "Only report what would be removed.",
+          "type": "boolean"
+        },
+        "keep_reflog_days": {
+          "default": 90,
+          "description": "Reflog lines younger than this many days keep their snapshots alive;\n0 keeps only what refs point to.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "GcReport": {
+      "properties": {
+        "dry_run": {
+          "type": "boolean"
+        },
+        "live_objects": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "removed_bytes": {
+          "description": "Their stored (compressed) size.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "removed_objects": {
+          "description": "Dead objects and duplicate copies removed (or that would be removed).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "removed_packs": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "written_packs": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "dry_run",
+        "live_objects",
+        "removed_objects",
+        "removed_bytes",
+        "removed_packs",
+        "written_packs"
+      ],
+      "type": "object"
+    },
+    "GitRequest": {
+      "description": "Which Git repository to import from or export to.",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "prefix": {
+          "default": "git",
+          "description": "The folder of refs for the repository; `git` by default.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "ImportFormat": {
+      "description": "Archive formats `import` can read.",
+      "enum": [
+        "tar",
+        "tar.gz",
+        "zip",
+        "7z"
+      ],
+      "type": "string"
+    },
+    "ImportOptions": {
+      "properties": {
+        "archive": {
+          "type": "string"
+        },
+        "author": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "format": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ImportFormat"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "From the file name when absent."
+        },
+        "host": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "message": {
+          "default": null,
+          "description": "`import <file name>` when absent.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "archive",
+        "ref"
+      ],
+      "type": "object"
+    },
+    "ImportOutcome": {
+      "properties": {
+        "bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "dirs": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "files": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "new_bytes": {
+          "description": "File content bytes that were not already in the repository.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "snapshot": {
+          "$ref": "#/$defs/ObjectId"
+        },
+        "symlinks": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "warnings": {
+          "description": "Entries left out, with the reason.",
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "snapshot",
+        "files",
+        "dirs",
+        "symlinks",
+        "bytes",
+        "new_bytes",
+        "warnings"
+      ],
+      "type": "object"
+    },
+    "ImportReport": {
+      "properties": {
+        "commits": {
+          "description": "Commits stored as new snapshots.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "refs": {
+          "description": "Refs created or moved.",
+          "items": {
+            "$ref": "#/$defs/RefUpdate"
+          },
+          "type": "array"
+        },
+        "skipped": {
+          "items": {
+            "$ref": "#/$defs/Skipped"
+          },
+          "type": "array"
+        },
+        "stale": {
+          "description": "Refs under the prefix whose branch or tag is gone from Git; they are\nkept.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "tags": {
+          "description": "Annotated tags stored as new snapshots.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "commits",
+        "tags",
+        "refs",
+        "skipped",
+        "stale"
+      ],
+      "type": "object"
+    },
+    "Keep": {
+      "description": "Which version of a conflict to keep.",
+      "oneOf": [
+        {
+          "const": "this",
+          "description": "The file at the path; the copy is deleted.",
+          "type": "string"
+        },
+        {
+          "const": "copy",
+          "description": "The copy, which replaces the file at the path.",
+          "type": "string"
+        }
+      ]
+    },
+    "KeyId": {
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "KeyInfo": {
+      "description": "A key file of an encrypted repository.",
+      "properties": {
+        "created": {
+          "description": "When the key was added, as written in the key file (RFC 3339, UTC).",
+          "type": "string"
+        },
+        "current": {
+          "description": "Whether the repository was opened with this key.",
+          "type": "boolean"
+        },
+        "id": {
+          "description": "The name of the key file without `.key`.",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/KeyKind"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "created",
+        "current"
+      ],
+      "type": "object"
+    },
+    "KeyKind": {
+      "description": "What a password or recovery key is.",
+      "enum": [
+        "password",
+        "recovery"
+      ],
+      "type": "string"
+    },
+    "Kind": {
+      "enum": [
+        "file",
+        "dir",
+        "symlink"
+      ],
+      "type": "string"
+    },
+    "LegalHold": {
+      "description": "A hold with its id and, once lifted, its lift.",
+      "properties": {
+        "added": {
+          "description": "Unix seconds when the hold was placed.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "lift": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Lift"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "refs": {
+          "description": "A ref name, or a prefix followed by `*`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "refs",
+        "reason",
+        "added"
+      ],
+      "type": "object"
+    },
+    "Level": {
+      "oneOf": [
+        {
+          "const": "problem",
+          "description": "Data is damaged, missing on a copy or cannot be checked.",
+          "type": "string"
+        },
+        {
+          "const": "warning",
+          "description": "A weaker protection than expected.",
+          "type": "string"
+        }
+      ]
+    },
+    "Lift": {
+      "additionalProperties": false,
+      "description": "The file that lifts a hold.",
+      "properties": {
+        "lifted": {
+          "description": "Unix seconds when the hold was lifted.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason",
+        "lifted"
+      ],
+      "type": "object"
+    },
+    "LiftHold": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "ListRequest": {
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/Name",
+          "default": ""
+        },
+        "snapshot": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "snapshot"
+      ],
+      "type": "object"
+    },
+    "LogPage": {
+      "description": "One page of history, newest first.",
+      "properties": {
+        "next": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Where the next page starts; `None` at the first snapshot."
+        },
+        "snapshots": {
+          "items": {
+            "$ref": "#/$defs/SnapshotInfo"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "snapshots"
+      ],
+      "type": "object"
+    },
+    "LogRequest": {
+      "properties": {
+        "grep": {
+          "default": null,
+          "description": "Only snapshots whose message, author, host or metadata hold this\ntext, ignoring case; the limit then counts the matches.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "limit": {
+          "default": 50,
+          "description": "Maximum number of snapshots in one page.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "start": {
+          "description": "A snapshot spec where the history starts.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "start"
+      ],
+      "type": "object"
+    },
+    "MergeAction": {
+      "description": "What a merge did (BRANCH.md §2).",
+      "oneOf": [
+        {
+          "const": "up_to_date",
+          "description": "The ref already holds everything the other snapshot has.",
+          "type": "string"
+        },
+        {
+          "const": "fast_forward",
+          "description": "The ref moved forward to the other snapshot.",
+          "type": "string"
+        },
+        {
+          "const": "merged",
+          "description": "A new snapshot joins both lines of history.",
+          "type": "string"
+        },
+        {
+          "const": "picked",
+          "description": "A new snapshot on the ref holds the changes of one other snapshot\n(BRANCH.md §4).",
+          "type": "string"
+        },
+        {
+          "const": "rebased",
+          "description": "The ref's own snapshots were copied, one by one, on top of the\nother snapshot (BRANCH.md §5).",
+          "type": "string"
+        }
+      ]
+    },
+    "MergeOutcome": {
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/MergeAction"
+        },
+        "changes": {
+          "description": "Paths that differ between the two.",
+          "items": {
+            "$ref": "#/$defs/Change"
+          },
+          "type": "array"
+        },
+        "conflicts": {
+          "items": {
+            "$ref": "#/$defs/Conflict"
+          },
+          "type": "array"
+        },
+        "plugin_merges": {
+          "default": [],
+          "description": "Files plugins merged instead of making conflict copies.",
+          "items": {
+            "$ref": "#/$defs/PluginMerge"
+          },
+          "type": "array"
+        },
+        "previous": {
+          "$ref": "#/$defs/ObjectId",
+          "description": "What it pointed to before."
+        },
+        "snapshot": {
+          "$ref": "#/$defs/ObjectId",
+          "description": "What the ref points to now (would point to, in a dry run)."
+        },
+        "warnings": {
+          "default": [],
+          "description": "Plugins that failed; their files became conflict copies.",
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "action",
+        "snapshot",
+        "previous",
+        "changes",
+        "conflicts"
+      ],
+      "type": "object"
+    },
+    "MergeRequest": {
+      "description": "Which snapshot to merge into which ref.",
+      "properties": {
+        "author": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dry_run": {
+          "default": false,
+          "type": "boolean"
+        },
+        "from": {
+          "description": "A snapshot spec (API.md §8.4), usually a branch name.",
+          "type": "string"
+        },
+        "into": {
+          "default": "main",
+          "description": "The ref that moves; `main` by default.",
+          "type": "string"
+        },
+        "message": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "from"
+      ],
+      "type": "object"
+    },
+    "MirrorReport": {
+      "description": "What pushing or pulling every ref did, ref by ref.",
+      "properties": {
+        "refs": {
+          "items": {
+            "$ref": "#/$defs/MirroredRef"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "refs"
+      ],
+      "type": "object"
+    },
+    "MirroredRef": {
+      "description": "One ref of a [`MirrorReport`]: what was copied, or the conflict that\nkept it.",
+      "properties": {
+        "bytes": {
+          "description": "Their stored (compressed, encrypted) size.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "conflict": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Error"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "objects": {
+          "description": "Objects copied.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "previous": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The snapshot it pointed to before; `None` if the ref was new."
+        },
+        "snapshot": {
+          "$ref": "#/$defs/ObjectId",
+          "description": "The snapshot the ref points to on the target now."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "Name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "properties": {
+            "hex": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "hex"
+          ],
+          "type": "object"
+        }
+      ],
+      "description": "A path or name: text when its bytes are UTF-8, else the bytes in hexadecimal."
+    },
+    "Named": {
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "NewHold": {
+      "properties": {
+        "reason": {
+          "type": "string"
+        },
+        "refs": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "refs",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "NewRemote": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "url"
+      ],
+      "type": "object"
+    },
+    "NewRetention": {
+      "properties": {
+        "days": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "refs": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "refs",
+        "days"
+      ],
+      "type": "object"
+    },
+    "NoRequest": {
+      "description": "The request of an operation that takes none.",
+      "type": "object"
+    },
+    "ObjectId": {
+      "description": "An object id: 64 lowercase hexadecimal characters.",
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "Password": {
+      "properties": {
+        "password": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "password"
+      ],
+      "type": "object"
+    },
+    "Phase": {
+      "description": "What a long operation is doing.",
+      "oneOf": [
+        {
+          "enum": [
+            "starting",
+            "storing",
+            "restoring",
+            "exporting",
+            "verifying",
+            "done"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "scanning",
+          "description": "Counting what will be done, to know the totals.",
+          "type": "string"
+        },
+        {
+          "const": "copying",
+          "description": "Copying objects to or from a remote.",
+          "type": "string"
+        },
+        {
+          "const": "finishing",
+          "description": "Making the result durable and moving refs.",
+          "type": "string"
+        }
+      ]
+    },
+    "PluginDir": {
+      "properties": {
+        "dir": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "PluginFile": {
+      "properties": {
+        "dir": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "file": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "file"
+      ],
+      "type": "object"
+    },
+    "PluginInfo": {
+      "description": "What a plugin says about itself (PLUGIN.md §2).",
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "patterns": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "permissions": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "description",
+        "patterns",
+        "permissions"
+      ],
+      "type": "object"
+    },
+    "PluginMerge": {
+      "description": "A file a plugin merged instead of making a conflict copy.",
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/Name"
+        },
+        "plugin": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "plugin"
+      ],
+      "type": "object"
+    },
+    "PluginName": {
+      "properties": {
+        "dir": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "Progress": {
+      "description": "A copy of the progress of a long operation.",
+      "properties": {
+        "bytes_done": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "bytes_total": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "current": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Name"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The file being worked on."
+        },
+        "items_done": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "items_total": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "phase": {
+          "$ref": "#/$defs/Phase"
+        }
+      },
+      "required": [
+        "phase",
+        "items_done",
+        "bytes_done"
+      ],
+      "type": "object"
+    },
+    "PruneOptions": {
+      "description": "Which snapshots of a ref to keep. The newest is always kept.",
+      "properties": {
+        "dry_run": {
+          "default": false,
+          "description": "Only reports; moves no ref and stores nothing.",
+          "type": "boolean"
+        },
+        "keep_daily": {
+          "default": 0,
+          "description": "The newest snapshot of each of this many days that have one; UTC.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "keep_last": {
+          "default": 0,
+          "description": "The newest snapshots.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "keep_monthly": {
+          "default": 0,
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "keep_weekly": {
+          "default": 0,
+          "description": "The same per week, from Monday.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "keep_yearly": {
+          "default": 0,
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref"
+      ],
+      "type": "object"
+    },
+    "PruneOutcome": {
+      "properties": {
+        "dry_run": {
+          "type": "boolean"
+        },
+        "kept": {
+          "description": "Newest first.",
+          "items": {
+            "$ref": "#/$defs/PrunedKept"
+          },
+          "type": "array"
+        },
+        "previous": {
+          "$ref": "#/$defs/ObjectId",
+          "description": "The snapshot the ref pointed to before."
+        },
+        "ref": {
+          "type": "string"
+        },
+        "removed": {
+          "description": "Newest first.",
+          "items": {
+            "$ref": "#/$defs/PrunedRemoved"
+          },
+          "type": "array"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/ObjectId",
+          "description": "The snapshot it points to now (would point to, in a dry run)."
+        }
+      },
+      "required": [
+        "ref",
+        "dry_run",
+        "previous",
+        "snapshot",
+        "kept",
+        "removed"
+      ],
+      "type": "object"
+    },
+    "PrunedKept": {
+      "description": "A snapshot that stays, with the rules that keep it.",
+      "properties": {
+        "new": {
+          "$ref": "#/$defs/ObjectId",
+          "description": "Its id now that its parent changed; `snapshot` when nothing older went."
+        },
+        "reasons": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/ObjectId"
+        },
+        "time": {
+          "$ref": "#/$defs/Time"
+        }
+      },
+      "required": [
+        "snapshot",
+        "new",
+        "time",
+        "reasons"
+      ],
+      "type": "object"
+    },
+    "PrunedRemoved": {
+      "description": "A snapshot that left the history.",
+      "properties": {
+        "snapshot": {
+          "$ref": "#/$defs/ObjectId"
+        },
+        "time": {
+          "$ref": "#/$defs/Time"
+        }
+      },
+      "required": [
+        "snapshot",
+        "time"
+      ],
+      "type": "object"
+    },
+    "RefFacts": {
+      "properties": {
+        "copies": {
+          "description": "Its state on each remote, with `remotes`.",
+          "items": {
+            "$ref": "#/$defs/CopyState"
+          },
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        },
+        "retention_days": {
+          "description": "Days a retention rule keeps it, if one does.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "snapshot": {
+          "$ref": "#/$defs/ObjectId",
+          "description": "The snapshot the ref points to; its id fixes every byte under it and\nall its history."
+        },
+        "snapshots": {
+          "description": "Snapshots in its history, following first parents.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "stale": {
+          "type": "boolean"
+        },
+        "time": {
+          "$ref": "#/$defs/Time",
+          "description": "The time of that snapshot."
+        }
+      },
+      "required": [
+        "name",
+        "snapshot",
+        "time",
+        "snapshots",
+        "stale"
+      ],
+      "type": "object"
+    },
+    "RefInfo": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/ObjectId"
+        }
+      },
+      "required": [
+        "name",
+        "snapshot"
+      ],
+      "type": "object"
+    },
+    "RefOp": {
+      "description": "Kind of change recorded in a reflog line.",
+      "enum": [
+        "create",
+        "update",
+        "delete",
+        "repair"
+      ],
+      "type": "string"
+    },
+    "RefUpdate": {
+      "description": "A ref that was moved, with its Git and Apeiron names.",
+      "properties": {
+        "git": {
+          "description": "The full Git name, such as `refs/heads/main`.",
+          "type": "string"
+        },
+        "id": {
+          "description": "The Git object id.",
+          "type": "string"
+        },
+        "previous": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What the ref pointed to before; `None` if it is new."
+        },
+        "ref": {
+          "description": "The Apeiron ref, such as `git/heads/main`.",
+          "type": "string"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/ObjectId"
+        }
+      },
+      "required": [
+        "git",
+        "ref",
+        "id",
+        "snapshot"
+      ],
+      "type": "object"
+    },
+    "ReflogEntry": {
+      "description": "One line of a reflog.",
+      "properties": {
+        "new": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "old": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectId"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "op": {
+          "$ref": "#/$defs/RefOp"
+        },
+        "time": {
+          "description": "Unix time in seconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "time",
+        "op"
+      ],
+      "type": "object"
+    },
+    "Remote": {
+      "description": "A named remote copy of the repository.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "url"
+      ],
+      "type": "object"
+    },
+    "RemoteFacts": {
+      "properties": {
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Error"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "With `remotes`: the error if it did not answer."
+        },
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "url"
+      ],
+      "type": "object"
+    },
+    "RemoteGcRequest": {
+      "description": "Which remote to clean (FORMAT.md §15.8).",
+      "properties": {
+        "dry_run": {
+          "default": false,
+          "description": "Only reports what would be removed.",
+          "type": "boolean"
+        },
+        "remote": {
+          "description": "The name of a remote this repository alone writes to.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "remote"
+      ],
+      "type": "object"
+    },
+    "RemoteRequest": {
+      "description": "Which remote to push every ref to or pull every ref from\n([REPLICATION.md](REPLICATION.md) §2).",
+      "properties": {
+        "rate": {
+          "description": "The most bytes per second moved to or from the remote, on average\n(SYNC.md §2); no limit when absent.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "remote": {
+          "description": "The name of a remote.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "remote"
+      ],
+      "type": "object"
+    },
+    "RepairReport": {
+      "description": "What [`crate::Repository::repair`] did.",
+      "properties": {
+        "indexed_packs": {
+          "default": 0,
+          "description": "Packs added to a new index because no healthy index covered them.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "removed_index_files": {
+          "default": [],
+          "description": "Damaged index files that were deleted after the new index was written.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "removed_locks": {
+          "description": "Stale ref lock files that were removed.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "repaired_refs": {
+          "description": "Refs whose reflog got a `repair` line.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "removed_locks",
+        "repaired_refs"
+      ],
+      "type": "object"
+    },
+    "RepoInfo": {
+      "description": "Facts about an open repository.",
+      "properties": {
+        "api_version": {
+          "type": "string"
+        },
+        "chunk_avg": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "chunk_max": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "chunk_min": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "damaged_files": {
+          "description": "Index and pack files found damaged when the repository was opened;\n`verify` checks everything and `repair` replaces damaged indexes.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "encrypted": {
+          "type": "boolean"
+        },
+        "format_version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "format_version",
+        "api_version",
+        "chunk_min",
+        "chunk_avg",
+        "chunk_max",
+        "encrypted",
+        "damaged_files"
+      ],
+      "type": "object"
+    },
+    "ReportRequest": {
+      "description": "FindingKind a report covers (REPORTS.md §2).",
+      "properties": {
+        "remotes": {
+          "default": false,
+          "description": "Compare every ref with each remote; needs the remotes to answer.",
+          "type": "boolean"
+        },
+        "stale_days": {
+          "default": 7,
+          "description": "A ref whose newest snapshot is older than this many days is stale; 0\nchecks nothing.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "verify": {
+          "default": false,
+          "description": "Read and check every stored byte, as `verify` does.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "RepositoryFacts": {
+      "properties": {
+        "damaged_files": {
+          "description": "Files found damaged when the repository was opened.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "encrypted": {
+          "type": "boolean"
+        },
+        "format_version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "passwords": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "type": "string"
+        },
+        "recovery_keys": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "format_version",
+        "encrypted",
+        "passwords",
+        "recovery_keys",
+        "damaged_files"
+      ],
+      "type": "object"
+    },
+    "Resolve": {
+      "properties": {
+        "copy": {
+          "type": "string"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "keep": {
+          "$ref": "#/$defs/Keep"
+        }
+      },
+      "required": [
+        "folder",
+        "copy",
+        "keep"
+      ],
+      "type": "object"
+    },
+    "RestoreOutcome": {
+      "properties": {
+        "bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "dirs": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "files": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "symlinks": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "files",
+        "dirs",
+        "symlinks",
+        "bytes",
+        "warnings"
+      ],
+      "type": "object"
+    },
+    "RestoreProblem": {
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "$ref": "#/$defs/Name"
+        }
+      },
+      "required": [
+        "path",
+        "message"
+      ],
+      "type": "object"
+    },
+    "RestoreRequest": {
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/Name",
+          "default": "",
+          "description": "A path inside the snapshot; empty or absent for everything."
+        },
+        "snapshot": {
+          "description": "A snapshot spec (API.md §8.4).",
+          "type": "string"
+        },
+        "target": {
+          "description": "A new or empty folder.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "snapshot",
+        "target"
+      ],
+      "type": "object"
+    },
+    "RestoreTestOutcome": {
+      "properties": {
+        "bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "files": {
+          "description": "Files restored and checked.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "problems": {
+          "description": "Files that could not be restored intact.",
+          "items": {
+            "$ref": "#/$defs/RestoreProblem"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "files",
+        "bytes",
+        "problems"
+      ],
+      "type": "object"
+    },
+    "RestoreTestRequest": {
+      "properties": {
+        "sample_bytes": {
+          "default": 104857600,
+          "description": "How much to restore; at least one file is always restored.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "snapshot": {
+          "description": "A snapshot spec (API.md §8.4).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "snapshot"
+      ],
+      "type": "object"
+    },
+    "Rule": {
+      "additionalProperties": false,
+      "description": "One rule file (FORMAT.md §16.1).",
+      "properties": {
+        "added": {
+          "description": "Unix seconds when the rule was added.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "days": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "refs": {
+          "description": "A ref name, or a prefix followed by `*`.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "refs",
+        "days",
+        "added"
+      ],
+      "type": "object"
+    },
+    "SaveSearch": {
+      "description": "A search kept under a name.",
+      "properties": {
+        "after": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Time"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Modified at or after this time."
+        },
+        "before": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Time"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Modified before this time."
+        },
+        "file": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "history": {
+          "default": false,
+          "description": "Also search every snapshot before it.",
+          "type": "boolean"
+        },
+        "larger": {
+          "default": null,
+          "description": "Smallest size of a file, in bytes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "limit": {
+          "default": 1000,
+          "description": "Most results returned.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "pattern": {
+          "default": null,
+          "description": "A name, or with `/` a whole path; `*` and `?` as wildcards, ignoring case.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "smaller": {
+          "default": null,
+          "description": "A file must be smaller than this, in bytes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "snapshot": {
+          "default": null,
+          "description": "A snapshot spec (API.md §8.4); when absent, `main`, or with\n`history` every ref.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tags": {
+          "description": "Tags a file must all have, ignoring case (FORMAT.md §6.3).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "text": {
+          "default": null,
+          "description": "Text a text file must hold, ignoring case.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "SavedSearch": {
+      "description": "A search kept under a name.",
+      "properties": {
+        "after": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Time"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Modified at or after this time."
+        },
+        "before": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Time"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Modified before this time."
+        },
+        "history": {
+          "default": false,
+          "description": "Also search every snapshot before it.",
+          "type": "boolean"
+        },
+        "larger": {
+          "default": null,
+          "description": "Smallest size of a file, in bytes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "limit": {
+          "default": 1000,
+          "description": "Most results returned.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "pattern": {
+          "default": null,
+          "description": "A name, or with `/` a whole path; `*` and `?` as wildcards, ignoring case.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "smaller": {
+          "default": null,
+          "description": "A file must be smaller than this, in bytes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "snapshot": {
+          "default": null,
+          "description": "A snapshot spec (API.md §8.4); when absent, `main`, or with\n`history` every ref.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tags": {
+          "description": "Tags a file must all have, ignoring case (FORMAT.md §6.3).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "text": {
+          "default": null,
+          "description": "Text a text file must hold, ignoring case.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "SearchHit": {
+      "description": "One version of a path that matched.",
+      "properties": {
+        "entry": {
+          "$ref": "#/$defs/EntryInfo"
+        },
+        "line": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextLine"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "path": {
+          "$ref": "#/$defs/Name"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/ObjectId",
+          "description": "The newest snapshot searched that holds this version."
+        },
+        "time": {
+          "$ref": "#/$defs/Time"
+        }
+      },
+      "required": [
+        "path",
+        "entry",
+        "snapshot",
+        "time"
+      ],
+      "type": "object"
+    },
+    "SearchName": {
+      "properties": {
+        "file": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "SearchOutcome": {
+      "properties": {
+        "hits": {
+          "description": "Newest snapshot first, then by path.",
+          "items": {
+            "$ref": "#/$defs/SearchHit"
+          },
+          "type": "array"
+        },
+        "skipped": {
+          "description": "Files not read for text because they are too large.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "snapshots": {
+          "description": "Number of snapshots searched.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "truncated": {
+          "description": "More results exist than the limit allowed.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "hits",
+        "truncated",
+        "snapshots",
+        "skipped"
+      ],
+      "type": "object"
+    },
+    "SearchRequest": {
+      "description": "What to search for and where (SEARCH.md).",
+      "properties": {
+        "after": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Time"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Modified at or after this time."
+        },
+        "before": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Time"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Modified before this time."
+        },
+        "history": {
+          "default": false,
+          "description": "Also search every snapshot before it.",
+          "type": "boolean"
+        },
+        "larger": {
+          "default": null,
+          "description": "Smallest size of a file, in bytes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "limit": {
+          "default": 1000,
+          "description": "Most results returned.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pattern": {
+          "default": null,
+          "description": "A name, or with `/` a whole path; `*` and `?` as wildcards, ignoring case.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "smaller": {
+          "default": null,
+          "description": "A file must be smaller than this, in bytes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "snapshot": {
+          "default": null,
+          "description": "A snapshot spec (API.md §8.4); when absent, `main`, or with\n`history` every ref.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tags": {
+          "description": "Tags a file must all have, ignoring case (FORMAT.md §6.3).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "text": {
+          "default": null,
+          "description": "Text a text file must hold, ignoring case.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "SearchesFile": {
+      "properties": {
+        "file": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "Skipped": {
+      "description": "A ref or object that was left out, and why.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "SnapshotInfo": {
+      "properties": {
+        "author": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "host": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "$ref": "#/$defs/ObjectId"
+        },
+        "message": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "meta": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "parents": {
+          "items": {
+            "$ref": "#/$defs/ObjectId"
+          },
+          "type": "array"
+        },
+        "time": {
+          "$ref": "#/$defs/Time"
+        },
+        "tree": {
+          "$ref": "#/$defs/ObjectId"
+        }
+      },
+      "required": [
+        "id",
+        "tree",
+        "parents",
+        "time",
+        "meta"
+      ],
+      "type": "object"
+    },
+    "Spec": {
+      "properties": {
+        "spec": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "spec"
+      ],
+      "type": "object"
+    },
+    "SwitchOutcome": {
+      "properties": {
+        "changes": {
+          "description": "Changes made to the folder (that would be made, in a dry run).",
+          "items": {
+            "$ref": "#/$defs/Change"
+          },
+          "type": "array"
+        },
+        "conflicts": {
+          "description": "Files changed while the switch ran: left alone, with the version of\nthe snapshot beside them.",
+          "items": {
+            "$ref": "#/$defs/Conflict"
+          },
+          "type": "array"
+        },
+        "ref": {
+          "description": "The ref that records the folder.",
+          "type": "string"
+        },
+        "saved": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The snapshot made of the folder before it was changed, when it held\nsomething not recorded yet."
+        },
+        "skipped": {
+          "items": {
+            "$ref": "#/$defs/Name"
+          },
+          "type": "array"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/ObjectId",
+          "description": "The snapshot the folder holds now (would hold, in a dry run)."
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "ref",
+        "snapshot",
+        "changes",
+        "conflicts",
+        "skipped",
+        "warnings"
+      ],
+      "type": "object"
+    },
+    "SwitchRequest": {
+      "description": "Which snapshot a working folder is to hold (BRANCH.md §6).",
+      "properties": {
+        "dry_run": {
+          "default": false,
+          "description": "Shows what would change without changing the folder or a ref.",
+          "type": "boolean"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "snapshot": {
+          "description": "A snapshot spec (API.md §8.4), usually a branch.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "snapshot",
+        "folder"
+      ],
+      "type": "object"
+    },
+    "SyncAction": {
+      "description": "What a round did.",
+      "oneOf": [
+        {
+          "const": "up_to_date",
+          "description": "The folder, the local ref and the remote were already equal.",
+          "type": "string"
+        },
+        {
+          "const": "sent",
+          "description": "Only this device had changes; they were pushed.",
+          "type": "string"
+        },
+        {
+          "const": "received",
+          "description": "Only the remote had changes; they were applied to the folder.",
+          "type": "string"
+        },
+        {
+          "const": "merged",
+          "description": "Both had changes; they were merged, applied and pushed.",
+          "type": "string"
+        }
+      ]
+    },
+    "SyncMode": {
+      "description": "Which way a sync goes (SYNC.md §3).",
+      "oneOf": [
+        {
+          "enum": [
+            "two-way"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "send",
+          "description": "Back up and push; the folder is never changed.",
+          "type": "string"
+        },
+        {
+          "const": "receive",
+          "description": "Pull and apply; nothing is pushed.",
+          "type": "string"
+        }
+      ]
+    },
+    "SyncOutcome": {
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/SyncAction"
+        },
+        "attempts": {
+          "description": "Rounds run; more than one when another device pushed meanwhile.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "backup": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The snapshot made of the folder, if it had changed."
+        },
+        "changes": {
+          "description": "Changes made to the folder (that would be made, in a dry run).",
+          "items": {
+            "$ref": "#/$defs/Change"
+          },
+          "type": "array"
+        },
+        "conflicts": {
+          "items": {
+            "$ref": "#/$defs/Conflict"
+          },
+          "type": "array"
+        },
+        "fetched": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TransferReport"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What came from the remote."
+        },
+        "plugin_merges": {
+          "default": [],
+          "description": "Files plugins merged instead of making conflict copies.",
+          "items": {
+            "$ref": "#/$defs/PluginMerge"
+          },
+          "type": "array"
+        },
+        "pushed": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TransferReport"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ref": {
+          "type": "string"
+        },
+        "skipped": {
+          "description": "Paths changed here while the round ran; left alone for the next\nround.",
+          "items": {
+            "$ref": "#/$defs/Name"
+          },
+          "type": "array"
+        },
+        "snapshot": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The snapshot the local ref points to now (would point to, in a dry\nrun)."
+        },
+        "warnings": {
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "ref",
+        "action",
+        "changes",
+        "conflicts",
+        "skipped",
+        "warnings",
+        "attempts"
+      ],
+      "type": "object"
+    },
+    "SyncRequest": {
+      "description": "Which folder to sync with which remote.",
+      "properties": {
+        "dry_run": {
+          "default": false,
+          "description": "Shows what would change without changing the folder, a ref or the\nremote.",
+          "type": "boolean"
+        },
+        "exclude": {
+          "description": "Patterns of what this device leaves alone, beside the folder's\n`.apeironignore` (SYNC.md §5.1).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "mode": {
+          "$ref": "#/$defs/SyncMode",
+          "default": "two-way"
+        },
+        "rate": {
+          "description": "The most bytes per second moved to or from the remote, on average\n(SYNC.md §2); no limit when absent.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "ref": {
+          "description": "The ref on both sides; `sync/<folder name>` when absent.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "remote": {
+          "description": "The name of a remote.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "folder",
+        "remote"
+      ],
+      "type": "object"
+    },
+    "TextDiff": {
+      "description": "A changed path with the difference a plugin shows for it (TEXT.md §3).",
+      "properties": {
+        "error": {
+          "description": "Why the plugin could not show the difference.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "$ref": "#/$defs/ChangeKind"
+        },
+        "path": {
+          "$ref": "#/$defs/Name"
+        },
+        "text": {
+          "description": "The changed lines; absent when no plugin handles the file, it is not\ntext or it is a folder or a link.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "path",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "TextLine": {
+      "description": "The first line of a file holding the text searched for.",
+      "properties": {
+        "number": {
+          "description": "Counted from 1.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "number",
+        "text"
+      ],
+      "type": "object"
+    },
+    "Time": {
+      "description": "A point in time: Unix seconds (UTC) and nanoseconds.",
+      "properties": {
+        "nanos": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "seconds": {
+          "format": "int64",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "seconds",
+        "nanos"
+      ],
+      "type": "object"
+    },
+    "TransferReport": {
+      "description": "What a push or pull did.",
+      "properties": {
+        "bytes": {
+          "description": "Their stored (compressed, encrypted) size.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "objects": {
+          "description": "Objects copied.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "previous": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The snapshot it pointed to before; `None` if the ref was new."
+        },
+        "snapshot": {
+          "$ref": "#/$defs/ObjectId",
+          "description": "The snapshot the ref points to on the target now."
+        }
+      },
+      "required": [
+        "snapshot",
+        "objects",
+        "bytes"
+      ],
+      "type": "object"
+    },
+    "TransferRequest": {
+      "description": "Which ref to push to or pull from which remote.",
+      "properties": {
+        "rate": {
+          "description": "The most bytes per second moved to or from the remote, on average\n(SYNC.md §2); no limit when absent.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "ref": {
+          "default": "main",
+          "type": "string"
+        },
+        "remote": {
+          "description": "The name of a remote.",
+          "type": "string"
+        },
+        "replace": {
+          "description": "For a push after a prune: moves the remote ref although its history\nis not extended, when this ref has pointed to what it holds\n(FORMAT.md §13.4).",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "remote"
+      ],
+      "type": "object"
+    },
+    "VerifyReport": {
+      "description": "Result of [`Repository::verify`].",
+      "properties": {
+        "damaged_files": {
+          "description": "Pack and index files whose hash or structure is wrong.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "damaged_objects": {
+          "description": "Objects that cannot be read back intact.",
+          "items": {
+            "$ref": "#/$defs/ObjectId"
+          },
+          "type": "array"
+        },
+        "objects_checked": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "objects_checked",
+        "damaged_files",
+        "damaged_objects"
+      ],
+      "type": "object"
+    },
+    "Warning": {
+      "description": "A problem that did not stop the operation.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/WarningKind"
+        },
+        "message": {
+          "type": "string"
+        },
+        "path": {
+          "$ref": "#/$defs/Name"
+        }
+      },
+      "required": [
+        "path",
+        "kind",
+        "message"
+      ],
+      "type": "object"
+    },
+    "WarningKind": {
+      "oneOf": [
+        {
+          "const": "unreadable",
+          "description": "The file or folder could not be read and was skipped.",
+          "type": "string"
+        },
+        {
+          "const": "changed_while_reading",
+          "description": "The file changed while it was read; it was stored as read.",
+          "type": "string"
+        },
+        {
+          "const": "unsupported",
+          "description": "The entry type or name is not supported and was skipped.",
+          "type": "string"
+        },
+        {
+          "const": "not_restored",
+          "description": "The entry or one of its attributes could not be restored.",
+          "type": "string"
+        },
+        {
+          "const": "plugin",
+          "description": "A plugin failed; the file was kept as a conflict copy.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "error": {
+    "$ref": "#/$defs/Error"
+  },
+  "operations": {
+    "add_hold": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/NewHold"
+      },
+      "result": {
+        "$ref": "#/$defs/LegalHold"
+      }
+    },
+    "add_password": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/Password"
+      },
+      "result": {
+        "$ref": "#/$defs/AddedKey"
+      }
+    },
+    "add_recovery_key": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/NoRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/AddedKey"
+      }
+    },
+    "add_remote": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/NewRemote"
+      },
+      "result": {
+        "$ref": "#/$defs/Remote"
+      }
+    },
+    "add_retention": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/NewRetention"
+      },
+      "result": {
+        "$ref": "#/$defs/Rule"
+      }
+    },
+    "backup": {
+      "long": true,
+      "request": {
+        "$ref": "#/$defs/BackupOptions"
+      },
+      "result": {
+        "$ref": "#/$defs/BackupOutcome"
+      }
+    },
+    "cherry_pick": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/MergeRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/MergeOutcome"
+      }
+    },
+    "clone": {
+      "long": true,
+      "request": {
+        "$ref": "#/$defs/CloneRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/CloneReport"
+      }
+    },
+    "conflicts": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/Folder"
+      },
+      "result": {
+        "items": {
+          "$ref": "#/$defs/ConflictCopy"
+        },
+        "type": "array"
+      }
+    },
+    "create_ref": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/CreateRefRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/ObjectId"
+      }
+    },
+    "delete_ref": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/DeleteRefRequest"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "diff": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/DiffRequest"
+      },
+      "result": {
+        "items": {
+          "$ref": "#/$defs/Change"
+        },
+        "type": "array"
+      }
+    },
+    "diff_text": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/DiffRequest"
+      },
+      "result": {
+        "items": {
+          "$ref": "#/$defs/TextDiff"
+        },
+        "type": "array"
+      }
+    },
+    "duplicates": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/DuplicatesRequest"
+      },
+      "result": {
+        "items": {
+          "$ref": "#/$defs/Duplicate"
+        },
+        "type": "array"
+      }
+    },
+    "export": {
+      "long": true,
+      "request": {
+        "$ref": "#/$defs/ExportRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/ExportOutcome"
+      }
+    },
+    "forget_search": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/SearchName"
+      },
+      "result": {
+        "$ref": "#/$defs/SavedSearch"
+      }
+    },
+    "gc": {
+      "long": true,
+      "request": {
+        "$ref": "#/$defs/GcOptions"
+      },
+      "result": {
+        "$ref": "#/$defs/GcReport"
+      }
+    },
+    "gc_remote": {
+      "long": true,
+      "request": {
+        "$ref": "#/$defs/RemoteGcRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/GcReport"
+      }
+    },
+    "git_export": {
+      "long": true,
+      "request": {
+        "$ref": "#/$defs/GitRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/ExportReport"
+      }
+    },
+    "git_import": {
+      "long": true,
+      "request": {
+        "$ref": "#/$defs/GitRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/ImportReport"
+      }
+    },
+    "holds": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/NoRequest"
+      },
+      "result": {
+        "items": {
+          "$ref": "#/$defs/LegalHold"
+        },
+        "type": "array"
+      }
+    },
+    "import_archive": {
+      "long": true,
+      "request": {
+        "$ref": "#/$defs/ImportOptions"
+      },
+      "result": {
+        "$ref": "#/$defs/ImportOutcome"
+      }
+    },
+    "info": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/NoRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/RepoInfo"
+      }
+    },
+    "keys": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/NoRequest"
+      },
+      "result": {
+        "items": {
+          "$ref": "#/$defs/KeyInfo"
+        },
+        "type": "array"
+      }
+    },
+    "lift_hold": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/LiftHold"
+      },
+      "result": {
+        "$ref": "#/$defs/LegalHold"
+      }
+    },
+    "list": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/ListRequest"
+      },
+      "result": {
+        "items": {
+          "$ref": "#/$defs/EntryInfo"
+        },
+        "type": "array"
+      }
+    },
+    "log": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/LogRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/LogPage"
+      }
+    },
+    "merge": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/MergeRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/MergeOutcome"
+      }
+    },
+    "plugin_add": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/PluginFile"
+      },
+      "result": {
+        "$ref": "#/$defs/Added"
+      }
+    },
+    "plugin_remove": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/PluginName"
+      },
+      "result": {
+        "$ref": "#/$defs/PluginInfo"
+      }
+    },
+    "plugins": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/PluginDir"
+      },
+      "result": {
+        "items": {
+          "$ref": "#/$defs/PluginInfo"
+        },
+        "type": "array"
+      }
+    },
+    "prune": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/PruneOptions"
+      },
+      "result": {
+        "$ref": "#/$defs/PruneOutcome"
+      }
+    },
+    "pull": {
+      "long": true,
+      "request": {
+        "$ref": "#/$defs/TransferRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/TransferReport"
+      }
+    },
+    "pull_all": {
+      "long": true,
+      "request": {
+        "$ref": "#/$defs/RemoteRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/MirrorReport"
+      }
+    },
+    "push": {
+      "long": true,
+      "request": {
+        "$ref": "#/$defs/TransferRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/TransferReport"
+      }
+    },
+    "push_all": {
+      "long": true,
+      "request": {
+        "$ref": "#/$defs/RemoteRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/MirrorReport"
+      }
+    },
+    "rebase": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/MergeRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/MergeOutcome"
+      }
+    },
+    "reflog": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/Named"
+      },
+      "result": {
+        "items": {
+          "$ref": "#/$defs/ReflogEntry"
+        },
+        "type": "array"
+      }
+    },
+    "refs": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/NoRequest"
+      },
+      "result": {
+        "items": {
+          "$ref": "#/$defs/RefInfo"
+        },
+        "type": "array"
+      }
+    },
+    "remotes": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/NoRequest"
+      },
+      "result": {
+        "items": {
+          "$ref": "#/$defs/Remote"
+        },
+        "type": "array"
+      }
+    },
+    "remove_key": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/KeyId"
+      },
+      "result": {
+        "type": "string"
+      }
+    },
+    "remove_remote": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/Named"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "repair": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/NoRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/RepairReport"
+      }
+    },
+    "repair_from": {
+      "long": true,
+      "request": {
+        "$ref": "#/$defs/RemoteRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/CopyRepairReport"
+      }
+    },
+    "report": {
+      "long": true,
+      "request": {
+        "$ref": "#/$defs/ReportRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/ComplianceReport"
+      }
+    },
+    "resolve": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/Spec"
+      },
+      "result": {
+        "$ref": "#/$defs/ObjectId"
+      }
+    },
+    "resolve_conflict": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/Resolve"
+      },
+      "result": {
+        "$ref": "#/$defs/ConflictCopy"
+      }
+    },
+    "restore": {
+      "long": true,
+      "request": {
+        "$ref": "#/$defs/RestoreRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/RestoreOutcome"
+      }
+    },
+    "restore_test": {
+      "long": true,
+      "request": {
+        "$ref": "#/$defs/RestoreTestRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/RestoreTestOutcome"
+      }
+    },
+    "retention": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/NoRequest"
+      },
+      "result": {
+        "items": {
+          "$ref": "#/$defs/Rule"
+        },
+        "type": "array"
+      }
+    },
+    "save_search": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/SaveSearch"
+      },
+      "result": {
+        "type": "null"
+      }
+    },
+    "saved_searches": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/SearchesFile"
+      },
+      "result": {
+        "items": {
+          "$ref": "#/$defs/SavedSearch"
+        },
+        "type": "array"
+      }
+    },
+    "search": {
+      "long": true,
+      "request": {
+        "$ref": "#/$defs/SearchRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/SearchOutcome"
+      }
+    },
+    "switch": {
+      "long": true,
+      "request": {
+        "$ref": "#/$defs/SwitchRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/SwitchOutcome"
+      }
+    },
+    "sync": {
+      "long": true,
+      "request": {
+        "$ref": "#/$defs/SyncRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/SyncOutcome"
+      }
+    },
+    "verify": {
+      "long": true,
+      "request": {
+        "$ref": "#/$defs/NoRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/VerifyReport"
+      }
+    }
+  },
+  "progress": {
+    "$ref": "#/$defs/Progress"
+  },
+  "title": "Apeiron operations",
+  "version": "0.1"
+}

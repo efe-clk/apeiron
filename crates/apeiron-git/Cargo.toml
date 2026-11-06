@@ -12,6 +12,7 @@ publish = false
 apeiron-core = { path = "../apeiron-core" }
 flate2 = "1.1.10"
 gix = { version = "0.85", default-features = false, features = ["sha1"] }
+schemars = "1.2.1"
 serde = { version = "1.0.229", features = ["derive"] }
 thiserror = "2.0.21"
 

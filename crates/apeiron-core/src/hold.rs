@@ -15,7 +15,7 @@ const MAX_REASON: usize = 200;
 const LIFTED: &str = ".lifted.toml";
 
 /// One hold file (FORMAT.md §17.1).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Hold {
     /// A ref name, or a prefix followed by `*`.
@@ -26,7 +26,7 @@ pub struct Hold {
 }
 
 /// The file that lifts a hold.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Lift {
     pub reason: String,
@@ -35,7 +35,7 @@ pub struct Lift {
 }
 
 /// A hold with its id and, once lifted, its lift.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct LegalHold {
     pub id: String,
     #[serde(flatten)]

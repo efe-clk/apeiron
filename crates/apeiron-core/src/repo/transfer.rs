@@ -27,7 +27,7 @@ use crate::remote::{self, Remote, Store};
 pub type OnCopy<'a> = &'a mut dyn FnMut(&TransferReport) -> Result<()>;
 
 /// What a push or pull did.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct TransferReport {
     /// The snapshot the ref points to on the target now.
     pub snapshot: ObjectId,

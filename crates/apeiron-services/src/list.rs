@@ -39,7 +39,7 @@ pub(crate) fn lookup(repo: &Repository, root: &ObjectId, path: &[u8]) -> Result<
     Ok(Node::Tree(tree))
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Kind {
     File,
@@ -48,7 +48,7 @@ pub enum Kind {
 }
 
 /// One entry of a listing.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct EntryInfo {
     pub name: Name,
     pub kind: Kind,

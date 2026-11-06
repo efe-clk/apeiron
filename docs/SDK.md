@@ -2,7 +2,7 @@
 
 # Apeiron C ABI and SDKs
 
-> **Status: In progress.** Stage 3 work item 4 ([ROADMAP.md](ROADMAP.md) §5) is done: the C ABI, the Python SDK and the shared conformance suite. The C++ SDK, the JSON schemas and the SDKs of the next wave come later. The decisions behind it are ADR-015, ADR-016 and ADR-024 ([DECISIONS.md](DECISIONS.md)).
+> **Status: In progress.** Stage 3 work item 4 ([ROADMAP.md](ROADMAP.md) §5) is done: the C ABI, the Python SDK and the shared conformance suite. The JSON schemas are done; the C++ SDK and the SDKs of the next wave come later. The decisions behind it are ADR-015, ADR-016 and ADR-024 ([DECISIONS.md](DECISIONS.md)).
 
 Apeiron is used from many languages through one C interface (the C ABI). Every SDK is a thin layer over that interface; none of them re-implements Apeiron's logic. That way the same operation gives the same result in every language.
 
@@ -26,7 +26,7 @@ flowchart TB
 | `apeiron-ffi` | Builds `libapeiron` (shared and static library); its C header is `crates/apeiron-ffi/include/apeiron.h` | Done |
 | Python SDK | `sdk/python`, over the C ABI with `ctypes` | Done |
 | Conformance suite | `sdk/conformance`, run through the C ABI from Rust and through Python (section 6) | Done |
-| JSON schemas | Machine-readable description of every request, result, progress and error value | Planned |
+| JSON schemas | `sdk/schema/apeiron.schema.json`: machine-readable description of every request, result, progress and error value (section 3) | Done |
 | Other SDKs | Idiomatic wrappers in each language, generated in part from the schemas | Planned |
 
 ## 2. C ABI design
@@ -97,7 +97,7 @@ apeiron_repo_free(repo);
 
 ## 3. Schemas
 
-Every value that crosses the ABI will be described by a JSON Schema generated from the Rust types and checked into the repository, so that SDKs can generate typed classes instead of writing them by hand. Until then the Rust types of [API.md](API.md) §8 and the conformance scenarios define the values. A schema change that is not additive raises the minor version of the API before 1.0 and the major version after it ([API.md](API.md) §6).
+`sdk/schema/apeiron.schema.json` describes every value that crosses the ABI, as JSON Schema generated from the Rust types and checked into the repository, so that SDKs can generate typed classes instead of writing them by hand: for each operation in `operations`, whether it is `long` and its `request` and `result`, then `progress` and `error`, with the types in `$defs`. A test fails when the file differs from the types (`APEIRON_BLESS=1 cargo test -p apeiron-ffi` writes it anew), and the conformance suite checks every request, result and error it meets against it. A schema change that is not additive raises the minor version of the API before 1.0 and the major version after it ([API.md](API.md) §6).
 
 ## 4. SDK rules
 
@@ -105,7 +105,7 @@ Every value that crosses the ABI will be described by a JSON Schema generated fr
 | --- | --- |
 | No logic of their own | An SDK only converts values and calls the C ABI |
 | Idiomatic | Each SDK follows its language's habits: exceptions per error kind in Python and C++, context managers in Python, RAII in C++ |
-| Typed | Requests and results become typed classes generated from the schemas; until the schemas exist, Python returns records read by attribute or key |
+| Typed | Requests and results become typed classes generated from the schemas; until they are generated, Python returns records read by attribute or key |
 | Jobs | Every SDK offers `progress()`, `cancel()` and `wait()` with a timeout, plus a convenience that reports progress through the language's own mechanism (iterator, callback, event) on top of polling |
 | Packaging | Each SDK will ship the native library inside its normal package (Python wheel, CMake package, …) for Linux, macOS and Windows; until then the library is built with Cargo and found through `APEIRON_LIB` |
 | Same tests | Every SDK passes the shared conformance suite (section 6) |
@@ -146,5 +146,5 @@ Every operation has a method with the same name (`repo.search("*.pdf", history=T
 | Limit | Plan |
 | --- | --- |
 | File content does not pass through the ABI; operations work on paths | Streaming read and write handles in a later ABI minor version |
-| No typed classes in Python, no wheels | With the JSON schemas and packaging |
+| No typed classes in Python, no wheels | Generated from the JSON schemas, with packaging |
 | No remote mode | The same JSON values will be sent to the background service |

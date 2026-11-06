@@ -15,7 +15,7 @@ use crate::os;
 use crate::restore::{count_entry, count_tree};
 
 /// Archive formats `export` can write.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub enum ArchiveFormat {
     #[serde(rename = "tar")]
     Tar,
@@ -38,7 +38,7 @@ impl ArchiveFormat {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ExportOutcome {
     pub files: u64,
     pub dirs: u64,
