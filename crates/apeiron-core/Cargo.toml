@@ -1,5 +1,5 @@
 [package]
-name = "apeiron-core"
+name = "apeiron-core-rs"
 description = "Object model and storage engine for Apeiron"
 version.workspace = true
 edition.workspace = true
@@ -8,8 +8,11 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
+[lib]
+name = "apeiron_core"
+
 [dependencies]
-apeiron-sys = { version = "0.0.0", path = "../apeiron-sys" }
+apeiron-sys = { package = "apeiron-sys-rs", version = "0.0.0", path = "../apeiron-sys" }
 argon2 = { version = "0.6.0", default-features = false, features = ["alloc"] }
 blake3 = "1.8.7"
 chacha20poly1305 = { version = "0.11.0", default-features = false, features = ["alloc"] }

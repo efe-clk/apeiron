@@ -30,7 +30,7 @@ Apeiron Rust ile yazılmıştır. Rust araçları, Git ve bir C derleyicisi gere
 ### 2.2 Derleme ve kurulum
 
 ```bash
-cargo install --locked --git https://github.com/efe-clk/apeiron apeiron-cli
+cargo install --locked --git https://github.com/efe-clk/apeiron apeiron-cli-rs
 apeiron --version
 ```
 
@@ -39,7 +39,7 @@ apeiron --version
 ### 2.3 Güncelleme
 
 ```bash
-cargo install --locked --force --git https://github.com/efe-clk/apeiron apeiron-cli
+cargo install --locked --force --git https://github.com/efe-clk/apeiron apeiron-cli-rs
 ```
 
 ## 3. Depoyu oluşturma
@@ -246,7 +246,7 @@ Klasörü senkronlayan her bilgisayara kurun; kurulu olmayan bir bilgisayar bunu
 Masaüstü uygulaması, 3. ile 6. bölümler arasında çoğu kişinin ihtiyaç duyduğu her şeyi bir pencerede yapar: yedek klasörünü açmak ya da oluşturmak, yedeklemek, sürümlere bakmak, geri yüklemek ve denetlemek ([DESKTOP.tr.md](DESKTOP.tr.md)). Linux'ta önce WebKitGTK dosyalarını ister (Debian ve Ubuntu'da `sudo apt install libwebkit2gtk-4.1-dev`, Arch'ta `sudo pacman -S webkit2gtk-4.1`):
 
 ```bash
-cargo install --locked --git https://github.com/efe-clk/apeiron apeiron-desktop
+cargo install --locked --git https://github.com/efe-clk/apeiron apeiron-desktop-rs
 apeiron-desktop
 ```
 

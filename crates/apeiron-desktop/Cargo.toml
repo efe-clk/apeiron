@@ -1,5 +1,5 @@
 [package]
-name = "apeiron-desktop"
+name = "apeiron-desktop-rs"
 description = "Desktop app of Apeiron: its pages in a window"
 version.workspace = true
 edition.workspace = true
@@ -8,7 +8,11 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
+[[bin]]
+name = "apeiron-desktop"
+path = "src/main.rs"
+
 [dependencies]
-apeiron-server = { path = "../apeiron-server" }
+apeiron-server = { package = "apeiron-server-rs", path = "../apeiron-server" }
 tao = "0.37.2"
 wry = "0.57.1"

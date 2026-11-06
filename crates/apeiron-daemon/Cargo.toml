@@ -1,5 +1,5 @@
 [package]
-name = "apeiron-daemon"
+name = "apeiron-daemon-rs"
 description = "Background service of Apeiron: scheduled jobs and the restore test"
 version.workspace = true
 edition.workspace = true
@@ -8,9 +8,12 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
+[lib]
+name = "apeiron_daemon"
+
 [dependencies]
-apeiron = { path = "../apeiron" }
-apeiron-sys = { path = "../apeiron-sys" }
+apeiron = { package = "apeiron-rs", path = "../apeiron" }
+apeiron-sys = { package = "apeiron-sys-rs", path = "../apeiron-sys" }
 dirs = "6.0.0"
 fs4 = "1.1.0"
 jiff = { version = "0.2.38", features = ["serde"] }

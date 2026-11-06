@@ -97,7 +97,7 @@ apeiron_repo_free(repo);
 
 ## 3. Şemalar
 
-`sdk/schema/apeiron.schema.json`, ABI'yi geçen her değeri Rust türlerinden üretilen ve depoya eklenen JSON Schema olarak tanımlar; böylece SDK'lar tipli sınıflarını elle yazmak yerine üretebilir: `operations` içinde her işlem için `long` olup olmadığı, `request` ve `result`, ardından `progress` ve `error`, türler de `$defs` içinde. Dosya türlerden farklıysa bir test başarısız olur (`APEIRON_BLESS=1 cargo test -p apeiron-ffi` onu yeniden yazar) ve uygunluk paketi karşılaştığı her isteği, sonucu ve hatayı ona karşı denetler. Eklemeli olmayan bir şema değişikliği, 1.0'dan önce API'nin ara sürümünü, sonra ana sürümünü yükseltir ([API.tr.md](API.tr.md) §6).
+`sdk/schema/apeiron.schema.json`, ABI'yi geçen her değeri Rust türlerinden üretilen ve depoya eklenen JSON Schema olarak tanımlar; böylece SDK'lar tipli sınıflarını elle yazmak yerine üretebilir: `operations` içinde her işlem için `long` olup olmadığı, `request` ve `result`, ardından `progress` ve `error`, türler de `$defs` içinde. Dosya türlerden farklıysa bir test başarısız olur (`APEIRON_BLESS=1 cargo test -p apeiron-ffi-rs` onu yeniden yazar) ve uygunluk paketi karşılaştığı her isteği, sonucu ve hatayı ona karşı denetler. Eklemeli olmayan bir şema değişikliği, 1.0'dan önce API'nin ara sürümünü, sonra ana sürümünü yükseltir ([API.tr.md](API.tr.md) §6).
 
 ## 4. SDK kuralları
 

@@ -8,7 +8,7 @@ This guide explains how to set up a development environment, which checks every 
 
 | Path | Content |
 | --- | --- |
-| `crates/` | Cargo workspace; one crate per layer, plus `apeiron-sys` for operating system calls |
+| `crates/` | Cargo workspace; one crate per layer, plus `apeiron-sys` for operating system calls. Package names end in `-rs` (`cargo test -p apeiron-core-rs`), as `apeiron` and `apeiron-cli` are taken on crates.io; folders and names in the code do not |
 | `docs/` | Documentation, in English (`X.md`) and Turkish (`X.tr.md`) |
 | `plugins/` | The text plugin, a workspace of its own ([docs/TEXT.md](docs/TEXT.md)) |
 | `scripts/` | The performance measurement ([docs/PERFORMANCE.md](docs/PERFORMANCE.md)) |

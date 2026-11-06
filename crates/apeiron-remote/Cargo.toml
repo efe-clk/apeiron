@@ -1,5 +1,5 @@
 [package]
-name = "apeiron-remote"
+name = "apeiron-remote-rs"
 description = "SFTP and S3 remotes for Apeiron"
 version.workspace = true
 edition.workspace = true
@@ -8,8 +8,11 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
+[lib]
+name = "apeiron_remote"
+
 [dependencies]
-apeiron-core = { path = "../apeiron-core" }
+apeiron-core = { package = "apeiron-core-rs", path = "../apeiron-core" }
 russh = { version = "=0.63.1", default-features = false, features = ["ring", "rsa"] }
 russh-sftp = "3.0.1"
 thiserror = "2.0.21"

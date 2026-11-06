@@ -394,7 +394,7 @@ fn the_schema_is_up_to_date() {
         .replace("\r\n", "\n");
     assert!(
         current == generated,
-        "the schema is out of date; run APEIRON_BLESS=1 cargo test -p apeiron-ffi"
+        "the schema is out of date; run APEIRON_BLESS=1 cargo test -p apeiron-ffi-rs"
     );
 }
 
@@ -459,6 +459,6 @@ fn the_header_is_up_to_date() {
         .replace("\r\n", "\n");
     assert!(
         current == generated,
-        "include/apeiron.h is out of date; run APEIRON_BLESS=1 cargo test -p apeiron-ffi"
+        "include/apeiron.h is out of date; run APEIRON_BLESS=1 cargo test -p apeiron-ffi-rs"
     );
 }

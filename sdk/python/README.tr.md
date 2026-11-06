@@ -2,7 +2,7 @@
 
 # Python için Apeiron
 
-Apeiron'un C ABI'si üzerinde ince bir katman ([docs/SDK.tr.md](../../docs/SDK.tr.md)). Yerel kütüphaneye ihtiyaç duyar: `cargo build --release -p apeiron-ffi` ile derleyin ve `APEIRON_LIB` değişkenini `target/release/libapeiron.so` dosyasına (macOS'ta `libapeiron.dylib`, Windows'ta `apeiron.dll`) yöneltin ya da dosyayı `apeiron/__init__.py` yanına kopyalayın.
+Apeiron'un C ABI'si üzerinde ince bir katman ([docs/SDK.tr.md](../../docs/SDK.tr.md)). Yerel kütüphaneye ihtiyaç duyar: `cargo build --release -p apeiron-ffi-rs` ile derleyin ve `APEIRON_LIB` değişkenini `target/release/libapeiron.so` dosyasına (macOS'ta `libapeiron.dylib`, Windows'ta `apeiron.dll`) yöneltin ya da dosyayı `apeiron/__init__.py` yanına kopyalayın.
 
 ```python
 import apeiron

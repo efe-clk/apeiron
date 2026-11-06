@@ -1,5 +1,5 @@
 [package]
-name = "apeiron-services"
+name = "apeiron-services-rs"
 description = "Backup, restore, listing and diff for Apeiron"
 version.workspace = true
 edition.workspace = true
@@ -8,8 +8,11 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
+[lib]
+name = "apeiron_services"
+
 [dependencies]
-apeiron-core = { path = "../apeiron-core" }
+apeiron-core = { package = "apeiron-core-rs", path = "../apeiron-core" }
 flate2 = "1.1.10"
 schemars = "1.2.1"
 serde = { version = "1.0.229", features = ["derive"] }

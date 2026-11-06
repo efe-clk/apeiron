@@ -1,5 +1,5 @@
 [package]
-name = "apeiron-git"
+name = "apeiron-git-rs"
 description = "Git import and export for Apeiron"
 version.workspace = true
 edition.workspace = true
@@ -8,8 +8,11 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
+[lib]
+name = "apeiron_git"
+
 [dependencies]
-apeiron-core = { path = "../apeiron-core" }
+apeiron-core = { package = "apeiron-core-rs", path = "../apeiron-core" }
 flate2 = "1.1.10"
 gix = { version = "0.85", default-features = false, features = ["sha1"] }
 schemars = "1.2.1"

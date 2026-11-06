@@ -1,5 +1,5 @@
 [package]
-name = "apeiron-sys"
+name = "apeiron-sys-rs"
 description = "Operating system calls for Apeiron that need unsafe code"
 version.workspace = true
 edition.workspace = true
@@ -7,6 +7,9 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 publish = false
+
+[lib]
+name = "apeiron_sys"
 
 [dev-dependencies]
 tempfile = "3.27.0"

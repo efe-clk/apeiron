@@ -99,7 +99,7 @@ Aşama 5'in bütün işleri tamamlandı; aşama, çıkış kriteri olan ilk kuru
 12. Let's Encrypt (ACME).
 13. İlk sürüm: kurulum dosyaları, simgeler, indirilebilir metin eklentisi.
 
-Bu listede olmayan, belgelerin istediği ama yazılmamış işler `docs/ROADMAP.md` §8'dedir. Proje sahibi 2026-11-06'da sırayı Claude'a bıraktı: ~~bozuk nesneyi kopyadan onarma~~, ~~dışlama kuralları~~, ~~eski yedekleri budama~~, ~~performans ölçümü (bu makinede, `docs/PERFORMANCE.md`; Raspberry Pi 4 için cihaz gerekir)~~ (tamamlandı), ~~tar, zip ve 7z içe aktarma, dışa aktarımı bölme~~, ~~JSON şemaları~~, ~~Cargo ile kurulum (`cargo install --git`; proje sahibi Python wheel ve tipli sınıf istemedi)~~, ardından §8'in kalanı küçükten büyüğe. crates.io'da `apeiron` ve `apeiron-cli` adları başkalarına ait; yayımlamak için ad kararı proje sahibinindir.
+Bu listede olmayan, belgelerin istediği ama yazılmamış işler `docs/ROADMAP.md` §8'dedir. Proje sahibi 2026-11-06'da sırayı Claude'a bıraktı: ~~bozuk nesneyi kopyadan onarma~~, ~~dışlama kuralları~~, ~~eski yedekleri budama~~, ~~performans ölçümü (bu makinede, `docs/PERFORMANCE.md`; Raspberry Pi 4 için cihaz gerekir)~~ (tamamlandı), ~~tar, zip ve 7z içe aktarma, dışa aktarımı bölme~~, ~~JSON şemaları~~, ~~Cargo ile kurulum (`cargo install --git`; proje sahibi Python wheel ve tipli sınıf istemedi)~~, ardından §8'in kalanı küçükten büyüğe. Paket adları `-rs` ile biter (`apeiron-rs`, `apeiron-cli-rs` ...; proje sahibinin kararı, 2026-11-06); klasör ve kod adları, `apeiron` komutu ve `libapeiron` değişmez. `cargo -p` paket adını ister. crates.io'ya yayımlamak geri alınamaz, ayrıca onay ister.
 
 ## Çalışma düzeni
 
@@ -109,6 +109,6 @@ Bu listede olmayan, belgelerin istediği ama yazılmamış işler `docs/ROADMAP.
 - Derleme çıktısı `/tmp`'ye veya oturumun geçici çalışma klasörüne yönlendirilmez (`CARGO_TARGET_DIR`, `--target-dir`); Cargo'nun varsayılan `target/` klasörü kullanılır. `/tmp` RAM'de tutulur ve kullanıcı başına yaklaşık 6 GiB kotası vardır; kota dolunca derleme `Disk quota exceeded` hatası verir, `rust-lld` de SIGBUS ile çöker.
 - Metin eklentisi ayrı bir workspace'tir: `plugins/text` (`--manifest-path` ile; wasm `--target wasm32-wasip2`). `cargo test`'in eklenti testleri `rustup target add wasm32-wasip2` ister.
 - Belgelerin uyumunu `crates/apeiron-cli/tests/docs.rs` denetler; yeni komut, seçenek, işlem veya crate belgelenmeden `cargo test` geçmez.
-- Python SDK testi: `cargo build -p apeiron-ffi && APEIRON_LIB=target/debug/libapeiron.so PYTHONPATH=sdk/python/src python3 -m unittest discover -s sdk/python/tests`.
-- FFI belge yorumları ya da istek ve sonuç türleri değişince C başlığı ve `sdk/schema/apeiron.schema.json` `APEIRON_BLESS=1 cargo test -p apeiron-ffi` ile yeniden üretilir.
+- Python SDK testi: `cargo build -p apeiron-ffi-rs && APEIRON_LIB=target/debug/libapeiron.so PYTHONPATH=sdk/python/src python3 -m unittest discover -s sdk/python/tests`.
+- FFI belge yorumları ya da istek ve sonuç türleri değişince C başlığı ve `sdk/schema/apeiron.schema.json` `APEIRON_BLESS=1 cargo test -p apeiron-ffi-rs` ile yeniden üretilir.
 - Proje sahibinin kararını gerektiren işler atlanır ve not edilir; parolalar ve kişisel bilgiler hiçbir dosyaya yazılmaz.

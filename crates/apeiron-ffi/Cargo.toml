@@ -1,5 +1,5 @@
 [package]
-name = "apeiron-ffi"
+name = "apeiron-ffi-rs"
 description = "C ABI of Apeiron: libapeiron and apeiron.h"
 version.workspace = true
 edition.workspace = true
@@ -14,7 +14,7 @@ name = "apeiron"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
-api = { package = "apeiron", path = "../apeiron" }
+api = { package = "apeiron-rs", path = "../apeiron" }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 

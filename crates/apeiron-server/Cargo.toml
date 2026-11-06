@@ -1,5 +1,5 @@
 [package]
-name = "apeiron-server"
+name = "apeiron-server-rs"
 description = "Server of Apeiron's pages and JSON API, local and on the web"
 version.workspace = true
 edition.workspace = true
@@ -8,9 +8,12 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
+[lib]
+name = "apeiron_server"
+
 [dependencies]
-apeiron = { path = "../apeiron" }
-apeiron-daemon = { path = "../apeiron-daemon" }
+apeiron = { package = "apeiron-rs", path = "../apeiron" }
+apeiron-daemon = { package = "apeiron-daemon-rs", path = "../apeiron-daemon" }
 argon2 = "0.6.0"
 aws-lc-rs = "1.19.0"
 axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "query", "tokio"] }

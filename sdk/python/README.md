@@ -2,7 +2,7 @@
 
 # Apeiron for Python
 
-A thin layer over the C ABI of Apeiron ([docs/SDK.md](../../docs/SDK.md)). It needs the native library: build it with `cargo build --release -p apeiron-ffi` and point `APEIRON_LIB` at `target/release/libapeiron.so` (`libapeiron.dylib` on macOS, `apeiron.dll` on Windows), or copy the file next to `apeiron/__init__.py`.
+A thin layer over the C ABI of Apeiron ([docs/SDK.md](../../docs/SDK.md)). It needs the native library: build it with `cargo build --release -p apeiron-ffi-rs` and point `APEIRON_LIB` at `target/release/libapeiron.so` (`libapeiron.dylib` on macOS, `apeiron.dll` on Windows), or copy the file next to `apeiron/__init__.py`.
 
 ```python
 import apeiron

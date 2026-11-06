@@ -30,7 +30,7 @@ Apeiron is written in Rust. You need the Rust tools, Git and a C compiler.
 ### 2.2 Building and installing
 
 ```bash
-cargo install --locked --git https://github.com/efe-clk/apeiron apeiron-cli
+cargo install --locked --git https://github.com/efe-clk/apeiron apeiron-cli-rs
 apeiron --version
 ```
 
@@ -39,7 +39,7 @@ apeiron --version
 ### 2.3 Updating
 
 ```bash
-cargo install --locked --force --git https://github.com/efe-clk/apeiron apeiron-cli
+cargo install --locked --force --git https://github.com/efe-clk/apeiron apeiron-cli-rs
 ```
 
 ## 3. Creating the repository
@@ -246,7 +246,7 @@ Install it on every computer that syncs the folder; a computer without it makes 
 The desktop app does everything in sections 3 to 6 that most people need, in a window: opening or creating the backup folder, backing up, looking at versions, restoring and checking ([DESKTOP.md](DESKTOP.md)). On Linux it needs the WebKitGTK files first (`sudo apt install libwebkit2gtk-4.1-dev` on Debian and Ubuntu, `sudo pacman -S webkit2gtk-4.1` on Arch):
 
 ```bash
-cargo install --locked --git https://github.com/efe-clk/apeiron apeiron-desktop
+cargo install --locked --git https://github.com/efe-clk/apeiron apeiron-desktop-rs
 apeiron-desktop
 ```
 

@@ -149,30 +149,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
-name = "apeiron"
+name = "apeiron-cli-rs"
 version = "0.0.0"
 dependencies = [
- "apeiron-core",
- "apeiron-git",
- "apeiron-plugin",
- "apeiron-remote",
- "apeiron-services",
- "dirs 6.0.0",
- "gethostname",
- "schemars",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "apeiron-cli"
-version = "0.0.0"
-dependencies = [
- "apeiron",
- "apeiron-daemon",
- "apeiron-server",
+ "apeiron-daemon-rs",
+ "apeiron-rs",
+ "apeiron-server-rs",
  "aws-lc-rs",
  "clap",
  "ctrlc",
@@ -185,10 +167,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "apeiron-core"
+name = "apeiron-core-rs"
 version = "0.0.0"
 dependencies = [
- "apeiron-sys",
+ "apeiron-sys-rs",
  "argon2",
  "blake3",
  "chacha20poly1305",
@@ -206,11 +188,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "apeiron-daemon"
+name = "apeiron-daemon-rs"
 version = "0.0.0"
 dependencies = [
- "apeiron",
- "apeiron-sys",
+ "apeiron-rs",
+ "apeiron-sys-rs",
  "dirs 6.0.0",
  "fs4",
  "jiff",
@@ -223,19 +205,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "apeiron-desktop"
+name = "apeiron-desktop-rs"
 version = "0.0.0"
 dependencies = [
- "apeiron-server",
+ "apeiron-server-rs",
  "tao",
  "wry",
 ]
 
 [[package]]
-name = "apeiron-ffi"
+name = "apeiron-ffi-rs"
 version = "0.0.0"
 dependencies = [
- "apeiron",
+ "apeiron-rs",
  "cbindgen",
  "jsonschema",
  "serde",
@@ -244,10 +226,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "apeiron-git"
+name = "apeiron-git-rs"
 version = "0.0.0"
 dependencies = [
- "apeiron-core",
+ "apeiron-core-rs",
  "flate2",
  "gix",
  "schemars",
@@ -257,10 +239,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "apeiron-plugin"
+name = "apeiron-plugin-rs"
 version = "0.0.0"
 dependencies = [
- "apeiron-services",
+ "apeiron-services-rs",
  "dirs 6.0.0",
  "schemars",
  "serde",
@@ -272,10 +254,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "apeiron-remote"
+name = "apeiron-remote-rs"
 version = "0.0.0"
 dependencies = [
- "apeiron-core",
+ "apeiron-core-rs",
  "object_store",
  "russh",
  "russh-sftp",
@@ -285,11 +267,29 @@ dependencies = [
 ]
 
 [[package]]
-name = "apeiron-server"
+name = "apeiron-rs"
 version = "0.0.0"
 dependencies = [
- "apeiron",
- "apeiron-daemon",
+ "apeiron-core-rs",
+ "apeiron-git-rs",
+ "apeiron-plugin-rs",
+ "apeiron-remote-rs",
+ "apeiron-services-rs",
+ "dirs 6.0.0",
+ "gethostname",
+ "schemars",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "apeiron-server-rs"
+version = "0.0.0"
+dependencies = [
+ "apeiron-daemon-rs",
+ "apeiron-rs",
  "argon2",
  "aws-lc-rs",
  "axum",
@@ -318,10 +318,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "apeiron-services"
+name = "apeiron-services-rs"
 version = "0.0.0"
 dependencies = [
- "apeiron-core",
+ "apeiron-core-rs",
  "flate2",
  "schemars",
  "serde",
@@ -335,7 +335,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "apeiron-sys"
+name = "apeiron-sys-rs"
 version = "0.0.0"
 dependencies = [
  "libc",

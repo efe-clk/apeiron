@@ -45,7 +45,7 @@ jobs:
           APEIRON_SFTP_TEST: ${{ runner.os != 'Windows' && '1' || '' }}
       - run: cargo test --manifest-path plugins/text/Cargo.toml
       # The C ABI through the Python SDK and a C program (docs/SDK.md).
-      - run: cargo build -p apeiron-ffi
+      - run: cargo build -p apeiron-ffi-rs
       - name: Python SDK and C example
         shell: bash
         run: |
@@ -85,7 +85,7 @@ jobs:
             -H "Content-Type: application/xml" \
             -H "Content-MD5: $(printf '%s' "$lock" | openssl md5 -binary | base64)" \
             --data-binary "$lock"
-      - run: cargo test -p apeiron-remote --test s3 -- --nocapture
+      - run: cargo test -p apeiron-remote-rs --test s3 -- --nocapture
         env:
           APEIRON_S3_TEST_URL: s3://apeiron-test?endpoint=http://127.0.0.1:4566&region=us-east-1
           APEIRON_S3_LOCKED_URL: s3://apeiron-locked?endpoint=http://127.0.0.1:4566&region=us-east-1

@@ -1,5 +1,5 @@
 [package]
-name = "apeiron"
+name = "apeiron-rs"
 description = "Public Rust API of Apeiron"
 version.workspace = true
 edition.workspace = true
@@ -8,12 +8,15 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
+[lib]
+name = "apeiron"
+
 [dependencies]
-apeiron-core = { path = "../apeiron-core" }
-apeiron-git = { path = "../apeiron-git" }
-apeiron-plugin = { path = "../apeiron-plugin" }
-apeiron-remote = { path = "../apeiron-remote" }
-apeiron-services = { path = "../apeiron-services" }
+apeiron-core = { package = "apeiron-core-rs", path = "../apeiron-core" }
+apeiron-git = { package = "apeiron-git-rs", path = "../apeiron-git" }
+apeiron-plugin = { package = "apeiron-plugin-rs", path = "../apeiron-plugin" }
+apeiron-remote = { package = "apeiron-remote-rs", path = "../apeiron-remote" }
+apeiron-services = { package = "apeiron-services-rs", path = "../apeiron-services" }
 dirs = "6.0.0"
 gethostname = "1.1.0"
 schemars = "1.2.1"
@@ -22,6 +25,6 @@ serde_json = "1.0.154"
 thiserror = "2.0.21"
 
 [dev-dependencies]
-apeiron-core = { path = "../apeiron-core" }
+apeiron-core = { package = "apeiron-core-rs", path = "../apeiron-core" }
 serde_json = "1"
 tempfile = "3.27.0"

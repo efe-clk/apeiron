@@ -97,7 +97,7 @@ apeiron_repo_free(repo);
 
 ## 3. Schemas
 
-`sdk/schema/apeiron.schema.json` describes every value that crosses the ABI, as JSON Schema generated from the Rust types and checked into the repository, so that SDKs can generate typed classes instead of writing them by hand: for each operation in `operations`, whether it is `long` and its `request` and `result`, then `progress` and `error`, with the types in `$defs`. A test fails when the file differs from the types (`APEIRON_BLESS=1 cargo test -p apeiron-ffi` writes it anew), and the conformance suite checks every request, result and error it meets against it. A schema change that is not additive raises the minor version of the API before 1.0 and the major version after it ([API.md](API.md) §6).
+`sdk/schema/apeiron.schema.json` describes every value that crosses the ABI, as JSON Schema generated from the Rust types and checked into the repository, so that SDKs can generate typed classes instead of writing them by hand: for each operation in `operations`, whether it is `long` and its `request` and `result`, then `progress` and `error`, with the types in `$defs`. A test fails when the file differs from the types (`APEIRON_BLESS=1 cargo test -p apeiron-ffi-rs` writes it anew), and the conformance suite checks every request, result and error it meets against it. A schema change that is not additive raises the minor version of the API before 1.0 and the major version after it ([API.md](API.md) §6).
 
 ## 4. SDK rules
 

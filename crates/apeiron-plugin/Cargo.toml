@@ -1,5 +1,5 @@
 [package]
-name = "apeiron-plugin"
+name = "apeiron-plugin-rs"
 description = "Plugin host of Apeiron: WebAssembly components on Wasmtime"
 version.workspace = true
 edition.workspace = true
@@ -8,8 +8,11 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
+[lib]
+name = "apeiron_plugin"
+
 [dependencies]
-apeiron-services = { path = "../apeiron-services" }
+apeiron-services = { package = "apeiron-services-rs", path = "../apeiron-services" }
 dirs = "6.0.0"
 schemars = "1.2.1"
 serde = { version = "1.0.229", features = ["derive"] }
