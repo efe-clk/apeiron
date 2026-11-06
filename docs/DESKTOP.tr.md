@@ -38,9 +38,11 @@ Sayfalar yalnızca JSON API'yi, JSON API de yalnızca herkese açık API'yi ça�
 | Karşılaştır | Bir snapshot ile bir öncekinin arasında ne değiştiği; metin eklentisi kuruluysa metin dosyalarının değişen satır ve sözcükleriyle (TEXT.tr.md §3) | Tamamlandı |
 | Denetle | Tüm depoyu denetler ve sağlam olup olmadığını sade sözcüklerle söyler | Tamamlandı |
 | Senkron | Uzak depoları listeler, ekler ve kaldırır; bir klasörün onlardan biriyle bir senkron turunu iki yönlü ya da tek yönlü çalıştırır ya da yalnızca neyin değişeceğini gösterir (SYNC.tr.md); yapılan değişiklikleri ve her çatışmayı çatışma kopyasıyla listeler; klasördeki çatışma kopyalarını bulur ve her birinin iki sürümünden birini tek düğmeyle tutar (SYNC.tr.md §4) | Tamamlandı |
-| Parolalar | Şifreli bir depo için: parolalarını ve kurtarma anahtarlarını listeler, parola ekler, bir kurtarma anahtarı oluşturup bir kez gösterir ve bir anahtarı siler ama sonuncusunu asla (FORMAT.tr.md §15) | Tamamlandı |
+| Parolalar | Şifreli bir depo için: parolalarını ve kurtarma anahtarlarını listeler, parola ekler, bir kurtarma anahtarı oluşturup bir kez gösterir ve bir anahtarı siler ama sonuncusunu asla (FORMAT.tr.md §14) | Tamamlandı |
 | Eklentiler | Kurulu eklentileri işledikleri dosyalarla listeler, bir `.wasm` dosyasından eklenti kurar ve kaldırır; `apeiron plugin` gibi (PLUGIN.tr.md §1) | Tamamlandı |
 | Zamanlama | Arka plan hizmetinin işlerini son sonuçları ve sonraki çalışmalarıyla gösterir ve iş dosyasını düzenler; hatalı bir dosya kaydedilmez, elle bozulmuş bir dosya hatasıyla birlikte gösterilir (DAEMON.tr.md §3) | Tamamlandı |
+| Saklama | Saklama kurallarını listeler ve uyarıdan sonra kural ekler (ARCHIVE.tr.md §5) | Tamamlandı |
+| Rapor | Bir uyumluluk raporunun bulguları, deposu ve yedekleri; doğrulama ve uzak depolarla karşılaştırma seçeneğiyle (REPORTS.tr.md §5) | Tamamlandı |
 
 Sözcükler formatı değil kullanıcıyı izler: bir ref yedek, bir snapshot sürüm olarak gösterilir; kimlikler yalnızca bir ayrıntı satırında görünür.
 
@@ -74,6 +76,7 @@ Bir hata, API.tr.md §8.6'daki hata değeridir; durum kodu `invalid_input`, `amb
 | `Host` başlığı `127.0.0.1:<port>` olmalı ve `Origin` başlığı olan bir istek o kaynaktan gelmeli | Kullanıcının tarayıcısındaki bir web sayfası onu doğrudan ya da DNS yeniden bağlama (DNS rebinding) ile çağıramaz |
 | Sayfalar internetten hiçbir şey yüklemez | Çevrimdışı çalışırlar ve hiçbir şey sızdırmazlar |
 | Parola depoyu açmak için bir kez gönderilir ve yalnızca API'nin tutamacında tutulur | Arayüz onu asla saklamaz |
+| Her yanıtta yalnızca programın kendi dosyalarına izin veren bir `Content-Security-Policy`, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` ve `Referrer-Policy: no-referrer` bulunur | Sayfalar başka yerden bir şey çalıştırmaz, önbelleklerde tutulmaz ve bir adres bir istekle dışarı çıkmaz |
 
 ## 5. Bu işin parçası olmayanlar
 

@@ -4,7 +4,7 @@
 
 Bu belge Apeiron'un nasıl kurulduğunu anlatır: katmanlar, nesne modeli, bir snapshot alınırken, geri yüklenirken ya da senkronlanırken verinin izlediği yol, eklentilerin nereye bağlandığı ve güvenliğin tasarıma nasıl yerleştiği. Arkasındaki hedefler [VISION.tr.md](VISION.tr.md), diskteki formatın tam tanımı [FORMAT.tr.md](FORMAT.tr.md) içindedir.
 
-Her bölüm kendi durumunu belirtir. Sistemin büyük kısmı **Planlandı** durumundadır; yalnızca `apeiron-core` içindeki depolama motoru yazıldı.
+Her bölüm kendi durumunu belirtir. Aşağıdaki katmanlar yazıldı; hâlâ eksik olanlar [ROADMAP.tr.md](ROADMAP.tr.md) §8'de listelenir.
 
 ## 1. Genel bakış
 
@@ -40,7 +40,7 @@ Temel tasarım fikirleri:
 | --- | --- | --- | --- |
 | Arayüzler | CLI, arka plan hizmeti, masaüstü, web, mobil | `apeiron-cli`, `apeiron-daemon`, `apeiron-server`, `apeiron-desktop` | Devam ediyor (CLI, arka plan hizmeti, masaüstü ve web tamamlandı) |
 | Herkese açık API | Kararlı Rust API; diğer diller için C ABI; üstünde SDK'lar | `apeiron`, `apeiron-ffi` | Devam ediyor (Rust API, C ABI ve Python SDK'sı tamamlandı) |
-| Hizmetler | Sürümleme, arşiv, yedek, senkron, arama, politika | `apeiron-services`, `apeiron-git` | Devam ediyor (yedek, geri yükleme, fark, senkron, Git içe ve dışa aktarma) |
+| Hizmetler | Sürümleme, arşiv, yedek, senkron, arama, politika | `apeiron-services`, `apeiron-git` | Devam ediyor (yedek, geri yükleme, fark, senkron, birleştirme, arama, Git içe ve dışa aktarma) |
 | Çekirdek | Nesne modeli, depolama motoru, bütünlük, şifreleme, işlem günlüğü | `apeiron-core` | Devam ediyor |
 | Depolama hedefleri | Yerel disk, harici disk, ağ depolaması, uzak hedefler | `apeiron-core` (`Store`, klasörler), `apeiron-remote` (SFTP, S3) | Tamamlandı |
 | Eklentiler | Type driver'lar, storage backend'ler, içe/dışa aktarıcılar, hook'lar | `apeiron-plugin` | Devam ediyor (ortam ve tür sürücüleri tamamlandı) |
@@ -66,7 +66,7 @@ Her crate için geçerli kurallar:
 | `crypto`, `keyfile` | Şifreleme: mühürlü kutular ve anahtar dosyaları (FORMAT.tr.md §14) | Tamamlandı |
 | `remote`, `repo::transfer` | `remotes` dosyası, `Store` arayüzü, klasör uzak depoları, push ve pull (FORMAT.tr.md §15); SFTP ve S3 depoları `apeiron-remote` içinde | Tamamlandı |
 | `retention` | Saklama kuralları ve her ref değişikliğinin denetimleri (FORMAT.tr.md §16) | Tamamlandı |
-| İşlem günlüğü | — | Planlandı |
+| İşlem günlüğü | — | Planlandı, zamanlanmadı ([ROADMAP.tr.md](ROADMAP.tr.md) §8) |
 
 ## 3. Nesne modeli
 
@@ -93,11 +93,11 @@ Ref bir snapshot'a ad verir; snapshot bir kök tree'yi ve ebeveyn snapshot'ları
 | Tree | Bir dizin: adlar, türler, izinler, zamanlar, öznitelikler | Tamamlandı |
 | Snapshot | Bir veri kümesinin belirli andaki durumu; ebeveynleri, yazarı ve açıklamasıyla | Tamamlandı |
 | Ref | Bir snapshot'ı gösteren ad; dal, etiket ve yedek noktası aynı şeydir | Tamamlandı |
-| Store | Nesnelerin saklandığı yer; her hedef için aynı arayüz | Devam ediyor (yalnızca yerel klasör) |
-| Policy | Saklama, şifreleme, senkron ve doğrulama kuralları | Planlandı |
-| Type driver | Türe özgü diff, birleştirme, önizleme ve indeksleme; eklenti olarak | Planlandı |
+| Store | Nesnelerin saklandığı yer; her hedef için aynı arayüz | Tamamlandı (klasör, SFTP, S3) |
+| Policy | Saklama, şifreleme, senkron ve doğrulama kuralları | Devam ediyor (saklama kuralları ve yasal saklama kilitleri tamamlandı, [ARCHIVE.tr.md](ARCHIVE.tr.md); eski yedekleri budayan kurallar yazılmadı) |
+| Type driver | Türe özgü diff, birleştirme, önizleme ve indeksleme; eklenti olarak | Devam ediyor (fark ve birleştirme tamamlandı, [PLUGIN.tr.md](PLUGIN.tr.md); önizleme ve indeksleme yazılmadı) |
 
-Blob, tree ve snapshot `minicbor` ile kanonik CBOR olarak kodlanır. Bunları gerçek dosyalardan oluşturan bir kod henüz yok; bu, yedek ve sürümleme hizmetlerinin işidir.
+Blob, tree ve snapshot `minicbor` ile kanonik CBOR olarak kodlanır. Bunları gerçek dosyalardan yedek ve sürümleme hizmetleri oluşturur.
 
 ## 4. Diskte saklama
 
@@ -116,7 +116,7 @@ Tam spesifikasyon [FORMAT.tr.md](FORMAT.tr.md) içindedir. Kısaca:
 
 ### 5.1 Snapshot alma
 
-Durum: 3–6. adımlar (depolama) Tamamlandı; klasörü tarama, tree oluşturma ve hizmet katmanı Planlandı.
+Durum: Tamamlandı.
 
 ```mermaid
 sequenceDiagram
@@ -139,7 +139,7 @@ Bellek kullanımı sınırlı kalır: dosya akış olarak işlenir, aynı anda e
 
 ### 5.2 Geri yükleme
 
-Durum: Planlandı (nesneleri okuma ve doğrulama Tamamlandı).
+Durum: Tamamlandı.
 
 ```mermaid
 sequenceDiagram
@@ -159,7 +159,7 @@ sequenceDiagram
     S-->>U: Rapor: geri yüklenen, atlanan, başarısız
 ```
 
-Doğrulamadan geçemeyen bir chunk hedefe hiçbir zaman yazılmaz; hata raporlanır. Başka bir doğrulanmış kopyadan onarım Aşama 1'de planlandı.
+Doğrulamadan geçemeyen bir chunk hedefe hiçbir zaman yazılmaz; hata raporlanır. Başka bir doğrulanmış kopyadan otomatik onarım henüz yazılmadı ([ROADMAP.tr.md](ROADMAP.tr.md) §8); o zamana kadar doğrudan kopyadan geri yüklenir ([GUIDE.tr.md](GUIDE.tr.md) §6.1).
 
 ### 5.3 Senkronlama
 
@@ -223,7 +223,7 @@ flowchart LR
 | Denetim kaydı | Hassas işlemler kaydedilir; hassas veri hiçbir zaman kaydedilmez | Web arayüzü için tamamlandı ([AUDIT.tr.md](AUDIT.tr.md)) |
 | Eklentiler | Bildirilmiş ve kullanıcının onayladığı izinlerle WASM sandbox | Yerinde; henüz izin verilmiyor |
 | Bellek güvenliği | `unsafe` yalnızca FFI crate'inde ve `apeiron-sys` içinde | Uygulanıyor |
-| Uzak erişim | Varsayılan olarak kapalı; açıkça yapılandırılır | Planlandı (Aşama 2) |
+| Uzak erişim | Varsayılan olarak kapalı; açıkça yapılandırılır | Uygulanıyor (`apeiron web` yalnızca istenince başlar; `apeiron ui` yalnızca bu bilgisayarda dinler) |
 | Telemetri | Varsayılan olarak kapalı; veri hiçbir zaman zorunlu olarak üçüncü tarafa gönderilmez | Uygulanıyor (telemetri yok) |
 
 Güvenlik açığı bildirme: [SECURITY.tr.md](../SECURITY.tr.md).

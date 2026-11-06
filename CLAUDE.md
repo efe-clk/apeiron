@@ -99,12 +99,16 @@ Aşama 5'in bütün işleri tamamlandı; aşama, çıkış kriteri olan ilk kuru
 12. Let's Encrypt (ACME).
 13. İlk sürüm: kurulum dosyaları, simgeler, indirilebilir metin eklentisi.
 
+Bu listede olmayan, belgelerin istediği ama yazılmamış işler `docs/ROADMAP.md` §8'dedir (bozuk nesneyi başka kopyadan onarma, eski yedekleri budama, dışlama kuralları, performans ölçümü ...). Sıraları proje sahibinin kararıdır.
+
 ## Çalışma düzeni
 
 - Proje `efe-clk/apeiron` reposuyla eşzamanlı ilerler: yapılan iş commit edilir, `master`'a push edilir, CI arka planda beklenir; CI kırılırsa önce o düzeltilir. Push'tan sonra `cargo install --locked --path crates/apeiron-cli`.
 - Küçük işler 2-3'lü gruplar halinde yapılır: her biri ayrı commit, sonra tek push, tek CI beklemesi, tek kısa Türkçe rapor.
 - Her commit öncesi: `cargo fmt --all`, `cargo clippy --all-targets -- -D warnings`, `cargo test`; belgelerde X.md ile X.tr.md aynı başlıklara ve tablo satır sayılarına sahip olmalıdır.
-- Metin eklentisi ayrı bir workspace'tir: `plugins/text` (`--manifest-path` ile; wasm `--target wasm32-wasip2`).
+- Derleme çıktısı `/tmp`'ye veya oturumun geçici çalışma klasörüne yönlendirilmez (`CARGO_TARGET_DIR`, `--target-dir`); Cargo'nun varsayılan `target/` klasörü kullanılır. `/tmp` RAM'de tutulur ve kullanıcı başına yaklaşık 6 GiB kotası vardır; kota dolunca derleme `Disk quota exceeded` hatası verir, `rust-lld` de SIGBUS ile çöker.
+- Metin eklentisi ayrı bir workspace'tir: `plugins/text` (`--manifest-path` ile; wasm `--target wasm32-wasip2`). `cargo test`'in eklenti testleri `rustup target add wasm32-wasip2` ister.
+- Belgelerin uyumunu `crates/apeiron-cli/tests/docs.rs` denetler; yeni komut, seçenek, işlem veya crate belgelenmeden `cargo test` geçmez.
 - Python SDK testi: `cargo build -p apeiron-ffi && APEIRON_LIB=target/debug/libapeiron.so PYTHONPATH=sdk/python/src python3 -m unittest discover -s sdk/python/tests`.
 - FFI belge yorumları değişince C başlığı `APEIRON_BLESS=1 cargo test -p apeiron-ffi` ile yeniden üretilir.
 - Proje sahibinin kararını gerektiren işler atlanır ve not edilir; parolalar ve kişisel bilgiler hiçbir dosyaya yazılmaz.

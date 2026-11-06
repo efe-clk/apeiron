@@ -2,7 +2,7 @@
 
 # Apeiron Public API — Design Principles
 
-> **Status: Draft for review.** Sections 1–7 are the principles of the API; section 8 is the specification of the public `apeiron` crate, implemented in Stage 1; section 9 lists the core functions that already exist. The C ABI and the SDKs are specified in [SDK.md](SDK.md).
+> **Status: In progress.** Sections 1–7 are the principles of the API, each with its status; section 8 is the specification of the public `apeiron` crate, which is implemented; section 9 lists the core functions that already exist. The C ABI and the SDKs are specified in [SDK.md](SDK.md).
 
 The public API is the only way into Apeiron. The CLI, the background service, the desktop and web interfaces and every external application use it; there is no hidden back door ([VISION.md](VISION.md), principle 8).
 
@@ -31,10 +31,10 @@ SDKs never re-implement logic; they only wrap the C ABI. That is how the same op
 
 | Principle | Description | Status |
 | --- | --- | --- |
-| One model, two modes | The same operations and types work in embedded use (library in the same process) and remote use (through the background service) | Planned |
-| Complete coverage | Every versioning, archive, backup, sync and administration operation is available; if the CLI can do it, the API can do it | Planned |
-| Explicit results | Every critical operation ends in an explicit success or a typed error; there is no "probably done" state | Planned |
-| Plain-data inputs and outputs | Requests and results are plain data types that can be serialised (for the remote mode and the C ABI) | Planned |
+| One model, two modes | The same operations and types work in embedded use (library in the same process) and remote use (through the background service) | In progress (embedded done; remote not scheduled, [ROADMAP.md](ROADMAP.md) §8) |
+| Complete coverage | Every versioning, archive, backup, sync and administration operation is available; if the CLI can do it, the API can do it | In progress (section 8.3; the `web` commands manage the server's own files and are not in the API) |
+| Explicit results | Every critical operation ends in an explicit success or a typed error; there is no "probably done" state | Done |
+| Plain-data inputs and outputs | Requests and results are plain data types that can be serialised (for the remote mode and the C ABI) | Done |
 
 Long operations (backup, restore, sync, verification) are started as **jobs**. A job can be observed, cancelled and queried for its result (section 8.5).
 
@@ -42,10 +42,10 @@ Long operations (backup, restore, sync, verification) are started as **jobs**. A
 
 | Principle | Description | Status |
 | --- | --- | --- |
-| Progress reporting | Long jobs report progress (items and bytes done and total, current phase) | Planned |
-| Cancellation | Every long job can be cancelled; cancellation leaves the repository in a valid state (old or new, never half) | Planned |
-| Timeouts | SDKs support timeouts using the same cancellation mechanism | Planned |
-| Result query | A finished job's result can be read later, including in remote mode | Planned |
+| Progress reporting | Long jobs report progress (items and bytes done and total, current phase) | Done |
+| Cancellation | Every long job can be cancelled; cancellation leaves the repository in a valid state (old or new, never half) | Done |
+| Timeouts | SDKs support timeouts using the same cancellation mechanism | Done (Python) |
+| Result query | A finished job's result can be read later, including in remote mode | Done for embedded use and the web server; no remote mode yet |
 
 Cancellation is safe by construction: objects become visible only after they are flushed, and refs are updated last ([FORMAT.md](FORMAT.md) §9).
 
@@ -53,9 +53,9 @@ Cancellation is safe by construction: objects become visible only after they are
 
 | Principle | Description | Status |
 | --- | --- | --- |
-| Streams, not buffers | File content goes in and out as streams (`Read`/`Write` in Rust); content is never loaded into memory whole | Partly done (chunk writing streams in `apeiron-core`) |
-| Bounded memory | Memory use is independent of file size; target under 256 MB while adding a 10 GB file on a Raspberry Pi 4 ([VISION.md](VISION.md)) | Planned (to be measured in Stage 1) |
-| Lazy listing | History, trees and search results are returned as iterators or pages, not as one big list | Planned |
+| Streams, not buffers | File content goes in and out as streams (`Read`/`Write` in Rust); content is never loaded into memory whole | Done in the Rust API; the C ABI works on paths ([SDK.md](SDK.md) §7) |
+| Bounded memory | Memory use is independent of file size; target under 256 MB while adding a 10 GB file on a Raspberry Pi 4 ([VISION.md](VISION.md)) | Designed for; not measured yet ([ROADMAP.md](ROADMAP.md) §8) |
+| Lazy listing | History, trees and search results are returned as iterators or pages, not as one big list | In progress (history is paged; trees and search results are lists, search with a limit) |
 
 ## 5. Error types
 
@@ -75,7 +75,7 @@ Cancellation is safe by construction: objects become visible only after they are
 | Semantic versioning | The Rust API, the C ABI and each SDK follow SemVer | Planned |
 | Before 1.0 | Breaking changes are allowed between minor versions and are listed in release notes | Planned |
 | From 1.0 | Breaking changes only in a new major version, with a written compatibility policy | Planned |
-| Separate versions | The storage format ([FORMAT.md](FORMAT.md)), the C ABI and the plugin API have their own version numbers | Format: Done (version 1); others Planned |
+| Separate versions | The storage format ([FORMAT.md](FORMAT.md)), the C ABI and the plugin API have their own version numbers | Done: format version 1, C ABI 0.1, plugin API 0.1 |
 | Minimum Rust version | The workspace declares its minimum supported Rust version (currently 1.97) | Done |
 
 ## 7. C ABI and SDK layer
@@ -120,6 +120,7 @@ flowchart TB
 | `apeiron-services` | Turns folders into trees and snapshots and back; diff; tar, zip and 7z export | In progress |
 | `apeiron-cli` | The `apeiron` command ([CLI.md](CLI.md)) | In progress |
 | `apeiron-ffi` | C ABI over `apeiron` ([SDK.md](SDK.md)) | Done |
+| `apeiron-git`, `apeiron-plugin`, `apeiron-remote` | Git import and export, the plugin host, SFTP and S3 remotes, all used by `apeiron` | Done |
 
 ### 8.2 Repository handle
 
@@ -178,15 +179,18 @@ Every operation takes one plain request value and returns one plain result value
 | `pull` | remote name, ref name (default `main`) | `TransferReport`, the same for the local ref; `conflict` if the local ref has snapshots the remote does not | Yes |
 | `retention` | — | `Vec<RetentionRule>`: refs pattern, days, when added; oldest first ([ARCHIVE.md](ARCHIVE.md)) | No |
 | `add_retention` | refs (a name, or a prefix followed by `*`), days (1 to 36500) | `RetentionRule`; it can never be removed or shortened ([FORMAT.md](FORMAT.md) §16). A ref change a rule forbids fails with `conflict` | No |
-| `holds` | — | `Vec<LegalHold>`: id, refs pattern, reason, when placed and, once lifted, the lift's reason and time; oldest first ([ARCHIVE.md](ARCHIVE.md) §2.1) | No |
-| `add_hold` | refs (a name, or a prefix followed by `*`), reason (one line, 1 to 200 characters) | `LegalHold`; until lifted, a ref it matches only moves forward and is not deleted, and gc keeps its whole reflog ([FORMAT.md](FORMAT.md) §17). A ref change it forbids fails with `conflict` | No |
-| `lift_hold` | id, reason | `LegalHold` with its lift; cannot be undone. `not_found` for an unknown id | No |
+| `holds` (Rust: `legal_holds`) | — | `Vec<LegalHold>`: id, refs pattern, reason, when placed and, once lifted, the lift's reason and time; oldest first ([ARCHIVE.md](ARCHIVE.md) §2.1) | No |
+| `add_hold` (Rust: `add_legal_hold`) | refs (a name, or a prefix followed by `*`), reason (one line, 1 to 200 characters) | `LegalHold`; until lifted, a ref it matches only moves forward and is not deleted, and gc keeps its whole reflog ([FORMAT.md](FORMAT.md) §17). A ref change it forbids fails with `conflict` | No |
+| `lift_hold` (Rust: `lift_legal_hold`) | id, reason | `LegalHold` with its lift; cannot be undone. `not_found` for an unknown id | No |
 | `report` | verify, remotes, stale days (default 7) | `ComplianceReport`: time, repository facts (encryption, keys, damaged files), per ref the snapshot, newest time, history length, retention and state on each remote, retention rules, legal holds, verify result, remotes, findings ([REPORTS.md](REPORTS.md)) | Yes |
 | `push_all`, `pull_all` | remote name | `MirrorReport`: per ref its name and either a `TransferReport` or the `conflict` that left it; other errors stop them all ([REPLICATION.md](REPLICATION.md) §2, [FORMAT.md](FORMAT.md) §15.7) | Yes |
 | `git_import` | Git repository path, ref prefix (default `git`) | `GitImportReport`: commits and tags stored, refs moved (Git name, ref, Git id, snapshot, previous), skipped refs with the reason, stale refs ([GIT.md](GIT.md)) | Yes |
 | `git_export` | Git repository path (created bare if missing), ref prefix | `GitExportReport`: commits and tags written, refs updated, skipped refs, Git ids not reproduced | Yes |
 | `sync` | folder, remote name, ref name (default `sync/<folder name>`), mode (`two-way`, `send` or `receive`), dry run, speed limit | `SyncReport`: ref, action (`up_to_date`, `sent`, `received` or `merged`), snapshot, the backup made, what was fetched and pushed, folder changes, conflicts with their copies, files merged by plugins, paths left for the next round, warnings, rounds run ([SYNC.md](SYNC.md)); `conflict` in `send` mode when the remote has snapshots this copy does not | Yes |
 | `switch` | snapshot spec, folder, dry run | `SwitchReport`: the folder ref, the snapshot, the snapshot that recorded the folder first, folder changes, files changed during the switch with their copies, paths left alone, warnings ([BRANCH.md](BRANCH.md) §6) | Yes |
+| `add_file`, `export_zip_to` (Rust only) | a file added to a backup as a new version; a snapshot or a path in it written as a zip file to a `Write` | The file's new path and version; counts ([SHARE.md](SHARE.md)) | No |
+| `share_plugin`, `unshare_plugin`, `shared_plugins`, `install_shared_plugin` (Rust only) | plugin name | Plugins carried in the ref `apeiron/plugins` ([PLUGIN.md](PLUGIN.md) §5) | No |
+| `git_serve_refs`, `git_common`, `git_pack`, `git_receive` (Rust only) | ref prefix and what the Git client asked for | What the server answers to Git over HTTP ([GIT.md](GIT.md) §7) | No |
 
 ### 8.4 Naming a snapshot
 

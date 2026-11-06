@@ -38,9 +38,11 @@ The pages call only the JSON API, and the JSON API calls only the public API (AR
 | Compare | What changed between a snapshot and the one before it, with the changed lines and words of text files when the text plugin is installed (TEXT.md §3) | Done |
 | Verify | Checks the whole repository and says in plain words whether it is healthy | Done |
 | Sync | Lists, adds and removes remotes, and runs a sync round of a folder with one of them, both ways or one way, or only shows what would change (SYNC.md); lists the changes made and every conflict with its conflict copy; finds the conflict copies in the folder and keeps either version of each with one button (SYNC.md §4) | Done |
-| Passwords | For an encrypted repository: lists its passwords and recovery keys, adds a password, makes a recovery key and shows it once, and removes a key but never the last one (FORMAT.md §15) | Done |
+| Passwords | For an encrypted repository: lists its passwords and recovery keys, adds a password, makes a recovery key and shows it once, and removes a key but never the last one (FORMAT.md §14) | Done |
 | Plugins | Lists the installed plugins with the files they handle, installs one from a `.wasm` file and removes one, as `apeiron plugin` does (PLUGIN.md §1) | Done |
 | Schedule | Shows the background service's jobs with their last result and next run, and edits the jobs file; a file with an error is not saved, and one broken by hand is shown with its error (DAEMON.md §3) | Done |
+| Retention | Lists the retention rules and adds one after a warning (ARCHIVE.md §5) | Done |
+| Report | Findings, repository and backups of a compliance report, with the choice to verify and to compare with the remotes (REPORTS.md §5) | Done |
 
 Words follow the user, not the format: a ref is shown as a backup, a snapshot as a version, and ids appear only in a details line.
 
@@ -74,6 +76,7 @@ An error is the error value of API.md §8.6 with status 400 for `invalid_input`,
 | The `Host` header must be `127.0.0.1:<port>`, and a request with an `Origin` header must come from that origin | A web page in the user's browser cannot call it, directly or by DNS rebinding |
 | The pages load nothing from the internet | They work offline and leak nothing |
 | The password is sent once to open the repository and kept only inside the API's handle | It is never stored by the interface |
+| Every answer has a `Content-Security-Policy` that allows only the program's own files, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer` | Pages run nothing from elsewhere, are not kept in caches, and an address does not leave with a request |
 
 ## 5. Not part of this work item
 

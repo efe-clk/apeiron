@@ -90,9 +90,9 @@ Bir ad 1 ile 64 karakter arasıdır ve denetim karakteri içermez; çevresindeki
 
 | Konu | Nerede |
 | --- | --- |
-| PDF, ofis ve diğer biçimlerin içindeki metin | Eklenti sisteminin tür sürücüleri, Aşama 3 |
+| PDF, ofis ve diğer biçimlerin içindeki metin | Daha sonra, bir tür sürücüsü olarak; zamanlanmadı ([ROADMAP.tr.md](ROADMAP.tr.md) §8) |
 | macOS ve Windows'ta etiketler | Daha sonra; macOS onları Finder'ın kendi özniteliğinde tutar, Windows'ta yoktur |
-| Kullanıcının göremeyeceği sonuçları gizlemek | Kullanıcılar ve izinler, Aşama 4 |
+| Kullanıcının göremeyeceği sonuçları gizlemek | Web arayüzünde tamamlandı: `member` ya da `reader` gördüğü bir snapshot'ı adlandırmalıdır ([USERS.tr.md](USERS.tr.md) §4) |
 
 ## 8. Crate'ler
 

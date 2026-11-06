@@ -25,7 +25,7 @@ flowchart LR
 | 1. Local MVP | CLI; taking snapshots, history, file-level diff, restore, verification; local and external disk backup targets; tar, zip and 7z export | Backing up and restoring your own data with nothing but Apeiron for one month | Done (one-month test skipped) |
 | 2. Remote and sync | Background service, scheduled backup, encryption, SFTP and S3 targets, one-/two-way sync, conflict detection, restore test | One month of trouble-free sync between two devices and a remote server | Done (one-month test skipped) |
 | 3. Developer and ecosystem | Branching and merging, Git import/export (goal: Git network protocol), C ABI and Python SDK, WebAssembly plugin system, text diff plugin, search | A real Git repository can be moved into Apeiron and back | Done |
-| 4. Interfaces and multi-user | Desktop and web interface, users and permissions, audit log, sharing | A non-technical user can back up and restore without the CLI | Done |
+| 4. Interfaces and multi-user | Desktop and web interface, users and permissions, audit log, sharing | A non-technical user can back up and restore without the CLI | Done (installing still needs a terminal until the first release brings installers) |
 | 5. Enterprise | Central identity, multi-tenant use, replication, high availability, immutable archive, compliance reports | First enterprise pilot installation | In progress |
 
 ## 2. Stage 0 — Format and core
@@ -39,7 +39,7 @@ flowchart LR
 | 3 | Storage engine: chunk write/read, BLAKE3 verification, atomic ref update | Done | Packs, indexes, refs and reflogs in `apeiron-core` |
 | 4 | Canonical CBOR encoding of blob, tree and snapshot ([FORMAT.md](FORMAT.md) §6) | Done | With `minicbor`; non-canonical objects are rejected |
 | 5 | Power-failure and corruption tests ([FORMAT.md](FORMAT.md) §10) | Done | A crash and a full disk are simulated at every change to the disk; a bit flip is tested at every byte of a pack |
-| 6 | Rust API draft | Done | [API.md](API.md) §8, implemented in `apeiron-core`; the separate `apeiron` crate comes with the CLI |
+| 6 | Rust API draft | Done | [API.md](API.md) §8, implemented in `apeiron-core`; the separate `apeiron` crate followed with the CLI in Stage 1 |
 
 On Windows, renames use `MOVEFILE_WRITE_THROUGH` ([FORMAT.md](FORMAT.md) §9.1) through the small `apeiron-sys` crate ([ADR-014](DECISIONS.md#adr-014-a-small-system-crate-for-unsafe-os-calls)).
 
@@ -114,3 +114,23 @@ Central identity comes first, because a pilot organization signs its people in t
 | 5 | Compliance reports ([REPORTS.md](REPORTS.md)) | Done |
 
 Every work item is done (2026-10-30); the stage ends with its exit criterion, the first enterprise pilot installation.
+
+## 8. Not written yet
+
+[VISION.md](VISION.md) and the other documents ask for these, and no stage above delivered them. Their order is the owner's decision; none of them is scheduled.
+
+| Need | Asked for in | What happens today |
+| --- | --- | --- |
+| Repairing a damaged object from another copy | [VISION.md](VISION.md), [FORMAT.md](FORMAT.md) §10 | `verify` reports it; `pull` and `repair` do not replace it. A copy can be restored from directly |
+| Rules that prune old backups (7 daily, 4 weekly, 12 monthly) | [VISION.md](VISION.md) | `gc` removes only what no ref reaches; the history of a ref grows without limit |
+| Exclusion rules and selective sync | [VISION.md](VISION.md), [SYNC.md](SYNC.md) §7 | A backup or sync takes the whole folder |
+| Measuring the performance targets on a Raspberry Pi 4 | [VISION.md](VISION.md), [API.md](API.md) §4 | Not measured |
+| Operation log | [ARCHITECTURE.md](ARCHITECTURE.md) §2 | Reflogs record ref changes; nothing records other operations outside the web interface |
+| Archive packages: splitting into parts, inspecting without unpacking; importing tar and zip | [VISION.md](VISION.md) | tar, zip and 7z are export only |
+| Remote mode of the API and operating the daemon from another device | [API.md](API.md) §2, [DAEMON.md](DAEMON.md) §7 | Only the JSON API of the pages; a tenant's jobs on the Schedule page |
+| Git behind the plugin interface; other plugin types and a plugin store | [DECISIONS.md](DECISIONS.md) ADR-021, [PLUGIN.md](PLUGIN.md) §6 | `apeiron-git` is a crate of its own; plugins are type drivers only |
+| Text inside PDF and office files; tags on macOS and Windows; more standards in reports | [SEARCH.md](SEARCH.md) §7, [REPORTS.md](REPORTS.md) §6 | UTF-8 text only; tags on Linux only; ISO/IEC 27001 only |
+| JSON schemas, the C++ SDK, Python wheels, streaming through the C ABI | [SDK.md](SDK.md) §1, §7 | Python SDK over the C ABI, with the library built by hand |
+| Review, approval and comments | [VISION.md](VISION.md) | Not written |
+| Format upgrade tool | [FORMAT.md](FORMAT.md) §18 | The format is at version 1 |
+| Git over SSH, SAML, sync without a remote, Let's Encrypt, installers and the first release | [GIT.md](GIT.md) §8, [IDENTITY.md](IDENTITY.md) §6, [SYNC.md](SYNC.md) §7, [WEB.md](WEB.md) §6, [DESKTOP.md](DESKTOP.md) §5 | Git over HTTP, OpenID Connect, sync through a remote, a TLS proxy, building from source |

@@ -64,13 +64,19 @@ Apeiron belgelerinde ve kodunda geçen terimler ve İngilizce karşılıkları. 
 | Export | dışa aktarma | Veriyi başka bir biçimde dışarı yazmak (düz dosyalar, tar/zip, Git) |
 | Import | içe aktarma | Veriyi başka bir biçimden ya da sistemden içeri almak |
 | Incremental backup | artımlı yedek | Yalnızca değişeni aktaran yedek |
+| Legal hold | yasal saklama kilidi | Ref'leri sahip oldukları her sürümle birlikte kaldırılana dek tutar; kaldırılması kalıcı bir kayıt bırakır |
 | Merge | birleştirme | İki geçmiş çizgisini tek bir çizgide birleştirmek |
 | Rebase | yeniden temellendirme (rebase) | Değişiklikleri farklı bir başlangıç noktasının üzerine yeniden uygulamak |
+| Remote | uzak depo | Bir deponun başka bir tam kopyası: klasör, SFTP ya da S3 |
+| Replica | replika | Bir sunucunun her ref'ini her yedekten kısa süre sonra alan uzak depo |
 | Restore | geri yükleme | Bir snapshot'taki veriyi dosyalara geri yazmak |
 | Restore test | geri yükleme testi | Bir yedeğin çalıştığını kanıtlamak için onu düzenli olarak ayrı bir alana geri yüklemek |
-| Retention policy | saklama politikası | Kaç yedeğin ne kadar süre tutulacağına dair kurallar |
+| Retention policy | saklama politikası | Kaç yedeğin ne kadar süre tutulacağına ve gerisinin budanmasına dair kurallar; henüz yazılmadı ([ROADMAP.tr.md](ROADMAP.tr.md) §8). Saklama kuralıyla aynı şey değildir |
+| Retention rule | saklama kuralı | Yalnızca büyüyebilen ve belirli gün geçmeden silinemeyen ref'ler; asla kaldırılamaz |
+| Standby | yedek sunucu | Bir replikayı sunan ve görevi devralmaya hazır ikinci web sunucusu; yedek almaz |
 | Sync | senkron (senkronizasyon) | Veriyi birden fazla cihazda ya da hedefte aynı tutmak |
 | Tag | etiket | Sabit bir snapshot'a ad veren ref |
+| Tenant | kiracı | Paylaşılan bir web sunucusundaki kurum; kendi adresi, deposu, kullanıcıları ve kayıtları vardır |
 
 ## 4. Mimari ve araçlar
 

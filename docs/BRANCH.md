@@ -17,7 +17,7 @@ A branch is a ref (FORMAT.md §9.3): a name pointing to a snapshot. Branches, ta
 | `apeiron rebase <branch> [--onto <snapshot>] [--dry-run]` | Copies the snapshots of `<branch>` that `<onto>` (default `main`) lacks on top of it and moves `<branch>` there (section 5); exit code 3 when there are conflicts | Done |
 | `apeiron switch <snapshot> <folder> [--dry-run]` | Makes a working folder hold a snapshot, usually a branch, recording what it held first (section 6); exit code 3 when files changed during the switch | Done |
 
-A branch is worked on as any folder is: `apeiron switch feature ~/work` writes it into a folder, `apeiron backup ~/feature --ref feature` records the changes, and `apeiron merge feature` joins them into `main`. `apeiron diff main feature` shows what a merge would bring.
+A branch is worked on as any folder is: `apeiron switch feature ~/work` writes it into a folder, `apeiron backup ~/work --ref feature` records the changes, and `apeiron merge feature` joins them into `main`. `apeiron diff main feature` shows what a merge would bring.
 
 ## 2. A merge
 
@@ -39,7 +39,7 @@ flowchart TB
 
 ## 3. What a merge compares
 
-A file counts as changed when its kind, content or permission bits changed; times and owners alone do not, as in sync. A folder is compared by what it holds. A merge never looks inside a file: two changes to different lines of the same text file are a conflict. Merging the content of text and other file types is the task of type drivers, which come with the plugin system (VISION.md); the text diff plugin of Stage 3 is the first.
+A file counts as changed when its kind, content or permission bits changed; times and owners alone do not, as in sync. A folder is compared by what it holds. Without a plugin a merge never looks inside a file: two changes to different lines of the same text file are a conflict. Merging the content of text and other file types is the task of type drivers ([PLUGIN.md](PLUGIN.md) §4); the text plugin ([TEXT.md](TEXT.md)) is the first.
 
 ## 4. Cherry-pick
 
@@ -77,8 +77,8 @@ The switch records the folder but does not back it up into a branch: changes are
 
 | Item | Where |
 | --- | --- |
-| Merging inside a file, line by line | The text diff plugin, Stage 3 |
-| A tool to resolve conflicts | The desktop interface (Stage 4); conflict copies are plain files until then |
+| Merging inside a file, line by line | The text plugin ([TEXT.md](TEXT.md)) |
+| A tool to resolve conflicts | The Sync page of the desktop and web interfaces ([DESKTOP.md](DESKTOP.md) §2); conflict copies stay plain files |
 
 ## 8. Crates
 

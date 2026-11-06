@@ -4,7 +4,7 @@
 
 This document describes how Apeiron is structured: the layers, the object model, how data flows when a snapshot is taken, restored or synchronised, where plugins attach and how security is built in. The goals behind it are in [VISION.md](VISION.md); the exact on-disk format is in [FORMAT.md](FORMAT.md).
 
-Every section states its status. Most of the system is **Planned**; only the storage engine in `apeiron-core` is written.
+Every section states its status. The layers below are written; what is still missing is listed in [ROADMAP.md](ROADMAP.md) §8.
 
 ## 1. Overview
 
@@ -40,7 +40,7 @@ Key design ideas:
 | --- | --- | --- | --- |
 | Interfaces | CLI, background service, desktop, web, mobile | `apeiron-cli`, `apeiron-daemon`, `apeiron-server`, `apeiron-desktop` | In progress (CLI, background service, desktop and web done) |
 | Public API | Stable Rust API; C ABI for other languages; SDKs on top | `apeiron`, `apeiron-ffi` | In progress (Rust API, C ABI and Python SDK done) |
-| Services | Versioning, archive, backup, sync, search, policy | `apeiron-services`, `apeiron-git` | In progress (backup, restore, diff, sync, Git import and export) |
+| Services | Versioning, archive, backup, sync, search, policy | `apeiron-services`, `apeiron-git` | In progress (backup, restore, diff, sync, merge, search, Git import and export) |
 | Core | Object model, storage engine, integrity, encryption, operation log | `apeiron-core` | In progress |
 | Storage targets | Local disk, external disk, network storage, remote targets | `apeiron-core` (`Store`, folders), `apeiron-remote` (SFTP, S3) | Done |
 | Plugins | Type drivers, storage backends, importers/exporters, hooks | `apeiron-plugin` | In progress (host and type drivers done) |
@@ -66,7 +66,7 @@ What `apeiron-core` contains today:
 | `crypto`, `keyfile` | Encryption: sealed boxes and key files (FORMAT.md §14) | Done |
 | `remote`, `repo::transfer` | The `remotes` file, the `Store` interface, folder remotes, push and pull (FORMAT.md §15); SFTP and S3 stores are in `apeiron-remote` | Done |
 | `retention` | Retention rules and the checks of every ref change (FORMAT.md §16) | Done |
-| Operation log | — | Planned |
+| Operation log | — | Planned, not scheduled ([ROADMAP.md](ROADMAP.md) §8) |
 
 ## 3. Object model
 
@@ -93,11 +93,11 @@ A ref names a snapshot; a snapshot points at a root tree and at its parent snaps
 | Tree | A directory: names, kinds, permissions, times, attributes | Done |
 | Snapshot | The state of a data set at a moment, with parents, author and message | Done |
 | Ref | A name pointing at a snapshot; branch, tag and backup point alike | Done |
-| Store | Where objects are kept; the same interface for every target | In progress (local directory only) |
-| Policy | Retention, encryption, sync and verification rules | Planned |
-| Type driver | Type-specific diff, merge, preview and indexing, as a plugin | Planned |
+| Store | Where objects are kept; the same interface for every target | Done (folder, SFTP, S3) |
+| Policy | Retention, encryption, sync and verification rules | In progress (retention rules and legal holds are done, [ARCHIVE.md](ARCHIVE.md); rules that prune old backups are not) |
+| Type driver | Type-specific diff, merge, preview and indexing, as a plugin | In progress (diff and merge are done, [PLUGIN.md](PLUGIN.md); preview and indexing are not) |
 
-Blob, tree and snapshot are encoded in canonical CBOR with `minicbor`. Nothing creates them from real files yet; that is the job of the backup and versioning services.
+Blob, tree and snapshot are encoded in canonical CBOR with `minicbor`. The backup and versioning services create them from real files.
 
 ## 4. Storage on disk
 
@@ -116,7 +116,7 @@ The full specification is [FORMAT.md](FORMAT.md). In short:
 
 ### 5.1 Taking a snapshot
 
-Status: steps 3–6 (storage) are Done; scanning, building trees and the service layer are Planned.
+Status: Done.
 
 ```mermaid
 sequenceDiagram
@@ -139,7 +139,7 @@ Memory stays bounded: a file is processed as a stream, at most one chunk (`max_s
 
 ### 5.2 Restoring
 
-Status: Planned (reading and verifying objects is Done).
+Status: Done.
 
 ```mermaid
 sequenceDiagram
@@ -159,7 +159,7 @@ sequenceDiagram
     S-->>U: Report: restored, skipped, failed
 ```
 
-A chunk that fails verification is never written to the target; the error is reported. Repair from another verified copy is planned for Stage 1.
+A chunk that fails verification is never written to the target; the error is reported. Automatic repair from another verified copy is not written yet ([ROADMAP.md](ROADMAP.md) §8); until then, restore from the copy itself ([GUIDE.md](GUIDE.md) §6.1).
 
 ### 5.3 Synchronising
 
@@ -223,7 +223,7 @@ flowchart LR
 | Audit log | Sensitive operations are logged; sensitive data never is | Done for the web interface ([AUDIT.md](AUDIT.md)) |
 | Plugins | WASM sandbox with declared, user-approved permissions | In place; no permissions granted yet |
 | Memory safety | `unsafe` only in the FFI crate and `apeiron-sys` | In effect |
-| Remote access | Off by default; configured explicitly | Planned (Stage 2) |
+| Remote access | Off by default; configured explicitly | In effect (`apeiron web` starts only when asked; `apeiron ui` listens only on this computer) |
 | Telemetry | Off by default; data is never sent to a third party as a requirement | In effect (there is no telemetry) |
 
 Reporting vulnerabilities: [SECURITY.md](../SECURITY.md).

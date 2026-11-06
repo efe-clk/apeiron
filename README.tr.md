@@ -48,7 +48,7 @@ Her katman yalnızca hemen altındaki katmanı kullanır. Ayrıntılar: [docs/AR
 | --- | --- | --- | --- |
 | Çekirdek | `apeiron-core` | Nesne modeli, chunk bölme, paket/indeks dosyaları, ref ve reflog | Devam ediyor |
 | Depolama hedefleri | `apeiron-core`, `apeiron-remote` | Klasör (yerel ya da harici disk), SFTP ve S3 uzak depoları | Tamamlandı |
-| Hizmetler | `apeiron-services` | Bugün yedek, geri yükleme, listeleme, fark, senkron, birleştirme ve arama; arşiv ve politika sonra | Devam ediyor |
+| Hizmetler | `apeiron-services` | Bugün yedek, geri yükleme, listeleme, fark, senkron, birleştirme ve arama; eski yedekleri budayan kurallar sonra ([docs/ROADMAP.tr.md](docs/ROADMAP.tr.md) §8) | Devam ediyor |
 | Herkese açık API | `apeiron` | Tüm işlemler için Rust API ([docs/API.tr.md](docs/API.tr.md) §8) | Devam ediyor |
 | Sistem çağrıları | `apeiron-sys` | `unsafe` gerektiren işletim sistemi çağrıları (Windows write-through) | Tamamlandı |
 | C ABI | `apeiron-ffi` | `apeiron.h` başlık dosyasıyla kararlı C arayüzü `libapeiron` ve onun üzerindeki Python SDK'sı ([docs/SDK.tr.md](docs/SDK.tr.md)); `unsafe` kullanabilir | Tamamlandı |
@@ -72,9 +72,9 @@ Planlanan katmanların crate adları, o katmana başlanırken belirlenir.
 | Ayar dosyası | TOML (`toml`, `serde`) | Kullanımda |
 | Hatalar | Tipli hatalar (`thiserror`) | Kullanımda |
 | Yapısal nesneler | Kanonik CBOR (`minicbor`) | Kullanımda |
-| Git uyumu | gitoxide (`gix`) | Planlandı |
+| Git uyumu | gitoxide (`gix`) | Kullanımda |
 | Eklentiler | WebAssembly bileşen modeli, Wasmtime | Kullanımda |
-| Asenkron çalışma zamanı | Tokio (yalnızca ağ, senkron ve arka plan hizmeti katmanları) | Planlandı |
+| Asenkron çalışma zamanı | Tokio (yalnızca SFTP, S3 ve web sunucusu; çekirdek ve arka plan hizmeti engelleyici kalır) | Kullanımda |
 | CI | GitHub Actions: Linux x86_64/aarch64, macOS ve Windows'ta fmt, clippy, testler | Kullanımda |
 
 Her seçimin gerekçesi: [docs/DECISIONS.tr.md](docs/DECISIONS.tr.md).
@@ -87,8 +87,8 @@ Her seçimin gerekçesi: [docs/DECISIONS.tr.md](docs/DECISIONS.tr.md).
 | 1. Yerel MVP | CLI, snapshot, geçmiş, geri yükleme, yerel yedek hedefleri, tar, zip ve 7z dışa aktarma | Tamamlandı |
 | 2. Uzak ve senkron | Arka plan hizmeti, şifreleme, SFTP/S3, senkron, geri yükleme testi | Tamamlandı |
 | 3. Geliştirici ve ekosistem | Dal/birleştirme, Git içe/dışa aktarma, C ABI, Python SDK, eklentiler | Tamamlandı |
-| 4. Arayüzler ve çok kullanıcı | Masaüstü ve web arayüzü, izinler, denetim kaydı, paylaşım | Devam ediyor |
-| 5. Kurumsal | Merkezi kimlik, replikasyon, yüksek erişilebilirlik | Planlandı |
+| 4. Arayüzler ve çok kullanıcı | Masaüstü ve web arayüzü, izinler, denetim kaydı, paylaşım | Tamamlandı |
+| 5. Kurumsal | Merkezi kimlik, çok kiracılı kullanım, replikasyon, yüksek erişilebilirlik, değiştirilemez arşiv, uyumluluk raporları | Devam ediyor |
 
 Ayrıntılar ve çıkış kriterleri: [docs/ROADMAP.tr.md](docs/ROADMAP.tr.md).
 
@@ -111,8 +111,8 @@ Kod, commit ve format değişikliği kuralları: [CONTRIBUTING.tr.md](CONTRIBUTI
 | [Depolama formatı](docs/FORMAT.tr.md) | Disk formatı spesifikasyonu, sürüm 1 |
 | [Kararlar](docs/DECISIONS.tr.md) | Mimari karar kayıtları (ADR) |
 | [Yol haritası](docs/ROADMAP.tr.md) | Aşama 0–5, kapsam, çıkış kriterleri, güncel durum |
-| [API](docs/API.tr.md) | Planlanan herkese açık API'nin tasarım ilkeleri (taslak) |
-| [CLI](docs/CLI.tr.md) | `apeiron` komutunun tasarımı (taslak) |
+| [API](docs/API.tr.md) | Herkese açık API'nin tasarım ilkeleri ve spesifikasyonu |
+| [CLI](docs/CLI.tr.md) | `apeiron`'un bütün komutları, seçenekleri ve çıkış kodları |
 | [SDK](docs/SDK.tr.md) | C ABI ve dil SDK'ları |
 | [Arka plan hizmeti](docs/DAEMON.tr.md) | Zamanlanmış işler ve geri yükleme testi |
 | [Senkron](docs/SYNC.tr.md) | Klasörlerin cihazlar arası senkronu ve çatışma tespiti |

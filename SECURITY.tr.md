@@ -4,7 +4,7 @@
 
 ## 1. Desteklenen sürümler
 
-Apeiron erken geliştirme aşamasındadır (Aşama 0) ve henüz bir sürümü yayımlanmadı. Güvenlik düzeltmeleri yalnızca `master` dalının en son hâline yapılır.
+Apeiron erken geliştirme aşamasındadır ve henüz bir sürümü yayımlanmadı; şu anki aşamayı [docs/ROADMAP.tr.md](docs/ROADMAP.tr.md) gösterir. Güvenlik düzeltmeleri yalnızca `master` dalının en son hâline yapılır.
 
 | Sürüm | Destekleniyor |
 | --- | --- |
@@ -21,7 +21,7 @@ Güvenlik sorunlarını lütfen herkese açık issue, pull request ya da tartı�
 
 Bildiriminizi yalnızca proje yürütücüleri görür. En kısa sürede yanıt verilir; proje küçük bir ekip tarafından yürütüldüğü için sabit bir yanıt süresi sözü verilmez. Düzeltme hazır olunca sorun bir güvenlik duyurusuyla (security advisory) açıklanır; isterseniz adınız da belirtilir.
 
-**Kapsamda** özellikle şu sorunlar vardır: sessiz veri kaybına ya da bozulmaya yol açabilecek, bütünlük doğrulamasını atlatan, saklanan içerik hakkında bilgi sızdıran ya da (var olduklarında) şifrelemeyi, izinleri veya eklenti sandbox'ını aşan sorunlar.
+**Kapsamda** özellikle şu sorunlar vardır: sessiz veri kaybına ya da bozulmaya yol açabilecek, bütünlük doğrulamasını atlatan, saklanan içerik hakkında bilgi sızdıran ya da şifrelemeyi, izinleri veya eklenti sandbox'ını aşan sorunlar.
 
 ## 3. Güvenlik ilkeleri
 
@@ -32,10 +32,10 @@ Bildiriminizi yalnızca proje yürütücüleri görür. En kısa sürede yanıt 
 | İçerik gizliliği | Nesne kimlikleri anahtarlı özettir; saklanan içerik kimliklerden tahmin edilemez | Tamamlandı |
 | Bellek güvenliği | Rust ile yazılır; `unsafe` yalnızca FFI crate'inde ve küçük `apeiron-sys` crate'inde | Uygulanıyor |
 | Şifreleme | İstemci tarafında; anahtarlar kullanıcıya aittir; uzak hedef düz metni hiç görmez ([FORMAT.tr.md](docs/FORMAT.tr.md) §14) | Tamamlandı |
-| İzinler | Okuma, yazma, silme, paylaşma ve yönetme izinleri ayrıdır | Planlandı (Aşama 4) |
-| Denetim kaydı | Hassas işlemler kaydedilir; hassas veri hiçbir zaman kaydedilmez | Planlandı (Aşama 4) |
-| Eklenti yalıtımı | Eklentiler, bildirilmiş ve kullanıcının onayladığı izinlerle WebAssembly sandbox'ında çalışır | Planlandı (Aşama 3) |
-| Güvenli varsayılanlar | Uzak erişim ve telemetri varsayılan olarak kapalıdır | Uygulanıyor (henüz uzak erişim ya da telemetri yok) |
+| İzinler | Okuma, yazma, silme, paylaşma ve yönetme izinleri ayrıdır | Web arayüzü için tamamlandı ([USERS.tr.md](docs/USERS.tr.md), [SHARE.tr.md](docs/SHARE.tr.md)) |
+| Denetim kaydı | Hassas işlemler kaydedilir; hassas veri hiçbir zaman kaydedilmez | Web arayüzü için tamamlandı ([AUDIT.tr.md](docs/AUDIT.tr.md)) |
+| Eklenti yalıtımı | Eklentiler, bildirilmiş ve kullanıcının onayladığı izinlerle WebAssembly sandbox'ında çalışır | Yerinde; eklenti API'sinin 0.1 sürümü hiçbir izin vermez ([PLUGIN.tr.md](docs/PLUGIN.tr.md)) |
+| Güvenli varsayılanlar | Uzak erişim ve telemetri varsayılan olarak kapalıdır | Uygulanıyor (web sunucusu yalnızca istenince başlar, `apeiron ui` yalnızca bu bilgisayarda dinler ve telemetri yoktur) |
 | Zorunlu üçüncü taraf yok | Veri hiçbir zaman zorunlu olarak üçüncü bir tarafa gönderilmez | Uygulanıyor |
 
 Güvenlik modelinin tamamı [docs/ARCHITECTURE.tr.md](docs/ARCHITECTURE.tr.md) içindedir.

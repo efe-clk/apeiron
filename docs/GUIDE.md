@@ -2,15 +2,15 @@
 
 # Apeiron User Guide
 
-> **Status:** For the Stage 1 test ([ROADMAP.md](ROADMAP.md) §3). Apeiron has no release yet; it is built from source. All commands below work today. The full command reference is [CLI.md](CLI.md).
+> **Status:** For trying Apeiron on your own data. Apeiron has no release yet; it is built from source. All commands below work today. The full command reference is [CLI.md](CLI.md).
 
-This guide takes you from installation to a daily backup on an external disk, restoring files, and the routine for the one-month test.
+This guide takes you from installation to a daily backup on an external disk, restoring files, and a routine for one month of trying it.
 
 ## 1. Before you start
 
 | Point | Advice |
 | --- | --- |
-| Keep your old backup | Apeiron is in early development. During the test, leave your existing backup untouched as a safety net; do not delete it |
+| Keep your old backup | Apeiron is in early development. While you try it, leave your existing backup untouched as a safety net; do not delete it |
 | Where the repository lives | On a different disk from the data it protects, for example an external disk. A repository is an ordinary folder |
 | Platforms | Linux and macOS are the main targets of this guide; Windows works too, but the automatic backup in section 8 is Linux-only |
 
@@ -32,7 +32,7 @@ Apeiron is written in Rust. You need the Rust tools, Git and a C compiler.
 ```bash
 git clone https://github.com/efe-clk/apeiron.git
 cd apeiron
-cargo install --path crates/apeiron-cli
+cargo install --locked --path crates/apeiron-cli
 apeiron --version
 ```
 
@@ -43,7 +43,7 @@ apeiron --version
 ```bash
 cd apeiron
 git pull
-cargo install --path crates/apeiron-cli
+cargo install --locked --path crates/apeiron-cli
 ```
 
 ## 3. Creating the repository
@@ -356,7 +356,7 @@ On a home server where nobody logs in, `loginctl enable-linger <user>` keeps the
 
 ## 9. The one-month test
 
-The exit criterion of Stage 1 is to back up and restore your own data with nothing but Apeiron for one month. Keep short notes; they decide what Stage 2 fixes first.
+The one-month test of Stage 1 was skipped by the owner's decision ([ROADMAP.md](ROADMAP.md)); it is still the best way to find out whether Apeiron suits your data. Keep short notes and report what goes wrong as GitHub issues.
 
 | Week | Do | Note down |
 | --- | --- | --- |
@@ -372,7 +372,7 @@ The exit criterion of Stage 1 is to back up and restore your own data with nothi
 | `no repository given` | Set `APEIRON_REPO` (section 3) or pass `--repo` |
 | `invalid repository … no config file` | The path is wrong or the external disk is not mounted |
 | `the repository is locked by another program` | `gc` runs only when nothing else uses the repository, and other commands cannot start during `gc`. Wait and try again |
-| `warning: damaged file …` | Run `apeiron verify` for details and `apeiron repair` to rebuild damaged index files. Damaged packs cannot be repaired yet (Stage 2 brings copies on other targets) |
+| `warning: damaged file …` | Run `apeiron verify` for details and `apeiron repair` to rebuild damaged index files. Damaged packs cannot be repaired yet, and `pull` does not replace them; if you have a copy (section 6.1), restore from it with `--repo` |
 | `wrong password or recovery key` | Type the password again; the recovery key works too, with or without dashes. With a password file, check that its first line is the password |
 | `already exists and is not an empty folder` | `restore` and `export` never overwrite; choose a new target |
 | Exit code 130 | The command was cancelled with Ctrl+C; nothing half-done is visible |

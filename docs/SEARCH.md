@@ -90,9 +90,9 @@ A name has 1 to 64 characters and no control characters; spaces around it are dr
 
 | Item | Where |
 | --- | --- |
-| Text inside PDF, office and other formats | Type drivers of the plugin system, Stage 3 |
+| Text inside PDF, office and other formats | Later, as a type driver; not scheduled ([ROADMAP.md](ROADMAP.md) §8) |
 | Tags on macOS and Windows | Later; macOS keeps them in Finder's own attribute, Windows has none |
-| Hiding results a user may not see | Users and permissions, Stage 4 |
+| Hiding results a user may not see | Done in the web interface: a `member` or `reader` must name a snapshot it sees ([USERS.md](USERS.md) §4) |
 
 ## 8. Crates
 

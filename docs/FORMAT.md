@@ -21,6 +21,9 @@ Implementation status (`apeiron-core`):
 | 14 | Encryption | Done |
 | 15 | Remote repositories, push and pull: folders, SFTP and S3 | Done |
 | 15.6 | Clone | Done |
+| 15.7, 15.8 | Every ref, garbage collection of a remote copy | Done |
+| 16 | Retention rules | Done |
+| 17 | Legal holds | Done |
 
 ## Plain summary
 
@@ -34,7 +37,7 @@ Implementation status (`apeiron-core`):
 
 1. All multi-byte integers are written **little-endian**.
 2. Object identifiers (IDs) are 32 bytes. In text they are written as 64 **lowercase hexadecimal** (hex) characters.
-3. Objects are immutable. Once written, an object's content is never changed; it can only be removed later by garbage collection (Stage 1).
+3. Objects are immutable. Once written, an object's content is never changed; it can only be removed later by garbage collection (section 13).
 4. A reader that meets a format version it does not know refuses to open the repository. It does not guess.
 5. Data that fails verification is never handed to the caller; a typed corruption error is returned.
 
@@ -104,7 +107,7 @@ ID = BLAKE3_keyed(id_key, type_byte ‖ content)
 - `type_byte`: a single byte (section 5). The same bytes stored as a different type get a different identifier.
 - `content`: the **uncompressed, unencrypted** form of the object. Raw data for a chunk; the canonical encoding of section 6 for the others.
 
-**Why keyed:** In Stage 2 the remote target will store encrypted data. If identifiers were plain BLAKE3, the remote side could answer "is this known file in this repository?" by looking at the identifiers. A keyed identifier prevents this. The cost: there is no deduplication between two repositories with different `id_key`s. Copies of the same repository (sync, backup target) share the same key.
+**Why keyed:** A remote target stores encrypted data. If identifiers were plain BLAKE3, the remote side could answer "is this known file in this repository?" by looking at the identifiers. A keyed identifier prevents this. The cost: there is no deduplication between two repositories with different `id_key`s. Copies of the same repository (sync, backup target) share the same key.
 
 The **names** of pack and index files, however, are given by an unkeyed, plain `BLAKE3(all bytes of the file)`. This way even a remote server that does not know the key can verify that the files are intact.
 
@@ -366,7 +369,7 @@ The table below lists the expected results of the Stage 0 power-failure tests. E
 | Ref lock taken, not moved | Ref points to the old snapshot | The stale lock is removed with `repair` |
 | Ref moved, reflog not written | Ref points to the new snapshot | A `repair` line is appended on the next update |
 | Disk full (at any step) | No change; if the error comes after the ref was moved, as in the row above | The error is reported, the temporary file is deleted |
-| Bit corruption inside a pack | Reading gives a "corruption" error | Repair from another copy (Stage 1) |
+| Bit corruption inside a pack | Reading gives a "corruption" error | Not automatic yet ([ROADMAP.md](ROADMAP.md) §8): restore from another copy (section 15) |
 | Bit corruption inside an index file | The repository opens; the damaged index is reported and its packs are read directly | `repair` writes a new index and deletes the damaged one |
 
 In no row may the state "a ref points to a missing or half-written object" arise.

@@ -25,7 +25,7 @@ flowchart LR
 | 1. Yerel MVP | CLI; snapshot alma, geçmiş, dosya düzeyi diff, geri yükleme, doğrulama; yerel ve harici disk yedek hedefi; tar, zip ve 7z dışa aktarma | Kendi verini bir ay boyunca yalnızca Apeiron ile yedekleyip geri yükleyebilmek | Tamamlandı (bir aylık deneme atlandı) |
 | 2. Uzak ve senkron | Arka plan hizmeti, zamanlanmış yedek, şifreleme, SFTP ve S3 hedefleri, tek/çift yönlü senkron, çatışma tespiti, geri yükleme testi | İki cihaz ve bir uzak sunucu arasında bir ay sorunsuz senkron | Tamamlandı (bir aylık deneme atlandı) |
 | 3. Geliştirici ve ekosistem | Dal ve birleştirme, Git içe/dışa aktarma (hedef: Git ağ protokolü), C ABI ve Python SDK, WebAssembly eklenti sistemi, metin diff eklentisi, arama | Gerçek bir Git deposu Apeiron'a taşınıp geri alınabiliyor | Tamamlandı |
-| 4. Arayüzler ve çok kullanıcı | Masaüstü ve web arayüzü, kullanıcı ve izinler, denetim kaydı, paylaşım | Teknik olmayan bir kullanıcı CLI'sız yedek alıp geri yükleyebiliyor | Tamamlandı |
+| 4. Arayüzler ve çok kullanıcı | Masaüstü ve web arayüzü, kullanıcı ve izinler, denetim kaydı, paylaşım | Teknik olmayan bir kullanıcı CLI'sız yedek alıp geri yükleyebiliyor | Tamamlandı (ilk sürüm kurulum dosyalarını getirene kadar kurulum için terminal gerekir) |
 | 5. Kurumsal | Merkezi kimlik, çok kiracılı kullanım, replikasyon, yüksek erişilebilirlik, değiştirilemez arşiv, uyumluluk raporları | İlk kurumsal pilot kurulum | Devam ediyor |
 
 ## 2. Aşama 0 — Format ve çekirdek
@@ -39,7 +39,7 @@ flowchart LR
 | 3 | Depolama motoru: chunk yazma/okuma, BLAKE3 doğrulama, atomik ref güncelleme | Tamamlandı | `apeiron-core` içinde paketler, indeksler, ref'ler ve reflog'lar |
 | 4 | Blob, tree ve snapshot'ın kanonik CBOR kodlaması ([FORMAT.tr.md](FORMAT.tr.md) §6) | Tamamlandı | `minicbor` ile; kanonik olmayan nesneler reddedilir |
 | 5 | Güç kesintisi ve bozulma testleri ([FORMAT.tr.md](FORMAT.tr.md) §10) | Tamamlandı | Diskteki her değişiklikte çökme ve disk dolması taklit edilir; bit bozulması bir paketin her baytında denenir |
-| 6 | Rust API taslağı | Tamamlandı | [API.tr.md](API.tr.md) §8, `apeiron-core` içinde uygulandı; ayrı `apeiron` crate'i CLI ile gelecek |
+| 6 | Rust API taslağı | Tamamlandı | [API.tr.md](API.tr.md) §8, `apeiron-core` içinde uygulandı; ayrı `apeiron` crate'i Aşama 1'de CLI ile geldi |
 
 Windows'ta yeniden adlandırmalar küçük `apeiron-sys` crate'i üzerinden `MOVEFILE_WRITE_THROUGH` kullanır ([FORMAT.tr.md](FORMAT.tr.md) §9.1, [ADR-014](DECISIONS.tr.md#adr-014-güvensiz-sistem-çağrıları-için-küçük-bir-sistem-cratei)).
 
@@ -114,3 +114,23 @@ Merkezi kimlik önce gelir, çünkü pilot bir kurum her şeyden önce çalışa
 | 5 | Uyumluluk raporları ([REPORTS.tr.md](REPORTS.tr.md)) | Tamamlandı |
 
 Her iş tamamlandı (2026-10-30); aşama, çıkış kriteri olan ilk kurumsal pilot kurulumla biter.
+
+## 8. Henüz yazılmayanlar
+
+[VISION.tr.md](VISION.tr.md) ve diğer belgeler bunları ister, yukarıdaki aşamaların hiçbiri getirmedi. Sıraları proje sahibinin kararıdır; hiçbiri zamanlanmadı.
+
+| İhtiyaç | İsteyen belge | Bugün ne oluyor |
+| --- | --- | --- |
+| Bozuk bir nesneyi başka bir kopyadan onarmak | [VISION.tr.md](VISION.tr.md), [FORMAT.tr.md](FORMAT.tr.md) §10 | `verify` bildirir; `pull` ve `repair` onu değiştirmez. Doğrudan kopyadan geri yüklenebilir |
+| Eski yedekleri budayan kurallar (7 günlük, 4 haftalık, 12 aylık) | [VISION.tr.md](VISION.tr.md) | `gc` yalnızca hiçbir ref'in ulaşmadığını siler; bir ref'in geçmişi sınırsız büyür |
+| Dışlama kuralları ve seçmeli senkron | [VISION.tr.md](VISION.tr.md), [SYNC.tr.md](SYNC.tr.md) §7 | Yedek ya da senkron bütün klasörü alır |
+| Performans hedeflerini Raspberry Pi 4'te ölçmek | [VISION.tr.md](VISION.tr.md), [API.tr.md](API.tr.md) §4 | Ölçülmedi |
+| İşlem günlüğü | [ARCHITECTURE.tr.md](ARCHITECTURE.tr.md) §2 | Reflog'lar ref değişikliklerini kaydeder; web arayüzü dışındaki diğer işlemleri hiçbir şey kaydetmez |
+| Arşiv paketleri: parçalara bölme, açmadan inceleme; tar ve zip içe aktarma | [VISION.tr.md](VISION.tr.md) | tar, zip ve 7z yalnızca dışa aktarılır |
+| API'nin uzak kullanımı ve daemon'u başka bir cihazdan yönetmek | [API.tr.md](API.tr.md) §2, [DAEMON.tr.md](DAEMON.tr.md) §7 | Yalnızca sayfaların JSON API'si; bir kiracının işleri Zamanlama sayfasında |
+| Git'in eklenti arayüzünün arkasına geçmesi; diğer eklenti türleri ve eklenti mağazası | [DECISIONS.tr.md](DECISIONS.tr.md) ADR-021, [PLUGIN.tr.md](PLUGIN.tr.md) §6 | `apeiron-git` kendi crate'idir; eklentiler yalnızca tür sürücüsüdür |
+| PDF ve ofis dosyalarının içindeki metin; macOS ve Windows'ta etiketler; raporlarda başka standartlar | [SEARCH.tr.md](SEARCH.tr.md) §7, [REPORTS.tr.md](REPORTS.tr.md) §6 | Yalnızca UTF-8 metin; etiketler yalnızca Linux'ta; yalnızca ISO/IEC 27001 |
+| JSON şemaları, C++ SDK'sı, Python wheel'leri, C ABI üzerinden akış | [SDK.tr.md](SDK.tr.md) §1, §7 | C ABI üzerinde Python SDK'sı; kütüphane elle derlenir |
+| İnceleme, onay ve yorumlar | [VISION.tr.md](VISION.tr.md) | Yazılmadı |
+| Format yükseltme aracı | [FORMAT.tr.md](FORMAT.tr.md) §18 | Format 1. sürümde |
+| SSH üzerinden Git, SAML, uzak depo olmadan senkron, Let's Encrypt, kurulum dosyaları ve ilk sürüm | [GIT.tr.md](GIT.tr.md) §8, [IDENTITY.tr.md](IDENTITY.tr.md) §6, [SYNC.tr.md](SYNC.tr.md) §7, [WEB.tr.md](WEB.tr.md) §6, [DESKTOP.tr.md](DESKTOP.tr.md) §5 | HTTP üzerinden Git, OpenID Connect, uzak depo üzerinden senkron, TLS vekili, kaynaktan derleme |

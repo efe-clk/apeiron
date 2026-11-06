@@ -2,7 +2,7 @@
 
 # Apeiron Command-Line Interface
 
-> **Status: In progress.** This is the Stage 1 design of the `apeiron` command ([ROADMAP.md](ROADMAP.md) §3). The parts marked Done work today.
+> **Status: In progress.** This is the reference of the `apeiron` command. The parts marked Done work today.
 
 The CLI is the first interface of Apeiron. Like every other interface it uses only the public API ([API.md](API.md)); it has no access to the core that a third-party program would not have.
 
@@ -10,7 +10,7 @@ The CLI is the first interface of Apeiron. Like every other interface it uses on
 
 | Principle | Rule | Status |
 | --- | --- | --- |
-| API only | The CLI calls only the public `apeiron` crate | Done |
+| API only | The CLI calls only the public `apeiron` crate; `apeiron daemon`, `web` and `ui` start the crates `apeiron-daemon` and `apeiron-server`, which use it as well | Done |
 | Never destroy data silently | No command overwrites or deletes existing files unless an explicit flag asks for it | Done |
 | Machine-readable output | Every command accepts `--json` and then prints one JSON document to standard output | Done |
 | Progress | Long commands show progress on standard error when it is a terminal | Done |
@@ -54,7 +54,7 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | Command | What it does | Status |
 | --- | --- | --- |
 | `apeiron init <path> [--encrypt]` | Creates an empty repository; `--encrypt` encrypts it with a password (section 2.1) | Done |
-| `apeiron backup <folder> [--ref <name>] [--message <text>]` | Stores the folder as a new snapshot and moves the ref to it (default ref: `main`) | Done |
+| `apeiron backup <folder> [--ref <name>] [--message <text>] [--author <text>] [--host <text>]` | Stores the folder as a new snapshot and moves the ref to it (default ref: `main`) | Done |
 | `apeiron log [<ref>] [--grep <text>]` | Lists the snapshots of a ref, newest first; `--grep` keeps those whose message, author, host or metadata hold the text, ignoring case | Done |
 | `apeiron ls <snapshot> [<path>]` | Lists the files and folders inside a snapshot | Done |
 | `apeiron diff <snapshot> <snapshot> [--text]` | Lists files added, removed and changed between two snapshots; `--text` also shows the changed lines of files a plugin handles ([TEXT.md](TEXT.md)) | Done |
@@ -101,7 +101,7 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | `apeiron plugin share <name>`, `plugin unshare <name>`, `plugin list --shared`, `plugin add --from-repo <name>` | Carries plugins in the repository and installs them from it ([PLUGIN.md](PLUGIN.md) §5) | Done |
 | `apeiron tag <file>... [--add <tag>]... [--remove <tag>]...` | Shows or changes the tags of files on disk, which backups keep and `search --tag` finds; Linux only ([SEARCH.md](SEARCH.md) §1.1) | Done |
 | `apeiron hold add <refs> --reason <text>`, `hold list`, `hold lift <id> --reason <text>` | Places a legal hold, which keeps refs with every version they had until it is lifted; lifting is recorded for good ([ARCHIVE.md](ARCHIVE.md) §2.1) | Done |
-| `apeiron push --all <remote>`, `apeiron pull --all <remote> [--rate <speed>]` | Pushes or pulls every ref, to keep a replica or a standby; a ref with a conflict is left and named, the others are copied; exit code 3 then ([REPLICATION.md](REPLICATION.md)) | Done |
+| `apeiron push --all <remote> [--rate <speed>]`, `apeiron pull --all <remote> [--rate <speed>]` | Pushes or pulls every ref, to keep a replica or a standby; a ref with a conflict is left and named, the others are copied; exit code 3 then ([REPLICATION.md](REPLICATION.md)) | Done |
 | `apeiron web … [--replicate <remote>]... [--standby]` | Pushes every ref to each replica after each backup, or serves a standby copy that takes no backups ([REPLICATION.md](REPLICATION.md)) | Done |
 | `apeiron web … --audit-syslog <target>` | Also sends each audit event to a syslog server (`udp://host:port`) or a local socket such as `/dev/log` ([AUDIT.md](AUDIT.md) §5) | Done |
 | `apeiron key remove <id>` | Removes a password or recovery key; the last one cannot be removed | Done |
@@ -115,7 +115,7 @@ A `<snapshot>` can be written as a ref name (`main`), a full snapshot id, or the
 | Files, folders, symbolic links | Yes | Done |
 | Permission bits and modification time | Yes | Done |
 | Owner (uid/gid) on Linux and macOS | Yes | Done |
-| Extended attributes | Not in Stage 1 | Planned |
+| Extended attributes | Only the tags of files on Linux, `user.xdg.tags` ([SEARCH.md](SEARCH.md) §1.1); others not yet | In progress |
 | Hard links | As separate files; the link between them is not kept ([FORMAT.md](FORMAT.md) §6.3) | Done |
 | Device files, sockets, pipes | No; skipped and reported | Done |
 
@@ -129,7 +129,7 @@ A file that changes while it is being read is stored as read and reported as a w
 | 1 | Error; nothing was changed in the repository |
 | 2 | Usage error (wrong command or option) |
 | 3 | Finished with warnings (for example skipped files), or `sync` or `merge` found conflicts, or `sync` left files for the next round |
-| 4 | Damage found by `verify` |
+| 4 | Damage found by `verify`, `restore-test` or `report --verify`; a changed report or audit log (`report check`, `web audit verify`); a failed job in `daemon once` or `daemon status` |
 | 130 | Cancelled with Ctrl+C |
 
 ## 6. Example session
@@ -152,7 +152,7 @@ apeiron verify
 | `apeiron` | Public Rust API ([API.md](API.md) §8) | In progress |
 | `apeiron-services` | Folder ↔ snapshot, diff and export logic used by the API | In progress |
 | `apeiron-cli` | The `apeiron` program | In progress |
-| `apeiron-remote` | SFTP and S3 remotes (ADR-018) | In progress |
+| `apeiron-remote` | SFTP and S3 remotes (ADR-018) | Done |
 
 | Need | Proposed library | Reason |
 | --- | --- | --- |

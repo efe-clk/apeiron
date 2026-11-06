@@ -2,15 +2,15 @@
 
 # Apeiron Kullanım Rehberi
 
-> **Durum:** Aşama 1 denemesi için ([ROADMAP.tr.md](ROADMAP.tr.md) §3). Apeiron'un henüz bir sürümü yok; kaynak koddan derlenir. Aşağıdaki tüm komutlar bugün çalışır. Tam komut başvurusu [CLI.tr.md](CLI.tr.md) içindedir.
+> **Durum:** Apeiron'u kendi verinizle denemek için. Apeiron'un henüz bir sürümü yok; kaynak koddan derlenir. Aşağıdaki tüm komutlar bugün çalışır. Tam komut başvurusu [CLI.tr.md](CLI.tr.md) içindedir.
 
-Bu rehber kurulumdan harici diske günlük yedeğe, dosyaları geri yüklemeye ve bir aylık denemenin düzenine kadar yol gösterir.
+Bu rehber kurulumdan harici diske günlük yedeğe, dosyaları geri yüklemeye ve bir aylık deneme düzenine kadar yol gösterir.
 
 ## 1. Başlamadan önce
 
 | Konu | Öneri |
 | --- | --- |
-| Eski yedeğinizi koruyun | Apeiron erken geliştirme aşamasındadır. Deneme boyunca var olan yedeğinize güvenlik ağı olarak dokunmayın; silmeyin |
+| Eski yedeğinizi koruyun | Apeiron erken geliştirme aşamasındadır. Denerken var olan yedeğinize güvenlik ağı olarak dokunmayın; silmeyin |
 | Depo nerede durur | Koruduğu veriden farklı bir diskte, örneğin harici bir diskte. Depo sıradan bir klasördür |
 | Platformlar | Bu rehberin ana hedefi Linux ve macOS'tur; Windows da çalışır, ama bölüm 8'deki otomatik yedek yalnızca Linux içindir |
 
@@ -32,7 +32,7 @@ Apeiron Rust ile yazılmıştır. Rust araçları, Git ve bir C derleyicisi gere
 ```bash
 git clone https://github.com/efe-clk/apeiron.git
 cd apeiron
-cargo install --path crates/apeiron-cli
+cargo install --locked --path crates/apeiron-cli
 apeiron --version
 ```
 
@@ -43,7 +43,7 @@ apeiron --version
 ```bash
 cd apeiron
 git pull
-cargo install --path crates/apeiron-cli
+cargo install --locked --path crates/apeiron-cli
 ```
 
 ## 3. Depoyu oluşturma
@@ -356,7 +356,7 @@ Kimsenin oturum açmadığı bir ev sunucusunda `loginctl enable-linger <user>`,
 
 ## 9. Bir aylık deneme
 
-Aşama 1'in çıkış kriteri, kendi verinizi bir ay boyunca yalnızca Apeiron ile yedekleyip geri yüklemektir. Kısa notlar tutun; Aşama 2'de neyin önce düzeltileceğini onlar belirler.
+Aşama 1'in bir aylık denemesi proje sahibinin kararıyla atlandı ([ROADMAP.tr.md](ROADMAP.tr.md)); yine de Apeiron'un verinize uyup uymadığını anlamanın en iyi yolu budur. Kısa notlar tutun ve ters gidenleri GitHub issue olarak bildirin.
 
 | Hafta | Yapın | Not edin |
 | --- | --- | --- |
@@ -372,7 +372,7 @@ Aşama 1'in çıkış kriteri, kendi verinizi bir ay boyunca yalnızca Apeiron i
 | `no repository given` | `APEIRON_REPO`'yu ayarlayın (bölüm 3) ya da `--repo` verin |
 | `invalid repository … no config file` | Yol yanlış ya da harici disk bağlı değil |
 | `the repository is locked by another program` | `gc` yalnızca depoyu başka hiçbir şey kullanmıyorken çalışır ve `gc` sürerken diğer komutlar başlayamaz. Bekleyip yeniden deneyin |
-| `warning: damaged file …` | Ayrıntı için `apeiron verify`, bozuk indeks dosyalarını yeniden kurmak için `apeiron repair` çalıştırın. Bozuk paketler henüz onarılamaz (Aşama 2 başka hedeflerde kopyalar getirir) |
+| `warning: damaged file …` | Ayrıntı için `apeiron verify`, bozuk indeks dosyalarını yeniden kurmak için `apeiron repair` çalıştırın. Bozuk paketler henüz onarılamaz ve `pull` onları değiştirmez; bir kopyanız varsa (bölüm 6.1) `--repo` ile doğrudan ondan geri yükleyin |
 | `wrong password or recovery key` | Parolayı yeniden yazın; kurtarma anahtarı da tireli ya da tiresiz çalışır. Parola dosyası kullanıyorsanız ilk satırının parola olduğunu denetleyin |
 | `already exists and is not an empty folder` | `restore` ve `export` asla üzerine yazmaz; yeni bir hedef seçin |
 | Çıkış kodu 130 | Komut Ctrl+C ile iptal edildi; yarım kalmış hiçbir şey görünmez |

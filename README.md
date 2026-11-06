@@ -48,7 +48,7 @@ Each layer uses only the layer directly below it. Details: [docs/ARCHITECTURE.md
 | --- | --- | --- | --- |
 | Core | `apeiron-core` | Object model, chunking, pack/index files, refs and reflogs | In progress |
 | Storage targets | `apeiron-core`, `apeiron-remote` | Folder (local or external disk), SFTP and S3 remotes | Done |
-| Services | `apeiron-services` | Backup, restore, listing, diff, sync, merge and search today; archive and policy later | In progress |
+| Services | `apeiron-services` | Backup, restore, listing, diff, sync, merge and search today; rules that prune old backups later ([docs/ROADMAP.md](docs/ROADMAP.md) §8) | In progress |
 | Public API | `apeiron` | Rust API for all operations ([docs/API.md](docs/API.md) §8) | In progress |
 | System calls | `apeiron-sys` | Operating system calls that need `unsafe` (Windows write-through) | Done |
 | C ABI | `apeiron-ffi` | Stable C interface `libapeiron` with the header `apeiron.h`, and the Python SDK over it ([docs/SDK.md](docs/SDK.md)); may use `unsafe` | Done |
@@ -72,9 +72,9 @@ Crate names for planned layers are chosen when the layer is started.
 | Configuration | TOML (`toml`, `serde`) | In use |
 | Errors | Typed errors (`thiserror`) | In use |
 | Structured objects | Canonical CBOR (`minicbor`) | In use |
-| Git compatibility | gitoxide (`gix`) | Planned |
+| Git compatibility | gitoxide (`gix`) | In use |
 | Plugins | WebAssembly component model, Wasmtime | In use |
-| Async runtime | Tokio (network, sync and daemon layers only) | Planned |
+| Async runtime | Tokio (SFTP, S3 and the web server only; the core and the background service stay blocking) | In use |
 | CI | GitHub Actions: fmt, clippy, tests on Linux x86_64/aarch64, macOS, Windows | In use |
 
 Why each choice was made: [docs/DECISIONS.md](docs/DECISIONS.md).
@@ -87,8 +87,8 @@ Why each choice was made: [docs/DECISIONS.md](docs/DECISIONS.md).
 | 1. Local MVP | CLI, snapshots, history, restore, local backup targets, tar, zip and 7z export | Done |
 | 2. Remote and sync | Daemon, encryption, SFTP/S3, sync, restore test | Done |
 | 3. Developer and ecosystem | Branch/merge, Git import/export, C ABI, Python SDK, plugins | Done |
-| 4. Interfaces and multi-user | Desktop and web UI, permissions, audit log, sharing | In progress |
-| 5. Enterprise | Central identity, replication, high availability | Planned |
+| 4. Interfaces and multi-user | Desktop and web UI, permissions, audit log, sharing | Done |
+| 5. Enterprise | Central identity, multi-tenant use, replication, high availability, immutable archive, compliance reports | In progress |
 
 Details and exit criteria: [docs/ROADMAP.md](docs/ROADMAP.md).
 
@@ -111,8 +111,8 @@ Rules for code, commits and format changes: [CONTRIBUTING.md](CONTRIBUTING.md).
 | [Storage format](docs/FORMAT.md) | On-disk format specification, version 1 |
 | [Decisions](docs/DECISIONS.md) | Architecture decision records (ADR) |
 | [Roadmap](docs/ROADMAP.md) | Stages 0–5, scope, exit criteria, current status |
-| [API](docs/API.md) | Design principles of the planned public API (draft) |
-| [CLI](docs/CLI.md) | Design of the `apeiron` command (draft) |
+| [API](docs/API.md) | Design principles and specification of the public API |
+| [CLI](docs/CLI.md) | Every command of `apeiron`, its options and exit codes |
 | [SDK](docs/SDK.md) | The C ABI and the language SDKs |
 | [Background service](docs/DAEMON.md) | Scheduled jobs and the restore test |
 | [Sync](docs/SYNC.md) | Folder sync between devices and conflict detection |

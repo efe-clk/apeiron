@@ -91,15 +91,15 @@ The folder ref moves only after the folder has been applied. An interrupted appl
 
 ## 6. Clone
 
-`apeiron clone` creates a new local repository from a remote (FORMAT.md §15.6, new): it copies `config` and `keys/`, creates the folders of a repository, then pulls every ref of the remote and names it `origin`. The password of the remote repository opens the clone. This is the only operation that copies keys from a remote.
+`apeiron clone` creates a new local repository from a remote (FORMAT.md §15.6): it copies `config` and `keys/`, creates the folders of a repository, then pulls every ref of the remote and names it `origin`. The password of the remote repository opens the clone. This is the only operation that copies keys from a remote.
 
 ## 7. Not part of this work item
 
 | Item | Where |
 | --- | --- |
 | Peer-to-peer sync without a remote | Later; a remote covers Stage 2 |
-| Exclusion rules and selective sync | With the backup service's exclusion rules, Stage 3 |
-| Operating the daemon from another device (remote API) | The desktop and web interfaces (Stage 4); [DAEMON.md](DAEMON.md) is updated |
+| Exclusion rules and selective sync | Not written; not scheduled ([ROADMAP.md](ROADMAP.md) §8) |
+| Operating the daemon from another device (remote API) | Not written, except a tenant's jobs on the Schedule page ([DAEMON.md](DAEMON.md) §3.1) |
 
 ## 8. Crates
 

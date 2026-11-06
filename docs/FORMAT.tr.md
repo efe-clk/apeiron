@@ -21,6 +21,9 @@ Uygulama durumu (`apeiron-core`):
 | 14 | Şifreleme | Tamamlandı |
 | 15 | Uzak depolar, push ve pull: klasörler, SFTP ve S3 | Tamamlandı |
 | 15.6 | Klon | Tamamlandı |
+| 15.7, 15.8 | Her ref, uzak bir kopyanın çöp toplaması | Tamamlandı |
+| 16 | Saklama kuralları | Tamamlandı |
+| 17 | Yasal saklama kilitleri | Tamamlandı |
 
 ## Sade anlatım
 
@@ -34,7 +37,7 @@ Uygulama durumu (`apeiron-core`):
 
 1. Tüm çok baytlı tamsayılar **little-endian** yazılır.
 2. Nesne kimlikleri (ID) 32 bayttır. Metin içinde 64 karakterlik **küçük harf onaltılık** (hex) olarak yazılır.
-3. Nesneler değişmezdir. Bir nesne yazıldıktan sonra içeriği hiçbir zaman değiştirilmez; yalnızca ileride çöp toplama (Aşama 1) ile silinebilir.
+3. Nesneler değişmezdir. Bir nesne yazıldıktan sonra içeriği hiçbir zaman değiştirilmez; yalnızca ileride çöp toplama (bölüm 13) ile silinebilir.
 4. Okuyucu, tanımadığı bir format sürümüyle karşılaşırsa depoyu açmayı reddeder. Tahmin yürütmez.
 5. Doğrulamadan geçmeyen veri hiçbir zaman çağırana verilmez; tipli bir bozulma hatası döner.
 
@@ -104,7 +107,7 @@ ID = BLAKE3_keyed(id_key, tür_baytı ‖ içerik)
 - `tür_baytı`: tek bayt (bölüm 5). Aynı baytlar farklı türde saklanırsa farklı kimlik alır.
 - `içerik`: nesnenin **sıkıştırılmamış, şifrelenmemiş** hâli. Chunk için ham veri; diğerleri için bölüm 6'daki kanonik kodlama.
 
-**Neden anahtarlı:** Aşama 2'de uzak hedef şifreli veri saklayacak. Kimlikler düz BLAKE3 olsaydı, uzak taraf "şu bilinen dosya bu depoda var mı?" sorusunu kimliklere bakarak yanıtlayabilirdi. Anahtarlı kimlik bunu engeller. Bedeli: farklı `id_key`'e sahip iki depo arasında tekilleştirme olmaz. Aynı deponun kopyaları (senkron, yedek hedefi) aynı anahtarı paylaşır.
+**Neden anahtarlı:** Uzak hedef şifreli veri saklar. Kimlikler düz BLAKE3 olsaydı, uzak taraf "şu bilinen dosya bu depoda var mı?" sorusunu kimliklere bakarak yanıtlayabilirdi. Anahtarlı kimlik bunu engeller. Bedeli: farklı `id_key`'e sahip iki depo arasında tekilleştirme olmaz. Aynı deponun kopyaları (senkron, yedek hedefi) aynı anahtarı paylaşır.
 
 Paket ve indeks dosyalarının **adları** ise anahtarsız, düz `BLAKE3(dosyanın tüm baytları)` ile verilir. Böylece anahtarı bilmeyen bir uzak sunucu da dosyaların bozulmadığını doğrulayabilir.
 
@@ -366,7 +369,7 @@ Aşağıdaki tablo, Aşama 0'ın güç kesintisi testlerinin beklenen sonuçlar�
 | Ref kilidi alındı, taşınmadı | Ref eski snapshot'ı gösterir | Bayat kilit `repair` ile kaldırılır |
 | Ref taşındı, reflog yazılmadı | Ref yeni snapshot'ı gösterir | Sonraki güncellemede `repair` satırı eklenir |
 | Disk doldu (herhangi bir adımda) | Değişiklik yok; hata ref taşındıktan sonra gelirse bir üstteki satırdaki gibi | Hata raporlanır, geçici dosya silinir |
-| Paket içinde bit bozulması | Okuma "bozulma" hatası verir | Başka bir kopyadan onarım (Aşama 1) |
+| Paket içinde bit bozulması | Okuma "bozulma" hatası verir | Henüz otomatik değil ([ROADMAP.tr.md](ROADMAP.tr.md) §8): başka bir kopyadan geri yüklenir (bölüm 15) |
 | İndeks dosyası içinde bit bozulması | Depo açılır; bozuk indeks bildirilir ve paketleri doğrudan okunur | `repair` yeni bir indeks yazar ve bozuk olanı siler |
 
 Hiçbir satırda "ref, var olmayan veya yarım yazılmış bir nesneyi gösteriyor" durumu oluşmamalıdır.

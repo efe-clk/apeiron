@@ -15,6 +15,7 @@ Bir aile ya da küçük bir ofis tek bir yedek sunucusunu paylaşır: herkes ken
 | Geri yüklemek | Evet | Evet | Hayır |
 | Depoyu denetlemek | Evet | Hayır | Hayır |
 | Saklama kurallarını görmek ve eklemek ([ARCHIVE.tr.md](ARCHIVE.tr.md)) | Evet | Hayır | Hayır |
+| Yasal saklama kilitlerini görmek ve koymak, uyumluluk raporu oluşturmak ([ARCHIVE.tr.md](ARCHIVE.tr.md) §2.1, [REPORTS.tr.md](REPORTS.tr.md)) | Evet | Hayır | Hayır |
 | Sayfalarda uzak depolar, senkron, parolalar ve eklentiler ([WEB.tr.md](WEB.tr.md) §4) | Evet | Hayır | Hayır |
 | `git push` ([GIT.tr.md](GIT.tr.md) §7.1) | Her dala | Kendi yedeklerine | Hayır |
 | Bağlantıyla paylaşmak ([SHARE.tr.md](SHARE.tr.md)) | Her sürümü | Gördüğü sürümleri | Hayır |

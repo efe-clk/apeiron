@@ -43,8 +43,10 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [033](#adr-033-replikasyon-her-refi-uzak-bir-kopyaya-push-etmektir-görevi-devralmak-adminin-kararıdır) | Replikasyon ve yüksek erişilebilirlik | Her ref her yedekten sonra ve değişince her 30 saniyede replikalara push edilir; yedek sunucu bir replikayı yedek almadan sunar; `/api/health`; görev devri admin tarafından | Kabul edildi |
 | [034](#adr-034-arşiv-saklama-kuralları-altında-yalnızca-büyüyen-reflerdir-ve-kendini-kilitleyen-bir-depolamayla-desteklenir) | Değiştirilemez arşiv | Yalnızca eklenebilen `retention/<özet>.toml` kural dosyaları; korunan ref'ler yalnızca ileri gider ve ancak süreleri dolunca silinir; kurallar push ve pull ile kopyalanır; S3 Object Lock için SHA-256 sağlama toplamları | Kabul edildi |
 | [035](#adr-035-uyumluluk-raporları-istek-üzerine-depodan-ve-web-sunucusunun-dosyalarından-oluşturulur) | Uyumluluk raporları | Salt okunur, istek üzerine; ref'lerden, saklamadan, anahtarlardan, doğrulamadan, uzak depolardan ve `--web` ile kullanıcılar ve denetim kaydından gerçekler ve bulgular; Markdown ya da JSON; kanıt olarak snapshot kimlikleri ve denetim özeti | Kabul edildi |
+| [036](#adr-036-rustcrypto-yanında-imzalar-için-aws-lc-rs) | İmzalar | İmzaları `aws-lc-rs` denetler ve üretir; RustCrypto depo verisi ve parolalar için kalır; ADR-017'yi değiştirir | Kabul edildi |
+| [037](#adr-037-önceki-kararlardaki-değişiklikler-2026-11-06ya-kadar) | Sonraki değişiklikler | ADR-018, 022, 025, 029–035'te değişenlerin ve yasal saklama kilitleri ile etiketlerin tek tablosu | Kabul edildi |
 
-ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı.
+ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı. ADR-036 ve ADR-037, kendi kayıtları olmadan daha önce alınan kararları ve eski ADR'lerde değişenleri 2026-11-06'da kaydeder.
 
 ## ADR-001: Ana dil olarak Rust
 
@@ -769,3 +771,46 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Önce web arayüzünde raporlar | Denetçileri yanıtlayan kişiler sunucuyu çalıştırır; CLI yeni sayfalar olmadan her gerçeğe ulaşır |
 
 **Sonuçlar.** `--verify` ile bir rapor saklanan her baytı okur ve `apeiron verify` kadar sürer; `--remotes` ile uzak depoların yanıt vermesi gerekir. Raporlar istek üzerine ya da sistemin zamanlayıcısıyla oluşturulur, Apeiron tarafından saklanmaz; onları saklamak sürecin kurumdaki parçasıdır.
+
+## ADR-036: RustCrypto yanında imzalar için aws-lc-rs
+
+**Durum:** Kabul edildi (2026-11-06'da kaydedildi)
+
+**Bağlam.** ADR-017, kriptografi için RustCrypto dışındaki kütüphanelerin kullanılmadığını söyler. Web sunucusu kimlik sağlayıcıların RS256 ve ES256 imzalarını denetlemelidir (ADR-031), raporlar da Ed25519 ile imzalanır ([REPORTS.tr.md](REPORTS.tr.md) §5.1). `aws-lc-rs`, HTTPS için `object_store` üzerinden programda zaten vardı (ADR-018).
+
+**Karar.** Bu imzaları `apeiron-server` ve `apeiron-cli` içinde `aws-lc-rs` denetler ve üretir. Depo verisini ve parolaları koruyan işler RustCrypto'da kalır: XChaCha20-Poly1305, Argon2id ve sunucu dosyalarındaki SHA-256. Bu, ADR-017'nin sonuçlarındaki son cümleyi değiştirir.
+
+**Gerekçe.** Programda zaten derlenen tek bir kütüphane üç imza algoritmasını da yapar, bunlar için başka crate eklenmez.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| RSA, P-256 ve Ed25519 için RustCrypto crate'leri | Zaten var olan bir kütüphanenin yanına üç bağımlılık daha |
+
+**Sonuçlar.** `aws-lc-rs` C kodu içerir ve `zstd` gibi (ADR-011) "mümkün olan her yerde Rust" kuralının bir istisnasıdır (ADR-001); `russh` da C ve assembly içeren `ring`'i getirir. Derlemek için C derleyicisi gerekir ([CONTRIBUTING.tr.md](../CONTRIBUTING.tr.md)).
+
+## ADR-037: Önceki kararlardaki değişiklikler, 2026-11-06'ya kadar
+
+**Durum:** Kabul edildi (2026-11-06'da kaydedildi)
+
+**Bağlam.** İlk kayıtlardan sonraki işler bazılarının söylediğini değiştirdi ya da kayıtsız kararlar ekledi. Eski kayıtlar yeniden yazılmaz, bu yüzden "Sonuçlar" ve "Alternatifler" bölümleri hâlâ geçerliymiş gibi okunabilir. Aşağıdaki nedenler belgelerin verdiği nedenlerdir; o sırada tartılan alternatifler yazılmamıştır ve burada yeniden kurgulanmaz.
+
+**Karar.** Bu tablo, önceki kayıttan farklı olduğu yerde neyin geçerli olduğunu söyler.
+
+| Önceki kayıt | Şimdi geçerli olan | Neden | Ayrıntı |
+| --- | --- | --- | --- |
+| ADR-018: uzak kopyanın çöp toplaması sonra | `apeiron gc --remote`, yalnızca bu deponun yazdığı bir kopyayı temizler | Replika, makinesine girmeden temizlenir | [FORMAT.tr.md](FORMAT.tr.md) §15.8 |
+| ADR-022: rebase ve cherry-pick yok, dalı izleyen çalışma klasörü yok | `cherry-pick`, `rebase` ve `switch` var; `switch` klasörü değiştirmeden önce kaydeder | Vizyon bunları ister; önce kaydetmek işin kaybolmasını önler | [BRANCH.tr.md](BRANCH.tr.md) §4–6 |
+| ADR-025: eklentiler depoda saklanmaz | Bir depo `apeiron/plugins` içinde eklenti taşıyabilir; kopya hiçbirini kendiliğinden kurmaz | Kopyalar aynı eklentileri kullanabilir, kurmak yine her kullanıcının kararıdır | [PLUGIN.tr.md](PLUGIN.tr.md) §5 |
+| ADR-029: kayıt sınırsız büyür; syslog kullanılmaz | Kayıt 16 MiB'de zincir kopmadan bölünür; her olay ayrıca syslog'a gidebilir | Uzun çalışan sunucular; merkezî hizmet, sunucunun geri alamayacağı bir kopya tutar. Asıl kayıt dosyadır | [AUDIT.tr.md](AUDIT.tr.md) §3, §5 |
+| ADR-030: okuma bağlantıları, klasörler dosya dosya | Zip indirme, bağlantı parolası, indirme sınırı ve yükleme bağlantıları | Büyük klasörler ve hesabı olmayanlardan dosya almak | [SHARE.tr.md](SHARE.tr.md) §2, §4, §7 |
+| ADR-031: kullanıcılar tek tek eklenir | Kullanıcılar sağlayıcının gruplarından oluşturulabilir; parola kullanıcıları doğrulama kodu ekleyebilir | Kurumlar kişileri gruplarla yönetir; yönetici için yalnızca parola zayıftır | [IDENTITY.tr.md](IDENTITY.tr.md) §2.1, §4 |
+| ADR-032: kiracı başına sınır yok | Depolama ve iş sınırları, operatör kiracılar, kiracı başına işler | Bir kiracı diğerlerinin diskini ya da işlemcisini almamalıdır | [TENANTS.tr.md](TENANTS.tr.md) §2.1, §4.1, [DAEMON.tr.md](DAEMON.tr.md) §3.1 |
+| ADR-033: denetim kaydı ve bağlantılar her sunucuda kalır | İkisinin kopyası `apeiron/web` ref'inde taşınır | Bağlantılar görev devrinden sonra çalışır, eski kayıt okunabilir | [REPLICATION.tr.md](REPLICATION.tr.md) §6.1 |
+| ADR-034: süresi belli saklama kuralları | Yanlarında yasal saklama kilitleri: kendi sonları yoktur, kaldırılmaları kalıcı kayıt bırakır | Bir davanın ne zaman biteceği önceden bilinmez | [FORMAT.tr.md](FORMAT.tr.md) §17 |
+| ADR-035: standarda eşleme yok, imza yok | `--standard iso27001` ve Ed25519 imzaları | Denetçiler kontrolleri ve raporun değişmediğinin kanıtını ister | [REPORTS.tr.md](REPORTS.tr.md) §3.1, §5.1 |
+| Yok | Etiketler, var olan `xattrs` alanındaki `user.xdg.tags` özniteliğidir; yalnızca Linux | Dosya yöneticilerinin zaten yazdığı gelenek; format sürümü değişmez | [FORMAT.tr.md](FORMAT.tr.md) §6.3 |
+| ADR-021: Git crate'i eklenti arayüzü olunca onun arkasına geçer | Yapılmadı; hâlâ kendi crate'idir | İçe aktarıcı eklenti türü gerekir | [ROADMAP.tr.md](ROADMAP.tr.md) §8 |
+
+**Sonuçlar.** Eski bir ADR'yi okuyan önce bu tabloya bakar. Sonraki bir değişiklik kendi ADR'sini alır.

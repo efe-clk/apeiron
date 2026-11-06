@@ -91,15 +91,15 @@ Klasör ref'i ancak klasör uygulandıktan sonra taşınır. Yarıda kalan bir u
 
 ## 6. Klon
 
-`apeiron clone`, bir uzak depodan yeni bir yerel depo oluşturur (FORMAT.tr.md §15.6, yeni): `config`'i ve `keys/`'i kopyalar, bir deponun klasörlerini oluşturur, ardından uzak deponun her ref'ini pull eder ve ona `origin` adını verir. Uzak deponun parolası klonu açar. Uzak depodan anahtar kopyalayan tek işlem budur.
+`apeiron clone`, bir uzak depodan yeni bir yerel depo oluşturur (FORMAT.tr.md §15.6): `config`'i ve `keys/`'i kopyalar, bir deponun klasörlerini oluşturur, ardından uzak deponun her ref'ini pull eder ve ona `origin` adını verir. Uzak deponun parolası klonu açar. Uzak depodan anahtar kopyalayan tek işlem budur.
 
 ## 7. Bu işin parçası olmayanlar
 
 | Konu | Nerede |
 | --- | --- |
 | Uzak depo olmadan eşler arası senkron | Daha sonra; Aşama 2 için bir uzak depo yeterlidir |
-| Dışlama kuralları ve seçmeli senkron | Yedek hizmetinin dışlama kurallarıyla, Aşama 3 |
-| Daemon'u başka bir cihazdan yönetmek (uzak API) | Masaüstü ve web arayüzleri (Aşama 4); [DAEMON.tr.md](DAEMON.tr.md) güncellenir |
+| Dışlama kuralları ve seçmeli senkron | Yazılmadı; zamanlanmadı ([ROADMAP.tr.md](ROADMAP.tr.md) §8) |
+| Daemon'u başka bir cihazdan yönetmek (uzak API) | Yazılmadı; yalnızca bir kiracının işleri Zamanlama sayfasındadır ([DAEMON.tr.md](DAEMON.tr.md) §3.1) |
 
 ## 8. Crate'ler
 

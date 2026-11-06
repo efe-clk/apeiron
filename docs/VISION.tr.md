@@ -2,7 +2,7 @@
 
 # Apeiron — Ürün Vizyonu ve Gereksinimler
 
-> **Durum:** Bu belge hedeflenen ürünü anlatır; burada geçen yeteneklerin çoğu henüz yazılmadı (Planlandı). Neyin bittiğini [ROADMAP.tr.md](ROADMAP.tr.md) gösterir.
+> **Durum:** Bu belge bugün var olanı değil, hedeflenen ürünü anlatır. Neyin bittiğini [ROADMAP.tr.md](ROADMAP.tr.md), neyin henüz yazılmadığını onun §8'i gösterir.
 
 ## Özet
 
@@ -207,7 +207,7 @@ Eklentiler isteğe bağlıdır; hiçbiri kurulu olmadan da çekirdek tam çalı�
 
 ## Platformlar ve performans hedefleri
 
-Referans cihaz Raspberry Pi 4'tür (4 GB RAM). Bu cihazda hedefleri karşılayan bir sürüm, daha güçlü donanımda da karşılar. Aşağıdaki sayılar ilk öneridir; Aşama 1 ölçümleriyle güncellenecektir.
+Referans cihaz Raspberry Pi 4'tür (4 GB RAM). Bu cihazda hedefleri karşılayan bir sürüm, daha güçlü donanımda da karşılar. Aşağıdaki sayılar ilk öneridir; henüz ölçülmediler.
 
 **Platformlar:** Linux (x86_64, aarch64) birinci sınıf hedef. Windows ve macOS tam desteklenir. Raspberry Pi, NAS ve ev sunucuları gerçek kullanım hedefidir.
 

@@ -122,8 +122,8 @@ Sunucu Git'in akıllı HTTP protokolünün 0. sürümünü side-band olmadan kon
 | --- | --- |
 | SSH üzerinden Git | Daha sonra; HTTP (bölüm 7) bir projeyi Apeiron'a alır ve oradan çıkarır |
 | Bir Git çalışma ağacına checkout | `apeiron restore` bir snapshot'ı bir klasöre yazar |
-| Apeiron içinde dallanma ve birleştirme | Aşama 3'ün 2. işi |
-| Kodu eklenti arayüzünün arkasına taşımak | Eklenti sistemiyle, Aşama 3 |
+| Apeiron içinde dallanma ve birleştirme | [BRANCH.tr.md](BRANCH.tr.md) |
+| Kodu eklenti arayüzünün arkasına taşımak | Yapılmadı; içe aktarıcı eklenti türü gerekir ([ROADMAP.tr.md](ROADMAP.tr.md) §8) |
 
 ## 9. Crate'ler ve kütüphaneler
 
@@ -134,6 +134,6 @@ Sunucu Git'in akıllı HTTP protokolünün 0. sürümünü side-band olmadan kon
 | `apeiron-server` | `/git/<prefix>/info/refs`, `/git/<prefix>/git-upload-pack` ve `/git/<prefix>/git-receive-pack` (bölüm 7) | Tamamlandı |
 | `apeiron-cli` | `apeiron git import` ve `apeiron git export` | Tamamlandı |
 
-Nesneleri ve ref'leri `gix` (gitoxide) 0.85 okur ve yazar (VISION.tr.md); Rust 1.85 ile derlenen en yeni sürüm odur. Nesneler ham bayt olarak çözülür ve yazılır; böylece gix'in normalleştirdiği hiçbir şey bir kimliği değiştiremez.
+Nesneleri ve ref'leri `gix` (gitoxide) 0.85 okur ve yazar (VISION.tr.md). Nesneler ham bayt olarak çözülür ve yazılır; böylece gix'in normalleştirdiği hiçbir şey bir kimliği değiştiremez.
 
 Testler `git` ile; bir birleştirme, büyük harfli bir dal, çalıştırılabilir bir dosya, bir sembolik bağ, bir alt modül girdisi, iki tür etiket, bir imza başlığı ve Latin-1 bir mesaj içeren bir depo kurar ve her kimliğin geri geldiğini denetler. Gerçek depolar da aynı şekilde geri geldi: 3.568 commit'lik bir depo; 4.265 commit ve 13 etiketli bir depo; ve 22 saniyede içe alınıp 19 saniyede dışa aktarılan 27.156 commit ve 70 etiketli bir depo.

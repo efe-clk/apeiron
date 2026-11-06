@@ -2,7 +2,7 @@
 
 # Apeiron Herkese Açık API — Tasarım İlkeleri
 
-> **Durum: İncelemeye sunulan taslak.** Bölüm 1–7 API'nin ilkeleridir; bölüm 8, Aşama 1'de uygulanmış olan herkese açık `apeiron` crate'inin spesifikasyonudur; bölüm 9 zaten var olan çekirdek işlevleri listeler. C ABI ve SDK'lar [SDK.tr.md](SDK.tr.md) içinde tanımlanır.
+> **Durum: Devam ediyor.** Bölüm 1–7 API'nin ilkeleridir, her biri durumunu belirtir; bölüm 8, uygulanmış olan herkese açık `apeiron` crate'inin spesifikasyonudur; bölüm 9 zaten var olan çekirdek işlevleri listeler. C ABI ve SDK'lar [SDK.tr.md](SDK.tr.md) içinde tanımlanır.
 
 Herkese açık API, Apeiron'a girmenin tek yoludur. CLI, arka plan hizmeti, masaüstü ve web arayüzleri ve tüm dış uygulamalar onu kullanır; gizli iç kapı yoktur ([VISION.tr.md](VISION.tr.md), ilke 8).
 
@@ -31,10 +31,10 @@ SDK'lar mantığı yeniden yazmaz, yalnızca C ABI'yi sarar. Aynı işlemin her 
 
 | İlke | Açıklama | Durum |
 | --- | --- | --- |
-| Tek model, iki kullanım | Aynı işlemler ve türler gömülü kullanımda (aynı süreçte kütüphane) ve uzak kullanımda (arka plan hizmeti üzerinden) çalışır | Planlandı |
-| Eksiksiz kapsam | Sürümleme, arşiv, yedek, senkron ve yönetim işlemlerinin hepsi erişilebilir; CLI'ın yapabildiği her şeyi API de yapabilir | Planlandı |
-| Açık sonuç | Her kritik işlem açık bir başarıyla ya da tipli bir hatayla biter; "muhtemelen oldu" durumu yoktur | Planlandı |
-| Düz veri giriş ve çıkışları | İstekler ve sonuçlar, serileştirilebilen düz veri türleridir (uzak kullanım ve C ABI için) | Planlandı |
+| Tek model, iki kullanım | Aynı işlemler ve türler gömülü kullanımda (aynı süreçte kütüphane) ve uzak kullanımda (arka plan hizmeti üzerinden) çalışır | Devam ediyor (gömülü tamamlandı; uzak zamanlanmadı, [ROADMAP.tr.md](ROADMAP.tr.md) §8) |
+| Eksiksiz kapsam | Sürümleme, arşiv, yedek, senkron ve yönetim işlemlerinin hepsi erişilebilir; CLI'ın yapabildiği her şeyi API de yapabilir | Devam ediyor (bölüm 8.3; `web` komutları sunucunun kendi dosyalarını yönetir, API'de değildir) |
+| Açık sonuç | Her kritik işlem açık bir başarıyla ya da tipli bir hatayla biter; "muhtemelen oldu" durumu yoktur | Tamamlandı |
+| Düz veri giriş ve çıkışları | İstekler ve sonuçlar, serileştirilebilen düz veri türleridir (uzak kullanım ve C ABI için) | Tamamlandı |
 
 Uzun işlemler (yedek, geri yükleme, senkron, doğrulama) **iş** (job) olarak başlatılır. Bir iş izlenebilir, iptal edilebilir ve sonucu sorgulanabilir (bölüm 8.5).
 
@@ -42,10 +42,10 @@ Uzun işlemler (yedek, geri yükleme, senkron, doğrulama) **iş** (job) olarak 
 
 | İlke | Açıklama | Durum |
 | --- | --- | --- |
-| İlerleme bildirimi | Uzun işler ilerlemeyi bildirir (biten ve toplam öğe ve bayt, o anki evre) | Planlandı |
-| İptal | Her uzun iş iptal edilebilir; iptal, depoyu geçerli bir durumda bırakır (eski ya da yeni, asla yarım) | Planlandı |
-| Zaman aşımı | SDK'lar aynı iptal mekanizmasıyla zaman aşımını destekler | Planlandı |
-| Sonuç sorgulama | Biten bir işin sonucu sonradan okunabilir; uzak kullanımda da | Planlandı |
+| İlerleme bildirimi | Uzun işler ilerlemeyi bildirir (biten ve toplam öğe ve bayt, o anki evre) | Tamamlandı |
+| İptal | Her uzun iş iptal edilebilir; iptal, depoyu geçerli bir durumda bırakır (eski ya da yeni, asla yarım) | Tamamlandı |
+| Zaman aşımı | SDK'lar aynı iptal mekanizmasıyla zaman aşımını destekler | Tamamlandı (Python) |
+| Sonuç sorgulama | Biten bir işin sonucu sonradan okunabilir; uzak kullanımda da | Gömülü kullanım ve web sunucusu için tamamlandı; uzak kullanım henüz yok |
 
 İptal, tasarım gereği güvenlidir: nesneler ancak diske sabitlendikten sonra görünür ve ref'ler en son güncellenir ([FORMAT.tr.md](FORMAT.tr.md) §9).
 
@@ -53,9 +53,9 @@ Uzun işlemler (yedek, geri yükleme, senkron, doğrulama) **iş** (job) olarak 
 
 | İlke | Açıklama | Durum |
 | --- | --- | --- |
-| Tampon değil akış | Dosya içeriği akış olarak girer ve çıkar (Rust'ta `Read`/`Write`); içerik hiçbir zaman tamamen belleğe alınmaz | Kısmen tamamlandı (`apeiron-core` içinde chunk yazma akışla çalışıyor) |
-| Sınırlı bellek | Bellek kullanımı dosya boyutundan bağımsızdır; hedef, Raspberry Pi 4'te 10 GB'lık bir dosya eklerken 256 MB altı ([VISION.tr.md](VISION.tr.md)) | Planlandı (Aşama 1'de ölçülecek) |
-| Tembel listeleme | Geçmiş, tree'ler ve arama sonuçları tek büyük liste olarak değil, yineleyici (iterator) ya da sayfalar olarak döner | Planlandı |
+| Tampon değil akış | Dosya içeriği akış olarak girer ve çıkar (Rust'ta `Read`/`Write`); içerik hiçbir zaman tamamen belleğe alınmaz | Rust API'de tamamlandı; C ABI yollarla çalışır ([SDK.tr.md](SDK.tr.md) §7) |
+| Sınırlı bellek | Bellek kullanımı dosya boyutundan bağımsızdır; hedef, Raspberry Pi 4'te 10 GB'lık bir dosya eklerken 256 MB altı ([VISION.tr.md](VISION.tr.md)) | Buna göre tasarlandı; henüz ölçülmedi ([ROADMAP.tr.md](ROADMAP.tr.md) §8) |
+| Tembel listeleme | Geçmiş, tree'ler ve arama sonuçları tek büyük liste olarak değil, yineleyici (iterator) ya da sayfalar olarak döner | Devam ediyor (geçmiş sayfalıdır; tree'ler ve arama sonuçları listedir, arama sınırlıdır) |
 
 ## 5. Hata türleri
 
@@ -75,7 +75,7 @@ Uzun işlemler (yedek, geri yükleme, senkron, doğrulama) **iş** (job) olarak 
 | Semantik sürümleme | Rust API, C ABI ve her SDK SemVer'e uyar | Planlandı |
 | 1.0 öncesi | Küçük sürümler arasında uyumu bozan değişikliklere izin verilir ve sürüm notlarında listelenir | Planlandı |
 | 1.0'dan sonra | Uyumu bozan değişiklik yalnızca yeni ana sürümde, yazılı bir uyumluluk politikasıyla | Planlandı |
-| Ayrı sürümler | Depolama formatının ([FORMAT.tr.md](FORMAT.tr.md)), C ABI'nin ve eklenti API'sinin kendi sürüm numaraları vardır | Format: Tamamlandı (sürüm 1); diğerleri Planlandı |
+| Ayrı sürümler | Depolama formatının ([FORMAT.tr.md](FORMAT.tr.md)), C ABI'nin ve eklenti API'sinin kendi sürüm numaraları vardır | Tamamlandı: format sürümü 1, C ABI 0.1, eklenti API'si 0.1 |
 | En düşük Rust sürümü | Workspace desteklenen en düşük Rust sürümünü belirtir (şu an 1.97) | Tamamlandı |
 
 ## 7. C ABI ve SDK katmanı
@@ -120,6 +120,7 @@ flowchart TB
 | `apeiron-services` | Klasörleri tree ve snapshot'a, onları da geri klasöre çevirir; fark; tar, zip ve 7z dışa aktarma | Devam ediyor |
 | `apeiron-cli` | `apeiron` komutu ([CLI.tr.md](CLI.tr.md)) | Devam ediyor |
 | `apeiron-ffi` | `apeiron` üzerinde C ABI ([SDK.tr.md](SDK.tr.md)) | Tamamlandı |
+| `apeiron-git`, `apeiron-plugin`, `apeiron-remote` | Git içe ve dışa aktarma, eklenti barındırıcısı, SFTP ve S3 uzak depoları; hepsini `apeiron` kullanır | Tamamlandı |
 
 ### 8.2 Depo tutamacı
 
@@ -178,15 +179,18 @@ Her işlem tek bir düz istek değeri alır ve tek bir düz sonuç değeri dönd
 | `pull` | uzak depo adı, ref adı (varsayılan `main`) | yerel ref için aynısı, `TransferReport`; yerel ref'te uzak depoda olmayan snapshot'lar varsa `conflict` | Evet |
 | `retention` | — | `Vec<RetentionRule>`: ref deseni, gün sayısı, ne zaman eklendiği; en eskisi önce ([ARCHIVE.tr.md](ARCHIVE.tr.md)) | Hayır |
 | `add_retention` | ref'ler (bir ad ya da ardından `*` gelen bir önek), gün sayısı (1 ile 36500 arası) | `RetentionRule`; asla kaldırılamaz ya da kısaltılamaz ([FORMAT.tr.md](FORMAT.tr.md) §16). Bir kuralın yasakladığı ref değişikliği `conflict` ile başarısız olur | Hayır |
-| `holds` | — | `Vec<LegalHold>`: kimlik, ref kalıbı, neden, konduğu zaman ve kaldırıldıysa kaldırmanın nedeni ve zamanı; en eskisi önce ([ARCHIVE.tr.md](ARCHIVE.tr.md) §2.1) | Hayır |
-| `add_hold` | ref'ler (bir ad ya da ardından `*` gelen bir önek), neden (tek satır, 1 ile 200 karakter) | `LegalHold`; kaldırılana kadar eşleştiği bir ref yalnızca ileri gider ve silinmez, gc de bütün reflog'unu tutar ([FORMAT.tr.md](FORMAT.tr.md) §17). Kilidin yasakladığı ref değişikliği `conflict` ile başarısız olur | Hayır |
-| `lift_hold` | kimlik, neden | Kaldırmasıyla birlikte `LegalHold`; geri alınamaz. Bilinmeyen bir kimlik için `not_found` | Hayır |
+| `holds` (Rust: `legal_holds`) | — | `Vec<LegalHold>`: kimlik, ref kalıbı, neden, konduğu zaman ve kaldırıldıysa kaldırmanın nedeni ve zamanı; en eskisi önce ([ARCHIVE.tr.md](ARCHIVE.tr.md) §2.1) | Hayır |
+| `add_hold` (Rust: `add_legal_hold`) | ref'ler (bir ad ya da ardından `*` gelen bir önek), neden (tek satır, 1 ile 200 karakter) | `LegalHold`; kaldırılana kadar eşleştiği bir ref yalnızca ileri gider ve silinmez, gc de bütün reflog'unu tutar ([FORMAT.tr.md](FORMAT.tr.md) §17). Kilidin yasakladığı ref değişikliği `conflict` ile başarısız olur | Hayır |
+| `lift_hold` (Rust: `lift_legal_hold`) | kimlik, neden | Kaldırmasıyla birlikte `LegalHold`; geri alınamaz. Bilinmeyen bir kimlik için `not_found` | Hayır |
 | `report` | doğrulama, uzak depolar, eskime günü (varsayılan 7) | `ComplianceReport`: zaman, depo gerçekleri (şifreleme, anahtarlar, bozuk dosyalar), ref başına snapshot, en yeni zaman, geçmiş uzunluğu, saklama ve her uzak depodaki durum, saklama kuralları, yasal saklama kilitleri, doğrulama sonucu, uzak depolar, bulgular ([REPORTS.tr.md](REPORTS.tr.md)) | Evet |
 | `push_all`, `pull_all` | uzak depo adı | `MirrorReport`: ref başına adı ve ya bir `TransferReport` ya da onu bırakan `conflict`; diğer hatalar hepsini durdurur ([REPLICATION.tr.md](REPLICATION.tr.md) §2, [FORMAT.tr.md](FORMAT.tr.md) §15.7) | Evet |
 | `git_import` | Git deposu yolu, ref öneki (varsayılan `git`) | `GitImportReport`: saklanan commit ve etiketler, taşınan ref'ler (Git adı, ref, Git kimliği, snapshot, önceki), nedeniyle atlanan ref'ler, eskimiş ref'ler ([GIT.tr.md](GIT.tr.md)) | Evet |
 | `git_export` | Git deposu yolu (yoksa çıplak olarak oluşturulur), ref öneki | `GitExportReport`: yazılan commit ve etiketler, güncellenen ref'ler, atlanan ref'ler, yeniden üretilemeyen Git kimlikleri | Evet |
 | `sync` | klasör, uzak depo adı, ref adı (varsayılan `sync/<klasör adı>`), kip (`two-way`, `send` ya da `receive`), hız sınırı, deneme çalışması | `SyncReport`: ref, eylem (`up_to_date`, `sent`, `received` ya da `merged`), snapshot, alınan yedek, ne çekildiği ve push edildiği, klasördeki değişiklikler, kopyalarıyla çatışmalar, eklentilerin birleştirdiği dosyalar, sonraki tura bırakılan yollar, uyarılar, çalışan tur sayısı ([SYNC.tr.md](SYNC.tr.md)); `send` kipinde uzak depoda bu kopyada olmayan snapshot'lar varsa `conflict` | Evet |
 | `switch` | snapshot belirteci, klasör, deneme çalışması | `SwitchReport`: klasör ref'i, snapshot, klasörü önce kaydeden snapshot, klasördeki değişiklikler, geçiş sırasında değişen dosyalar ve kopyaları, dokunulmayan yollar, uyarılar ([BRANCH.tr.md](BRANCH.tr.md) §6) | Evet |
+| `add_file`, `export_zip_to` (yalnızca Rust) | bir yedeğe yeni sürüm olarak eklenen dosya; bir `Write`'a zip olarak yazılan snapshot ya da içindeki yol | Dosyanın yeni yolu ve sürümü; sayılar ([SHARE.tr.md](SHARE.tr.md)) | Hayır |
+| `share_plugin`, `unshare_plugin`, `shared_plugins`, `install_shared_plugin` (yalnızca Rust) | eklenti adı | `apeiron/plugins` ref'inde taşınan eklentiler ([PLUGIN.tr.md](PLUGIN.tr.md) §5) | Hayır |
+| `git_serve_refs`, `git_common`, `git_pack`, `git_receive` (yalnızca Rust) | ref öneki ve Git istemcisinin istedikleri | Sunucunun HTTP üzerinden Git'e verdiği yanıtlar ([GIT.tr.md](GIT.tr.md) §7) | Hayır |
 
 ### 8.4 Bir snapshot'ı adlandırma
 

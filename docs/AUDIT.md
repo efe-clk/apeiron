@@ -15,7 +15,7 @@ When several people share a backup server, the admin must be able to answer "who
 | `git_push` | Every `git push` | The ref prefix and each ref with its new Git id and error; the outcome is `conflict` when no ref moved |
 | `sign_out` | Signing out | |
 | `call:<operation>` | Every short operation, such as `list` or `log` | The request after the checks of USERS.md §4, with snapshots as ids and paths resolved; a `password` in it is written as `null` |
-| `start:<operation>` | Every long operation started: `backup`, `restore`, `verify`, `search` | The same |
+| `start:<operation>` | Every long operation started: `backup`, `restore`, `verify`, `search`, `report`, `sync` | The same |
 | `done:<operation>` | When the result of a long operation is collected | The job number |
 | `start:backup`, `done:backup`, `start:restore`, `done:restore` with `"via": "cli"` | `apeiron backup` and `apeiron restore`, when the web server of this computer has an audit log: that of the tenant whose repository it is, or else the server's own | The repository, the folder or snapshot and target, and at the end the new snapshot or the files and bytes restored; the outcome is the error kind if it failed. A start that cannot be recorded stops the command |
 | `cancel` | A request to stop a job | The job number |

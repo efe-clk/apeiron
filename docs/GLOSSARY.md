@@ -64,13 +64,19 @@ Terms used across the Apeiron documentation and code, with their Turkish equival
 | Export | dışa aktarma | Writing data out in another format (plain files, tar/zip, Git) |
 | Import | içe aktarma | Bringing data in from another format or system |
 | Incremental backup | artımlı yedek | A backup that transfers only what changed |
+| Legal hold | yasal saklama kilidi | Keeps refs and every version they had until it is lifted, with a permanent record of the lift |
 | Merge | birleştirme | Combining two lines of history into one |
 | Rebase | yeniden temellendirme (rebase) | Replaying changes on top of a different starting point |
+| Remote | uzak depo | Another complete copy of a repository: a folder, SFTP or S3 |
+| Replica | replika | A remote that receives every ref of a server, soon after each backup |
 | Restore | geri yükleme | Writing data from a snapshot back to files |
 | Restore test | geri yükleme testi | Regularly restoring a backup to a separate area to prove it works |
-| Retention policy | saklama politikası | Rules for how many backups to keep and for how long |
+| Retention policy | saklama politikası | Rules for how many backups to keep and for how long, pruning the rest; not written yet ([ROADMAP.md](ROADMAP.md) §8). Not the same as a retention rule |
+| Retention rule | saklama kuralı | Refs that may only grow and cannot be deleted before a number of days have passed; can never be removed |
+| Standby | yedek sunucu | A second web server serving a replica, ready to take over; it takes no backups |
 | Sync | senkron (senkronizasyon) | Keeping data the same on several devices or targets |
 | Tag | etiket | A ref that names a fixed snapshot |
+| Tenant | kiracı | An organization on a shared web server, with its own host, repository, users and records |
 
 ## 4. Architecture and tooling
 

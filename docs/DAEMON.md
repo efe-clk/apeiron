@@ -125,7 +125,7 @@ A backup is proven only by restoring it (VISION.md). The restore test does this 
 
 | Item | Where |
 | --- | --- |
-| Operating the daemon from another device (remote API) | The desktop and web interfaces (Stage 4) |
+| Operating the daemon from another device (remote API) | Not written, except a tenant's jobs on the Schedule page (section 3.1); not scheduled ([ROADMAP.md](ROADMAP.md) §8) |
 
 ## 8. Crates and libraries
 

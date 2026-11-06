@@ -125,7 +125,7 @@ Bir yedek ancak geri yüklenerek kanıtlanır (VISION.tr.md). Geri yükleme test
 
 | Konu | Nerede |
 | --- | --- |
-| Daemon'u başka bir cihazdan yönetmek (uzak API) | Masaüstü ve web arayüzleri (Aşama 4) |
+| Daemon'u başka bir cihazdan yönetmek (uzak API) | Yazılmadı; yalnızca bir kiracının işleri Zamanlama sayfasındadır (bölüm 3.1); zamanlanmadı ([ROADMAP.tr.md](ROADMAP.tr.md) §8) |
 
 ## 8. Crate'ler ve kütüphaneler
 

@@ -17,7 +17,7 @@ Bir dal bir ref'tir (FORMAT.tr.md §9.3): bir snapshot'a işaret eden bir ad. Ap
 | `apeiron rebase <branch> [--onto <snapshot>] [--dry-run]` | `<branch>`'in, `<onto>`'da (varsayılan `main`) olmayan snapshot'larını onun üstüne kopyalar ve `<branch>`'i oraya taşır (bölüm 5); çatışma varsa çıkış kodu 3'tür | Tamamlandı |
 | `apeiron switch <snapshot> <folder> [--dry-run]` | Bir çalışma klasörünün bir snapshot'ı, çoğunlukla bir dalı tutmasını sağlar; önce klasörün tuttuğunu kaydeder (bölüm 6); geçiş sırasında değişen dosya varsa çıkış kodu 3'tür | Tamamlandı |
 
-Bir dal üzerinde her klasörde olduğu gibi çalışılır: `apeiron switch feature ~/work` onu bir klasöre yazar, `apeiron backup ~/feature --ref feature` değişiklikleri kaydeder ve `apeiron merge feature` onları `main`'e birleştirir. `apeiron diff main feature`, bir birleştirmenin ne getireceğini gösterir.
+Bir dal üzerinde her klasörde olduğu gibi çalışılır: `apeiron switch feature ~/work` onu bir klasöre yazar, `apeiron backup ~/work --ref feature` değişiklikleri kaydeder ve `apeiron merge feature` onları `main`'e birleştirir. `apeiron diff main feature`, bir birleştirmenin ne getireceğini gösterir.
 
 ## 2. Bir birleştirme
 
@@ -39,7 +39,7 @@ flowchart TB
 
 ## 3. Bir birleştirme neyi karşılaştırır
 
-Bir dosyanın türü, içeriği ya da izin bitleri değiştiyse dosya değişmiş sayılır; senkrondaki gibi yalnızca zamanlar ve sahipler sayılmaz. Bir klasör tuttuklarıyla karşılaştırılır. Bir birleştirme asla bir dosyanın içine bakmaz: aynı metin dosyasının farklı satırlarındaki iki değişiklik bir çatışmadır. Metnin ve diğer dosya türlerinin içeriğini birleştirmek, eklenti sistemiyle gelen tür sürücülerinin işidir (VISION.tr.md); Aşama 3'ün metin diff eklentisi ilkidir.
+Bir dosyanın türü, içeriği ya da izin bitleri değiştiyse dosya değişmiş sayılır; senkrondaki gibi yalnızca zamanlar ve sahipler sayılmaz. Bir klasör tuttuklarıyla karşılaştırılır. Eklenti olmadan bir birleştirme asla bir dosyanın içine bakmaz: aynı metin dosyasının farklı satırlarındaki iki değişiklik bir çatışmadır. Metnin ve diğer dosya türlerinin içeriğini birleştirmek tür sürücülerinin işidir ([PLUGIN.tr.md](PLUGIN.tr.md) §4); metin eklentisi ([TEXT.tr.md](TEXT.tr.md)) ilkidir.
 
 ## 4. Cherry-pick
 
@@ -77,8 +77,8 @@ Geçiş klasörü kaydeder ama bir dala yedeklemez: değişiklikler önceki gibi
 
 | Konu | Nerede |
 | --- | --- |
-| Bir dosyanın içinde, satır satır birleştirme | Metin diff eklentisi, Aşama 3 |
-| Çatışmaları çözmek için bir araç | Masaüstü arayüzü (Aşama 4); o zamana kadar çatışma kopyaları düz dosyalardır |
+| Bir dosyanın içinde, satır satır birleştirme | Metin eklentisi ([TEXT.tr.md](TEXT.tr.md)) |
+| Çatışmaları çözmek için bir araç | Masaüstü ve web arayüzlerinin Senkron sayfası ([DESKTOP.tr.md](DESKTOP.tr.md) §2); çatışma kopyaları düz dosya olarak kalır |
 
 ## 8. Crate'ler
 

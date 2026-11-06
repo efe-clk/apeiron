@@ -2,7 +2,7 @@
 
 # Apeiron — Product Vision and Requirements
 
-> **Status:** This document describes the intended product; most capabilities mentioned here are not written yet (Planned). [ROADMAP.md](ROADMAP.md) shows what is done.
+> **Status:** This document describes the intended product, not what exists today. [ROADMAP.md](ROADMAP.md) shows what is done, and its §8 what is not written yet.
 
 ## Summary
 
@@ -207,7 +207,7 @@ Plugins are optional; the core works fully without any of them installed.
 
 ## Platforms and performance targets
 
-The reference device is a Raspberry Pi 4 (4 GB RAM). A release that meets the targets on this device also meets them on stronger hardware. The numbers below are initial proposals; they will be updated with Stage 1 measurements.
+The reference device is a Raspberry Pi 4 (4 GB RAM). A release that meets the targets on this device also meets them on stronger hardware. The numbers below are initial proposals; they have not been measured yet.
 
 **Platforms:** Linux (x86_64, aarch64) is the first-class target. Windows and macOS are fully supported. Raspberry Pi, NAS devices and home servers are real usage targets.
 

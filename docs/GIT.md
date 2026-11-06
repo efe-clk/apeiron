@@ -122,8 +122,8 @@ The server speaks Git's smart HTTP protocol, version 0, without side-band; newer
 | --- | --- |
 | Git over SSH | Later; HTTP (section 7) takes a project in and out of Apeiron |
 | Checking out into a Git working tree | `apeiron restore` writes a snapshot into a folder |
-| Branching and merging inside Apeiron | Stage 3 work item 2 |
-| Moving the code behind the plugin interface | With the plugin system, Stage 3 |
+| Branching and merging inside Apeiron | [BRANCH.md](BRANCH.md) |
+| Moving the code behind the plugin interface | Not done; it needs an importer plugin type ([ROADMAP.md](ROADMAP.md) §8) |
 
 ## 9. Crates and libraries
 
@@ -134,6 +134,6 @@ The server speaks Git's smart HTTP protocol, version 0, without side-band; newer
 | `apeiron-server` | `/git/<prefix>/info/refs`, `/git/<prefix>/git-upload-pack` and `/git/<prefix>/git-receive-pack` (section 7) | Done |
 | `apeiron-cli` | `apeiron git import` and `apeiron git export` | Done |
 
-`gix` (gitoxide) 0.85 reads and writes the objects and refs (VISION.md); it is the newest release that builds with Rust 1.85. Objects are parsed and written as raw bytes, so nothing gix normalizes can change an id.
+`gix` (gitoxide) 0.85 reads and writes the objects and refs (VISION.md). Objects are parsed and written as raw bytes, so nothing gix normalizes can change an id.
 
 The tests build a repository with `git` that has a merge, a branch with capitals, an executable, a symbolic link, a submodule entry, both kinds of tag, a signature header and a Latin-1 message, and check that every id comes back. Real repositories came back the same way: one of 3,568 commits; one of 4,265 commits and 13 tags; and one of 27,156 commits and 70 tags, imported in 22 seconds and exported in 19.

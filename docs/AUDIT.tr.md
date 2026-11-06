@@ -15,7 +15,7 @@ Birkaç kişi bir yedek sunucusunu paylaştığında admin, "bu klasörü kim, n
 | `git_push` | Her `git push` | Ref öneki ve her ref'in yeni Git kimliği ve hatası; hiçbir ref taşınmadıysa sonuç `conflict`'tir |
 | `sign_out` | Oturumu kapatma | |
 | `call:<operation>` | `list` ya da `log` gibi her kısa işlem | USERS.tr.md §4'teki denetimlerden sonraki istek; snapshot'lar kimlik olarak, yollar çözülmüş olarak; içindeki bir `password` `null` olarak yazılır |
-| `start:<operation>` | Başlatılan her uzun işlem: `backup`, `restore`, `verify`, `search` | Aynısı |
+| `start:<operation>` | Başlatılan her uzun işlem: `backup`, `restore`, `verify`, `search`, `report`, `sync` | Aynısı |
 | `done:<operation>` | Uzun bir işlemin sonucu alındığında | İş numarası |
 | `"via": "cli"` ile `start:backup`, `done:backup`, `start:restore`, `done:restore` | Bu bilgisayardaki web sunucusunun bir denetim kaydı varsa `apeiron backup` ve `apeiron restore`: deposu bu olan kiracınınki, yoksa sunucunun kendisininki | Depo, klasör ya da sürüm ve hedef; sonunda yeni sürüm ya da geri yüklenen dosyalar ve baytlar; başarısız olduysa sonuç hata türüdür. Başlangıcı kaydedilemeyen komut çalışmaz |
 | `cancel` | Bir işi durdurma isteği | İş numarası |

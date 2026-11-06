@@ -43,8 +43,10 @@ This document records every technical decision made so far, in ADR (architecture
 | [033](#adr-033-replication-is-pushing-every-ref-to-a-remote-copy-taking-over-is-the-admins-decision) | Replication and high availability | Every ref pushed to replicas after each backup and every 30 s on change; a standby serves a replica without backups; `/api/health`; failover by the admin | Accepted |
 | [034](#adr-034-the-archive-is-append-only-refs-under-retention-rules-backed-by-storage-that-locks-itself) | Immutable archive | Rule files `retention/<hash>.toml`, add-only; kept refs only move forward and are deleted only after their days; rules copied with push and pull; SHA-256 checksums for S3 Object Lock | Accepted |
 | [035](#adr-035-compliance-reports-are-made-on-demand-from-the-repository-and-the-web-servers-files) | Compliance reports | Read-only, on demand; facts and findings from refs, retention, keys, verify, remotes and, with `--web`, users and the audit log; Markdown or JSON; snapshot ids and the audit hash as proof | Accepted |
+| [036](#adr-036-aws-lc-rs-for-signatures-beside-rustcrypto) | Signatures | `aws-lc-rs` checks and makes signatures; RustCrypto stays for repository data and passwords; changes ADR-017 | Accepted |
+| [037](#adr-037-changes-to-earlier-decisions-up-to-2026-11-06) | Later changes | One table of what changed in ADR-018, 022, 025, 029–035, and legal holds and tags | Accepted |
 
-ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28.
+ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28. ADR-036 and ADR-037 record on 2026-11-06 decisions made earlier without a record of their own, including what changed in older ADRs.
 
 ## ADR-001: Rust as the main language
 
@@ -769,3 +771,46 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Reports in the web interface first | The people who answer auditors run the server; the CLI reaches every fact without new pages |
 
 **Consequences.** A report with `--verify` reads every stored byte and takes as long as `apeiron verify`; with `--remotes` it needs the remotes to answer. Reports are made on demand or by the system's scheduler, not kept by Apeiron; keeping them is the organization's part of the process.
+
+## ADR-036: aws-lc-rs for signatures, beside RustCrypto
+
+**Status:** Accepted (recorded 2026-11-06)
+
+**Context.** ADR-017 says that libraries outside RustCrypto are not used for cryptography. The web server must check the RS256 and ES256 signatures of identity providers (ADR-031), and reports are signed with Ed25519 ([REPORTS.md](REPORTS.md) §5.1). `aws-lc-rs` was already in the program, through `object_store` for HTTPS (ADR-018).
+
+**Decision.** `aws-lc-rs` checks and makes these signatures, in `apeiron-server` and `apeiron-cli`. RustCrypto stays for what protects repository data and passwords: XChaCha20-Poly1305, Argon2id and SHA-256 in the server's files. This changes the last sentence of ADR-017's consequences.
+
+**Rationale.** One library already built into the program does all three signature algorithms, so no further crates are added for them.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| The RustCrypto crates for RSA, P-256 and Ed25519 | Three more dependencies beside a library that is already there |
+
+**Consequences.** `aws-lc-rs` contains C code and, like `zstd` (ADR-011), is an exception to "Rust wherever possible" (ADR-001); `russh` brings `ring`, which contains C and assembly too. A C compiler is needed to build ([CONTRIBUTING.md](../CONTRIBUTING.md)).
+
+## ADR-037: Changes to earlier decisions, up to 2026-11-06
+
+**Status:** Accepted (recorded 2026-11-06)
+
+**Context.** Work after the first records changed what some of them say, or added decisions without a record. Old records are not rewritten, so their "Consequences" and "Alternatives" can read as if still true. The reasons below are the ones the documents give; alternatives weighed at the time were not written down and are not reconstructed here.
+
+**Decision.** This table says what holds now where it differs from the earlier record.
+
+| Earlier record | What holds now | Why | Details |
+| --- | --- | --- | --- |
+| ADR-018: garbage collection of a remote copy is later | `apeiron gc --remote` cleans a copy only this repository writes to | A replica is cleaned without signing in to its machine | [FORMAT.md](FORMAT.md) §15.8 |
+| ADR-022: no rebase or cherry-pick, no working folder that follows a branch | `cherry-pick`, `rebase` and `switch` exist; `switch` records the folder before changing it | The vision asks for them; recording first keeps work from being lost | [BRANCH.md](BRANCH.md) §4–6 |
+| ADR-025: plugins are not stored in the repository | A repository can carry plugins in `apeiron/plugins`; a copy never installs one by itself | Copies can use the same plugins while installing stays each user's decision | [PLUGIN.md](PLUGIN.md) §5 |
+| ADR-029: the log grows without limit; syslog is not used | The log is split at 16 MiB with the chain unbroken; each event can also go to syslog | Long-running servers; a central service holds a copy the server cannot take back. The file stays the record | [AUDIT.md](AUDIT.md) §3, §5 |
+| ADR-030: read links, folders one file at a time | Zip downloads, link passwords, download limits and upload links | Larger folders, and receiving files from people without an account | [SHARE.md](SHARE.md) §2, §4, §7 |
+| ADR-031: users added one by one | Users can be made from the provider's groups; password users can add an authenticator code | Organizations manage people in groups; a password alone is weak for an admin | [IDENTITY.md](IDENTITY.md) §2.1, §4 |
+| ADR-032: no limits per tenant | Storage and job limits, operator tenants, jobs per tenant | One tenant must not take the disk or processors of others | [TENANTS.md](TENANTS.md) §2.1, §4.1, [DAEMON.md](DAEMON.md) §3.1 |
+| ADR-033: audit log and links stay with each server | A copy of both travels in the ref `apeiron/web` | Links keep working after a failover, and the old log can still be read | [REPLICATION.md](REPLICATION.md) §6.1 |
+| ADR-034: retention rules with a fixed time | Legal holds beside them: no end of their own, and lifting leaves a permanent record | The end of a court case is not known beforehand | [FORMAT.md](FORMAT.md) §17 |
+| ADR-035: no mapping to a standard, nothing signed | `--standard iso27001` and Ed25519 signatures | Auditors ask for controls and for proof the report is unchanged | [REPORTS.md](REPORTS.md) §3.1, §5.1 |
+| None | Tags are the attribute `user.xdg.tags` in the existing `xattrs` field, Linux only | The convention file managers already write; the format version does not change | [FORMAT.md](FORMAT.md) §6.3 |
+| ADR-021: the Git crate moves behind the plugin interface once that exists | Not done; still a crate of its own | It needs an importer plugin type | [ROADMAP.md](ROADMAP.md) §8 |
+
+**Consequences.** A reader of an older ADR checks this table first. A later change gets its own ADR.

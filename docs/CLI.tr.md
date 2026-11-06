@@ -2,7 +2,7 @@
 
 # Apeiron Komut Satırı Arayüzü
 
-> **Durum: Devam ediyor.** `apeiron` komutunun Aşama 1 tasarımıdır ([ROADMAP.tr.md](ROADMAP.tr.md) §3). Tamamlandı olarak işaretlenen kısımlar bugün çalışır.
+> **Durum: Devam ediyor.** `apeiron` komutunun başvuru belgesidir. Tamamlandı olarak işaretlenen kısımlar bugün çalışır.
 
 CLI, Apeiron'un ilk arayüzüdür. Diğer tüm arayüzler gibi yalnızca herkese açık API'yi kullanır ([API.tr.md](API.tr.md)); çekirdeğe üçüncü taraf bir programın sahip olmadığı hiçbir erişimi yoktur.
 
@@ -10,7 +10,7 @@ CLI, Apeiron'un ilk arayüzüdür. Diğer tüm arayüzler gibi yalnızca herkese
 
 | İlke | Kural | Durum |
 | --- | --- | --- |
-| Yalnızca API | CLI yalnızca herkese açık `apeiron` crate'ini çağırır | Tamamlandı |
+| Yalnızca API | CLI yalnızca herkese açık `apeiron` crate'ini çağırır; `apeiron daemon`, `web` ve `ui`, aynı crate'i kullanan `apeiron-daemon` ve `apeiron-server` crate'lerini başlatır | Tamamlandı |
 | Veri asla sessizce yok edilmez | Açık bir seçenek istemedikçe hiçbir komut var olan dosyaların üzerine yazmaz ya da onları silmez | Tamamlandı |
 | Makinece okunabilir çıktı | Her komut `--json` kabul eder ve o zaman standart çıktıya tek bir JSON belgesi yazar | Tamamlandı |
 | İlerleme | Uzun komutlar, standart hata bir terminalse ilerlemeyi orada gösterir | Tamamlandı |
@@ -54,7 +54,7 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | Komut | Ne yapar | Durum |
 | --- | --- | --- |
 | `apeiron init <path> [--encrypt]` | Boş bir depo oluşturur; `--encrypt` onu bir parolayla şifreler (bölüm 2.1) | Tamamlandı |
-| `apeiron backup <folder> [--ref <name>] [--message <text>]` | Klasörü yeni bir snapshot olarak saklar ve ref'i ona taşır (varsayılan ref: `main`) | Tamamlandı |
+| `apeiron backup <folder> [--ref <name>] [--message <text>] [--author <text>] [--host <text>]` | Klasörü yeni bir snapshot olarak saklar ve ref'i ona taşır (varsayılan ref: `main`) | Tamamlandı |
 | `apeiron log [<ref>] [--grep <metin>]` | Bir ref'in snapshot'larını en yeniden başlayarak listeler; `--grep`, mesajı, yazarı, makinesi ya da üst verisi metni büyük-küçük harf ayırmadan içerenleri bırakır | Tamamlandı |
 | `apeiron ls <snapshot> [<path>]` | Bir snapshot'taki dosya ve klasörleri listeler | Tamamlandı |
 | `apeiron diff <snapshot> <snapshot> [--text]` | İki snapshot arasında eklenen, silinen ve değişen dosyaları listeler; `--text` bir eklentinin işlediği dosyaların değişen satırlarını da gösterir ([TEXT.tr.md](TEXT.tr.md)) | Tamamlandı |
@@ -101,7 +101,7 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | `apeiron plugin share <name>`, `plugin unshare <name>`, `plugin list --shared`, `plugin add --from-repo <name>` | Eklentileri depoda taşır ve depodan kurar ([PLUGIN.tr.md](PLUGIN.tr.md) §5) | Tamamlandı |
 | `apeiron tag <file>... [--add <tag>]... [--remove <tag>]...` | Diskteki dosyaların, yedeklerin sakladığı ve `search --tag`'in bulduğu etiketlerini gösterir ya da değiştirir; yalnızca Linux ([SEARCH.tr.md](SEARCH.tr.md) §1.1) | Tamamlandı |
 | `apeiron hold add <refs> --reason <text>`, `hold list`, `hold lift <id> --reason <text>` | Ref'leri, sahip oldukları her sürümle kaldırılana kadar tutan bir yasal saklama kilidi koyar; kaldırma kalıcı olarak kaydedilir ([ARCHIVE.tr.md](ARCHIVE.tr.md) §2.1) | Tamamlandı |
-| `apeiron push --all <remote>`, `apeiron pull --all <remote> [--rate <hız>]` | Bir replikayı ya da yedek sunucuyu güncel tutmak için her ref'i push ya da pull eder; çatışmalı bir ref bırakılır ve adlandırılır, diğerleri kopyalanır; o zaman çıkış kodu 3'tür ([REPLICATION.tr.md](REPLICATION.tr.md)) | Tamamlandı |
+| `apeiron push --all <remote> [--rate <hız>]`, `apeiron pull --all <remote> [--rate <hız>]` | Bir replikayı ya da yedek sunucuyu güncel tutmak için her ref'i push ya da pull eder; çatışmalı bir ref bırakılır ve adlandırılır, diğerleri kopyalanır; o zaman çıkış kodu 3'tür ([REPLICATION.tr.md](REPLICATION.tr.md)) | Tamamlandı |
 | `apeiron web … [--replicate <remote>]... [--standby]` | Her yedekten sonra her ref'i her replikaya push eder ya da yedek almayan bir yedek sunucu kopyası sunar ([REPLICATION.tr.md](REPLICATION.tr.md)) | Tamamlandı |
 | `apeiron web … --audit-syslog <target>` | Her denetim olayını bir syslog sunucusuna (`udp://host:port`) ya da `/dev/log` gibi yerel bir sokete de gönderir ([AUDIT.tr.md](AUDIT.tr.md) §5) | Tamamlandı |
 | `apeiron key remove <id>` | Bir parolayı ya da kurtarma anahtarını siler; sonuncusu silinemez | Tamamlandı |
@@ -115,7 +115,7 @@ Bir `<snapshot>`; ref adı (`main`), tam snapshot kimliği ya da tek bir snapsho
 | Dosyalar, klasörler, sembolik bağlar | Evet | Tamamlandı |
 | İzin bitleri ve değişiklik zamanı | Evet | Tamamlandı |
 | Linux ve macOS'ta sahip (uid/gid) | Evet | Tamamlandı |
-| Genişletilmiş öznitelikler | Aşama 1'de değil | Planlandı |
+| Genişletilmiş öznitelikler | Yalnızca Linux'ta dosya etiketleri, `user.xdg.tags` ([SEARCH.tr.md](SEARCH.tr.md) §1.1); diğerleri henüz değil | Devam ediyor |
 | Sabit bağlar | Ayrı dosyalar olarak; aralarındaki bağ korunmaz ([FORMAT.tr.md](FORMAT.tr.md) §6.3) | Tamamlandı |
 | Aygıt dosyaları, soketler, borular | Hayır; atlanır ve raporlanır | Tamamlandı |
 
@@ -129,7 +129,7 @@ Okunurken değişen bir dosya okunduğu hâliyle saklanır ve uyarı olarak rapo
 | 1 | Hata; depoda hiçbir şey değişmedi |
 | 2 | Kullanım hatası (yanlış komut ya da seçenek) |
 | 3 | Uyarılarla bitti (ör. atlanan dosyalar) ya da `sync` veya `merge` çatışma buldu ya da `sync` dosyaları sonraki tura bıraktı |
-| 4 | `verify` bozulma buldu |
+| 4 | `verify`, `restore-test` ya da `report --verify` bozulma buldu; rapor ya da denetim kaydı değişmiş (`report check`, `web audit verify`); `daemon once` ya da `daemon status` içinde başarısız bir iş |
 | 130 | Ctrl+C ile iptal edildi |
 
 ## 6. Örnek oturum
@@ -152,7 +152,7 @@ apeiron verify
 | `apeiron` | Herkese açık Rust API'si ([API.tr.md](API.tr.md) §8) | Devam ediyor |
 | `apeiron-services` | API'nin kullandığı klasör ↔ snapshot, fark ve dışa aktarma mantığı | Devam ediyor |
 | `apeiron-cli` | `apeiron` programı | Devam ediyor |
-| `apeiron-remote` | SFTP ve S3 uzak depoları (ADR-018) | Devam ediyor |
+| `apeiron-remote` | SFTP ve S3 uzak depoları (ADR-018) | Tamamlandı |
 
 | İhtiyaç | Önerilen kütüphane | Gerekçe |
 | --- | --- | --- |
