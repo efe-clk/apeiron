@@ -209,7 +209,33 @@ impl Repository {
         }
         self.prepare_remote(store)?;
         let mut have = remote_index(store, &self.keys)?.into_keys().collect();
-        self.push_ref(store, name, &mut have, on_copy)
+        self.push_ref(store, name, &mut have, false, on_copy)
+    }
+
+    /// Pushes the ref `name` even though its history is not an extension of
+    /// the remote's, after a prune here (FORMAT.md §13.4). The remote ref
+    /// must hold a snapshot this ref's reflog names, so that nothing is lost
+    /// that this copy has not seen; a ref under a retention rule or a legal
+    /// hold is refused.
+    pub fn push_replacing(
+        &self,
+        store: &dyn Store,
+        name: &str,
+        on_copy: OnCopy<'_>,
+    ) -> Result<TransferReport> {
+        validate_ref_name(name)?;
+        if self.read_ref(name)?.is_none() {
+            return Err(Error::RefNotFound(name.to_owned()));
+        }
+        if let Some(reason) = self.ref_protection(name)? {
+            return Err(Error::Retained {
+                name: name.to_owned(),
+                reason,
+            });
+        }
+        self.prepare_remote(store)?;
+        let mut have = remote_index(store, &self.keys)?.into_keys().collect();
+        self.push_ref(store, name, &mut have, true, on_copy)
     }
 
     /// Pushes every ref to `store`, reading its index once (FORMAT.md
@@ -222,7 +248,7 @@ impl Repository {
         let mut done = Vec::new();
         let mut totals = (0, 0);
         for (name, _) in self.list_refs()? {
-            let result = self.push_ref(store, &name, &mut have, &mut |r| {
+            let result = self.push_ref(store, &name, &mut have, false, &mut |r| {
                 on_copy(&summed(r, totals))
             });
             done.push(outcome(name, result, &mut totals)?);
@@ -237,6 +263,7 @@ impl Repository {
         store: &dyn Store,
         name: &str,
         have: &mut HashSet<ObjectId>,
+        replace: bool,
         on_copy: OnCopy<'_>,
     ) -> Result<TransferReport> {
         let local = self
@@ -252,10 +279,18 @@ impl Repository {
         if previous == Some(local) {
             return Ok(report);
         }
-        if let Some(remote) = previous
-            && !is_ancestor(remote, local, |id| self.read_snapshot(id))?
-        {
-            return Err(Error::RemoteAhead(name.to_owned()));
+        if let Some(remote) = previous {
+            let known = replace
+                && self
+                    .reflog(name)?
+                    .iter()
+                    .any(|line| line.old == Some(remote) || line.new == Some(remote));
+            if !known && !self.contains(&remote) {
+                return Err(Error::RemoteAhead(name.to_owned()));
+            }
+            if !known && !is_ancestor(remote, local, |id| self.read_snapshot(id))? {
+                return Err(Error::RemoteAhead(name.to_owned()));
+            }
         }
 
         let missing = missing_objects(

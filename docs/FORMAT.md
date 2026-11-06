@@ -282,7 +282,7 @@ A pack whose file hash is wrong, or that an index lists and is gone, can be repl
 1. Take the repository lock exclusive (section 12), run the repair of section 8.2, and check that the copy's `config` has the local `id`.
 2. Check the file hash of every pack. A pack that passes is healthy; its objects need nothing.
 3. Find what to replace: every object an index places outside the healthy packs, and every object not in a healthy pack that a ref or a reflog line reaches, reading what is needed to walk from wherever it is whole.
-4. For each, in order of id, take its stored bytes from the damaged pack if they decode to its id (section 8.1 rule 5), otherwise from the copy under the same check; write them into new packs (section 9.1). An error other than "not held whole", such as a broken connection, stops here, and nothing was deleted.
+4. For each, in order of id, take its stored bytes from the damaged pack if they decode to its id (section 8.1 rule 5), otherwise from the copy under the same check; write them into new packs (section 9.1). A new pack with the bytes the damaged one once had also has its name: it replaces that file in one rename and is then not deleted. An error other than "not held whole", such as a broken connection, stops here, and nothing was deleted.
 5. An object that a ref or a reflog line reaches, or that a reflog line names and an index lists, is required. A required object held whole nowhere is unrecoverable. Any other object held whole nowhere is dropped: nothing can reach it, or garbage collection already removed it on purpose.
 6. Write one new index that lists every healthy and new pack, and each damaged pack only with its unrecoverable objects. Delete all other index files, then flush `index/`.
 7. Delete the damaged packs, then flush their folders, except a pack an unrecoverable object is listed in and, while any object is unrecoverable, a damaged pack no index listed: it may hold that object.
@@ -445,6 +445,17 @@ A dry run performs steps 1–3 and reports what would be removed without changin
 | After step 5, before step 7 ends | Every live object is covered by the new index; some dead packs remain | Remaining dead packs are found as unindexed packs; the next run removes them |
 
 In no case does a ref point to a missing object: an object is deleted only after a durable index covers another copy of it, or after it was found dead.
+
+### 13.4 Pruning a ref
+
+A snapshot names its parents, so a snapshot cannot leave the middle of a history without new ids for those after it. Pruning writes such a shorter history as ordinary objects; nothing in the format changes.
+
+1. Refuse a ref a retention rule or a legal hold protects (sections 16, 17), a ref of sync (one with a ref `folder/<name>`, or under `folder/` or `apeiron/`), and a history with a merge or a Git commit (`git.id` in `meta`), whose ids mean something elsewhere.
+2. Walk the ref's first parents. Keep the newest snapshot, and for each rule the newest snapshot of as many periods as the rule says: the last snapshots, or days, weeks from Monday, months and years, in UTC. Periods without a snapshot do not count.
+3. From the oldest kept to the newest, store a copy equal in everything but `parents`, which name the copy before it; the oldest kept has none. Ids follow from content, so a snapshot with nothing removed below it keeps its id.
+4. Move the ref to the newest copy (section 9.2), which adds a reflog line. Until the keep period of section 13.1 has passed, the old snapshots stay and the ref can be moved back by hand; after it, garbage collection frees what only they reached.
+
+A push of the shorter history is refused, as the remote's snapshot is not an ancestor of it (section 15.3 step 4). A push asked to replace moves the remote ref anyway if the local reflog names the remote's snapshot and no rule or hold protects the ref, so nothing this copy has not seen can be lost; a snapshot another device added stops it as before. Other copies that pull get a conflict: they delete the ref and pull again. Garbage collection of the remote (section 15.8) then frees its room.
 
 ## 14. Encryption
 

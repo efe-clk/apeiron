@@ -156,6 +156,7 @@ Every operation takes one plain request value and returns one plain result value
 | `resolve` | snapshot spec (section 8.4) | snapshot id | No |
 | `delete_ref` | ref name, expected snapshot | — | No |
 | `repair` | — | `RepairReport`: removed locks, repaired reflogs, packs indexed anew, damaged indexes removed | No |
+| `prune` | ref name, `keep_last`, `keep_daily`, `keep_weekly`, `keep_monthly`, `keep_yearly`, dry run | `PruneReport`: previous and new snapshot, snapshots kept with their new ids and the rules behind them, snapshots removed ([FORMAT.md](FORMAT.md) §13.4); `invalid_input` without a rule, `conflict` for a protected ref, `unsupported` for a ref of sync | No |
 | `repair_from` | remote name, optional speed limit | `CopyRepairReport`: what `repair` did, damaged packs, objects kept from them and copied from the remote, packs removed, objects no copy holds whole ([FORMAT.md](FORMAT.md) §8.3) | Yes |
 | `gc` | days of reflog to keep (default 90), dry run | `GcReport`: live objects, removed objects, bytes and packs, packs written | Yes |
 | `gc_remote` | remote name, dry run | `GcReport` for the remote ([FORMAT.md](FORMAT.md) §15.8); `locked` while another cleanup runs there | Yes |

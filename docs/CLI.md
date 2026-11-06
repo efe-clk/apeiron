@@ -65,6 +65,7 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | `apeiron refs` | Lists all refs and the snapshots they point to | Done |
 | `apeiron verify` | Reads and checks every pack, index and object | Done |
 | `apeiron repair [--from <remote> [--rate <speed>]]` | Removes stale ref locks, adds lost reflog lines and replaces damaged index files; `--from` also replaces damaged or missing data from a whole copy ([FORMAT.md](FORMAT.md) §8.3), with exit code 4 when no copy holds some of it whole | Done |
+| `apeiron prune <ref> [--keep-last <n>] [--keep-daily <n>] [--keep-weekly <n>] [--keep-monthly <n>] [--keep-yearly <n>] [--dry-run]` | Keeps the snapshots the rules name and moves the ref to a copy of that shorter history ([FORMAT.md](FORMAT.md) §13.4); `gc` frees the room later. A ref of sync, or one under a retention rule or a legal hold, is refused | Done |
 | `apeiron gc [--keep-days <days>] [--dry-run]` | Deletes data no ref and no reflog line of the last 90 days (or `--keep-days`) can reach; `--dry-run` only reports | Done |
 | `apeiron gc --remote <remote> [--dry-run]` | Deletes from a remote the data its refs cannot reach, such as on a replica; only for a remote this repository alone writes to ([FORMAT.md](FORMAT.md) §15.8) | Done |
 | `apeiron key list` | Lists the passwords and recovery keys of an encrypted repository | Done |
@@ -94,7 +95,7 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | `apeiron plugin remove <name>` | Removes a plugin | Done |
 | `apeiron git import <git-repo> [--prefix <name>]` | Stores every branch, tag and remote-tracking branch of a Git repository, with its history, under `git/` ([GIT.md](GIT.md)) | Done |
 | `apeiron git export <git-repo> [--prefix <name>]` | Writes them back into a Git repository with the same commit ids; exit code 3 if one could not be reproduced | Done |
-| `apeiron push <remote> [<ref>] [--rate <speed>]` | Copies the snapshots of a ref (default `main`) to a remote and moves the ref there | Done |
+| `apeiron push <remote> [<ref>] [--rate <speed>] [--replace]` | Copies the snapshots of a ref (default `main`) to a remote and moves the ref there; after a `prune`, `--replace` has the remote follow ([FORMAT.md](FORMAT.md) §13.4) | Done |
 | `apeiron pull <remote> [<ref>] [--rate <speed>]` | Copies the snapshots of a ref from a remote and moves the local ref forward | Done |
 | `apeiron report [--verify] [--remotes] [--stale-days <n>] [--all-tenants] [--web [--tenant <name>] [--since <date>]] [--standard iso27001] [--out <file> [--sign <key>]]`, `report key <file>`, `report check <file>` | Prints a compliance report as Markdown (or JSON with `--json`): backups, integrity, copies, protection, retention and legal holds, with `--web` users and the audit log, with `--standard` the facts mapped to its controls; signed with `--sign` and checked with `report check` (§5.1 of REPORTS.md); exit code 3 with a problem, 4 with damaged data ([REPORTS.md](REPORTS.md)) | Done |
 | `apeiron retention add <refs> --days <n>`, `apeiron retention list` | Keeps the refs a name or a prefix followed by `*` matches as an archive: they only move forward and are not deleted until the days have passed since their last change; a rule can never be removed ([ARCHIVE.md](ARCHIVE.md)) | Done |

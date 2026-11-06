@@ -47,6 +47,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [037](#adr-037-changes-to-earlier-decisions-up-to-2026-11-06) | Later changes | One table of what changed in ADR-018, 022, 025, 029–035, and legal holds and tags | Accepted |
 | [038](#adr-038-repairing-from-a-copy-is-an-explicit-command-that-deletes-only-what-it-replaced) | Repair | `apeiron repair --from <remote>` under the exclusive lock; damaged packs go only when nothing in them is lost | Accepted |
 | [039](#adr-039-a-left-out-path-is-left-alone-not-deleted) | Exclusion | Patterns from `--exclude` and `.apeironignore`; a backup does not read such paths, and a sync keeps them as they were recorded | Accepted |
+| [040](#adr-040-pruning-rewrites-a-linear-history-and-remotes-follow-only-when-asked) | Pruning | `apeiron prune` copies the kept snapshots with new parents; protected refs, sync and merges are refused; `push --replace` for remotes | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28. ADR-036 and ADR-037 record on 2026-11-06 decisions made earlier without a record of their own, including what changed in older ADRs.
 
@@ -856,3 +857,25 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Rules kept in the repository's settings | They would not follow a folder to a second device or a new repository |
 
 **Consequences.** A snapshot made by sync can hold a file its device does not have. Restoring such a snapshot writes that file. A folder removed elsewhere stays here while a left-out file is in it.
+
+## ADR-040: Pruning rewrites a linear history, and remotes follow only when asked
+
+**Status:** Accepted (2026-11-06)
+
+**Context.** Every backup kept the whole history of its ref, so a repository only grew. The vision asks for rules such as 7 daily, 4 weekly and 12 monthly. Snapshots name their parents and ids follow from content, so removing one from the middle changes the id of everything after it, and a push refuses a history that does not extend the remote's.
+
+**Decision.** `apeiron prune` copies the snapshots the rules keep, equal but for their parents, and moves the ref ([FORMAT.md](FORMAT.md) §13.4). Protected refs, refs of sync and histories with merges or Git commits are refused. Room is freed later by garbage collection, once the reflog's keep period has passed. `push --replace` moves a remote ref only when the local reflog names what it holds.
+
+**Rationale.** It needs no format change and uses write paths that are already crash-tested: objects first, the ref last with compare-and-swap, the old head in the reflog. Reversal stays possible through the keep period, as Principle 5 asks. Sync depends on common ancestors between devices, so it must not lose them; Git ids must stay reproducible. The reflog test for replacing lets a remote follow without ever overwriting a snapshot another device added.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| Snapshots without parents for backups | A second kind of history; merge and sync rely on parents |
+| A list of forgotten snapshots beside the history | Every reader and copy would have to honour it, a format change |
+| Deleting at once instead of through the reflog | A wrong rule would be final |
+| Pruning sync refs | Devices would lose their common ancestor and every file would become a conflict |
+| A plain `push --force` | It could overwrite what another device added |
+
+**Consequences.** A pruned ref's ids change, so ids written down earlier stop naming a snapshot once it is collected; a retention rule is the tool for history that must stay. Other copies that pull must delete the ref first. Sync histories are not thinned.

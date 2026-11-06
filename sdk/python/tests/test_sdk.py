@@ -139,6 +139,8 @@ class Sdk(unittest.TestCase):
             pulled = repo.pull_all("disk").wait()
             self.assertEqual(pulled.refs[0].name, "main")
             self.assertEqual(repo.repair_from("disk").wait().unrecoverable, [])
+            self.assertEqual(repo.prune(keep_last=1).removed, [])
+            repo.push("disk", replace=True).wait()
             report = repo.report(stale_days=0).wait()
             self.assertEqual(report.refs[0].name, "main")
 

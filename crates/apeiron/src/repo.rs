@@ -25,8 +25,8 @@ use crate::{
     AddFileReport, AddFileRequest, ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo,
     ExportReport, GcReport, GcRequest, GitExportReport, GitImportReport, GitPushResult,
     GitPushedRef, GitServedRef, KeyInfo, LegalHold, ObjectId, Phase, PluginAdded, PluginInfo,
-    ReflogEntry, Remote, RepairReport, RestoreReport, RestoreTestReport, RetentionRule,
-    SearchReport, SwitchReport, SyncReport, TransferReport, VerifyReport,
+    PruneReport, PruneRequest, ReflogEntry, Remote, RepairReport, RestoreReport, RestoreTestReport,
+    RetentionRule, SearchReport, SwitchReport, SyncReport, TransferReport, VerifyReport,
 };
 
 /// The ref the plugins a repository carries are kept in (PLUGIN.md §5).
@@ -1007,9 +1007,12 @@ impl Repository {
         Job::spawn("push", move |ctl| {
             ctl.update(|p| p.phase = Phase::Copying);
             let store = open_store(&remote, repo.info().encrypted, request.rate)?;
-            let report = repo
-                .view()?
-                .push(&*store, &request.ref_name, &mut |r| copied(ctl, r))?;
+            let view = repo.view()?;
+            let report = if request.replace {
+                view.push_replacing(&*store, &request.ref_name, &mut |r| copied(ctl, r))?
+            } else {
+                view.push(&*store, &request.ref_name, &mut |r| copied(ctl, r))?
+            };
             ctl.update(|p| p.phase = Phase::Done);
             Ok(report)
         })
@@ -1078,6 +1081,18 @@ impl Repository {
         let mut core = self.write();
         core.refresh_index()?;
         Ok(core.repair()?)
+    }
+
+    /// Keeps the snapshots of a ref the rules name and moves the ref to the
+    /// copy of the newest (FORMAT.md §13.4). Freeing their room is left to
+    /// [`Repository::gc`], and following on a remote to `push` with
+    /// `replace`.
+    pub fn prune(&self, request: &PruneRequest) -> Result<PruneReport> {
+        let _writer = self.lock_writer();
+        let _lock = core::RepoLock::shared(self.path())?;
+        let mut core = self.write();
+        core.refresh_index()?;
+        Ok(services::prune(&mut core, request)?)
     }
 
     /// Replaces damaged or missing objects from a whole copy on a remote and

@@ -47,6 +47,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [037](#adr-037-önceki-kararlardaki-değişiklikler-2026-11-06ya-kadar) | Sonraki değişiklikler | ADR-018, 022, 025, 029–035'te değişenlerin ve yasal saklama kilitleri ile etiketlerin tek tablosu | Kabul edildi |
 | [038](#adr-038-bir-kopyadan-onarım-yalnızca-yerine-koyduğunu-silen-açık-bir-komuttur) | Onarım | Özel kilit altında `apeiron repair --from <remote>`; bozuk paketler ancak içlerinden hiçbir şey kaybolmayacaksa silinir | Kabul edildi |
 | [039](#adr-039-dışarıda-bırakılan-yola-dokunulmaz-silinmez) | Dışlama | `--exclude` ve `.apeironignore` kalıpları; yedek bu yolları okumaz, senkron onları kaydedildiği gibi tutar | Kabul edildi |
+| [040](#adr-040-budama-doğrusal-bir-geçmişi-yeniden-yazar-uzak-depolar-yalnızca-istenince-izler) | Budama | `apeiron prune`, tutulan snapshot'ları yeni ebeveynlerle kopyalar; korunan ref'ler, senkron ve birleştirmeler reddedilir; uzak depolar için `push --replace` | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı. ADR-036 ve ADR-037, kendi kayıtları olmadan daha önce alınan kararları ve eski ADR'lerde değişenleri 2026-11-06'da kaydeder.
 
@@ -856,3 +857,25 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Kuralları deponun ayarlarında tutmak | Bir klasörü ikinci cihaza ya da yeni depoya izlemezdi |
 
 **Sonuçlar.** Senkronun yaptığı bir snapshot, cihazında olmayan bir dosyayı tutabilir. Böyle bir snapshot geri yüklendiğinde o dosya yazılır. Başka yerde silinen klasör, içinde dışarıda bırakılan dosya oldukça burada kalır.
+
+## ADR-040: Budama doğrusal bir geçmişi yeniden yazar, uzak depolar yalnızca istenince izler
+
+**Durum:** Kabul edildi (2026-11-06)
+
+**Bağlam.** Her yedek, ref'inin bütün geçmişini tutuyordu, bu yüzden depo yalnızca büyüyordu. Vizyon 7 günlük, 4 haftalık ve 12 aylık gibi kurallar ister. Snapshot'lar ebeveynlerini adlandırır ve kimlikler içerikten gelir; ortadan birini çıkarmak ondan sonraki her şeyin kimliğini değiştirir ve push, uzak deponunkini uzatmayan geçmişi reddeder.
+
+**Karar.** `apeiron prune`, kuralların tuttuğu snapshot'ları ebeveynleri dışında eşit olarak kopyalar ve ref'i taşır ([FORMAT.tr.md](FORMAT.tr.md) §13.4). Korunan ref'ler, senkron ref'leri ve birleştirme ya da Git commit'i içeren geçmişler reddedilir. Yer, reflog'un tutma süresi geçince çöp toplamayla boşalır. `push --replace`, uzak ref'i yalnızca yerel reflog onun tuttuğunu adlandırıyorsa taşır.
+
+**Gerekçe.** Format değişikliği gerektirmez ve kesinti testlerinden geçmiş yazma yollarını kullanır: önce nesneler, en son karşılaştır-değiştir ile ref, eski baş reflog'da. 5. ilkenin istediği gibi tutma süresi boyunca geri dönülebilir. Senkron, cihazlar arasındaki ortak atalara dayanır, onları kaybetmemelidir; Git kimlikleri yeniden üretilebilir kalmalıdır. Yerine koyma için reflog sınaması, başka bir cihazın eklediği snapshot'ın üzerine asla yazmadan uzak deponun izlemesini sağlar.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Yedekler için ebeveynsiz snapshot'lar | İkinci bir geçmiş türü; birleştirme ve senkron ebeveynlere dayanır |
+| Geçmişin yanında unutulan snapshot listesi | Her okuyucu ve kopya ona uymak zorunda kalırdı; format değişikliğidir |
+| Reflog yerine hemen silmek | Yanlış bir kural geri dönülmez olurdu |
+| Senkron ref'lerini budamak | Cihazlar ortak atalarını kaybeder ve her dosya çatışma olurdu |
+| Düz `push --force` | Başka bir cihazın eklediğinin üzerine yazabilirdi |
+
+**Sonuçlar.** Budanan ref'in kimlikleri değişir; daha önce not edilen kimlikler toplandıktan sonra snapshot adlandırmaz; kalması gereken geçmişin aracı saklama kuralıdır. Pull yapan diğer kopyalar önce ref'i silmelidir. Senkron geçmişleri seyreltilmez.

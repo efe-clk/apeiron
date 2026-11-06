@@ -94,7 +94,7 @@ Ref bir snapshot'a ad verir; snapshot bir kök tree'yi ve ebeveyn snapshot'ları
 | Snapshot | Bir veri kümesinin belirli andaki durumu; ebeveynleri, yazarı ve açıklamasıyla | Tamamlandı |
 | Ref | Bir snapshot'ı gösteren ad; dal, etiket ve yedek noktası aynı şeydir | Tamamlandı |
 | Store | Nesnelerin saklandığı yer; her hedef için aynı arayüz | Tamamlandı (klasör, SFTP, S3) |
-| Policy | Saklama, şifreleme, senkron ve doğrulama kuralları | Devam ediyor (saklama kuralları ve yasal saklama kilitleri tamamlandı, [ARCHIVE.tr.md](ARCHIVE.tr.md); eski yedekleri budayan kurallar yazılmadı) |
+| Policy | Saklama, şifreleme, senkron ve doğrulama kuralları | Devam ediyor (saklama kuralları, yasal saklama kilitleri ve budama tamamlandı, [ARCHIVE.tr.md](ARCHIVE.tr.md), [FORMAT.tr.md](FORMAT.tr.md) §13.4; politika olarak senkron ve doğrulama kuralları yazılmadı) |
 | Type driver | Türe özgü diff, birleştirme, önizleme ve indeksleme; eklenti olarak | Devam ediyor (fark ve birleştirme tamamlandı, [PLUGIN.tr.md](PLUGIN.tr.md); önizleme ve indeksleme yazılmadı) |
 
 Blob, tree ve snapshot `minicbor` ile kanonik CBOR olarak kodlanır. Bunları gerçek dosyalardan yedek ve sürümleme hizmetleri oluşturur.

@@ -288,7 +288,7 @@ For an audit, `apeiron report --verify --remotes --web > report.md` writes one d
 | Daily (or automatic, section 8) | `apeiron backup …` for each folder | New snapshot of what changed |
 | After each backup, or weekly | `apeiron push disk …` for each ref (section 6.1) | A second copy that survives the computer |
 | Weekly | `apeiron verify` | Reads every stored byte and checks it. `OK: …` means no damage; exit code 4 lists damaged files |
-| Monthly | `apeiron gc` | Deletes data that no ref reaches and that is older than 90 days. Try `apeiron gc --dry-run` first |
+| Monthly | `apeiron prune backup/documents --keep-daily 7 --keep-weekly 4 --keep-monthly 12`, then `apeiron gc` | Keeps those snapshots of a backup. `gc` deletes data that no ref reaches and that is older than 90 days. Try both with `--dry-run` first; a copy follows with `apeiron push disk backup/documents --replace` |
 | Monthly | Restore a few files to a new folder and open them | A backup is only proven by restoring it |
 | When a warning says so | `apeiron repair` | Removes stale locks, completes reflogs and rebuilds damaged index files |
 

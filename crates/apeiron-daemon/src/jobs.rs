@@ -5,7 +5,7 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use apeiron::SyncMode;
+use apeiron::{PruneRequest, SyncMode};
 use serde::Deserialize;
 
 use crate::{Error, IoContext, Result};
@@ -84,6 +84,12 @@ pub enum Action {
         sample_bytes: u64,
     },
     Gc,
+    /// Thins out the history of a ref by rules and has the remotes follow
+    /// (FORMAT.md §13.4).
+    Prune {
+        rules: PruneRequest,
+        push: Vec<String>,
+    },
     /// Replaces damaged objects from a remote (FORMAT.md §8.3).
     Repair {
         remote: String,
@@ -109,6 +115,7 @@ impl Action {
             Action::RestoreTest { .. } => "restore-test",
             Action::Gc => "gc",
             Action::Repair { .. } => "repair",
+            Action::Prune { .. } => "prune",
             Action::Sync { .. } => "sync",
         }
     }
@@ -148,6 +155,11 @@ struct RawJob {
     remote: Option<String>,
     mode: Option<String>,
     exclude: Option<Vec<String>>,
+    keep_last: Option<u32>,
+    keep_daily: Option<u32>,
+    keep_weekly: Option<u32>,
+    keep_monthly: Option<u32>,
+    keep_yearly: Option<u32>,
 }
 
 /// Reads the jobs file; jobs come sorted by name, the order they run in.
@@ -270,6 +282,40 @@ fn to_job(name: &str, raw: RawJob, scope: Option<&Scope>) -> std::result::Result
                 ref_name: some_ref,
             }
         }
+        "prune" => {
+            for (key, present) in [
+                ("folder", raw.folder.is_some()),
+                ("message", raw.message.is_some()),
+                ("sample_mb", raw.sample_mb.is_some()),
+            ] {
+                not_here(key, present)?;
+            }
+            let rules = PruneRequest {
+                ref_name: raw.ref_name.clone().ok_or("`ref` is missing")?,
+                keep_last: raw.keep_last.unwrap_or(0),
+                keep_daily: raw.keep_daily.unwrap_or(0),
+                keep_weekly: raw.keep_weekly.unwrap_or(0),
+                keep_monthly: raw.keep_monthly.unwrap_or(0),
+                keep_yearly: raw.keep_yearly.unwrap_or(0),
+                dry_run: false,
+            };
+            if [
+                rules.keep_last,
+                rules.keep_daily,
+                rules.keep_weekly,
+                rules.keep_monthly,
+                rules.keep_yearly,
+            ]
+            .iter()
+            .all(|n| *n == 0)
+            {
+                return Err("give at least one of `keep_last`, `keep_daily`, `keep_weekly`, `keep_monthly` and `keep_yearly`".to_owned());
+            }
+            Action::Prune {
+                rules,
+                push: raw.push.clone().unwrap_or_default(),
+            }
+        }
         "repair" => {
             for (key, present) in [
                 ("folder", raw.folder.is_some()),
@@ -331,10 +377,21 @@ fn to_job(name: &str, raw: RawJob, scope: Option<&Scope>) -> std::result::Result
         }
         other => {
             return Err(format!(
-                "unknown `do = {other:?}`; use backup, push, pull, verify, restore-test, gc, repair or sync"
+                "unknown `do = {other:?}`; use backup, push, pull, verify, restore-test, gc, prune, repair or sync"
             ));
         }
     };
+    if !matches!(action, Action::Prune { .. }) {
+        for (key, present) in [
+            ("keep_last", raw.keep_last.is_some()),
+            ("keep_daily", raw.keep_daily.is_some()),
+            ("keep_weekly", raw.keep_weekly.is_some()),
+            ("keep_monthly", raw.keep_monthly.is_some()),
+            ("keep_yearly", raw.keep_yearly.is_some()),
+        ] {
+            not_here(key, present)?;
+        }
+    }
     if !matches!(action, Action::Backup { .. } | Action::Sync { .. }) {
         not_here("exclude", raw.exclude.is_some())?;
     }

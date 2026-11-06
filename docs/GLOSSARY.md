@@ -71,7 +71,7 @@ Terms used across the Apeiron documentation and code, with their Turkish equival
 | Replica | replika | A remote that receives every ref of a server, soon after each backup |
 | Restore | geri yükleme | Writing data from a snapshot back to files |
 | Restore test | geri yükleme testi | Regularly restoring a backup to a separate area to prove it works |
-| Retention policy | saklama politikası | Rules for how many backups to keep and for how long, pruning the rest; not written yet ([ROADMAP.md](ROADMAP.md) §8). Not the same as a retention rule |
+| Retention policy | saklama politikası | Rules for how many backups to keep and for how long, pruning the rest (`apeiron prune`). Not the same as a retention rule |
 | Retention rule | saklama kuralı | Refs that may only grow and cannot be deleted before a number of days have passed; can never be removed |
 | Standby | yedek sunucu | A second web server serving a replica, ready to take over; it takes no backups |
 | Sync | senkron (senkronizasyon) | Keeping data the same on several devices or targets |

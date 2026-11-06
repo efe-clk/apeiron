@@ -501,6 +501,9 @@ class Repository:
     def rebase(self, branch: str, onto: str = "main", **options: Any) -> Record:
         return self.call("rebase", **{"from": onto, "into": branch}, **options)
 
+    def prune(self, ref: str = "main", **rules: Any) -> Record:
+        return self.call("prune", ref=ref, **rules)
+
     def repair(self) -> Record:
         return self.call("repair")
 
@@ -560,8 +563,11 @@ class Repository:
     def gc_remote(self, remote: str, **options: Any) -> Job:
         return self.start("gc_remote", remote=remote, **options)
 
-    def push(self, remote: str, ref: str = "main", rate: Optional[int] = None) -> Job:
-        return self.start("push", **_drop_none({"remote": remote, "ref": ref, "rate": rate}))
+    def push(
+        self, remote: str, ref: str = "main", rate: Optional[int] = None, replace: bool = False
+    ) -> Job:
+        request = {"remote": remote, "ref": ref, "rate": rate, "replace": replace}
+        return self.start("push", **_drop_none(request))
 
     def pull(self, remote: str, ref: str = "main", rate: Optional[int] = None) -> Job:
         return self.start("pull", **_drop_none({"remote": remote, "ref": ref, "rate": rate}))

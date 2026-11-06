@@ -606,6 +606,20 @@ impl Repository {
         }
     }
 
+    /// Why the history of `name` must stay whole, if a retention rule or a
+    /// legal hold says so (FORMAT.md §16.2, §17.2).
+    pub fn ref_protection(&self, name: &str) -> Result<Option<String>> {
+        if let Some(held) = self.legal_holds()?.iter().find(|h| h.holds(name)) {
+            return Ok(Some(format!(
+                "the legal hold {} holds it: {}",
+                held.id, held.hold.reason
+            )));
+        }
+        let rules = self.retention_rules()?;
+        Ok(retention::days_for(&rules, name)
+            .map(|days| format!("a retention rule keeps it for {days} days")))
+    }
+
     /// The retention rules, sorted by when they were added (FORMAT.md §16).
     pub fn retention_rules(&self) -> Result<Vec<retention::Rule>> {
         retention::read_rules(&self.dir(RETENTION))
@@ -833,6 +847,12 @@ impl ObjectWriter<'_> {
             chunks.push((self.put(ObjectType::Chunk, &chunk)?, len));
         }
         Ok(chunks)
+    }
+
+    /// The id a snapshot would get, without storing it.
+    pub fn id_of_snapshot(&self, snapshot: &Snapshot) -> Result<ObjectId> {
+        let data = snapshot.encode()?;
+        Ok(self.repo.keys.id.object_id(ObjectType::Snapshot, &data))
     }
 
     /// Reads a tree that was stored before this batch.

@@ -94,7 +94,7 @@ A ref names a snapshot; a snapshot points at a root tree and at its parent snaps
 | Snapshot | The state of a data set at a moment, with parents, author and message | Done |
 | Ref | A name pointing at a snapshot; branch, tag and backup point alike | Done |
 | Store | Where objects are kept; the same interface for every target | Done (folder, SFTP, S3) |
-| Policy | Retention, encryption, sync and verification rules | In progress (retention rules and legal holds are done, [ARCHIVE.md](ARCHIVE.md); rules that prune old backups are not) |
+| Policy | Retention, encryption, sync and verification rules | In progress (retention rules, legal holds and pruning are done, [ARCHIVE.md](ARCHIVE.md), [FORMAT.md](FORMAT.md) §13.4; sync and verification rules as policy are not) |
 | Type driver | Type-specific diff, merge, preview and indexing, as a plugin | In progress (diff and merge are done, [PLUGIN.md](PLUGIN.md); preview and indexing are not) |
 
 Blob, tree and snapshot are encoded in canonical CBOR with `minicbor`. The backup and versioning services create them from real files.

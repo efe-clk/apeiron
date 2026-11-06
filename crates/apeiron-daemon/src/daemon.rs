@@ -464,6 +464,27 @@ fn try_run(job: &Job, stop: &AtomicBool) -> apeiron::Result<(RunResult, String)>
             };
             (result, text)
         }
+        Action::Prune { rules, push } => {
+            let report = repo.prune(rules)?;
+            let mut text = format!(
+                "{}: {} snapshots removed, {} kept",
+                report.ref_name,
+                report.removed.len(),
+                report.kept.len()
+            );
+            for remote in push {
+                let pushed = wait(
+                    repo.push(TransferRequest {
+                        rate: job.rate,
+                        replace: true,
+                        ..TransferRequest::new(remote, &report.ref_name)
+                    })?,
+                    stop,
+                )?;
+                text.push_str(&format!("; pushed to {remote}: {} objects", pushed.objects));
+            }
+            (RunResult::Ok, text)
+        }
         Action::Repair { remote } => {
             let request = RemoteRequest {
                 remote: remote.clone(),

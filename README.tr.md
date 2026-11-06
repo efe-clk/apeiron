@@ -48,7 +48,7 @@ Her katman yalnızca hemen altındaki katmanı kullanır. Ayrıntılar: [docs/AR
 | --- | --- | --- | --- |
 | Çekirdek | `apeiron-core` | Nesne modeli, chunk bölme, paket/indeks dosyaları, ref ve reflog | Devam ediyor |
 | Depolama hedefleri | `apeiron-core`, `apeiron-remote` | Klasör (yerel ya da harici disk), SFTP ve S3 uzak depoları | Tamamlandı |
-| Hizmetler | `apeiron-services` | Bugün yedek, geri yükleme, listeleme, fark, senkron, birleştirme ve arama; eski yedekleri budayan kurallar sonra ([docs/ROADMAP.tr.md](docs/ROADMAP.tr.md) §8) | Devam ediyor |
+| Hizmetler | `apeiron-services` | Bugün yedek, geri yükleme, listeleme, fark, senkron, birleştirme, arama ve eski yedekleri budama | Devam ediyor |
 | Herkese açık API | `apeiron` | Tüm işlemler için Rust API ([docs/API.tr.md](docs/API.tr.md) §8) | Devam ediyor |
 | Sistem çağrıları | `apeiron-sys` | `unsafe` gerektiren işletim sistemi çağrıları (Windows write-through) | Tamamlandı |
 | C ABI | `apeiron-ffi` | `apeiron.h` başlık dosyasıyla kararlı C arayüzü `libapeiron` ve onun üzerindeki Python SDK'sı ([docs/SDK.tr.md](docs/SDK.tr.md)); `unsafe` kullanabilir | Tamamlandı |

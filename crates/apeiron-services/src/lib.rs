@@ -15,6 +15,7 @@ mod list;
 mod merge;
 mod name;
 mod os;
+mod prune;
 mod restore;
 mod restore_test;
 mod search;
@@ -36,6 +37,7 @@ pub use merge::{
     PLUGIN_SIZE_LIMIT, PluginMerge, cherry_pick, merge, rebase,
 };
 pub use name::Name;
+pub use prune::{PruneOptions, PruneOutcome, PrunedKept, PrunedRemoved, prune};
 pub use restore::{RestoreOutcome, restore};
 pub use restore_test::{RestoreProblem, RestoreTestOutcome, restore_test};
 pub use search::{

@@ -282,7 +282,7 @@ Dosya özeti yanlış olan ya da bir indeksin listelediği halde yok olan bir pa
 1. Depo kilidi özel olarak alınır (bölüm 12), bölüm 8.2'nin onarımı çalıştırılır ve kopyanın `config` dosyasının yerel `id`'ye sahip olduğu denetlenir.
 2. Her paketin dosya özeti denetlenir. Geçen paket sağlıklıdır; nesnelerinin hiçbir şeye ihtiyacı yoktur.
 3. Yerine konacaklar bulunur: bir indeksin sağlıklı paketlerin dışında gösterdiği her nesne ve sağlıklı bir pakette olmayıp bir ref'in ya da reflog satırının ulaştığı her nesne; gezinmek için gereken nesneler sağlam oldukları yerden okunur.
-4. Her biri için, kimlik sırasıyla, saklanan baytlar kimliğine çözülüyorsa (bölüm 8.1 kural 5) bozuk paketten, değilse aynı denetimle kopyadan alınır ve yeni paketlere yazılır (bölüm 9.1). "Sağlam olarak bulunmuyor" dışındaki bir hata, örneğin kopan bağlantı, burada durdurur ve hiçbir şey silinmemiştir.
+4. Her biri için, kimlik sırasıyla, saklanan baytlar kimliğine çözülüyorsa (bölüm 8.1 kural 5) bozuk paketten, değilse aynı denetimle kopyadan alınır ve yeni paketlere yazılır (bölüm 9.1). Bozuk paketin bir zamanlar sahip olduğu baytlara sahip yeni paket onun adını da taşır: o dosyayı tek bir yeniden adlandırmayla değiştirir ve sonra silinmez. "Sağlam olarak bulunmuyor" dışındaki bir hata, örneğin kopan bağlantı, burada durdurur ve hiçbir şey silinmemiştir.
 5. Bir ref'in ya da reflog satırının ulaştığı veya bir reflog satırının adını verdiği ve bir indeksin listelediği nesne gereklidir. Hiçbir yerde sağlam olmayan gerekli nesne kurtarılamaz. Hiçbir yerde sağlam olmayan diğer nesneler bırakılır: ya hiçbir şey onlara ulaşamaz ya da çöp toplama onları bilerek silmiştir.
 6. Her sağlıklı ve yeni paketi, her bozuk paketi de yalnızca kurtarılamayan nesneleriyle listeleyen tek bir yeni indeks yazılır. Diğer tüm indeks dosyaları silinir, ardından `index/` diske sabitlenir.
 7. Bozuk paketler silinir ve klasörleri diske sabitlenir; ancak içinde kurtarılamayan bir nesne listelenen paket ve herhangi bir nesne kurtarılamaz durumdayken hiçbir indeksin listelemediği bozuk paket silinmez: o nesneyi tutuyor olabilir.
@@ -445,6 +445,17 @@ Deneme çalıştırması (dry run) 1–3. adımları yapar ve hiçbir şeyi değ
 | 5. adımdan sonra, 7. adım bitmeden önce | Her canlı nesne yeni indeks tarafından kapsanır; bazı ölü paketler kalır | Kalan ölü paketler indekssiz paket olarak bulunur; sonraki çalıştırma onları siler |
 
 Hiçbir durumda bir ref var olmayan bir nesneyi göstermez: bir nesne ancak kalıcı bir indeks onun başka bir kopyasını kapsadıktan sonra ya da ölü olduğu anlaşıldıktan sonra silinir.
+
+### 13.4 Bir ref'i budamak
+
+Bir snapshot ebeveynlerini adlandırır, bu yüzden bir snapshot, ondan sonrakilere yeni kimlikler verilmeden geçmişin ortasından çıkamaz. Budama böyle kısa bir geçmişi sıradan nesneler olarak yazar; formatta hiçbir şey değişmez.
+
+1. Saklama kuralının ya da yasal saklama kilidinin koruduğu ref (bölüm 16, 17), senkron ref'i (`folder/<ad>` ref'i olan ya da `folder/` veya `apeiron/` altındaki) ve birleştirme ya da Git commit'i (`meta` içinde `git.id`) içeren geçmiş reddedilir; bunların kimlikleri başka yerde anlam taşır.
+2. Ref'in ilk ebeveynleri gezilir. En yeni snapshot ve her kural için kuralın söylediği kadar dönemin en yeni snapshot'ı tutulur: son snapshot'lar ya da UTC olarak günler, Pazartesi'den başlayan haftalar, aylar ve yıllar. Snapshot'ı olmayan dönemler sayılmaz.
+3. Tutulan en eskiden en yeniye, `parents` dışında her şeyi eşit bir kopya saklanır; `parents` önceki kopyayı adlandırır, en eskinin ebeveyni yoktur. Kimlikler içerikten geldiği için altından hiçbir şey çıkmayan snapshot kimliğini korur.
+4. Ref en yeni kopyaya taşınır (bölüm 9.2), bu bir reflog satırı ekler. Bölüm 13.1'in tutma süresi geçene kadar eski snapshot'lar kalır ve ref elle geri taşınabilir; süre geçince çöp toplama yalnızca onların ulaştığını boşaltır.
+
+Kısa geçmişin push'u reddedilir, çünkü uzak deponun snapshot'ı onun atası değildir (bölüm 15.3 adım 4). Yerine koyması istenen push, yerel reflog uzak deponun snapshot'ını adlandırıyorsa ve hiçbir kural ya da kilit ref'i korumuyorsa uzak ref'i yine de taşır; böylece bu kopyanın görmediği hiçbir şey kaybolmaz, başka bir cihazın eklediği snapshot ise yine durdurur. Pull yapan diğer kopyalar çatışma alır: ref'i silip yeniden pull ederler. Ardından uzak deponun çöp toplaması (bölüm 15.8) yerini boşaltır.
 
 ## 14. Şifreleme
 

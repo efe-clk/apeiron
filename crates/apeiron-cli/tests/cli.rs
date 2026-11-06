@@ -953,3 +953,33 @@ fn damaged_data_is_replaced_from_a_copy() {
     s.ok(&["restore", "main", restored.to_str().unwrap()]);
     assert_eq!(fs::read(restored.join("a.txt")).unwrap(), b"first");
 }
+
+#[test]
+fn old_backups_are_pruned_and_a_copy_follows() {
+    let s = Setup::new();
+    let copy = s.root.join("copy");
+    let src = s.root.join("src");
+    for text in ["one", "two", "three"] {
+        fs::write(src.join("a.txt"), text).unwrap();
+        s.ok(&["backup", src.to_str().unwrap(), "--message", text]);
+    }
+    s.ok(&["remote", "add", "disk", copy.to_str().unwrap()]);
+    s.ok(&["push", "disk"]);
+
+    let trial = s.ok(&["prune", "main", "--keep-last", "1", "--dry-run"]);
+    assert!(trial.contains("Would remove 2 snapshots"), "{trial}");
+    assert_eq!(s.ok(&["log"]).lines().count(), 3);
+    assert_eq!(code(&s.run(&["prune", "main"])), Some(1));
+
+    s.ok(&["prune", "main", "--keep-last", "1"]);
+    let log = s.ok(&["log"]);
+    assert_eq!(log.lines().count(), 1, "{log}");
+    assert!(log.contains("three"), "{log}");
+    assert_eq!(code(&s.run(&["push", "disk"])), Some(1));
+    s.ok(&["push", "disk", "--replace"]);
+    s.ok(&["gc", "--keep-days", "0"]);
+    s.ok(&["verify"]);
+    let restored = s.root.join("restored");
+    s.ok(&["restore", "main", restored.to_str().unwrap()]);
+    assert_eq!(fs::read(restored.join("a.txt")).unwrap(), b"three");
+}

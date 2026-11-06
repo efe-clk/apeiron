@@ -48,7 +48,7 @@ Each layer uses only the layer directly below it. Details: [docs/ARCHITECTURE.md
 | --- | --- | --- | --- |
 | Core | `apeiron-core` | Object model, chunking, pack/index files, refs and reflogs | In progress |
 | Storage targets | `apeiron-core`, `apeiron-remote` | Folder (local or external disk), SFTP and S3 remotes | Done |
-| Services | `apeiron-services` | Backup, restore, listing, diff, sync, merge and search today; rules that prune old backups later ([docs/ROADMAP.md](docs/ROADMAP.md) §8) | In progress |
+| Services | `apeiron-services` | Backup, restore, listing, diff, sync, merge, search and pruning old backups today | In progress |
 | Public API | `apeiron` | Rust API for all operations ([docs/API.md](docs/API.md) §8) | In progress |
 | System calls | `apeiron-sys` | Operating system calls that need `unsafe` (Windows write-through) | Done |
 | C ABI | `apeiron-ffi` | Stable C interface `libapeiron` with the header `apeiron.h`, and the Python SDK over it ([docs/SDK.md](docs/SDK.md)); may use `unsafe` | Done |

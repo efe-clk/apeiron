@@ -254,6 +254,11 @@ pub struct TransferRequest {
     /// (SYNC.md §2); no limit when absent.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rate: Option<u64>,
+    /// For a push after a prune: moves the remote ref although its history
+    /// is not extended, when this ref has pointed to what it holds
+    /// (FORMAT.md §13.4).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub replace: bool,
 }
 
 fn default_ref() -> String {
@@ -266,6 +271,7 @@ impl TransferRequest {
             remote: remote.into(),
             ref_name: ref_name.into(),
             rate: None,
+            replace: false,
         }
     }
 }

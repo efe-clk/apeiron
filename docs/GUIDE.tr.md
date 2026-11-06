@@ -288,7 +288,7 @@ Bir denetim için `apeiron report --verify --remotes --web > rapor.md`, neyin ne
 | Günlük (ya da otomatik, bölüm 8) | Her klasör için `apeiron backup …` | Değişenlerin yeni bir snapshot'ı |
 | Her yedekten sonra ya da haftalık | Her ref için `apeiron push disk …` (bölüm 6.1) | Bilgisayardan bağımsız ikinci bir kopya |
 | Haftalık | `apeiron verify` | Saklanan her baytı okur ve denetler. `OK: …` bozulma yok demektir; çıkış kodu 4 bozuk dosyaları listeler |
-| Aylık | `apeiron gc` | Hiçbir ref'in ulaşmadığı ve 90 günden eski veriyi siler. Önce `apeiron gc --dry-run` ile deneyin |
+| Aylık | `apeiron prune backup/documents --keep-daily 7 --keep-weekly 4 --keep-monthly 12`, ardından `apeiron gc` (önce `--dry-run`; kopya `apeiron push disk backup/documents --replace` ile izler) | Hiçbir ref'in ulaşmadığı ve 90 günden eski veriyi siler. Önce `apeiron gc --dry-run` ile deneyin |
 | Aylık | Birkaç dosyayı yeni bir klasöre geri yükleyip açın | Bir yedek ancak geri yüklenerek kanıtlanır |
 | Bir uyarı söylediğinde | `apeiron repair` | Bayat kilitleri kaldırır, reflog'ları tamamlar ve bozuk indeks dosyalarını yeniden kurar |
 

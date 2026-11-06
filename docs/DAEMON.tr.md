@@ -65,11 +65,12 @@ every = "week"
 | --- | --- |
 | `repo` | İşin çalıştığı depo; bir klasör uzak deposu, o kopyayı test etmek için doğrudan burada yazılabilir |
 | `password_file` | İlk satırı, şifreli bir deponun parolası ya da kurtarma anahtarıdır |
-| `do` | `backup`, `push`, `pull`, `verify`, `restore-test`, `gc`, `repair` ([FORMAT.tr.md](FORMAT.tr.md) §8.3) ya da `sync` ([SYNC.tr.md](SYNC.tr.md)) |
+| `do` | `backup`, `push`, `pull`, `verify`, `restore-test`, `gc`, `prune` ([FORMAT.tr.md](FORMAT.tr.md) §13.4), `repair` ([FORMAT.tr.md](FORMAT.tr.md) §8.3) ya da `sync` ([SYNC.tr.md](SYNC.tr.md)) |
 | `folder`, `ref`, `message` | `backup` için: neyin saklanacağı ve hangi ref'in taşınacağı; `sync` için: klasör ve ref, varsayılan `sync/<klasör adı>` |
 | `remote`, `mode` | `sync` için: uzak depo ve `two-way` (varsayılan), `send` ya da `receive`; `pull` ve `repair` için: uzak depo |
 | `ref = "*"` | `push` ve `pull` için: bir replikayı ya da yedek sunucuyu güncel tutmak için her ref ([REPLICATION.tr.md](REPLICATION.tr.md) §3) |
 | `push` | `backup` için: başarılı bir yedekten sonra ref'in push edileceği uzak depolar; `push` için: uzak depolar |
+| `keep_last`, `keep_daily`, `keep_weekly`, `keep_monthly`, `keep_yearly` | `prune` için: `ref`'ten tutulacaklar; `push` izleyecek uzak depoları adlandırır |
 | `exclude` | `backup` ve `sync` için: dışarıda bırakılacak kalıpların listesi ([CLI.tr.md](CLI.tr.md) §4.1, [SYNC.tr.md](SYNC.tr.md) §5.1) |
 | `every` | `hour`, `day`, `week` ya da dakika, saat veya gün sayısı: `15m`, `6h`, `2d` |
 | `at` | `day` ve `week` için: günün en erken yerel saati, `HH:MM` |

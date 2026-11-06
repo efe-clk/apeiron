@@ -165,6 +165,29 @@ enum Command {
         #[arg(long, value_parser = parse_rate, requires = "from")]
         rate: Option<u64>,
     },
+    /// Keep only the snapshots of a ref that rules name; gc then frees the room
+    Prune {
+        #[arg(name = "ref")]
+        ref_name: String,
+        /// Keep this many newest snapshots
+        #[arg(long, default_value_t = 0)]
+        keep_last: u32,
+        /// Keep the newest snapshot of this many days
+        #[arg(long, default_value_t = 0)]
+        keep_daily: u32,
+        /// Keep the newest snapshot of this many weeks
+        #[arg(long, default_value_t = 0)]
+        keep_weekly: u32,
+        /// Keep the newest snapshot of this many months
+        #[arg(long, default_value_t = 0)]
+        keep_monthly: u32,
+        /// Keep the newest snapshot of this many years
+        #[arg(long, default_value_t = 0)]
+        keep_yearly: u32,
+        /// Only show what would be kept and removed
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// Delete data that no ref and no recent reflog line can reach
     Gc {
         /// Snapshots a ref pointed to within this many days are kept; 0 keeps only what refs point to now
@@ -459,6 +482,9 @@ enum Command {
         /// Push every ref, to keep a replica (docs/REPLICATION.md)
         #[arg(long, conflicts_with = "ref_name")]
         all: bool,
+        /// After a prune: move the remote ref although its history is not extended
+        #[arg(long, conflicts_with = "all")]
+        replace: bool,
         /// Move at most this much per second on average, such as 500K or 2M
         #[arg(long, value_parser = parse_rate)]
         rate: Option<u64>,
@@ -2383,6 +2409,50 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             });
             Ok(if report.is_ok() { 0 } else { EXIT_DAMAGED })
         }
+        Command::Prune {
+            ref_name,
+            keep_last,
+            keep_daily,
+            keep_weekly,
+            keep_monthly,
+            keep_yearly,
+            dry_run,
+        } => {
+            let repo = open(cli.repo, password_file)?;
+            let report = repo.prune(&apeiron::PruneRequest {
+                ref_name,
+                keep_last,
+                keep_daily,
+                keep_weekly,
+                keep_monthly,
+                keep_yearly,
+                dry_run,
+            })?;
+            out.result(&report, |r| {
+                for k in &r.kept {
+                    say!(
+                        "keep    {}  {}  {}",
+                        format::short_id(&k.snapshot),
+                        format::time(&k.time),
+                        k.reasons.join(", ")
+                    );
+                }
+                for s in &r.removed {
+                    say!(
+                        "remove  {}  {}",
+                        format::short_id(&s.snapshot),
+                        format::time(&s.time)
+                    );
+                }
+                let verb = if r.dry_run { "Would remove" } else { "Removed" };
+                say!(
+                    "{verb} {} from {}; `apeiron gc` frees their room after the reflog's keep period",
+                    format::count(r.removed.len() as u64, "snapshot"),
+                    r.ref_name
+                );
+            });
+            Ok(0)
+        }
         Command::Gc {
             keep_days,
             dry_run,
@@ -3286,12 +3356,14 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
         Command::Push {
             remote,
             ref_name,
+            replace,
             rate,
             ..
         } => {
             let repo = open(cli.repo, password_file)?;
             let request = TransferRequest {
                 rate,
+                replace,
                 ..TransferRequest::new(remote.clone(), ref_name.clone())
             };
             let report = watch(out, repo.push(request)?)?;
