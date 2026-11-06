@@ -8,15 +8,18 @@ This guide explains how to set up a development environment, which checks every 
 
 | Path | Content |
 | --- | --- |
-| `crates/` | Cargo workspace; one crate per layer (today `apeiron-core`, plus `apeiron-sys` for operating system calls) |
+| `crates/` | Cargo workspace; one crate per layer, plus `apeiron-sys` for operating system calls |
 | `docs/` | Documentation, in English (`X.md`) and Turkish (`X.tr.md`) |
+| `plugins/` | The text plugin, a workspace of its own ([docs/TEXT.md](docs/TEXT.md)) |
+| `sdk/` | The C example, the Python SDK and the shared conformance suite ([docs/SDK.md](docs/SDK.md)) |
 | `.github/workflows/` | CI: formatting, lints and tests |
 | `LICENSE-MIT`, `LICENSE-APACHE` | The two licences |
 
 ## 2. Development environment
 
-- **Rust:** install with [rustup](https://rustup.rs) (stable toolchain with `rustfmt` and `clippy`). The minimum supported version is 1.85 (edition 2024).
-- **C compiler:** required to build the `zstd` and `blake3` dependencies (GCC or Clang on Linux/macOS, MSVC on Windows).
+- **Rust:** install with [rustup](https://rustup.rs) (stable toolchain with `rustfmt` and `clippy`). The minimum supported version is 1.97 (edition 2024). The tests of the plugin host also need `rustup target add wasm32-wasip2`.
+- **C compiler:** required to build dependencies such as `zstd`, `blake3` and `aws-lc-rs` (GCC or Clang on Linux/macOS, MSVC on Windows).
+- **Desktop app on Linux:** the WebKitGTK files (`libwebkit2gtk-4.1-dev` on Debian and Ubuntu).
 - **Platforms:** Linux (x86_64, aarch64), macOS and Windows are all tested in CI.
 
 ```bash
@@ -95,6 +98,7 @@ Documentation is bilingual: `X.md` is English, `X.tr.md` is Turkish.
 | Same commit | When a document changes, both language versions are updated in the same commit |
 | Same structure | Both versions have the same headings, tables and diagrams |
 | Language link | Every file starts with a link to its other-language version |
+| Checked by a test | `cargo test` runs `crates/apeiron-cli/tests/docs.rs`: both languages and their structure, links, section references, every command and option of the program, every operation of the C ABI, every crate, the minimum Rust version and the status of every stage |
 | Honest status | Unwritten features are never described as working; status is always stated (Planned / In progress / Done) |
 | Diagrams | Diagrams are written in Mermaid so GitHub renders them |
 | Links | Internal links use relative paths |

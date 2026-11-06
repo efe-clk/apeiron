@@ -8,15 +8,18 @@ Bu rehber geliştirme ortamının nasıl kurulacağını, her değişikliğin ha
 
 | Yol | İçerik |
 | --- | --- |
-| `crates/` | Cargo workspace; her katman için bir crate (bugün `apeiron-core` ve işletim sistemi çağrıları için `apeiron-sys`) |
+| `crates/` | Cargo workspace; her katman için bir crate ve işletim sistemi çağrıları için `apeiron-sys` |
 | `docs/` | Belgeler; İngilizce (`X.md`) ve Türkçe (`X.tr.md`) |
+| `plugins/` | Kendi workspace'i olan metin eklentisi ([docs/TEXT.tr.md](docs/TEXT.tr.md)) |
+| `sdk/` | C örneği, Python SDK'sı ve ortak uyumluluk testleri ([docs/SDK.tr.md](docs/SDK.tr.md)) |
 | `.github/workflows/` | CI: biçim, lint ve testler |
 | `LICENSE-MIT`, `LICENSE-APACHE` | İki lisans |
 
 ## 2. Geliştirme ortamı
 
-- **Rust:** [rustup](https://rustup.rs) ile kurulur (`rustfmt` ve `clippy` içeren kararlı araç zinciri). Desteklenen en düşük sürüm 1.85'tir (2024 sürümü).
-- **C derleyicisi:** `zstd` ve `blake3` bağımlılıklarını derlemek için gerekir (Linux/macOS'ta GCC ya da Clang, Windows'ta MSVC).
+- **Rust:** [rustup](https://rustup.rs) ile kurulur (`rustfmt` ve `clippy` içeren kararlı araç zinciri). Desteklenen en düşük sürüm 1.97'dir (2024 sürümü). Eklenti barındırıcısının testleri için ayrıca `rustup target add wasm32-wasip2` gerekir.
+- **C derleyicisi:** `zstd`, `blake3` ve `aws-lc-rs` gibi bağımlılıkları derlemek için gerekir (Linux/macOS'ta GCC ya da Clang, Windows'ta MSVC).
+- **Linux'ta masaüstü uygulaması:** WebKitGTK dosyaları (Debian ve Ubuntu'da `libwebkit2gtk-4.1-dev`).
 - **Platformlar:** Linux (x86_64, aarch64), macOS ve Windows'un hepsi CI'da test edilir.
 
 ```bash
@@ -95,6 +98,7 @@ Belgeler iki dillidir: `X.md` İngilizce, `X.tr.md` Türkçedir.
 | Aynı commit | Bir belge değişince iki dil sürümü aynı commit'te güncellenir |
 | Aynı yapı | İki sürümde aynı başlıklar, tablolar ve diyagramlar bulunur |
 | Dil bağlantısı | Her dosya, öbür dildeki sürümüne giden bir bağlantıyla başlar |
+| Testle denetlenir | `cargo test`, `crates/apeiron-cli/tests/docs.rs` dosyasını çalıştırır: iki dil ve yapıları, bağlantılar, bölüm atıfları, programın her komutu ve seçeneği, C ABI'nin her işlemi, her crate, en düşük Rust sürümü ve her aşamanın durumu |
 | Dürüst durum | Yazılmamış özellikler hiçbir zaman çalışıyor gibi anlatılmaz; durum her zaman belirtilir (Planlandı / Devam ediyor / Tamamlandı) |
 | Diyagramlar | Diyagramlar GitHub'da çizim olarak görünsün diye Mermaid ile yazılır |
 | Bağlantılar | İç bağlantılar göreli yol kullanır |
