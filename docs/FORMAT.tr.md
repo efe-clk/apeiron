@@ -585,12 +585,12 @@ Pull, push'un adımlarını ters yönde, hedef olarak yerel depoyla çalıştır
 
 1. Uzaktaki `config`'in yerel `id`'yi taşıdığını denetle. Uzaktaki indeks dosyalarını ve uzaktaki ref'i oku.
 2. Uzaktaki ref'ten ulaşılabilen nesneleri, tree ve snapshot nesnelerini uzak depodan okuyarak dolaş; yerel deponun sahip olduğu nesnelerin içine girilmez. Bir paketin bitişik bayt aralıkları birlikte okunur.
-3. Eksik nesneleri yeni yerel paketlere ve onların indeksine yaz (bölüm 9.2).
+3. Eksik nesneleri, her birini başvurduklarından sonra, yeni yerel paketlere ve onların indeksine yaz (bölüm 9.2).
 4. Yerel ref'i karşılaştır ve değiştir ile ve bir reflog satırıyla taşı; ama yalnızca ileri. Uzaktaki snapshot yereldekinin atasıysa hiçbir şey yapılmaz; ikisi de ötekinin atası değilse bir çatışmayla dur. Anahtarlar asla pull edilmez.
 
 ### 15.5 Kurallar ve kesintiler
 
-- Kapanış: bir kopyanın indeksi bir nesneyi listeliyorsa, kopya ondan ulaşılabilen her nesneye sahiptir. Push her nesneyi başvurduklarından sonra, her paketten sonra da bir indeks gönderir; böylece listelenen her şey bu kuralı her an korur. Pull, uzak deponun paket sırasıyla yazar ve onları ancak sonunda listeler; indeksi olmayan bir paket, bir nesneyi başvurduğu şeyler olmadan tutabilir, bu yüzden pull yalnızca böyle paketlerin tuttuğunu geçip yürür ve yalnızca onlarda eksik olanı yeniden okur.
+- Kapanış: bir kopya bir nesneye sahipse, ondan ulaşılabilen her nesneye de sahiptir. Her yazıcı bir nesneyi başvurduklarından sonra saklar; push ve pull bunu paketler arasında da yapar, push her paketten sonra bir indeks yazar. Böylece bu kural, indeksi olmayan paketler için de her an geçerlidir.
 - Uzaktaki bir ref, ancak ulaştığı her nesne uzak depoya yazıldıktan sonra değiştirilir (bölüm 9.2'deki gibi).
 - Aynı ref'i aynı anda push eden iki program: koşullu değiştirme birinin kazanmasını sağlar; öteki bir çatışmayla durur ve hiçbir şeyi değiştirmez.
 - Yarıda kalan bir push ya da pull yeniden çalıştırılır. Yazılmakta olan paketten devam eder: yeniden gönderilen en çok o pakettir, yaklaşık 32 MiB'a kadar, tek bir chunk değil. Hiç taşınmayan bir ref için gönderilen nesneler, o kopyanın çöp toplaması onları silene kadar yer kaplar.

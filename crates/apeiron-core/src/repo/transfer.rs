@@ -470,32 +470,20 @@ impl Repository {
         report: &mut TransferReport,
         on_copy: OnCopy<'_>,
     ) -> Result<()> {
-        // Packs no index lists were left by an interrupted write, and may
-        // hold an object without what it refers to. So they do not stop the
-        // walk (FORMAT.md §15.5); what they hold is simply not read again.
-        let unlisted: HashSet<ObjectId> = self
-            .unindexed
-            .iter()
-            .flat_map(|(_, entries)| entries.iter().map(|e| e.id))
-            .collect();
+        // Objects are stored after what they refer to, so every pack on the
+        // disk keeps the closure rule of FORMAT.md §15.5, whether an index
+        // lists it yet or not, and a walk may stop at anything already here.
         let missing = missing_objects(
             report.snapshot,
-            |id| self.contains(id) && !unlisted.contains(id),
+            |id| self.contains(id),
             |id, ty| read_remote(store, have, &self.keys, id, ty),
         )?;
-        let reached: HashSet<ObjectId> = missing.iter().map(|(id, _)| *id).collect();
-
-        // Read in pack order so that adjacent objects come in one read.
         let mut wanted: Vec<Location> = Vec::with_capacity(missing.len());
         for (id, ty) in missing {
-            if self.contains(&id) {
-                continue;
-            }
             let location = have.get(&id).ok_or(Error::ObjectNotFound(id))?;
             check_type(id, ty, location)?;
             wanted.push(*location);
         }
-        wanted.sort_by_key(|l| (l.pack, l.entry.offset));
         let mut writer = self.writer();
         let mut start = 0;
         while start < wanted.len() {
@@ -526,14 +514,11 @@ impl Repository {
             start = end;
         }
         writer.finish()?;
-        // Everything this walk reached is here now, so a pack holding only
-        // such objects can be listed: nothing it refers to is missing.
-        let (done, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut self.unindexed)
-            .into_iter()
-            .partition(|(_, entries)| entries.iter().all(|e| reached.contains(&e.id)));
-        self.unindexed = rest;
-        if !done.is_empty() {
-            index::write_index(&self.dir(TMP), &self.dir(INDEX), &done, &self.keys)?;
+        // Packs an interrupted run left are listed now, so that opening the
+        // repository need not read them.
+        let unlisted = std::mem::take(&mut self.unindexed);
+        if !unlisted.is_empty() {
+            index::write_index(&self.dir(TMP), &self.dir(INDEX), &unlisted, &self.keys)?;
         }
         Ok(())
     }

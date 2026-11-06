@@ -585,12 +585,12 @@ Pull runs the steps of push in the other direction, with the local repository as
 
 1. Check that the remote `config` has the local `id`. Read the remote index files and the remote ref.
 2. Walk the objects reachable from the remote ref, reading tree and snapshot objects from the remote; objects the local repository has are not entered. Adjacent byte ranges of one pack are read together.
-3. Write the missing objects into new local packs and their index (section 9.2).
+3. Write the missing objects, each after what it refers to, into new local packs and their index (section 9.2).
 4. Move the local ref with compare and swap and a reflog line, but only forward. If the remote snapshot is an ancestor of the local one, nothing is done; if neither is an ancestor of the other, stop with a conflict. Keys are never pulled.
 
 ### 15.5 Rules and interruptions
 
-- Closure: if an index of a copy lists an object, the copy has every object reachable from it. A push sends each object after what it refers to and an index after each pack, so whatever is listed keeps this rule at every moment. A pull writes in the order of the remote's packs and lists them only at the end; a pack without an index can hold an object without what it refers to, so a pull walks past what only such packs hold, and reads again only what they lack.
+- Closure: if a copy has an object, it has every object reachable from it. Every writer stores an object after what it refers to, and push and pull do so across packs too, with push writing an index after each pack, so this holds at every moment, for packs without an index as well.
 - A remote ref is replaced only after every object it reaches is written on the remote, as in section 9.2.
 - Two programs pushing the same ref at once: the conditional replace lets one win; the other stops with a conflict and changes nothing.
 - An interrupted push or pull is simply run again. It goes on from the pack that was being written: at most that pack, up to about 32 MiB, is sent again, not one chunk. Objects sent for a ref that never moved take up space until garbage collection of that copy removes them.
