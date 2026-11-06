@@ -172,16 +172,19 @@ fn round(
     // 1. Back up the folder as L.
     let state = folder_ref(name);
     let previous = repo.read_ref(&state)?;
-    let previous_tree = previous
-        .map(|id| repo.read_snapshot(&id).map(|s| s.tree))
-        .transpose()?;
+    let previous_snapshot = previous.map(|id| repo.read_snapshot(&id)).transpose()?;
+    let previous_tree = previous_snapshot.as_ref().map(|s| s.tree);
     let mut writer = repo.writer();
     let stored = backup::store_folder(
         &mut writer,
         &options.folder,
         true,
         &options.exclude,
-        previous_tree,
+        backup::Previous {
+            tree: previous_tree,
+            time: previous_snapshot.as_ref().map(|s| s.time),
+            keep_excluded: true,
+        },
         ctl,
     )?;
     outcome.warnings = stored.warnings;
@@ -756,9 +759,16 @@ mod tests {
 
     fn store(repo: &mut Repository, folder: &Path) -> ObjectId {
         let mut writer = repo.writer();
-        let tree = backup::store_folder(&mut writer, folder, true, &[], None, &Control::new())
-            .unwrap()
-            .tree;
+        let tree = backup::store_folder(
+            &mut writer,
+            folder,
+            true,
+            &[],
+            backup::Previous::default(),
+            &Control::new(),
+        )
+        .unwrap()
+        .tree;
         writer.finish().unwrap();
         tree
     }

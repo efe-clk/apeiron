@@ -68,7 +68,14 @@ pub fn switch(
 
     let mut writer = repo.writer();
     let (folder_tree, warnings) = if options.folder.exists() {
-        let stored = backup::store_folder(&mut writer, &options.folder, true, &[], None, ctl)?;
+        let stored = backup::store_folder(
+            &mut writer,
+            &options.folder,
+            true,
+            &[],
+            backup::Previous::default(),
+            ctl,
+        )?;
         (stored.tree, stored.warnings)
     } else {
         (

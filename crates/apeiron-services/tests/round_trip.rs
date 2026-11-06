@@ -406,3 +406,52 @@ fn a_backup_leaves_out_what_the_patterns_and_the_file_name() {
     assert!(!target.join("docs/old").exists());
     assert!(!target.join("d.TMP").exists());
 }
+
+/// Sets the time of a file an hour back, keeping it clear of the margin.
+fn make_old(path: &Path) {
+    let old = std::time::SystemTime::now() - std::time::Duration::from_secs(3600);
+    fs::File::options()
+        .write(true)
+        .open(path)
+        .unwrap()
+        .set_modified(old)
+        .unwrap();
+}
+
+#[test]
+fn a_file_that_did_not_change_is_not_read_again() {
+    let mut s = Setup::new();
+    let file = s.src.join("a.txt");
+    fs::write(&file, "first").unwrap();
+    make_old(&file);
+    assert_eq!(s.backup().unchanged, 0);
+    // Older than the last snapshot, same size and time: not read.
+    let same = s.backup();
+    assert_eq!((same.unchanged, same.files), (1, 1));
+    assert_eq!(same.bytes, 5);
+
+    // Different content under the same size and time goes unseen, which is
+    // what `reread` is for.
+    let time = fs::metadata(&file).unwrap().modified().unwrap();
+    fs::write(&file, "other").unwrap();
+    fs::File::options()
+        .write(true)
+        .open(&file)
+        .unwrap()
+        .set_modified(time)
+        .unwrap();
+    let unseen = s.backup();
+    assert_eq!(unseen.unchanged, 1);
+    let mut options = BackupOptions::new(s.src.clone(), "main");
+    options.reread = true;
+    let seen = backup(&mut s.repo, &options, &Control::new()).unwrap();
+    assert_eq!(seen.unchanged, 0);
+    let out = s.root.join("out");
+    restore(&s.repo, &seen.snapshot, b"", &out, &Control::new()).unwrap();
+    assert_eq!(fs::read(out.join("a.txt")).unwrap(), b"other");
+
+    // A new size is always read, and so is a file modified just now.
+    fs::write(&file, "longer content").unwrap();
+    assert_eq!(s.backup().unchanged, 0);
+    assert_eq!(s.backup().unchanged, 0);
+}

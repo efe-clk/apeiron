@@ -98,6 +98,9 @@ enum Command {
         /// Leave out what matches this pattern; can be given more than once
         #[arg(long, value_name = "PATTERN")]
         exclude: Vec<String>,
+        /// Read every file, also those whose size and time did not change
+        #[arg(long)]
+        reread: bool,
     },
     /// List the snapshots of a ref, newest first
     Log {
@@ -2188,6 +2191,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             author,
             host,
             exclude,
+            reread,
         } => {
             let audit = CliAudit::find(cli.repo.as_deref())?;
             let repo = open(cli.repo, password_file)?;
@@ -2196,6 +2200,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             request.author = author;
             request.host = host;
             request.exclude = exclude;
+            request.reread = reread;
             let detail = serde_json::json!({
                 "source": request.source,
                 "ref": request.ref_name,

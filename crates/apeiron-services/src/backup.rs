@@ -5,7 +5,9 @@ use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-use apeiron_core::{EntryKind, ObjectId, ObjectWriter, Repository, Snapshot, Tree, TreeEntry};
+use apeiron_core::{
+    EntryKind, ObjectId, ObjectWriter, Repository, Snapshot, Time, Tree, TreeEntry,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::control::{Control, Phase, Warning, WarningKind};
@@ -34,6 +36,10 @@ pub struct BackupOptions {
     /// (CLI.md §4.1).
     #[serde(default)]
     pub exclude: Vec<String>,
+    /// Reads every file, also those whose size and time say they did not
+    /// change (CLI.md §4).
+    #[serde(default)]
+    pub reread: bool,
 }
 
 impl BackupOptions {
@@ -46,6 +52,7 @@ impl BackupOptions {
             host: None,
             meta: Vec::new(),
             exclude: Vec::new(),
+            reread: false,
         }
     }
 }
@@ -65,6 +72,9 @@ pub struct BackupOutcome {
     /// Files and folders left out by a pattern.
     #[serde(default)]
     pub excluded: u64,
+    /// Files whose size and time said they did not change; not read.
+    #[serde(default)]
+    pub unchanged: u64,
     pub warnings: Vec<Warning>,
 }
 
@@ -79,13 +89,24 @@ pub fn backup(
 ) -> Result<BackupOutcome> {
     apeiron_core::validate_ref_name(&options.ref_name)?;
     let parent = repo.read_ref(&options.ref_name)?;
+    let before = match parent {
+        Some(id) if !options.reread => {
+            let snapshot = repo.read_snapshot(&id)?;
+            Previous {
+                tree: Some(snapshot.tree),
+                time: Some(snapshot.time),
+                keep_excluded: false,
+            }
+        }
+        _ => Previous::default(),
+    };
     let mut writer = repo.writer();
     let stored = store_folder(
         &mut writer,
         &options.source,
         false,
         &options.exclude,
-        None,
+        before,
         ctl,
     )?;
     let tree = stored.tree;
@@ -117,6 +138,7 @@ pub fn backup(
         bytes: stored.bytes,
         new_bytes,
         excluded: stored.excluded,
+        unchanged: stored.unchanged,
         warnings: stored.warnings,
     })
 }
@@ -129,21 +151,37 @@ pub(crate) struct Stored {
     pub(crate) symlinks: u64,
     pub(crate) bytes: u64,
     pub(crate) excluded: u64,
+    pub(crate) unchanged: u64,
     pub(crate) warnings: Vec<Warning>,
 }
+
+/// What the folder was last recorded as.
+#[derive(Default)]
+pub(crate) struct Previous {
+    pub(crate) tree: Option<ObjectId>,
+    /// When: a file modified shortly before it might change again within
+    /// the resolution of its time, so only older files can skip being read.
+    /// `None` reads every file.
+    pub(crate) time: Option<Time>,
+    /// Keeps what the tree holds at left-out paths (SYNC.md §5.1).
+    pub(crate) keep_excluded: bool,
+}
+
+/// How much older than the snapshot a file's time must be for its time to
+/// prove anything.
+const TIME_MARGIN_SECONDS: i64 = 2;
 
 /// Stores the folder `source` through `writer`. With `for_sync`, the
 /// temporary files of a sync (`sync::TMP_PREFIX`) are left out, and those
 /// left behind by an interrupted one are removed. What `exclude` and the
-/// folder's `.apeironignore` match is not read; with `keep`, a tree the
-/// folder was recorded as, what that tree holds at such paths stays in the
-/// new tree, so that leaving a path out does not delete it (SYNC.md §5.1).
+/// folder's `.apeironignore` match is not read. `previous` saves reading files
+/// that did not change and can keep left-out paths.
 pub(crate) fn store_folder(
     writer: &mut ObjectWriter<'_>,
     source: &Path,
     for_sync: bool,
     exclude: &[String],
-    keep: Option<ObjectId>,
+    previous: Previous,
     ctl: &Control,
 ) -> Result<Stored> {
     if !fs::metadata(source).at(source)?.is_dir() {
@@ -165,15 +203,20 @@ pub(crate) fn store_folder(
         p.bytes_total = Some(totals.1);
     });
 
-    let keep = match keep {
-        Some(tree) if !exclude.is_empty() => Some(writer.read_tree(&tree)?),
-        _ => None,
+    let before = match previous.tree {
+        Some(tree) => Some(writer.read_tree(&tree)?),
+        None => None,
     };
     let mut walk = Walk {
         ctl,
         for_sync,
         exclude: &exclude,
         excluded: 0,
+        unchanged: 0,
+        keep_excluded: previous.keep_excluded && !exclude.is_empty(),
+        newer_than: previous
+            .time
+            .map(|t| t.seconds.saturating_sub(TIME_MARGIN_SECONDS)),
         warnings: Vec::new(),
         files: 0,
         dirs: 0,
@@ -181,7 +224,7 @@ pub(crate) fn store_folder(
         bytes: 0,
     };
     let tree = walk
-        .store_dir(writer, source, &Name::default(), keep.as_ref())?
+        .store_dir(writer, source, &Name::default(), before.as_ref())?
         .ok_or_else(|| Error::InvalidInput(format!("{} cannot be read", source.display())))?;
     Ok(Stored {
         tree,
@@ -190,6 +233,7 @@ pub(crate) fn store_folder(
         symlinks: walk.symlinks,
         bytes: walk.bytes,
         excluded: walk.excluded,
+        unchanged: walk.unchanged,
         warnings: walk.warnings,
     })
 }
@@ -233,6 +277,10 @@ struct Walk<'c> {
     for_sync: bool,
     exclude: &'c Exclude,
     excluded: u64,
+    unchanged: u64,
+    keep_excluded: bool,
+    /// Only a file with a time before this can skip being read.
+    newer_than: Option<i64>,
     warnings: Vec<Warning>,
     files: u64,
     dirs: u64,
@@ -325,11 +373,19 @@ impl Walk<'_> {
                     continue;
                 }
             };
+            let recorded = previous.and_then(|p| {
+                p.entries
+                    .binary_search_by(|e| e.name.as_slice().cmp(&name))
+                    .ok()
+                    .map(|i| &p.entries[i])
+            });
             let kind = if md.is_file() {
-                self.store_file(writer, &path, &child, &md)?
+                match self.unchanged_file(recorded, &md) {
+                    Some(kind) => Some(kind),
+                    None => self.store_file(writer, &path, &child, &md)?,
+                }
             } else if md.is_dir() {
-                let before = previous.and_then(|p| p.entries.iter().find(|e| e.name == name));
-                let before = match before.map(|e| &e.kind) {
+                let before = match recorded.map(|e| &e.kind) {
                     Some(EntryKind::Directory { tree }) => Some(writer.read_tree(tree)?),
                     _ => None,
                 };
@@ -364,7 +420,8 @@ impl Walk<'_> {
                 xattrs,
             });
         }
-        for entry in previous.map_or(&[][..], |p| &p.entries) {
+        let kept = if self.keep_excluded { previous } else { None };
+        for entry in kept.map_or(&[][..], |p| &p.entries) {
             if entries.iter().any(|e: &TreeEntry| e.name == entry.name) {
                 continue;
             }
@@ -386,6 +443,28 @@ impl Walk<'_> {
             self.dirs += 1;
         }
         Ok(Some(writer.put_tree(&Tree { entries })?))
+    }
+
+    /// The recorded file, if its size and time say it did not change. Its
+    /// time must be older than the snapshot that recorded it (CLI.md §4).
+    fn unchanged_file(&mut self, recorded: Option<&TreeEntry>, md: &Metadata) -> Option<EntryKind> {
+        let newer_than = self.newer_than?;
+        let entry = recorded?;
+        let EntryKind::File { size, blob } = entry.kind else {
+            return None;
+        };
+        let mtime = os::attrs(md).mtime?;
+        if size != md.len() || entry.mtime != Some(mtime) || mtime.seconds >= newer_than {
+            return None;
+        }
+        self.unchanged += 1;
+        self.files += 1;
+        self.bytes += size;
+        self.ctl.update(|p| {
+            p.items_done += 1;
+            p.bytes_done += size;
+        });
+        Some(EntryKind::File { size, blob })
     }
 
     fn store_file(
