@@ -147,6 +147,20 @@ enum Command {
         #[arg(long, default_value = "")]
         path: String,
     },
+    /// Store a tar or zip archive as a new snapshot of a ref
+    Import {
+        /// The archive; its name chooses the format
+        file: PathBuf,
+        /// Ref to move to the new snapshot
+        #[arg(long = "ref", default_value = "main")]
+        ref_name: String,
+        /// Archive format, if the file name does not say it
+        #[arg(long, value_enum)]
+        format: Option<ImportFormatArg>,
+        /// Description of the snapshot
+        #[arg(short, long)]
+        message: Option<String>,
+    },
     /// Restore a random sample of a snapshot into a temporary folder and check it
     RestoreTest {
         #[arg(default_value = "main")]
@@ -1928,6 +1942,24 @@ impl From<ModeArg> for SyncMode {
 }
 
 #[derive(Clone, Copy, clap::ValueEnum)]
+enum ImportFormatArg {
+    Tar,
+    #[value(name = "tar.gz")]
+    TarGz,
+    Zip,
+}
+
+impl From<ImportFormatArg> for apeiron::ImportFormat {
+    fn from(format: ImportFormatArg) -> Self {
+        match format {
+            ImportFormatArg::Tar => apeiron::ImportFormat::Tar,
+            ImportFormatArg::TarGz => apeiron::ImportFormat::TarGz,
+            ImportFormatArg::Zip => apeiron::ImportFormat::Zip,
+        }
+    }
+}
+
+#[derive(Clone, Copy, clap::ValueEnum)]
 enum FormatArg {
     Tar,
     Zip,
@@ -2335,6 +2367,29 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     format::count(r.dirs, "folder"),
                     format::bytes(r.bytes),
                     target.display()
+                );
+            });
+            Ok(warnings_exit(out, &report.warnings))
+        }
+        Command::Import {
+            file,
+            ref_name,
+            format,
+            message,
+        } => {
+            let repo = open(cli.repo, password_file)?;
+            let mut request = apeiron::ImportRequest::new(file, ref_name.clone());
+            request.format = format.map(apeiron::ImportFormat::from);
+            request.message = message;
+            let report = watch(out, repo.import_archive(request)?)?;
+            out.result(&report, |r| {
+                say!(
+                    "Snapshot {} ({ref_name}): {}, {}, {} read, {} new",
+                    format::short_id(&r.snapshot),
+                    format::count(r.files, "file"),
+                    format::count(r.dirs, "folder"),
+                    format::bytes(r.bytes),
+                    format::bytes(r.new_bytes)
                 );
             });
             Ok(warnings_exit(out, &report.warnings))

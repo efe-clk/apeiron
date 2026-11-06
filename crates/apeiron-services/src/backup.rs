@@ -538,7 +538,7 @@ impl Walk<'_> {
 
 /// Marks the I/O error a [`Reader`] returns when the operation is cancelled.
 #[derive(Debug)]
-struct CancelMarker;
+pub(crate) struct CancelMarker;
 
 impl std::fmt::Display for CancelMarker {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -548,7 +548,7 @@ impl std::fmt::Display for CancelMarker {
 
 impl std::error::Error for CancelMarker {}
 
-fn is_cancel(e: &io::Error) -> bool {
+pub(crate) fn is_cancel(e: &io::Error) -> bool {
     e.get_ref().is_some_and(|inner| inner.is::<CancelMarker>())
 }
 

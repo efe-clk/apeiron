@@ -24,9 +24,10 @@ use crate::types::{
 use crate::{
     AddFileReport, AddFileRequest, ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo,
     ExportReport, GcReport, GcRequest, GitExportReport, GitImportReport, GitPushResult,
-    GitPushedRef, GitServedRef, KeyInfo, LegalHold, ObjectId, Phase, PluginAdded, PluginInfo,
-    PruneReport, PruneRequest, ReflogEntry, Remote, RepairReport, RestoreReport, RestoreTestReport,
-    RetentionRule, SearchReport, SwitchReport, SyncReport, TransferReport, VerifyReport,
+    GitPushedRef, GitServedRef, ImportReport, ImportRequest, KeyInfo, LegalHold, ObjectId, Phase,
+    PluginAdded, PluginInfo, PruneReport, PruneRequest, ReflogEntry, Remote, RepairReport,
+    RestoreReport, RestoreTestReport, RetentionRule, SearchReport, SwitchReport, SyncReport,
+    TransferReport, VerifyReport,
 };
 
 /// The ref the plugins a repository carries are kept in (PLUGIN.md §5).
@@ -237,6 +238,20 @@ impl Repository {
             let _lock = core::RepoLock::shared(repo.path())?;
             let mut core = repo.read().reopen()?;
             let report = services::backup(&mut core, &request, ctl)?;
+            *repo.write() = core;
+            Ok(report)
+        })
+    }
+
+    /// Stores a tar or zip archive as a new snapshot of a ref (CLI.md §4.2).
+    /// If it is damaged, the ref does not move.
+    pub fn import_archive(&self, request: ImportRequest) -> Result<Job<ImportReport>> {
+        let repo = self.clone();
+        Job::spawn("import", move |ctl| {
+            let _writer = repo.lock_writer();
+            let _lock = core::RepoLock::shared(repo.path())?;
+            let mut core = repo.read().reopen()?;
+            let report = services::import(&mut core, &request, ctl)?;
             *repo.write() = core;
             Ok(report)
         })

@@ -141,7 +141,7 @@ Apeiron never overwrites existing files. The target folder must not exist or be 
 
 Then copy what you need from `~/restored` to its place. Permissions and times are restored; owners only when you have the right to set them.
 
-To hand a backup to someone without Apeiron, write it into an archive: `apeiron export backup/documents ~/documents.zip` (`.tar` and `.7z` work as well).
+To hand a backup to someone without Apeiron, write it into an archive: `apeiron export backup/documents ~/documents.zip` (`.tar` and `.7z` work as well). An old `.tar`, `.tar.gz` or `.zip` archive comes in with `apeiron import ~/old.zip --ref archive/old` ([CLI.md](CLI.md) §4.2).
 
 ### 6.1 A second copy on an external disk
 

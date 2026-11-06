@@ -11,6 +11,7 @@ mod diff;
 mod error;
 mod exclude;
 mod export;
+mod import;
 mod list;
 mod merge;
 mod name;
@@ -31,6 +32,7 @@ pub use diff::{Change, ChangeKind, diff};
 pub use error::{Error, Result};
 pub use exclude::IGNORE_FILE;
 pub use export::{ArchiveFormat, ExportOutcome, export, export_zip_to};
+pub use import::{ImportFormat, ImportOptions, ImportOutcome, import};
 pub use list::{EntryInfo, Kind, list, read_path, read_to};
 pub use merge::{
     Conflict, ConflictKind, ContentMerger, MergeAction, MergeOptions, MergeOutcome, Merged,

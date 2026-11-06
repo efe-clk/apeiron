@@ -259,6 +259,7 @@ pub fn start(repo: &Repository, operation: &str, request: Value) -> Result<Box<d
         "backup" => boxed(repo.backup(parse(request)?)?),
         "restore" => boxed(repo.restore(parse(request)?)?),
         "export" => boxed(repo.export(parse(request)?)?),
+        "import_archive" => boxed(repo.import_archive(parse(request)?)?),
         "verify" => boxed(repo.verify()?),
         "gc" => boxed(repo.gc(parse(request)?)?),
         "gc_remote" => boxed(repo.gc_remote(parse(request)?)?),

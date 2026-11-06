@@ -130,6 +130,13 @@ class Sdk(unittest.TestCase):
             with self.assertRaises(apeiron.InvalidInputError):
                 copy.push("origin", rate=0).wait()
 
+    def test_an_archive_comes_back(self):
+        with apeiron.Repository.init(self.root / "repo") as repo:
+            repo.backup(self.root / "src").wait()
+            repo.export("main", self.root / "x.tar").wait()
+            report = repo.import_archive(self.root / "x.tar", ref="again").wait()
+            self.assertEqual(report.new_bytes, 0)
+
     def test_every_ref_and_the_report(self):
         with apeiron.Repository.init(self.root / "repo") as repo:
             repo.backup(self.root / "src").wait()

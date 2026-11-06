@@ -572,6 +572,9 @@ class Repository:
     def pull(self, remote: str, ref: str = "main", rate: Optional[int] = None) -> Job:
         return self.start("pull", **_drop_none({"remote": remote, "ref": ref, "rate": rate}))
 
+    def import_archive(self, archive: Any, ref: str = "main", **options: Any) -> Job:
+        return self.start("import_archive", archive=archive, ref=ref, **options)
+
     def push_all(self, remote: str, rate: Optional[int] = None) -> Job:
         return self.start("push_all", **_drop_none({"remote": remote, "rate": rate}))
 

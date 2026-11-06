@@ -60,6 +60,7 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | `apeiron diff <snapshot> <snapshot> [--text]` | İki snapshot arasında eklenen, silinen ve değişen dosyaları listeler; `--text` bir eklentinin işlediği dosyaların değişen satırlarını da gösterir ([TEXT.tr.md](TEXT.tr.md)) | Tamamlandı |
 | `apeiron restore <snapshot> <target> [--path <path>]` | Bir snapshot'ı (ya da içindeki bir yolu) yeni ya da boş bir klasöre yazar | Tamamlandı |
 | `apeiron export <snapshot> <file> [--format <format>] [--path <path>]` | Bir snapshot'ı (ya da içindeki bir yolu) yeni bir `.tar`, `.zip` ya da `.7z` dosyasına yazar; `--format` verilmezse biçimi dosya uzantısı belirler | Tamamlandı |
+| `apeiron import <file> [--ref <name>] [--format tar\|tar.gz\|zip] [--message <metin>]` | Bir `.tar`, `.tar.gz`, `.tgz` ya da `.zip` arşivini bir ref'in (varsayılan `main`) yeni snapshot'ı olarak saklar, bölüm 4.2 | Tamamlandı |
 | `apeiron restore-test [<snapshot>] [--sample-mb <n>]` | Bir snapshot'tan rastgele bir örneği (varsayılan 100 MiB) geçici bir klasöre geri yükler, her dosyayı denetler ve klasörü siler; bir dosya bozuksa çıkış kodu 4'tür | Tamamlandı |
 | `apeiron daemon run\|once\|status [--priority low\|normal] [--tenant <name>]` | Zamanlanmış işleri, `--priority normal` verilmedikçe düşük işlemci ve disk önceliğiyle çalıştırır; `run`, `--no-notify` verilmedikçe bir iş başarısız olmaya başlayınca masaüstü bildirimi gösterir ([DAEMON.tr.md](DAEMON.tr.md) §2); `--tenant` bir web sunucusu kiracısının işlerini çalıştırır (§3.1) | Tamamlandı |
 | `apeiron refs` | Tüm ref'leri ve gösterdikleri snapshot'ları listeler | Tamamlandı |
@@ -133,6 +134,22 @@ Okunurken değişen bir dosya okunduğu hâliyle saklanır ve uyarı olarak rapo
 | `# metin`, boş satır | Dosyada hiçbir şey |
 
 `.apeironignore` sıradan bir dosyadır: diğerleri gibi yedeklenir, geri yüklenir ve eşitlenir. Yeni bir yedeğin dışında bırakılan yol eski yedeklerde durur. Senkron böyle yolları silmek yerine onlara dokunmaz ([SYNC.tr.md](SYNC.tr.md) §5.1).
+
+### 4.2 Arşiv içe aktarmak
+
+`apeiron import`, arşivi diske açmadan olduğu gibi okur ve yeni bir snapshot olarak saklar; depoda zaten olan içerik yeniden saklanmaz. Arşiv herhangi birinden gelebilir, bu yüzden:
+
+| Arşivde | Ne olur |
+| --- | --- |
+| `..`, sıfır baytı ya da 256'dan fazla düzey içeren yol | Uyarıyla dışarıda bırakılır; çıkış kodu 3 |
+| Kökten başlayan yol (`/etc/x`) | Snapshot'ın içinde saklanır (`etc/x`) |
+| Sembolik bağlantı | Neyi gösterirse göstersin bağlantı olarak tutulur; izlenmez |
+| Sabit bağlantı | Dosyası daha önce geldiyse onun içeriği; yoksa uyarı |
+| Aygıt dosyaları, borular ya da zip dosyasında parolalı girdi | Uyarıyla dışarıda bırakılır |
+| Aynı yol iki kez | Açarken olduğu gibi sonraki girdi geçerlidir |
+| Kesik ya da bozuk veri | Komut başarısız olur, ref taşınmaz; saklananı `gc` siler |
+
+7z ve RAR arşivleri içe aktarılamaz.
 
 ## 5. Çıkış kodları
 

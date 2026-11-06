@@ -294,6 +294,7 @@ name = "apeiron-services"
 version = "0.0.0"
 dependencies = [
  "apeiron-core",
+ "flate2",
  "serde",
  "serde_json",
  "sevenz-rust2",

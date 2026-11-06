@@ -123,7 +123,7 @@ Every work item is done (2026-10-30); the stage ends with its exit criterion, th
 | --- | --- | --- |
 | Measuring the performance targets on a Raspberry Pi 4 | [VISION.md](VISION.md), [API.md](API.md) §4 | Measured on a stronger computer ([PERFORMANCE.md](PERFORMANCE.md)); it needs the device |
 | Operation log | [ARCHITECTURE.md](ARCHITECTURE.md) §2 | Reflogs record ref changes; nothing records other operations outside the web interface |
-| Archive packages: splitting into parts, inspecting without unpacking; importing tar and zip | [VISION.md](VISION.md) | tar, zip and 7z are export only |
+| Archive packages: splitting into parts, inspecting without unpacking; importing 7z | [VISION.md](VISION.md) | tar, zip and 7z export; tar and zip import ([CLI.md](CLI.md) §4.2) |
 | Remote mode of the API and operating the daemon from another device | [API.md](API.md) §2, [DAEMON.md](DAEMON.md) §7 | Only the JSON API of the pages; a tenant's jobs on the Schedule page |
 | Git behind the plugin interface; other plugin types and a plugin store | [DECISIONS.md](DECISIONS.md) ADR-021, [PLUGIN.md](PLUGIN.md) §6 | `apeiron-git` is a crate of its own; plugins are type drivers only |
 | Text inside PDF and office files; tags on macOS and Windows; more standards in reports | [SEARCH.md](SEARCH.md) §7, [REPORTS.md](REPORTS.md) §6 | UTF-8 text only; tags on Linux only; ISO/IEC 27001 only |

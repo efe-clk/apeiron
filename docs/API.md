@@ -144,6 +144,7 @@ Every operation takes one plain request value and returns one plain result value
 | `backup` | source folder, ref name, message, author, host, meta, patterns to leave out ([CLI.md](CLI.md) §4.1), `reread` to read files that seem unchanged | `BackupReport`: snapshot id, counts of files, folders and bytes, bytes newly stored, entries left out, files not read as `unchanged`, warnings | Yes |
 | `restore` | snapshot, target folder, optional path inside the snapshot | `RestoreReport`: counts, warnings | Yes |
 | `export` | snapshot, output file, format (`tar`, `zip` or `7z`; from the extension when absent), optional path | `ExportReport`: counts, warnings | Yes |
+| `import_archive` | archive file, ref name, format (`tar`, `tar.gz` or `zip`; from the name when absent), message, author, host | `ImportReport`: snapshot, parent, counts of files, folders and links, bytes, bytes newly stored, entries left out as warnings ([CLI.md](CLI.md) §4.2) | Yes |
 | `verify` | — | `VerifyReport`: objects checked, damaged files and objects | Yes |
 | `restore_test` | snapshot, bytes to restore (default 100 MiB) | `RestoreTestReport`: files and bytes restored and checked, damaged files | Yes |
 | `log` | start snapshot, maximum count, optional text the message, author, host or metadata must hold (ignoring case; the count then counts matches) | `LogPage`: snapshots, newest first, and where the next page starts | No |
