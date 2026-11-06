@@ -24,14 +24,14 @@ At least one criterion is needed. `--in` names the snapshot searched (default `m
 
 ### 1.1 Tags
 
-A tag is a word or a few words put on a file, such as `invoice` or `Project X`. Apeiron keeps the tags that file managers such as Dolphin put on files on Linux, in the attribute `user.xdg.tags` ([FORMAT.md](FORMAT.md) §6.3): a backup stores them with each version, `apeiron search --tag` finds them, `apeiron ls` and the results show them in brackets, and a restore writes them back.
+A tag is a word or a few words put on a file, such as `invoice` or `Project X`. Apeiron keeps the tags that file managers put on files, such as Dolphin on Linux and Finder on macOS, in the attribute `user.xdg.tags` ([FORMAT.md](FORMAT.md) §6.3): a backup stores them with each version, `apeiron search --tag` finds them, `apeiron ls` and the results show them in brackets, and a restore writes them back.
 
 | Command | What it does |
 | --- | --- |
 | `apeiron tag <file>...` | Shows the tags of files on disk |
 | `apeiron tag <file>... --add <tag>... --remove <tag>...` | Adds or removes tags, ignoring case; the next backup keeps them |
 
-Tags are a property of the files, so changing them changes the folder, not the versions already stored: a version keeps the tags its files had when it was made. Other systems keep tags elsewhere (macOS in Finder's own attribute, Windows not at all), so backups there have no tags yet, and `apeiron tag` says so. In the JSON API the criterion is `tags`, a list, and each entry has `tags` when it has any.
+Tags are a property of the files, so changing them changes the folder, not the versions already stored: a version keeps the tags its files had when it was made. Finder's colours are not kept: a restored tag has its name only. Windows has no tags, so backups there have none, and `apeiron tag` says so. In the JSON API the criterion is `tags`, a list, and each entry has `tags` when it has any.
 
 Snapshots themselves are found by their message, author, host or metadata with `apeiron log --grep <text>` ([CLI.md](CLI.md)).
 
@@ -91,7 +91,7 @@ A name has 1 to 64 characters and no control characters; spaces around it are dr
 | Item | Where |
 | --- | --- |
 | Text inside PDF, office and other formats | Later, as a type driver; not scheduled ([ROADMAP.md](ROADMAP.md) §8) |
-| Tags on macOS and Windows | Later; macOS keeps them in Finder's own attribute, Windows has none |
+| Tags on Windows | Not planned; Windows has none |
 | Hiding results a user may not see | Done in the web interface: a `member` or `reader` must name a snapshot it sees ([USERS.md](USERS.md) §4) |
 
 ## 8. Crates

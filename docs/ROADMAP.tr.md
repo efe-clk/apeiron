@@ -125,7 +125,7 @@ Her iş tamamlandı (2026-10-30); aşama, çıkış kriteri olan ilk kurumsal pi
 | İşlem günlüğü | [ARCHITECTURE.tr.md](ARCHITECTURE.tr.md) §2 | Reflog'lar ref değişikliklerini kaydeder; web arayüzü dışındaki diğer işlemleri hiçbir şey kaydetmez |
 | API'nin uzak kullanımı ve daemon'u başka bir cihazdan yönetmek | [API.tr.md](API.tr.md) §2, [DAEMON.tr.md](DAEMON.tr.md) §7 | Yalnızca sayfaların JSON API'si; bir kiracının işleri Zamanlama sayfasında |
 | Git'in eklenti arayüzünün arkasına geçmesi; diğer eklenti türleri ve eklenti mağazası | [DECISIONS.tr.md](DECISIONS.tr.md) ADR-021, [PLUGIN.tr.md](PLUGIN.tr.md) §6 | `apeiron-git` kendi crate'idir; eklentiler yalnızca tür sürücüsüdür |
-| PDF ve ofis dosyalarının içindeki metin; macOS ve Windows'ta etiketler; raporlarda başka standartlar | [SEARCH.tr.md](SEARCH.tr.md) §7, [REPORTS.tr.md](REPORTS.tr.md) §6 | Yalnızca UTF-8 metin; etiketler yalnızca Linux'ta; yalnızca ISO/IEC 27001 |
+| PDF ve ofis dosyalarının içindeki metin; raporlarda başka standartlar | [SEARCH.tr.md](SEARCH.tr.md) §7, [REPORTS.tr.md](REPORTS.tr.md) §6 | Yalnızca UTF-8 metin; yalnızca ISO/IEC 27001 |
 | C++ SDK'sı, C ABI üzerinden akış | [SDK.tr.md](SDK.tr.md) §1, §7 | C ABI üzerinde Python SDK'sı; kütüphane Cargo ile derlenir |
 | İnceleme, onay ve yorumlar | [VISION.tr.md](VISION.tr.md) | Yazılmadı |
 | Format yükseltme aracı | [FORMAT.tr.md](FORMAT.tr.md) §18 | Format 1. sürümde |

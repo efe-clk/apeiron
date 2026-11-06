@@ -24,14 +24,14 @@ En az bir ölçüt gerekir. `--in` aranan snapshot'ı adlandırır (varsayılan 
 
 ### 1.1 Etiketler
 
-Etiket, bir dosyaya konan bir ya da birkaç kelimedir; örneğin `fatura` ya da `Proje X`. Apeiron, Linux'ta Dolphin gibi dosya yöneticilerinin dosyalara koyduğu etiketleri `user.xdg.tags` özniteliğinde tutar ([FORMAT.tr.md](FORMAT.tr.md) §6.3): bir yedek onları her sürümle saklar, `apeiron search --tag` onları bulur, `apeiron ls` ve sonuçlar onları köşeli parantez içinde gösterir ve geri yükleme onları geri yazar.
+Etiket, bir dosyaya konan bir ya da birkaç kelimedir; örneğin `fatura` ya da `Proje X`. Apeiron, Linux'ta Dolphin, macOS'ta Finder gibi dosya yöneticilerinin dosyalara koyduğu etiketleri `user.xdg.tags` özniteliğinde tutar ([FORMAT.tr.md](FORMAT.tr.md) §6.3): bir yedek onları her sürümle saklar, `apeiron search --tag` onları bulur, `apeiron ls` ve sonuçlar onları köşeli parantez içinde gösterir ve geri yükleme onları geri yazar.
 
 | Komut | Ne yapar |
 | --- | --- |
 | `apeiron tag <dosya>...` | Diskteki dosyaların etiketlerini gösterir |
 | `apeiron tag <dosya>... --add <etiket>... --remove <etiket>...` | Büyük/küçük harf ayırmadan etiket ekler ya da kaldırır; sonraki yedek onları saklar |
 
-Etiketler dosyaların bir özelliğidir; bu yüzden onları değiştirmek saklanmış sürümleri değil klasörü değiştirir: bir sürüm, oluşturulduğunda dosyalarının sahip olduğu etiketleri tutar. Başka sistemler etiketleri başka yerde tutar (macOS Finder'ın kendi özniteliğinde, Windows hiç tutmaz); bu yüzden oralardaki yedeklerde henüz etiket yoktur ve `apeiron tag` bunu söyler. JSON API'de ölçüt bir liste olan `tags`'tir ve etiketi olan her girişin `tags` alanı vardır.
+Etiketler dosyaların bir özelliğidir; bu yüzden onları değiştirmek saklanmış sürümleri değil klasörü değiştirir: bir sürüm, oluşturulduğunda dosyalarının sahip olduğu etiketleri tutar. Finder'ın renkleri tutulmaz: geri yüklenen etiketin yalnızca adı vardır. Windows'ta etiket yoktur, bu yüzden oradaki yedeklerde de yoktur ve `apeiron tag` bunu söyler. JSON API'de ölçüt bir liste olan `tags`'tir ve etiketi olan her girişin `tags` alanı vardır.
 
 Snapshot'ların kendileri mesajlarına, yazarlarına, makinelerine ya da üst verilerine göre `apeiron log --grep <metin>` ile bulunur ([CLI.tr.md](CLI.tr.md)).
 
@@ -91,7 +91,7 @@ Bir ad 1 ile 64 karakter arasıdır ve denetim karakteri içermez; çevresindeki
 | Konu | Nerede |
 | --- | --- |
 | PDF, ofis ve diğer biçimlerin içindeki metin | Daha sonra, bir tür sürücüsü olarak; zamanlanmadı ([ROADMAP.tr.md](ROADMAP.tr.md) §8) |
-| macOS ve Windows'ta etiketler | Daha sonra; macOS onları Finder'ın kendi özniteliğinde tutar, Windows'ta yoktur |
+| Windows'ta etiketler | Planlanmıyor; Windows'ta yoktur |
 | Kullanıcının göremeyeceği sonuçları gizlemek | Web arayüzünde tamamlandı: `member` ya da `reader` gördüğü bir snapshot'ı adlandırmalıdır ([USERS.tr.md](USERS.tr.md) §4) |
 
 ## 8. Crate'ler

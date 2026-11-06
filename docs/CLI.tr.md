@@ -101,7 +101,7 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | `apeiron report [--verify] [--remotes] [--stale-days <n>] [--all-tenants] [--web [--tenant <name>] [--since <date>]] [--standard iso27001] [--out <file> [--sign <key>]]`, `report key <file>`, `report check <file>` | Bir uyumluluk raporunu Markdown olarak (ya da `--json` ile JSON olarak) yazdırır: yedekler, bütünlük, kopyalar, koruma, saklama ve yasal saklama kilitleri, `--web` ile kullanıcılar ve denetim kaydı, `--standard` ile maddelerine eşlenmiş gerçekler; `--sign` ile imzalanır, `report check` ile denetlenir (REPORTS.tr.md §5.1); bir sorun varsa çıkış kodu 3, bozuk veri varsa 4 ([REPORTS.tr.md](REPORTS.tr.md)) | Tamamlandı |
 | `apeiron retention add <refs> --days <n>`, `apeiron retention list` | Bir adın ya da ardından `*` gelen bir önekin eşleştiği ref'leri arşiv olarak tutar: yalnızca ileri giderler ve son değişikliklerinden bu yana gün sayısı geçene kadar silinmezler; bir kural asla kaldırılamaz ([ARCHIVE.tr.md](ARCHIVE.tr.md)) | Tamamlandı |
 | `apeiron plugin share <name>`, `plugin unshare <name>`, `plugin list --shared`, `plugin add --from-repo <name>` | Eklentileri depoda taşır ve depodan kurar ([PLUGIN.tr.md](PLUGIN.tr.md) §5) | Tamamlandı |
-| `apeiron tag <file>... [--add <tag>]... [--remove <tag>]...` | Diskteki dosyaların, yedeklerin sakladığı ve `search --tag`'in bulduğu etiketlerini gösterir ya da değiştirir; yalnızca Linux ([SEARCH.tr.md](SEARCH.tr.md) §1.1) | Tamamlandı |
+| `apeiron tag <file>... [--add <tag>]... [--remove <tag>]...` | Diskteki dosyaların, yedeklerin sakladığı ve `search --tag`'in bulduğu etiketlerini gösterir ya da değiştirir; Linux ve macOS ([SEARCH.tr.md](SEARCH.tr.md) §1.1) | Tamamlandı |
 | `apeiron hold add <refs> --reason <text>`, `hold list`, `hold lift <id> --reason <text>` | Ref'leri, sahip oldukları her sürümle kaldırılana kadar tutan bir yasal saklama kilidi koyar; kaldırma kalıcı olarak kaydedilir ([ARCHIVE.tr.md](ARCHIVE.tr.md) §2.1) | Tamamlandı |
 | `apeiron push --all <remote> [--rate <hız>]`, `apeiron pull --all <remote> [--rate <hız>]` | Bir replikayı ya da yedek sunucuyu güncel tutmak için her ref'i push ya da pull eder; çatışmalı bir ref bırakılır ve adlandırılır, diğerleri kopyalanır; o zaman çıkış kodu 3'tür ([REPLICATION.tr.md](REPLICATION.tr.md)) | Tamamlandı |
 | `apeiron web … [--replicate <remote>]... [--standby]` | Her yedekten sonra her ref'i her replikaya push eder ya da yedek almayan bir yedek sunucu kopyası sunar ([REPLICATION.tr.md](REPLICATION.tr.md)) | Tamamlandı |
@@ -117,7 +117,7 @@ Bir `<snapshot>`; ref adı (`main`), tam snapshot kimliği ya da tek bir snapsho
 | Dosyalar, klasörler, sembolik bağlar | Evet | Tamamlandı |
 | İzin bitleri ve değişiklik zamanı | Evet | Tamamlandı |
 | Linux ve macOS'ta sahip (uid/gid) | Evet | Tamamlandı |
-| Genişletilmiş öznitelikler | Yalnızca Linux'ta dosya etiketleri, `user.xdg.tags` ([SEARCH.tr.md](SEARCH.tr.md) §1.1); diğerleri henüz değil | Devam ediyor |
+| Genişletilmiş öznitelikler | Yalnızca Linux ve macOS'ta dosya etiketleri, `user.xdg.tags` ([SEARCH.tr.md](SEARCH.tr.md) §1.1); diğerleri henüz değil | Devam ediyor |
 | Sabit bağlar | Ayrı dosyalar olarak; aralarındaki bağ korunmaz ([FORMAT.tr.md](FORMAT.tr.md) §6.3) | Tamamlandı |
 | Aygıt dosyaları, soketler, borular | Hayır; atlanır ve raporlanır | Tamamlandı |
 

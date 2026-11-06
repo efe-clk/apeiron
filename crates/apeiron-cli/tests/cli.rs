@@ -884,7 +884,7 @@ fn a_signed_report_is_checked() {
 
 /// Tags set on files are kept by backups, found by search and written back
 /// by restore (SEARCH.md §1, FORMAT.md §6.3).
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 #[test]
 fn tags_are_kept_found_and_restored() {
     let s = Setup::new();
