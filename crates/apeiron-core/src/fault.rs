@@ -1347,10 +1347,37 @@ mod repair {
             assert!(report.is_ok(), "{report:?}");
             assert_eq!(report.damaged_packs, 1);
             assert!(report.copied_objects > 0);
-            assert_eq!(report.removed_packs, std::slice::from_ref(&pack));
-            assert!(!pack.exists());
+            // Gone, unless the new pack came out with the same name.
+            assert!(report.removed_packs.len() <= 1);
             assert_whole(&f.base, f.main);
         }
+    }
+
+    /// A new pack with the same objects in the same order has the same bytes
+    /// and so the name of the pack it replaces, which must not then be
+    /// deleted as damaged. One object makes that order certain.
+    #[test]
+    fn a_replacement_with_the_name_of_the_damaged_pack_is_kept() {
+        let dir = tempfile::tempdir().unwrap();
+        let (base, copy) = (dir.path().join("repo"), dir.path().join("copy"));
+        let mut repo = init(&base, false);
+        let mut writer = repo.writer();
+        let id = writer.put(ObjectType::Chunk, b"only one").unwrap();
+        writer.finish().unwrap();
+        copy_dir(&base, &copy);
+
+        let pack = pack_of(&base);
+        damage(&pack);
+        let report = repair_from(&base, &copy).unwrap();
+        assert!(report.is_ok(), "{report:?}");
+        assert_eq!(report.copied_objects, 1);
+        assert_eq!(report.damaged_packs, 1);
+        assert!(report.removed_packs.is_empty());
+        // The same name, now holding whole bytes.
+        assert_eq!(pack_of(&base), pack);
+        let repo = open(&base).unwrap();
+        assert!(repo.verify().unwrap().is_ok());
+        assert_eq!(repo.read_object(&id).unwrap().1, b"only one");
     }
 
     #[test]

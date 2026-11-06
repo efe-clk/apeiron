@@ -259,11 +259,11 @@ impl Repository {
             if w.len() >= pack::TARGET_SIZE
                 && let Some(w) = writer.take()
             {
-                written.push(w.finish(&self.dir(PACKS))?);
+                written.push(w.finish_replacing(&self.dir(PACKS))?);
             }
         }
         if let Some(w) = writer.take() {
-            written.push(w.finish(&self.dir(PACKS))?);
+            written.push(w.finish_replacing(&self.dir(PACKS))?);
         }
         report.salvaged_objects = salvaged;
         report.copied_objects = copied;
@@ -277,11 +277,18 @@ impl Repository {
                 kept.entry(location.pack).or_default().push(location.entry);
             }
         }
+        // A new pack can have the very bytes the damaged one had before it
+        // was damaged, and so its name: then it has just replaced that file,
+        // which must not be deleted now.
+        let rewritten: HashSet<FileHash> = written.iter().map(|(name, _)| *name).collect();
+        kept.retain(|name, _| !rewritten.contains(name));
         let known: HashSet<FileHash> = self.index.values().map(|l| l.pack).collect();
         let delete: Vec<PathBuf> = damaged
             .iter()
             .filter(|(name, _)| {
-                !kept.contains_key(*name) && (unrecoverable.is_empty() || known.contains(*name))
+                !rewritten.contains(*name)
+                    && !kept.contains_key(*name)
+                    && (unrecoverable.is_empty() || known.contains(*name))
             })
             .map(|(_, path)| path.clone())
             .collect();

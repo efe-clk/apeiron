@@ -196,6 +196,22 @@ impl PackWriter {
         Ok((name, std::mem::take(&mut self.entries)))
     }
 
+    /// Like [`PackWriter::finish`], for a repair: a file of that name may be
+    /// a damaged copy of this very pack, so it is replaced, not trusted.
+    pub(crate) fn finish_replacing(
+        mut self,
+        packs_dir: &Path,
+    ) -> Result<(FileHash, Vec<PackEntry>)> {
+        self.write_table()?;
+        fsutil::checkpoint()
+            .and_then(|()| self.file.get_ref().sync_all())
+            .at(&self.tmp_path)?;
+        let name = *self.hasher.finalize().as_bytes();
+        fsutil::persist(&self.tmp_path, &pack_path(packs_dir, &name))?;
+        self.persisted = true;
+        Ok((name, std::mem::take(&mut self.entries)))
+    }
+
     /// Writes the entry table and returns the pack's name, entries and
     /// bytes; the temporary file is removed.
     pub(crate) fn finish_to_bytes(mut self) -> Result<(FileHash, Vec<PackEntry>, Vec<u8>)> {
