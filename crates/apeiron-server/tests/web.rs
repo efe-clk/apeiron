@@ -121,7 +121,13 @@ impl Client {
                 let mut stream = tcp;
                 stream.write_all(head.as_bytes()).unwrap();
                 stream.write_all(body.as_bytes()).unwrap();
-                stream.read_to_end(&mut raw).unwrap();
+                // macOS can report a reset after the whole answer arrived.
+                if let Err(e) = stream.read_to_end(&mut raw) {
+                    assert!(
+                        e.kind() == std::io::ErrorKind::ConnectionReset && !raw.is_empty(),
+                        "{e}"
+                    );
+                }
             }
             Some(config) => {
                 let name = "localhost".try_into().unwrap();
