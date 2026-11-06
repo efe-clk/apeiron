@@ -103,7 +103,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: |
           docker run -d --name challtestsrv --network host ghcr.io/letsencrypt/pebble-challtestsrv:2.10.1 \
-            -defaultIPv4 127.0.0.1 -defaultIPv6 "" -dns01 :8053 -http01 "" -https01 "" -tlsalpn01 "" -doh ""
+            -defaultIPv4 127.0.0.1 -defaultIPv6 "" -dnsserver :8053 -http01 "" -https01 "" -tlsalpn01 "" -doh ""
           docker run -d --name pebble --network host -e PEBBLE_VA_NOSLEEP=1 ghcr.io/letsencrypt/pebble:2.10.1 \
             -config test/config/pebble-config.json -dnsserver 127.0.0.1:8053
           curl -sSf -o "$RUNNER_TEMP/minica.pem" \
