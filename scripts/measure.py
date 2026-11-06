@@ -85,7 +85,7 @@ def main():
     s, m, _, _ = timed(app + ["backup", str(big), "--ref", "big"], env)
     line(f"Adding one file of {args.big_gb} GiB", "under 256 MiB", s, m)
     s, m, _, _ = timed(app + ["backup", str(big), "--ref", "big"], env)
-    line(f"Backup of that file, unchanged", "—", s, m, "the content is read again")
+    line("Backup of that file, unchanged", "—", s, m)
     s, m, _, _ = timed(app + ["restore", "big", str(work / "out")], env)
     line(f"Restoring that file", "—", s, m)
     (work / "out" / "big.bin").unlink()
@@ -122,7 +122,7 @@ def main():
     sent = sum(p.stat().st_size for p in copy.rglob("*.pack")) if copy.exists() else 0
     s, m, code, out = timed(app + ["--json", "push", "disk", "big"], env)
     again = json.loads(out)["bytes"] if code == 0 else -1
-    line("Sent again after a push stopped half way", "at most 1 chunk (4 MiB)", s, m,
+    line("Sent again after a push stopped half way", "at most 1 pack beyond what was left", s, m,
          f"{sent >> 20} MiB were on the copy; {again >> 20} MiB sent again")
 
 

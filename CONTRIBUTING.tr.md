@@ -11,6 +11,7 @@ Bu rehber geliştirme ortamının nasıl kurulacağını, her değişikliğin ha
 | `crates/` | Cargo workspace; her katman için bir crate ve işletim sistemi çağrıları için `apeiron-sys` |
 | `docs/` | Belgeler; İngilizce (`X.md`) ve Türkçe (`X.tr.md`) |
 | `plugins/` | Kendi workspace'i olan metin eklentisi ([docs/TEXT.tr.md](docs/TEXT.tr.md)) |
+| `scripts/` | Performans ölçümü ([docs/PERFORMANCE.tr.md](docs/PERFORMANCE.tr.md)) |
 | `sdk/` | C örneği, Python SDK'sı ve ortak uyumluluk testleri ([docs/SDK.tr.md](docs/SDK.tr.md)) |
 | `.github/workflows/` | CI: biçim, lint ve testler |
 | `LICENSE-MIT`, `LICENSE-APACHE` | İki lisans |

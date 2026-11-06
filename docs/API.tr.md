@@ -54,7 +54,7 @@ Uzun işlemler (yedek, geri yükleme, senkron, doğrulama) **iş** (job) olarak 
 | İlke | Açıklama | Durum |
 | --- | --- | --- |
 | Tampon değil akış | Dosya içeriği akış olarak girer ve çıkar (Rust'ta `Read`/`Write`); içerik hiçbir zaman tamamen belleğe alınmaz | Rust API'de tamamlandı; C ABI yollarla çalışır ([SDK.tr.md](SDK.tr.md) §7) |
-| Sınırlı bellek | Bellek kullanımı dosya boyutundan bağımsızdır; hedef, Raspberry Pi 4'te 10 GB'lık bir dosya eklerken 256 MB altı ([VISION.tr.md](VISION.tr.md)) | Buna göre tasarlandı; henüz ölçülmedi ([ROADMAP.tr.md](ROADMAP.tr.md) §8) |
+| Sınırlı bellek | Bellek kullanımı dosya boyutundan bağımsızdır; hedef, Raspberry Pi 4'te 10 GB'lık bir dosya eklerken 256 MB altı ([VISION.tr.md](VISION.tr.md)) | Daha güçlü bir bilgisayarda 10 GiB'lık dosya eklerken 134 MiB ([PERFORMANCE.tr.md](PERFORMANCE.tr.md)); Raspberry Pi 4'te ölçülmedi |
 | Tembel listeleme | Geçmiş, tree'ler ve arama sonuçları tek büyük liste olarak değil, yineleyici (iterator) ya da sayfalar olarak döner | Devam ediyor (geçmiş sayfalıdır; tree'ler ve arama sonuçları listedir, arama sınırlıdır) |
 
 ## 5. Hata türleri
@@ -141,7 +141,7 @@ Her işlem tek bir düz istek değeri alır ve tek bir düz sonuç değeri dönd
 
 | İşlem | İstek | Sonuç | Uzun |
 | --- | --- | --- | --- |
-| `backup` (`exclude`: dışarıda bırakılacak kalıplar, [CLI.tr.md](CLI.tr.md) §4.1; sonuçta `excluded`) | kaynak klasör, ref adı, açıklama, yazar, cihaz, meta | `BackupReport`: snapshot kimliği, dosya, klasör ve bayt sayıları, yeni saklanan baytlar, uyarılar | Evet |
+| `backup` (`exclude`: dışarıda bırakılacak kalıplar, [CLI.tr.md](CLI.tr.md) §4.1; `reread`: değişmemiş görünenleri de okur; sonuçta `excluded`, `unchanged`) | kaynak klasör, ref adı, açıklama, yazar, cihaz, meta | `BackupReport`: snapshot kimliği, dosya, klasör ve bayt sayıları, yeni saklanan baytlar, uyarılar | Evet |
 | `restore` | snapshot, hedef klasör, isteğe bağlı snapshot içi yol | `RestoreReport`: sayılar, uyarılar | Evet |
 | `export` | snapshot, çıktı dosyası, biçim (`tar`, `zip` ya da `7z`; verilmezse uzantıdan), isteğe bağlı yol | `ExportReport`: sayılar, uyarılar | Evet |
 | `verify` | — | `VerifyReport`: denetlenen nesneler, bozuk dosyalar ve nesneler | Evet |

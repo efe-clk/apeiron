@@ -121,7 +121,7 @@ Every work item is done (2026-10-30); the stage ends with its exit criterion, th
 
 | Need | Asked for in | What happens today |
 | --- | --- | --- |
-| Measuring the performance targets on a Raspberry Pi 4 | [VISION.md](VISION.md), [API.md](API.md) §4 | Not measured |
+| Measuring the performance targets on a Raspberry Pi 4 | [VISION.md](VISION.md), [API.md](API.md) §4 | Measured on a stronger computer ([PERFORMANCE.md](PERFORMANCE.md)); it needs the device |
 | Operation log | [ARCHITECTURE.md](ARCHITECTURE.md) §2 | Reflogs record ref changes; nothing records other operations outside the web interface |
 | Archive packages: splitting into parts, inspecting without unpacking; importing tar and zip | [VISION.md](VISION.md) | tar, zip and 7z are export only |
 | Remote mode of the API and operating the daemon from another device | [API.md](API.md) §2, [DAEMON.md](DAEMON.md) §7 | Only the JSON API of the pages; a tenant's jobs on the Schedule page |

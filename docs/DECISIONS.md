@@ -48,6 +48,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [038](#adr-038-repairing-from-a-copy-is-an-explicit-command-that-deletes-only-what-it-replaced) | Repair | `apeiron repair --from <remote>` under the exclusive lock; damaged packs go only when nothing in them is lost | Accepted |
 | [039](#adr-039-a-left-out-path-is-left-alone-not-deleted) | Exclusion | Patterns from `--exclude` and `.apeironignore`; a backup does not read such paths, and a sync keeps them as they were recorded | Accepted |
 | [040](#adr-040-pruning-rewrites-a-linear-history-and-remotes-follow-only-when-asked) | Pruning | `apeiron prune` copies the kept snapshots with new parents; protected refs, sync and merges are refused; `push --replace` for remotes | Accepted |
+| [041](#adr-041-transfers-resume-by-pack-and-unchanged-files-are-not-read) | Transfers and backups | An index after each pack, children before parents; a pull trusts only what indexes list; size and time spare reading a file | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28. ADR-036 and ADR-037 record on 2026-11-06 decisions made earlier without a record of their own, including what changed in older ADRs.
 
@@ -879,3 +880,24 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | A plain `push --force` | It could overwrite what another device added |
 
 **Consequences.** A pruned ref's ids change, so ids written down earlier stop naming a snapshot once it is collected; a retention rule is the tool for history that must stay. Other copies that pull must delete the ref first. Sync histories are not thinned.
+
+## ADR-041: Transfers resume by pack, and unchanged files are not read
+
+**Status:** Accepted (2026-11-06)
+
+**Context.** Measurements ([PERFORMANCE.md](PERFORMANCE.md)) showed a stopped push starting from nothing and a backup of unchanged files reading all of them. Testing the first found a worse fault: a pull wrote objects in the order of the remote's packs, so a stop could leave a snapshot without what it refers to, and the next run took it as whole.
+
+**Decision.** A push sends each object after what it refers to and an index after each pack, so whatever a copy holds is whole at every moment. A pull writes in that order too, and lists what a stopped run left. A backup or sync does not read a file whose size and time equal those the previous snapshot recorded and whose time is at least 2 seconds older than that snapshot; `--reread` reads all. The vision's "at most 1 chunk" becomes one pack.
+
+**Rationale.** The closure rule of [FORMAT.md](FORMAT.md) §15.5 is what lets a walk stop early, so it must hold for everything on the disk, also after `repair` lists a pack. A resume inside a pack would need partial files on every kind of remote; S3 has no such thing. One pack is at most about 32 MiB. Size and time are what `rsync`, Git and others rely on; the margin covers a change within the resolution of the time.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| Objects one per file on remotes, for a resume of one chunk | Many requests and files; ADR-010 chose packs for that reason |
+| One index at the end, with a pack listing on the remote to resume | A listing shows packs whose content no index vouches for, and needs their tables read over the network |
+| Comparing also change time and inode | The tree format has no place for them, and they change with a restore or on another device |
+| Always reading files | The target for unchanged files cannot be met on small devices |
+
+**Consequences.** A remote gets one small index file per pack until garbage collection of that copy merges them. A program that restores a file's old time after changing its content is not seen without `--reread`; `apeiron verify` does not notice this either, as it checks the repository, not the folder.

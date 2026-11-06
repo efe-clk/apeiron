@@ -54,7 +54,7 @@ Cancellation is safe by construction: objects become visible only after they are
 | Principle | Description | Status |
 | --- | --- | --- |
 | Streams, not buffers | File content goes in and out as streams (`Read`/`Write` in Rust); content is never loaded into memory whole | Done in the Rust API; the C ABI works on paths ([SDK.md](SDK.md) §7) |
-| Bounded memory | Memory use is independent of file size; target under 256 MB while adding a 10 GB file on a Raspberry Pi 4 ([VISION.md](VISION.md)) | Designed for; not measured yet ([ROADMAP.md](ROADMAP.md) §8) |
+| Bounded memory | Memory use is independent of file size; target under 256 MB while adding a 10 GB file on a Raspberry Pi 4 ([VISION.md](VISION.md)) | 134 MiB adding a 10 GiB file on a stronger computer ([PERFORMANCE.md](PERFORMANCE.md)); not measured on a Raspberry Pi 4 |
 | Lazy listing | History, trees and search results are returned as iterators or pages, not as one big list | In progress (history is paged; trees and search results are lists, search with a limit) |
 
 ## 5. Error types
@@ -141,7 +141,7 @@ Every operation takes one plain request value and returns one plain result value
 
 | Operation | Request | Result | Long |
 | --- | --- | --- | --- |
-| `backup` | source folder, ref name, message, author, host, meta, patterns to leave out ([CLI.md](CLI.md) §4.1) | `BackupReport`: snapshot id, counts of files, folders and bytes, bytes newly stored, entries left out, warnings | Yes |
+| `backup` | source folder, ref name, message, author, host, meta, patterns to leave out ([CLI.md](CLI.md) §4.1), `reread` to read files that seem unchanged | `BackupReport`: snapshot id, counts of files, folders and bytes, bytes newly stored, entries left out, files not read as `unchanged`, warnings | Yes |
 | `restore` | snapshot, target folder, optional path inside the snapshot | `RestoreReport`: counts, warnings | Yes |
 | `export` | snapshot, output file, format (`tar`, `zip` or `7z`; from the extension when absent), optional path | `ExportReport`: counts, warnings | Yes |
 | `verify` | — | `VerifyReport`: objects checked, damaged files and objects | Yes |

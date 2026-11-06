@@ -54,7 +54,7 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | Command | What it does | Status |
 | --- | --- | --- |
 | `apeiron init <path> [--encrypt]` | Creates an empty repository; `--encrypt` encrypts it with a password (section 2.1) | Done |
-| `apeiron backup <folder> [--ref <name>] [--message <text>] [--author <text>] [--host <text>] [--exclude <pattern>]...` | Stores the folder as a new snapshot and moves the ref to it (default ref: `main`) | Done |
+| `apeiron backup <folder> [--ref <name>] [--message <text>] [--author <text>] [--host <text>] [--exclude <pattern>]... [--reread]` | Stores the folder as a new snapshot and moves the ref to it (default ref: `main`) | Done |
 | `apeiron log [<ref>] [--grep <text>]` | Lists the snapshots of a ref, newest first; `--grep` keeps those whose message, author, host or metadata hold the text, ignoring case | Done |
 | `apeiron ls <snapshot> [<path>]` | Lists the files and folders inside a snapshot | Done |
 | `apeiron diff <snapshot> <snapshot> [--text]` | Lists files added, removed and changed between two snapshots; `--text` also shows the changed lines of files a plugin handles ([TEXT.md](TEXT.md)) | Done |
@@ -120,7 +120,7 @@ A `<snapshot>` can be written as a ref name (`main`), a full snapshot id, or the
 | Hard links | As separate files; the link between them is not kept ([FORMAT.md](FORMAT.md) §6.3) | Done |
 | Device files, sockets, pipes | No; skipped and reported | Done |
 
-A file that changes while it is being read is stored as read and reported as a warning. Restore recreates permissions and times; owners only when run with permission to set them.
+A file with the size and time the last snapshot of the ref recorded, and a time at least 2 seconds older than that snapshot, is taken as unchanged and not read, which makes a backup of unchanged files fast ([PERFORMANCE.md](PERFORMANCE.md)). A program that changes a file and sets its old time back goes unseen; `--reread` reads every file. A sync does the same. A file that changes while it is being read is stored as read and reported as a warning. Restore recreates permissions and times; owners only when run with permission to set them.
 
 ### 4.1 Leaving things out
 

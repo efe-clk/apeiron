@@ -48,6 +48,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [038](#adr-038-bir-kopyadan-onarım-yalnızca-yerine-koyduğunu-silen-açık-bir-komuttur) | Onarım | Özel kilit altında `apeiron repair --from <remote>`; bozuk paketler ancak içlerinden hiçbir şey kaybolmayacaksa silinir | Kabul edildi |
 | [039](#adr-039-dışarıda-bırakılan-yola-dokunulmaz-silinmez) | Dışlama | `--exclude` ve `.apeironignore` kalıpları; yedek bu yolları okumaz, senkron onları kaydedildiği gibi tutar | Kabul edildi |
 | [040](#adr-040-budama-doğrusal-bir-geçmişi-yeniden-yazar-uzak-depolar-yalnızca-istenince-izler) | Budama | `apeiron prune`, tutulan snapshot'ları yeni ebeveynlerle kopyalar; korunan ref'ler, senkron ve birleştirmeler reddedilir; uzak depolar için `push --replace` | Kabul edildi |
+| [041](#adr-041-aktarımlar-paket-paket-devam-eder-değişmeyen-dosyalar-okunmaz) | Aktarımlar ve yedekler | Her paketten sonra indeks, ebeveynden önce çocuk; pull yalnızca indekslerin listelediğine güvenir; boyut ve zaman dosyayı okumaktan kurtarır | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı. ADR-036 ve ADR-037, kendi kayıtları olmadan daha önce alınan kararları ve eski ADR'lerde değişenleri 2026-11-06'da kaydeder.
 
@@ -879,3 +880,24 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Düz `push --force` | Başka bir cihazın eklediğinin üzerine yazabilirdi |
 
 **Sonuçlar.** Budanan ref'in kimlikleri değişir; daha önce not edilen kimlikler toplandıktan sonra snapshot adlandırmaz; kalması gereken geçmişin aracı saklama kuralıdır. Pull yapan diğer kopyalar önce ref'i silmelidir. Senkron geçmişleri seyreltilmez.
+
+## ADR-041: Aktarımlar paket paket devam eder, değişmeyen dosyalar okunmaz
+
+**Durum:** Kabul edildi (2026-11-06)
+
+**Bağlam.** Ölçümler ([PERFORMANCE.tr.md](PERFORMANCE.tr.md)), durdurulan bir push'un sıfırdan başladığını ve değişmemiş dosyaların yedeğinin hepsini okuduğunu gösterdi. İlkini sınamak daha kötü bir hata buldu: pull nesneleri uzak deponun paket sırasıyla yazıyordu; bir durma, snapshot'ı başvurduğu şeyler olmadan bırakabiliyor ve sonraki çalışma onu bütün sanıyordu.
+
+**Karar.** Push her nesneyi başvurduklarından sonra, her paketten sonra da bir indeks gönderir; böylece bir kopyanın tuttuğu her şey her an bütündür. Pull da bu sırayla yazar ve durmuş bir çalışmanın bıraktığını listeler. Yedek ya da senkron, boyutu ve zamanı önceki snapshot'ın kaydettiğiyle aynı olan ve zamanı o snapshot'tan en az 2 saniye eski olan dosyayı okumaz; `--reread` hepsini okur. Vizyondaki "en çok 1 chunk" bir paket olur.
+
+**Gerekçe.** [FORMAT.tr.md](FORMAT.tr.md) §15.5'in kapanış kuralı, bir gezinmenin erken durmasını sağlayan şeydir; bu yüzden `repair` bir paketi listeledikten sonra da diskteki her şey için geçerli olmalıdır. Paketin içinden devam, her uzak depo türünde yarım dosya gerektirirdi; S3'te böyle bir şey yoktur. Bir paket en çok yaklaşık 32 MiB'tır. Boyut ve zaman, `rsync`, Git ve diğerlerinin dayandığı şeydir; pay, zamanın çözünürlüğü içindeki değişikliği karşılar.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Tek chunk'lık devam için uzak depolarda nesne başına dosya | Çok sayıda istek ve dosya; ADR-010 paketleri bu yüzden seçti |
+| Sonda tek indeks, devam için uzak depoda paket listesi | Liste, içeriğine hiçbir indeksin kefil olmadığı paketleri gösterir ve tablolarının ağdan okunmasını ister |
+| Değişiklik zamanını ve inode'u da karşılaştırmak | Tree biçiminde yerleri yoktur ve geri yüklemeyle ya da başka cihazda değişirler |
+| Dosyaları her zaman okumak | Değişmemiş dosya hedefi küçük cihazlarda karşılanamaz |
+
+**Sonuçlar.** Uzak depo, o kopyanın çöp toplaması birleştirene kadar paket başına küçük bir indeks dosyası alır. İçeriğini değiştirip eski zamanını geri koyan program `--reread` olmadan görülmez; `apeiron verify` de bunu fark etmez, çünkü klasörü değil depoyu denetler.

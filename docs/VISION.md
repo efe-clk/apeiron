@@ -207,7 +207,7 @@ Plugins are optional; the core works fully without any of them installed.
 
 ## Platforms and performance targets
 
-The reference device is a Raspberry Pi 4 (4 GB RAM). A release that meets the targets on this device also meets them on stronger hardware. The numbers below are initial proposals; they have not been measured yet.
+The reference device is a Raspberry Pi 4 (4 GB RAM). A release that meets the targets on this device also meets them on stronger hardware. The numbers below are initial proposals; [PERFORMANCE.md](PERFORMANCE.md) has what was measured so far, on a stronger computer.
 
 **Platforms:** Linux (x86_64, aarch64) is the first-class target. Windows and macOS are fully supported. Raspberry Pi, NAS devices and home servers are real usage targets.
 
@@ -217,7 +217,7 @@ The reference device is a Raspberry Pi 4 (4 GB RAM). A release that meets the ta
 | Incremental backup of 100,000 unchanged files | Under 10 s |
 | Memory use while adding a single 10 GB file | Under 256 MB, independent of file size |
 | Memory use of the idle background service | Under 50 MB |
-| Data re-sent after an interrupted transfer | At most 1 chunk |
+| Data re-sent after an interrupted transfer | At most 1 pack, about 32 MiB |
 
 - Background jobs (verification, indexing) run within CPU, disk and network limits; they do not slow down user operations.
 - For large installations, capacity can be spread over several machines (later stage).

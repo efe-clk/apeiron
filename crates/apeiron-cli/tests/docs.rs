@@ -380,6 +380,30 @@ fn the_documents_name_every_crate_and_the_minimum_rust_version() {
 }
 
 #[test]
+fn every_decision_record_named_exists_in_both_languages() {
+    let root = root();
+    let number_after = |text: &str| -> Vec<String> {
+        text.match_indices("ADR-")
+            .filter_map(|(at, _)| text.get(at + 4..at + 7))
+            .filter(|n| n.bytes().all(|b| b.is_ascii_digit()))
+            .map(str::to_owned)
+            .collect()
+    };
+    for decisions in ["docs/DECISIONS.md", "docs/DECISIONS.tr.md"] {
+        let text = read(&root.join(decisions));
+        for file in markdown_files() {
+            for number in number_after(&read(&file)) {
+                assert!(
+                    text.contains(&format!("## ADR-{number}:")),
+                    "{} names ADR-{number}, which {decisions} does not have",
+                    file.display()
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn the_readme_and_the_roadmap_give_every_stage_the_same_status() {
     let root = root();
     // `| 3. Name | … | Done |`: the number of the stage and its last column.

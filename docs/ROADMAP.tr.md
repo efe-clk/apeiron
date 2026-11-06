@@ -121,7 +121,7 @@ Her iş tamamlandı (2026-10-30); aşama, çıkış kriteri olan ilk kurumsal pi
 
 | İhtiyaç | İsteyen belge | Bugün ne oluyor |
 | --- | --- | --- |
-| Performans hedeflerini Raspberry Pi 4'te ölçmek | [VISION.tr.md](VISION.tr.md), [API.tr.md](API.tr.md) §4 | Ölçülmedi |
+| Performans hedeflerini Raspberry Pi 4'te ölçmek | [VISION.tr.md](VISION.tr.md), [API.tr.md](API.tr.md) §4 | Daha güçlü bir bilgisayarda ölçüldü ([PERFORMANCE.tr.md](PERFORMANCE.tr.md)); cihaz gerekir |
 | İşlem günlüğü | [ARCHITECTURE.tr.md](ARCHITECTURE.tr.md) §2 | Reflog'lar ref değişikliklerini kaydeder; web arayüzü dışındaki diğer işlemleri hiçbir şey kaydetmez |
 | Arşiv paketleri: parçalara bölme, açmadan inceleme; tar ve zip içe aktarma | [VISION.tr.md](VISION.tr.md) | tar, zip ve 7z yalnızca dışa aktarılır |
 | API'nin uzak kullanımı ve daemon'u başka bir cihazdan yönetmek | [API.tr.md](API.tr.md) §2, [DAEMON.tr.md](DAEMON.tr.md) §7 | Yalnızca sayfaların JSON API'si; bir kiracının işleri Zamanlama sayfasında |

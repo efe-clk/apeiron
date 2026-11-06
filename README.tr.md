@@ -131,6 +131,7 @@ Kod, commit ve format değişikliği kuralları: [CONTRIBUTING.tr.md](CONTRIBUTI
 | [Değiştirilemez arşiv](docs/ARCHIVE.tr.md) | Saklanması gereken süre dolmadan kimsenin değiştiremeyeceği ya da silemeyeceği yedekler |
 | [Uyumluluk raporları](docs/REPORTS.tr.md) | Denetçiler için tek belge: ne yedekleniyor, eksiksiz, kopyalanmış, korunuyor ve saklanıyor mu ve kimin erişimi vardı |
 | [Paylaşım](docs/SHARE.tr.md) | Hesabı olmayan birinin, bitene kadar bir yedeğin sürümünü, klasörünü ya da dosyasını indirebildiği bağlantılar |
+| [Performans](docs/PERFORMANCE.tr.md) | Programın ölçülen davranışı ve yeniden nasıl ölçüleceği |
 | [Kullanım rehberi](docs/GUIDE.tr.md) | Kurulum, günlük yedek, geri yükleme ve bir aylık deneme |
 | [Sözlük](docs/GLOSSARY.tr.md) | Terimler ve İngilizce–Türkçe karşılıkları |
 | [Katkı](CONTRIBUTING.tr.md) | Geliştirme ortamı ve kurallar |

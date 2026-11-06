@@ -37,5 +37,5 @@ Apeiron has no `status` command; the status query of the vision is met by readin
 | --- | --- |
 | An unchanged backup read every file | A file whose size and time equal the last snapshot, and older than it, is not read ([CLI.md](CLI.md) §4); `--reread` reads all |
 | A stopped push started again from nothing, as the remote's index was written only at the end | An index follows each pack, and objects are sent after what they refer to ([FORMAT.md](FORMAT.md) §15.5) |
-| A stopped pull could stop for good on the next run, as a pack without an index was trusted | A pull relies only on what indexes list ([FORMAT.md](FORMAT.md) §15.5) |
+| A stopped pull could fail on the next run, as it wrote objects before what they refer to | A pull writes in the same order as a push ([FORMAT.md](FORMAT.md) §15.5) |
 | A transfer cannot resume inside a pack, so the vision's "at most 1 chunk" cannot hold | The target is now one pack ([DECISIONS.md](DECISIONS.md) ADR-041) |

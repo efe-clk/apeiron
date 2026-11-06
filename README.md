@@ -131,6 +131,7 @@ Rules for code, commits and format changes: [CONTRIBUTING.md](CONTRIBUTING.md).
 | [Immutable archive](docs/ARCHIVE.md) | Backups nobody can change or delete before the time they must be kept |
 | [Compliance reports](docs/REPORTS.md) | One document for auditors: what is backed up, whether it is whole, copied, protected and kept, and who had access |
 | [Sharing](docs/SHARE.md) | Links that let someone without an account download a version, folder or file of a backup until they end |
+| [Performance](docs/PERFORMANCE.md) | What the program was measured to do, and how to measure it again |
 | [User guide](docs/GUIDE.md) | Installation, daily backup, restore and the one-month test |
 | [Glossary](docs/GLOSSARY.md) | Terms with English–Turkish equivalents |
 | [Contributing](CONTRIBUTING.md) | Development environment and rules |

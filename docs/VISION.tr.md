@@ -207,7 +207,7 @@ Eklentiler isteğe bağlıdır; hiçbiri kurulu olmadan da çekirdek tam çalı�
 
 ## Platformlar ve performans hedefleri
 
-Referans cihaz Raspberry Pi 4'tür (4 GB RAM). Bu cihazda hedefleri karşılayan bir sürüm, daha güçlü donanımda da karşılar. Aşağıdaki sayılar ilk öneridir; henüz ölçülmediler.
+Referans cihaz Raspberry Pi 4'tür (4 GB RAM). Bu cihazda hedefleri karşılayan bir sürüm, daha güçlü donanımda da karşılar. Aşağıdaki sayılar ilk öneridir; şimdiye kadar daha güçlü bir bilgisayarda ölçülenler [PERFORMANCE.tr.md](PERFORMANCE.tr.md) içindedir.
 
 **Platformlar:** Linux (x86_64, aarch64) birinci sınıf hedef. Windows ve macOS tam desteklenir. Raspberry Pi, NAS ve ev sunucuları gerçek kullanım hedefidir.
 
@@ -217,7 +217,7 @@ Referans cihaz Raspberry Pi 4'tür (4 GB RAM). Bu cihazda hedefleri karşılayan
 | Değişiklik olmayan 100 bin dosyada artımlı yedek | 10 sn altı |
 | 10 GB'lık tek dosya ekleme sırasında bellek kullanımı | 256 MB altı, dosya boyutundan bağımsız |
 | Boşta bekleyen arka plan hizmeti bellek kullanımı | 50 MB altı |
-| Kesilen aktarımda yeniden gönderilen veri | En fazla 1 chunk |
+| Kesilen aktarımda yeniden gönderilen veri | En çok 1 paket, yaklaşık 32 MiB |
 
 - Arka plan işleri (doğrulama, indeksleme) CPU, disk ve ağ sınırlarıyla çalışır; kullanıcı işlemini yavaşlatmaz.
 - Büyük kurulumlar için kapasite birden fazla makineye yayılabilir (ileri aşama).

@@ -11,6 +11,7 @@ This guide explains how to set up a development environment, which checks every 
 | `crates/` | Cargo workspace; one crate per layer, plus `apeiron-sys` for operating system calls |
 | `docs/` | Documentation, in English (`X.md`) and Turkish (`X.tr.md`) |
 | `plugins/` | The text plugin, a workspace of its own ([docs/TEXT.md](docs/TEXT.md)) |
+| `scripts/` | The performance measurement ([docs/PERFORMANCE.md](docs/PERFORMANCE.md)) |
 | `sdk/` | The C example, the Python SDK and the shared conformance suite ([docs/SDK.md](docs/SDK.md)) |
 | `.github/workflows/` | CI: formatting, lints and tests |
 | `LICENSE-MIT`, `LICENSE-APACHE` | The two licences |

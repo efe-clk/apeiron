@@ -37,5 +37,5 @@ Apeiron'un `status` komutu yoktur; vizyondaki durum sorgusunu geçmişi okumak v
 | --- | --- |
 | Değişmemiş bir yedek her dosyayı okuyordu | Boyutu ve zamanı son snapshot'la aynı olan ve ondan eski dosya okunmaz ([CLI.tr.md](CLI.tr.md) §4); `--reread` hepsini okur |
 | Durdurulan push sıfırdan başlıyordu, çünkü uzak deponun indeksi yalnızca sonda yazılıyordu | Her paketin ardından indeks gelir ve nesneler başvurduklarından sonra gönderilir ([FORMAT.tr.md](FORMAT.tr.md) §15.5) |
-| Durdurulan pull sonraki çalışmada kalıcı olarak takılabiliyordu, çünkü indekssiz pakete güveniliyordu | Pull yalnızca indekslerin listelediğine güvenir ([FORMAT.tr.md](FORMAT.tr.md) §15.5) |
+| Durdurulan pull sonraki çalışmada başarısız olabiliyordu, çünkü nesneleri başvurduklarından önce yazıyordu | Pull, push ile aynı sırayla yazar ([FORMAT.tr.md](FORMAT.tr.md) §15.5) |
 | Aktarım bir paketin içinden devam edemez, bu yüzden vizyondaki "en çok 1 chunk" tutamaz | Hedef artık bir pakettir ([DECISIONS.tr.md](DECISIONS.tr.md) ADR-041) |

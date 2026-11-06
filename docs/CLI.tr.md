@@ -54,7 +54,7 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | Komut | Ne yapar | Durum |
 | --- | --- | --- |
 | `apeiron init <path> [--encrypt]` | Boş bir depo oluşturur; `--encrypt` onu bir parolayla şifreler (bölüm 2.1) | Tamamlandı |
-| `apeiron backup <folder> [--ref <name>] [--message <text>] [--author <text>] [--host <text>] [--exclude <pattern>]...` | Klasörü yeni bir snapshot olarak saklar ve ref'i ona taşır (varsayılan ref: `main`) | Tamamlandı |
+| `apeiron backup <folder> [--ref <name>] [--message <text>] [--author <text>] [--host <text>] [--exclude <pattern>]... [--reread]` | Klasörü yeni bir snapshot olarak saklar ve ref'i ona taşır (varsayılan ref: `main`) | Tamamlandı |
 | `apeiron log [<ref>] [--grep <metin>]` | Bir ref'in snapshot'larını en yeniden başlayarak listeler; `--grep`, mesajı, yazarı, makinesi ya da üst verisi metni büyük-küçük harf ayırmadan içerenleri bırakır | Tamamlandı |
 | `apeiron ls <snapshot> [<path>]` | Bir snapshot'taki dosya ve klasörleri listeler | Tamamlandı |
 | `apeiron diff <snapshot> <snapshot> [--text]` | İki snapshot arasında eklenen, silinen ve değişen dosyaları listeler; `--text` bir eklentinin işlediği dosyaların değişen satırlarını da gösterir ([TEXT.tr.md](TEXT.tr.md)) | Tamamlandı |
@@ -120,7 +120,7 @@ Bir `<snapshot>`; ref adı (`main`), tam snapshot kimliği ya da tek bir snapsho
 | Sabit bağlar | Ayrı dosyalar olarak; aralarındaki bağ korunmaz ([FORMAT.tr.md](FORMAT.tr.md) §6.3) | Tamamlandı |
 | Aygıt dosyaları, soketler, borular | Hayır; atlanır ve raporlanır | Tamamlandı |
 
-Okunurken değişen bir dosya okunduğu hâliyle saklanır ve uyarı olarak raporlanır. Geri yükleme izinleri ve zamanları yeniden oluşturur; sahipleri yalnızca bunları ayarlama yetkisiyle çalıştırıldığında.
+Okunurken değişen bir dosya okunduğu hâliyle saklanır ve uyarı olarak raporlanır. Boyutu ve zamanı ref'in son snapshot'ının kaydettiğiyle aynı olan ve zamanı o snapshot'tan en az 2 saniye eski olan dosya değişmemiş sayılır ve okunmaz; bu, değişmemiş dosyaların yedeğini hızlandırır ([PERFORMANCE.tr.md](PERFORMANCE.tr.md)). Bir dosyayı değiştirip eski zamanını geri koyan program görülmez; `--reread` her dosyayı okur. Senkron da aynısını yapar. Geri yükleme izinleri ve zamanları yeniden oluşturur; sahipleri yalnızca bunları ayarlama yetkisiyle çalıştırıldığında.
 
 ### 4.1 Dışarıda bırakmak
 
