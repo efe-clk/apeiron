@@ -126,7 +126,7 @@ Every work item is done (2026-10-30); the stage ends with its exit criterion, th
 | Remote mode of the API and operating the daemon from another device | [API.md](API.md) §2, [DAEMON.md](DAEMON.md) §7 | Only the JSON API of the pages; a tenant's jobs on the Schedule page |
 | Git behind the plugin interface; other plugin types and a plugin store | [DECISIONS.md](DECISIONS.md) ADR-021, [PLUGIN.md](PLUGIN.md) §6 | `apeiron-git` is a crate of its own; plugins are type drivers only |
 | Text inside PDF and office files; tags on macOS and Windows; more standards in reports | [SEARCH.md](SEARCH.md) §7, [REPORTS.md](REPORTS.md) §6 | UTF-8 text only; tags on Linux only; ISO/IEC 27001 only |
-| The C++ SDK, Python wheels and typed classes, streaming through the C ABI | [SDK.md](SDK.md) §1, §7 | Python SDK over the C ABI, with the library built by hand |
+| The C++ SDK, streaming through the C ABI | [SDK.md](SDK.md) §1, §7 | Python SDK over the C ABI, with the library built with Cargo |
 | Review, approval and comments | [VISION.md](VISION.md) | Not written |
 | Format upgrade tool | [FORMAT.md](FORMAT.md) §18 | The format is at version 1 |
 | Git over SSH, SAML, sync without a remote, Let's Encrypt, installers and the first release | [GIT.md](GIT.md) §8, [IDENTITY.md](IDENTITY.md) §6, [SYNC.md](SYNC.md) §7, [WEB.md](WEB.md) §6, [DESKTOP.md](DESKTOP.md) §5 | Git over HTTP, OpenID Connect, sync through a remote, a TLS proxy, building from source |

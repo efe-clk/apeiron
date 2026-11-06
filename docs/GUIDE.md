@@ -30,9 +30,7 @@ Apeiron is written in Rust. You need the Rust tools, Git and a C compiler.
 ### 2.2 Building and installing
 
 ```bash
-git clone https://github.com/efe-clk/apeiron.git
-cd apeiron
-cargo install --locked --path crates/apeiron-cli
+cargo install --locked --git https://github.com/efe-clk/apeiron apeiron-cli
 apeiron --version
 ```
 
@@ -41,9 +39,7 @@ apeiron --version
 ### 2.3 Updating
 
 ```bash
-cd apeiron
-git pull
-cargo install --locked --path crates/apeiron-cli
+cargo install --locked --force --git https://github.com/efe-clk/apeiron apeiron-cli
 ```
 
 ## 3. Creating the repository
@@ -235,6 +231,8 @@ When both `main` and the branch changed the same file, `main` keeps its version 
 Without a plugin, two changes to the same text file always leave a conflict copy. The text plugin joins changes to different lines ([TEXT.md](TEXT.md)). It is built once and installed for your user:
 
 ```bash
+git clone https://github.com/efe-clk/apeiron.git
+cd apeiron
 rustup target add wasm32-wasip2
 cargo build --release --target wasm32-wasip2 --manifest-path plugins/text/Cargo.toml
 apeiron plugin add plugins/text/target/wasm32-wasip2/release/apeiron_text.wasm
@@ -248,7 +246,7 @@ Install it on every computer that syncs the folder; a computer without it makes 
 The desktop app does everything in sections 3 to 6 that most people need, in a window: opening or creating the backup folder, backing up, looking at versions, restoring and checking ([DESKTOP.md](DESKTOP.md)). On Linux it needs the WebKitGTK files first (`sudo apt install libwebkit2gtk-4.1-dev` on Debian and Ubuntu, `sudo pacman -S webkit2gtk-4.1` on Arch):
 
 ```bash
-cargo install --locked --path crates/apeiron-desktop
+cargo install --locked --git https://github.com/efe-clk/apeiron apeiron-desktop
 apeiron-desktop
 ```
 

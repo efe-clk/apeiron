@@ -107,7 +107,7 @@ apeiron_repo_free(repo);
 | Dile uygun | Her SDK kendi dilinin alışkanlıklarına uyar: Python ve C++'ta hata türü başına istisna, Python'da context manager, C++'ta RAII |
 | Tipli | İstekler ve sonuçlar şemalardan üretilen tipli sınıflar olur; üretilene kadar Python, alan adıyla ya da anahtarla okunan kayıtlar döndürür |
 | İşler | Her SDK `progress()`, `cancel()` ve zaman aşımlı `wait()` sunar; ayrıca sorgulamanın üzerine, ilerlemeyi dilin kendi yöntemiyle (yineleyici, geri çağrı, olay) bildiren bir kolaylık ekler |
-| Paketleme | Her SDK yerel kütüphaneyi kendi olağan paketinin içinde (Python wheel, CMake paketi, …) Linux, macOS ve Windows için dağıtacak; o zamana kadar kütüphane Cargo ile derlenir ve `APEIRON_LIB` ile bulunur |
+| Paketleme | Program ve kütüphane Cargo ile derlenir ve kurulur; proje sahibi bunu Python wheel'lerine tercih etti (2026-11-06). Python SDK'sı kütüphaneyi `APEIRON_LIB` ile bulur |
 | Aynı testler | Her SDK ortak uygunluk test paketinden geçer (bölüm 6) |
 
 ## 5. SDK dalgaları
@@ -146,5 +146,5 @@ Her işlemin aynı adlı bir yöntemi vardır (`repo.search("*.pdf", history=Tru
 | Sınır | Plan |
 | --- | --- |
 | Dosya içeriği ABI'den geçmez; işlemler yollar üzerinde çalışır | Sonraki bir ABI ara sürümünde akışlı okuma ve yazma tutamaçları |
-| Python'da tipli sınıflar ve wheel yok | JSON şemalarından üretilerek, paketlemeyle |
+| Python'da tipli sınıflar ve wheel yok | Planlanmıyor; Python, deponun bir kopyasından kullanılan ince bir katman olarak kalır |
 | Uzak kullanım yok | Aynı JSON değerler arka plan hizmetine gönderilecek |

@@ -30,9 +30,7 @@ Apeiron Rust ile yazılmıştır. Rust araçları, Git ve bir C derleyicisi gere
 ### 2.2 Derleme ve kurulum
 
 ```bash
-git clone https://github.com/efe-clk/apeiron.git
-cd apeiron
-cargo install --locked --path crates/apeiron-cli
+cargo install --locked --git https://github.com/efe-clk/apeiron apeiron-cli
 apeiron --version
 ```
 
@@ -41,9 +39,7 @@ apeiron --version
 ### 2.3 Güncelleme
 
 ```bash
-cd apeiron
-git pull
-cargo install --locked --path crates/apeiron-cli
+cargo install --locked --force --git https://github.com/efe-clk/apeiron apeiron-cli
 ```
 
 ## 3. Depoyu oluşturma
@@ -235,6 +231,8 @@ Hem `main` hem dal aynı dosyayı değiştirdiyse `main` kendi sürümünü tuta
 Eklenti olmadan, aynı metin dosyasındaki iki değişiklik her zaman bir çatışma kopyası bırakır. Metin eklentisi farklı satırlardaki değişiklikleri birleştirir ([TEXT.tr.md](TEXT.tr.md)). Bir kez derlenir ve kullanıcınız için kurulur:
 
 ```bash
+git clone https://github.com/efe-clk/apeiron.git
+cd apeiron
 rustup target add wasm32-wasip2
 cargo build --release --target wasm32-wasip2 --manifest-path plugins/text/Cargo.toml
 apeiron plugin add plugins/text/target/wasm32-wasip2/release/apeiron_text.wasm
@@ -248,7 +246,7 @@ Klasörü senkronlayan her bilgisayara kurun; kurulu olmayan bir bilgisayar bunu
 Masaüstü uygulaması, 3. ile 6. bölümler arasında çoğu kişinin ihtiyaç duyduğu her şeyi bir pencerede yapar: yedek klasörünü açmak ya da oluşturmak, yedeklemek, sürümlere bakmak, geri yüklemek ve denetlemek ([DESKTOP.tr.md](DESKTOP.tr.md)). Linux'ta önce WebKitGTK dosyalarını ister (Debian ve Ubuntu'da `sudo apt install libwebkit2gtk-4.1-dev`, Arch'ta `sudo pacman -S webkit2gtk-4.1`):
 
 ```bash
-cargo install --locked --path crates/apeiron-desktop
+cargo install --locked --git https://github.com/efe-clk/apeiron apeiron-desktop
 apeiron-desktop
 ```
 

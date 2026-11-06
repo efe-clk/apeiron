@@ -107,7 +107,7 @@ apeiron_repo_free(repo);
 | Idiomatic | Each SDK follows its language's habits: exceptions per error kind in Python and C++, context managers in Python, RAII in C++ |
 | Typed | Requests and results become typed classes generated from the schemas; until they are generated, Python returns records read by attribute or key |
 | Jobs | Every SDK offers `progress()`, `cancel()` and `wait()` with a timeout, plus a convenience that reports progress through the language's own mechanism (iterator, callback, event) on top of polling |
-| Packaging | Each SDK will ship the native library inside its normal package (Python wheel, CMake package, …) for Linux, macOS and Windows; until then the library is built with Cargo and found through `APEIRON_LIB` |
+| Packaging | The program and the library are built and installed with Cargo; the owner chose this over Python wheels (2026-11-06). The Python SDK finds the library through `APEIRON_LIB` |
 | Same tests | Every SDK passes the shared conformance suite (section 6) |
 
 ## 5. SDK waves
@@ -146,5 +146,5 @@ Every operation has a method with the same name (`repo.search("*.pdf", history=T
 | Limit | Plan |
 | --- | --- |
 | File content does not pass through the ABI; operations work on paths | Streaming read and write handles in a later ABI minor version |
-| No typed classes in Python, no wheels | Generated from the JSON schemas, with packaging |
+| No typed classes in Python, no wheels | Not planned; Python stays a thin layer used from a clone of the repository |
 | No remote mode | The same JSON values will be sent to the background service |
