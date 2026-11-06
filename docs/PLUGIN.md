@@ -20,13 +20,14 @@ Plugins are installed for the user, not for one repository, in the folder `plugi
 
 ## 2. The plugin interface
 
-A plugin is a WebAssembly component (the component model) that exports the interface `apeiron:plugin/type-driver@0.1.0`, written in WIT in `crates/apeiron-plugin/wit/plugin.wit`:
+A plugin is a WebAssembly component (the component model) that exports the interface `apeiron:plugin/type-driver@0.2.0`, written in WIT in `crates/apeiron-plugin/wit/plugin.wit`:
 
 | Function | What it returns |
 | --- | --- |
-| `describe()` | Name (lowercase letters, digits and `-`), version, description, the file name patterns it handles (`*.txt`, as in SEARCH.md §1) and the permissions it asks for |
+| `describe()` | Name (lowercase letters, digits and `-`), version, description, the file name patterns it merges (`*.txt`, as in SEARCH.md §1), those it reads text from (`text-patterns`) and the permissions it asks for |
 | `merge(base, ours, theirs)` | The merged content; `none` when the changes conflict; an error message when it cannot merge. `base` is absent when the file did not exist in the common snapshot |
 | `diff(old, new)` | A difference for people to read, or `none`; used by the text diff plugin's work item |
+| `extract-text(content)` | The text inside a file for search, or `none` when it holds none (SEARCH.md §3); the documents plugin in `plugins/documents` is the first to use it |
 
 The version in the package name is the plugin API version, separate from the API of the program (VISION.md). A plugin built for another version does not match the interface and is refused when it is added.
 
@@ -43,7 +44,7 @@ flowchart LR
 | Rule | How |
 | --- | --- |
 | No access to anything | The plugin gets no files, no network, no environment variables and no arguments; what it writes to standard output and error is dropped. It sees only the bytes it is given |
-| No permissions yet | Version 0.1 of the plugin API grants no permissions; a plugin that asks for any is refused. Permissions come with the plugin types that need them, such as storage backends, and are granted only with the user's approval |
+| No permissions yet | Version 0.2 of the plugin API grants no permissions; a plugin that asks for any is refused. Permissions come with the plugin types that need them, such as storage backends, and are granted only with the user's approval |
 | Time limit | A call that runs longer than 30 seconds is stopped |
 | Memory limit | A plugin can use at most 512 MiB of memory |
 | Size limit | Files larger than 64 MiB are not given to a plugin |

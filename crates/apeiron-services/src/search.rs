@@ -12,6 +12,8 @@ use crate::name::Name;
 
 /// Files larger than this are not read for text (SEARCH.md §3).
 const TEXT_LIMIT: u64 = 16 << 20;
+/// Files larger than this are not given to a plugin for text (PLUGIN.md §3).
+const DOCUMENT_LIMIT: u64 = 64 << 20;
 /// Longest line shown for a text match, in characters.
 const LINE_CHARS: usize = 200;
 
@@ -101,11 +103,35 @@ pub struct SearchOutcome {
     pub snapshots: u64,
     /// Files not read for text because they are too large.
     pub skipped: u64,
+    /// Files a plugin could not read for text.
+    #[serde(default)]
+    pub unreadable: u64,
+}
+
+/// Reads the text inside files of some formats, such as PDF (SEARCH.md §3).
+/// Implemented by the plugin host.
+pub trait TextExtractor {
+    /// Whether a plugin reads the text of files named `name`.
+    fn reads_text(&self, name: &[u8]) -> bool;
+
+    /// The text of the file; `None` when it holds none; a message when the
+    /// plugin failed.
+    fn extract(&self, name: &[u8], content: &[u8]) -> std::result::Result<Option<String>, String>;
 }
 
 /// Searches snapshots newest first, walking each folder version only once
 /// per path and reporting each version of a path once (SEARCH.md §2).
 pub fn search(repo: &Repository, options: &SearchOptions, ctl: &Control) -> Result<SearchOutcome> {
+    search_with(repo, options, None, ctl)
+}
+
+/// [`search`] that also finds text in the files `extractor` reads.
+pub fn search_with(
+    repo: &Repository,
+    options: &SearchOptions,
+    extractor: Option<&dyn TextExtractor>,
+    ctl: &Control,
+) -> Result<SearchOutcome> {
     if options.query.is_empty() {
         return Err(Error::InvalidInput(
             "a search needs at least one criterion".to_owned(),
@@ -124,6 +150,7 @@ pub fn search(repo: &Repository, options: &SearchOptions, ctl: &Control) -> Resu
         query: &options.query,
         pattern,
         text: options.query.text.as_deref().map(str::to_lowercase),
+        extractor,
         limit: options.limit,
         walked: HashSet::new(),
         reported: HashSet::new(),
@@ -133,6 +160,7 @@ pub fn search(repo: &Repository, options: &SearchOptions, ctl: &Control) -> Resu
             truncated: false,
             snapshots: 0,
             skipped: 0,
+            unreadable: 0,
         },
         ctl,
     };
@@ -262,6 +290,7 @@ struct Searcher<'a> {
     pattern: Option<(bool, Vec<char>)>,
     /// Lowercase text searched for.
     text: Option<String>,
+    extractor: Option<&'a dyn TextExtractor>,
     limit: usize,
     /// Folders already walked, by path and tree.
     walked: HashSet<(Name, ObjectId)>,
@@ -371,13 +400,29 @@ impl Searcher<'_> {
             return Ok(None);
         };
         if !self.texts.contains_key(&blob) {
-            let text = if size > TEXT_LIMIT {
+            let extractor = self.extractor.filter(|e| e.reads_text(&entry.name));
+            let limit = if extractor.is_some() {
+                DOCUMENT_LIMIT
+            } else {
+                TEXT_LIMIT
+            };
+            let text = if size > limit {
                 self.out.skipped += 1;
                 Text::TooLarge
             } else {
                 let mut data = Vec::new();
                 self.repo.read_file(&blob, &mut data)?;
-                Text::Found(find_line(&data, needle))
+                match extractor {
+                    None => Text::Found(find_line(&data, needle)),
+                    Some(e) => match e.extract(&entry.name, &data) {
+                        Ok(Some(text)) => Text::Found(find_line(text.as_bytes(), needle)),
+                        Ok(None) => Text::Found(None),
+                        Err(_) => {
+                            self.out.unreadable += 1;
+                            Text::Found(None)
+                        }
+                    },
+                }
             };
             self.texts.insert(blob, text);
         }

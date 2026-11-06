@@ -1,5 +1,5 @@
-// The plugin interface of Apeiron, version 0.1 (docs/PLUGIN.md §2).
-package apeiron:plugin@0.1.0;
+// The plugin interface of Apeiron, version 0.2 (docs/PLUGIN.md §2).
+package apeiron:plugin@0.2.0;
 
 // A type driver knows the content of some kinds of files.
 interface type-driver {
@@ -10,7 +10,10 @@ interface type-driver {
     description: string,
     // File name patterns such as `*.txt`; `*` and `?` as wildcards.
     patterns: list<string>,
-    // Permissions the plugin asks for; version 0.1 grants none.
+    // File name patterns of the files `extract-text` reads; none for a plugin
+    // that does not.
+    text-patterns: list<string>,
+    // Permissions the plugin asks for; this version grants none.
     permissions: list<string>,
   }
 
@@ -22,6 +25,9 @@ interface type-driver {
 
   // A difference for people to read, or `none`.
   diff: func(old: list<u8>, new: list<u8>) -> result<option<string>, string>;
+
+  // The text inside a file, for search; `none` when it holds none.
+  extract-text: func(content: list<u8>) -> result<option<string>, string>;
 }
 
 world type-driver-plugin {

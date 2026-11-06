@@ -20,13 +20,14 @@ Eklentiler tek bir depo için değil kullanıcı için kurulur; arka plan hizmet
 
 ## 2. Eklenti arayüzü
 
-Bir eklenti, `crates/apeiron-plugin/wit/plugin.wit` içinde WIT ile yazılmış `apeiron:plugin/type-driver@0.1.0` arayüzünü dışa veren bir WebAssembly bileşenidir (bileşen modeli):
+Bir eklenti, `crates/apeiron-plugin/wit/plugin.wit` içinde WIT ile yazılmış `apeiron:plugin/type-driver@0.2.0` arayüzünü dışa veren bir WebAssembly bileşenidir (bileşen modeli):
 
 | İşlev | Ne döndürür |
 | --- | --- |
-| `describe()` | Ad (küçük harfler, rakamlar ve `-`), sürüm, açıklama, işlediği dosya adı desenleri (SEARCH.tr.md §1'deki gibi `*.txt`) ve istediği izinler |
+| `describe()` | Ad (küçük harfler, rakamlar ve `-`), sürüm, açıklama, birleştirdiği dosya adı desenleri (SEARCH.tr.md §1'deki gibi `*.txt`), metin okuduğu desenler (`text-patterns`) ve istediği izinler |
 | `merge(base, ours, theirs)` | Birleştirilmiş içerik; değişiklikler çatışıyorsa `none`; birleştiremiyorsa bir hata mesajı. Dosya ortak snapshot'ta yoksa `base` yoktur |
 | `diff(old, new)` | İnsanların okuyacağı bir fark ya da `none`; metin diff eklentisinin işinde kullanılır |
+| `extract-text(content)` | Arama için bir dosyanın içindeki metin ya da metin yoksa `none` (SEARCH.tr.md §3); ilk kullanan `plugins/documents` içindeki belgeler eklentisidir |
 
 Paket adındaki sürüm, programın API'sinden ayrı olan eklenti API sürümüdür (VISION.tr.md). Başka bir sürüm için yapılmış bir eklenti arayüze uymaz ve eklenirken reddedilir.
 
@@ -43,7 +44,7 @@ flowchart LR
 | Kural | Nasıl |
 | --- | --- |
 | Hiçbir şeye erişim yok | Eklenti dosya, ağ, ortam değişkeni ve argüman almaz; standart çıktıya ve hataya yazdıkları atılır. Yalnızca kendisine verilen baytları görür |
-| Henüz izin yok | Eklenti API'sinin 0.1 sürümü hiç izin vermez; izin isteyen bir eklenti reddedilir. İzinler, depolama arka uçları gibi onlara ihtiyaç duyan eklenti türleriyle gelir ve yalnızca kullanıcının onayıyla verilir |
+| Henüz izin yok | Eklenti API'sinin 0.2 sürümü hiç izin vermez; izin isteyen bir eklenti reddedilir. İzinler, depolama arka uçları gibi onlara ihtiyaç duyan eklenti türleriyle gelir ve yalnızca kullanıcının onayıyla verilir |
 | Süre sınırı | 30 saniyeden uzun süren bir çağrı durdurulur |
 | Bellek sınırı | Bir eklenti en çok 512 MiB bellek kullanabilir |
 | Boyut sınırı | 64 MiB'tan büyük dosyalar eklentiye verilmez |

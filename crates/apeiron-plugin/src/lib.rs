@@ -13,7 +13,7 @@ use std::sync::{Mutex, OnceLock, PoisonError};
 use std::thread;
 use std::time::Duration;
 
-use apeiron_services::{ContentMerger, Merged, name_matches};
+use apeiron_services::{ContentMerger, Merged, TextExtractor, name_matches};
 use serde::{Deserialize, Serialize};
 use wasmtime::component::{Component, Linker, ResourceTable};
 use wasmtime::{Config, Engine, Store, StoreLimits, StoreLimitsBuilder, Trap};
@@ -66,6 +66,9 @@ pub struct PluginInfo {
     pub version: String,
     pub description: String,
     pub patterns: Vec<String>,
+    /// The files `extract-text` reads, for search; none for most plugins.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub text_patterns: Vec<String>,
     pub permissions: Vec<String>,
 }
 
@@ -76,6 +79,7 @@ impl From<bindings::exports::apeiron::plugin::type_driver::Info> for PluginInfo 
             version: i.version,
             description: i.description,
             patterns: i.patterns,
+            text_patterns: i.text_patterns,
             permissions: i.permissions,
         }
     }
@@ -95,7 +99,7 @@ impl PluginInfo {
                 "plugin name {n:?} must be lowercase letters, digits and -"
             )));
         }
-        if self.patterns.is_empty() {
+        if self.patterns.is_empty() && self.text_patterns.is_empty() {
             return Err(Error::Invalid(format!("plugin {n} names no file patterns")));
         }
         if !self.permissions.is_empty() {
@@ -200,7 +204,7 @@ impl Runtime {
         store.set_epoch_deadline((time_limit.as_millis() / TICK.as_millis()).max(1) as u64);
         store.epoch_deadline_trap();
         let run = TypeDriverPlugin::instantiate(&mut store, component, &self.linker)
-            .map_err(|e| format!("does not fit version 0.1 of the plugin interface: {e}"))?;
+            .map_err(|e| format!("does not fit version 0.2 of the plugin interface: {e}"))?;
         f(&run, &mut store).map_err(|e| match e.downcast_ref::<Trap>() {
             Some(Trap::Interrupt) => format!("took longer than {} s", time_limit.as_secs()),
             Some(trap) => format!("crashed: {trap}"),
@@ -337,6 +341,33 @@ impl Plugins {
             .find(|i| i.patterns.iter().any(|p| name_matches(p, name)))
     }
 
+    /// The first plugin, by name, that reads the text of files named `name`.
+    fn extractor_for(&self, name: &[u8]) -> Option<&PluginInfo> {
+        self.infos
+            .iter()
+            .find(|i| i.text_patterns.iter().any(|p| name_matches(p, name)))
+    }
+
+    /// The text inside a file, from the plugin that reads files of its name;
+    /// `None` when no plugin does or the file holds none.
+    pub fn extract_file(&self, name: &[u8], content: &[u8]) -> Result<Option<String>> {
+        let Some(info) = self.extractor_for(name) else {
+            return Ok(None);
+        };
+        let failed = |message: String| Error::Failed {
+            name: info.name.clone(),
+            message,
+        };
+        let component = self.component(&info.name)?;
+        self.runtime()?
+            .call(&component, self.time_limit, |p, store| {
+                p.apeiron_plugin_type_driver()
+                    .call_extract_text(store, content)
+            })
+            .map_err(failed)?
+            .map_err(|message| failed(format!("refused: {message}")))
+    }
+
     fn component(&self, name: &str) -> Result<Component> {
         if let Some(c) = self.lock().get(name) {
             return Ok(c.clone());
@@ -421,6 +452,16 @@ impl std::fmt::Debug for Plugins {
     }
 }
 
+impl TextExtractor for Plugins {
+    fn reads_text(&self, name: &[u8]) -> bool {
+        self.extractor_for(name).is_some()
+    }
+
+    fn extract(&self, name: &[u8], content: &[u8]) -> std::result::Result<Option<String>, String> {
+        self.extract_file(name, content).map_err(|e| e.to_string())
+    }
+}
+
 impl ContentMerger for Plugins {
     fn handles(&self, name: &[u8]) -> bool {
         self.driver_for(name).is_some()
@@ -456,6 +497,7 @@ mod tests {
             version: "1".to_owned(),
             description: String::new(),
             patterns: vec!["*.txt".to_owned()],
+            text_patterns: Vec::new(),
             permissions: permissions.iter().map(|p| (*p).to_owned()).collect(),
         }
     }

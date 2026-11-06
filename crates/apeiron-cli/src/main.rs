@@ -2934,8 +2934,14 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                 }
                 if r.skipped > 0 {
                     say!(
-                        "{} over 16 MiB not searched for text",
+                        "{} too large to search for text",
                         format::count(r.skipped, "file")
+                    );
+                }
+                if r.unreadable > 0 {
+                    say!(
+                        "{} a plugin could not read for text",
+                        format::count(r.unreadable, "file")
                     );
                 }
             });
@@ -3200,7 +3206,12 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                         let i = &a.info;
                         let verb = if a.replaced { "Replaced" } else { "Installed" };
                         say!("{verb} {} {}: {}", i.name, i.version, i.description);
-                        say!("It merges files named {}", i.patterns.join(", "));
+                        if !i.patterns.is_empty() {
+                            say!("It merges files named {}", i.patterns.join(", "));
+                        }
+                        if !i.text_patterns.is_empty() {
+                            say!("Search finds the text in {}", i.text_patterns.join(", "));
+                        }
                     });
                 }
                 PluginCommand::List { shared } => {
@@ -3215,7 +3226,9 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                                 "{} {}  {}  {}",
                                 i.name,
                                 i.version,
-                                i.patterns.join(" "),
+                                [i.patterns.as_slice(), i.text_patterns.as_slice()]
+                                    .concat()
+                                    .join(" "),
                                 i.description
                             );
                         }

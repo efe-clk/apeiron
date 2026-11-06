@@ -182,7 +182,7 @@ Sync is not backup: every device keeps its own history and reflogs, so a deletio
 
 ## 6. Plugin boundary
 
-Status: In progress. The host and the first plugin type, type drivers, are done ([PLUGIN.md](PLUGIN.md)); version 0.1 of the plugin API grants no permissions.
+Status: In progress. The host and the first plugin type, type drivers, are done ([PLUGIN.md](PLUGIN.md)); version 0.2 of the plugin API grants no permissions.
 
 ```mermaid
 flowchart LR

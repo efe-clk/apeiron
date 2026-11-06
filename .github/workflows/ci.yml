@@ -24,6 +24,8 @@ jobs:
       # The text plugin is a workspace of its own (docs/TEXT.md).
       - run: cargo fmt --manifest-path plugins/text/Cargo.toml --check
       - run: cargo clippy --manifest-path plugins/text/Cargo.toml --all-targets -- -D warnings
+      - run: cargo fmt --manifest-path plugins/documents/Cargo.toml --check
+      - run: cargo clippy --manifest-path plugins/documents/Cargo.toml --all-targets -- -D warnings
 
   test:
     strategy:
@@ -44,6 +46,7 @@ jobs:
         env:
           APEIRON_SFTP_TEST: ${{ runner.os != 'Windows' && '1' || '' }}
       - run: cargo test --manifest-path plugins/text/Cargo.toml
+      - run: cargo test --manifest-path plugins/documents/Cargo.toml
       # The C ABI through the Python SDK and a C program (docs/SDK.md).
       - run: cargo build -p apeiron-ffi-rs
       - name: Python SDK and C example

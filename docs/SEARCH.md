@@ -55,7 +55,13 @@ flowchart TB
 
 ## 3. Text search
 
-A file is searched for text when it is a text file: its content is valid UTF-8 and holds no zero byte. Files larger than 16 MiB are not read for text; the result counts them as skipped. Searching other formats, such as PDF or office documents, needs a driver that turns them into text and comes with the plugin system (VISION.md).
+A file is searched for text when it is a text file: its content is valid UTF-8 and holds no zero byte. Files larger than 16 MiB are not read for text; the result counts them as skipped. With the documents plugin installed, the text inside PDF, Word (`.docx`), Excel (`.xlsx`), PowerPoint (`.pptx`) and OpenDocument (`.odt`, `.ods`, `.odp`) files is searched too, in files up to 64 MiB; the line number is that of the text the plugin gives. Reading such files is the plugin's part, in its sandbox (PLUGIN.md §3), because they may come from anyone. A file it cannot read is counted, and stops nothing. A scanned PDF holds pictures, not text; old `.doc` and `.xls` files, and numbers in Excel cells, are not read.
+
+```bash
+rustup target add wasm32-wasip2
+cargo build --release --target wasm32-wasip2 --manifest-path plugins/documents/Cargo.toml
+apeiron plugin add plugins/documents/target/wasm32-wasip2/release/apeiron_documents.wasm
+```
 
 ## 4. Why there is no index
 
@@ -90,7 +96,7 @@ A name has 1 to 64 characters and no control characters; spaces around it are dr
 
 | Item | Where |
 | --- | --- |
-| Text inside PDF, office and other formats | Later, as a type driver; not scheduled ([ROADMAP.md](ROADMAP.md) §8) |
+| Reading text in pictures, such as scanned PDF files | Not planned |
 | Tags on Windows | Not planned; Windows has none |
 | Hiding results a user may not see | Done in the web interface: a `member` or `reader` must name a snapshot it sees ([USERS.md](USERS.md) §4) |
 

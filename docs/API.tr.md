@@ -75,7 +75,7 @@ Uzun işlemler (yedek, geri yükleme, senkron, doğrulama) **iş** (job) olarak 
 | Semantik sürümleme | Rust API, C ABI ve her SDK SemVer'e uyar | Planlandı |
 | 1.0 öncesi | Küçük sürümler arasında uyumu bozan değişikliklere izin verilir ve sürüm notlarında listelenir | Planlandı |
 | 1.0'dan sonra | Uyumu bozan değişiklik yalnızca yeni ana sürümde, yazılı bir uyumluluk politikasıyla | Planlandı |
-| Ayrı sürümler | Depolama formatının ([FORMAT.tr.md](FORMAT.tr.md)), C ABI'nin ve eklenti API'sinin kendi sürüm numaraları vardır | Tamamlandı: format sürümü 1, C ABI 0.1, eklenti API'si 0.1 |
+| Ayrı sürümler | Depolama formatının ([FORMAT.tr.md](FORMAT.tr.md)), C ABI'nin ve eklenti API'sinin kendi sürüm numaraları vardır | Tamamlandı: format sürümü 1, C ABI 0.1, eklenti API'si 0.2 |
 | En düşük Rust sürümü | Workspace desteklenen en düşük Rust sürümünü belirtir (şu an 1.97) | Tamamlandı |
 
 ## 7. C ABI ve SDK katmanı
@@ -169,7 +169,7 @@ Her işlem tek bir düz istek değeri alır ve tek bir düz sonuç değeri dönd
 | `merge` | birleştirilecek snapshot belirteci, taşınacak ref (varsayılan `main`), mesaj, yazar, deneme çalışması | `MergeReport`: eylem (`up_to_date`, `fast_forward` ya da `merged`), ref'in şimdi ve önceden işaret ettiği snapshot, değişen yollar, kopyalarıyla çatışmalar, eklentilerin birleştirdiği dosyalar, eklenti uyarıları | Hayır |
 | `cherry_pick` | alınacak snapshot belirteci, taşınacak ref (varsayılan `main`), mesaj, yazar, deneme çalışması | `up_to_date` ya da `picked` eylemli `MergeReport` ([BRANCH.tr.md](BRANCH.tr.md) §4) | Hayır |
 | `rebase` | üstüne kurulacak snapshot belirteci (`from`), taşınacak ref (`into`), yazar, deneme çalışması | `up_to_date`, `fast_forward` ya da `rebased` eylemli `MergeReport` ([BRANCH.tr.md](BRANCH.tr.md) §5) | Hayır |
-| `search` | snapshot belirteci (yoksa `main`, ya da geçmişle her ref), geçmiş, ad deseni, metin, en az boyut, en çok boyut, sonra, önce, etiketler, sınır (varsayılan 1000) | `SearchReport`: sonuçlar (yol, girdi, o sürümü tutan en yeni snapshot ve zamanı, metni içeren ilk satır), daha fazlasının olup olmadığı, aranan snapshot sayısı, metin için fazla büyük dosyalar ([SEARCH.tr.md](SEARCH.tr.md)); ölçüt yoksa `invalid_input` | Evet |
+| `search` (sonuçta `unreadable`: bir eklentinin okuyamadığı dosyalar) | snapshot belirteci (yoksa `main`, ya da geçmişle her ref), geçmiş, ad deseni, metin, en az boyut, en çok boyut, sonra, önce, etiketler, sınır (varsayılan 1000) | `SearchReport`: sonuçlar (yol, girdi, o sürümü tutan en yeni snapshot ve zamanı, metni içeren ilk satır), daha fazlasının olup olmadığı, aranan snapshot sayısı, metin için fazla büyük dosyalar ([SEARCH.tr.md](SEARCH.tr.md)); ölçüt yoksa `invalid_input` | Evet |
 | `duplicates` | snapshot belirteci, en küçük boyut (varsayılan 0; boş dosyalar her zaman dışarıda kalır) | `Vec<Duplicate>`: bir kopyanın boyutu ve iki ya da daha fazla yol; fazla kopyaları en çok yer kaplayan gruplar önce ([SEARCH.tr.md](SEARCH.tr.md) §5) | Hayır |
 | `plugins`, `add_plugin`, `remove_plugin` (serbest işlevler) | eklenti klasörü (varsayılan: kullanıcınınki), dosya ya da ad | `Vec<PluginInfo>`, `PluginAdded` (bilgi, birinin yerini alıp almadığı), `PluginInfo` ([PLUGIN.tr.md](PLUGIN.tr.md)) | Hayır |
 | `conflicts`, `resolve_conflict` (serbest işlevler) | klasör; ona göre kopyanın yolu ve tutulacak sürüm (`this` ya da `copy`) | `Vec<ConflictCopy>`: yola göre sıralı olarak yol, kopya ve yoldaki dosyanın var olup olmadığı; çözülen kopyanın `ConflictCopy` değeri ([SYNC.tr.md](SYNC.tr.md) §4) | Hayır |

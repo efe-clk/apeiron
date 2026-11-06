@@ -10,7 +10,7 @@ Bu rehber geliştirme ortamının nasıl kurulacağını, her değişikliğin ha
 | --- | --- |
 | `crates/` | Cargo workspace; her katman için bir crate ve işletim sistemi çağrıları için `apeiron-sys`. Paket adları `-rs` ile biter (`cargo test -p apeiron-core-rs`), çünkü crates.io'da `apeiron` ve `apeiron-cli` alınmıştır; klasörler ve koddaki adlar değişmez |
 | `docs/` | Belgeler; İngilizce (`X.md`) ve Türkçe (`X.tr.md`) |
-| `plugins/` | Kendi workspace'i olan metin eklentisi ([docs/TEXT.tr.md](docs/TEXT.tr.md)) |
+| `plugins/` | Her biri kendi workspace'i olan metin ([docs/TEXT.tr.md](docs/TEXT.tr.md)) ve belgeler ([docs/SEARCH.tr.md](docs/SEARCH.tr.md) §3) eklentileri |
 | `scripts/` | Performans ölçümü ([docs/PERFORMANCE.tr.md](docs/PERFORMANCE.tr.md)) |
 | `sdk/` | C örneği, Python SDK'sı ve ortak uyumluluk testleri ([docs/SDK.tr.md](docs/SDK.tr.md)) |
 | `.github/workflows/` | CI: biçim, lint ve testler |

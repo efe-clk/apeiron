@@ -14,6 +14,7 @@ impl Guest for Driver {
             version: "1.0".into(),
             description: "Misbehaves on purpose".into(),
             patterns: vec!["*.merge".into()],
+            text_patterns: vec!["*.extract".into()],
             permissions: vec![],
         }
     }
@@ -54,6 +55,15 @@ impl Guest for Driver {
 
     fn diff(old: Vec<u8>, new: Vec<u8>) -> Result<Option<String>, String> {
         Ok(Some(format!("{} -> {} bytes", old.len(), new.len())))
+    }
+
+    fn extract_text(content: Vec<u8>) -> Result<Option<String>, String> {
+        match content.as_slice() {
+            b"trap" => panic!("asked to crash"),
+            b"refuse" => Err("refused on purpose".into()),
+            b"none" => Ok(None),
+            _ => Ok(Some(String::from_utf8_lossy(&content).to_uppercase())),
+        }
     }
 }
 

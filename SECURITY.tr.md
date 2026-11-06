@@ -34,7 +34,7 @@ Bildiriminizi yalnızca proje yürütücüleri görür. En kısa sürede yanıt 
 | Şifreleme | İstemci tarafında; anahtarlar kullanıcıya aittir; uzak hedef düz metni hiç görmez ([FORMAT.tr.md](docs/FORMAT.tr.md) §14) | Tamamlandı |
 | İzinler | Okuma, yazma, silme, paylaşma ve yönetme izinleri ayrıdır | Web arayüzü için tamamlandı ([USERS.tr.md](docs/USERS.tr.md), [SHARE.tr.md](docs/SHARE.tr.md)) |
 | Denetim kaydı | Hassas işlemler kaydedilir; hassas veri hiçbir zaman kaydedilmez | Web arayüzü için tamamlandı ([AUDIT.tr.md](docs/AUDIT.tr.md)) |
-| Eklenti yalıtımı | Eklentiler, bildirilmiş ve kullanıcının onayladığı izinlerle WebAssembly sandbox'ında çalışır | Yerinde; eklenti API'sinin 0.1 sürümü hiçbir izin vermez ([PLUGIN.tr.md](docs/PLUGIN.tr.md)) |
+| Eklenti yalıtımı | Eklentiler, bildirilmiş ve kullanıcının onayladığı izinlerle WebAssembly sandbox'ında çalışır | Yerinde; eklenti API'sinin 0.2 sürümü hiçbir izin vermez ([PLUGIN.tr.md](docs/PLUGIN.tr.md)) |
 | Güvenli varsayılanlar | Uzak erişim ve telemetri varsayılan olarak kapalıdır | Uygulanıyor (web sunucusu yalnızca istenince başlar, `apeiron ui` yalnızca bu bilgisayarda dinler ve telemetri yoktur) |
 | Zorunlu üçüncü taraf yok | Veri hiçbir zaman zorunlu olarak üçüncü bir tarafa gönderilmez | Uygulanıyor |
 

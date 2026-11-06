@@ -75,7 +75,7 @@ Cancellation is safe by construction: objects become visible only after they are
 | Semantic versioning | The Rust API, the C ABI and each SDK follow SemVer | Planned |
 | Before 1.0 | Breaking changes are allowed between minor versions and are listed in release notes | Planned |
 | From 1.0 | Breaking changes only in a new major version, with a written compatibility policy | Planned |
-| Separate versions | The storage format ([FORMAT.md](FORMAT.md)), the C ABI and the plugin API have their own version numbers | Done: format version 1, C ABI 0.1, plugin API 0.1 |
+| Separate versions | The storage format ([FORMAT.md](FORMAT.md)), the C ABI and the plugin API have their own version numbers | Done: format version 1, C ABI 0.1, plugin API 0.2 |
 | Minimum Rust version | The workspace declares its minimum supported Rust version (currently 1.97) | Done |
 
 ## 7. C ABI and SDK layer
@@ -169,7 +169,7 @@ Every operation takes one plain request value and returns one plain result value
 | `merge` | snapshot spec to merge, ref to move (default `main`), message, author, dry run | `MergeReport`: action (`up_to_date`, `fast_forward` or `merged`), the snapshot the ref points to now and before, changed paths, conflicts with their copies, files merged by plugins, plugin warnings | No |
 | `cherry_pick` | snapshot spec to pick, ref to move (default `main`), message, author, dry run | `MergeReport` with the action `up_to_date` or `picked` ([BRANCH.md](BRANCH.md) §4) | No |
 | `rebase` | snapshot spec to build on (`from`), ref to move (`into`), author, dry run | `MergeReport` with the action `up_to_date`, `fast_forward` or `rebased` ([BRANCH.md](BRANCH.md) §5) | No |
-| `search` | snapshot spec (absent: `main`, or every ref with history), history, name pattern, text, larger, smaller, after, before, tags, limit (default 1000) | `SearchReport`: hits (path, entry, the newest snapshot holding that version and its time, the first line with the text), whether there were more, snapshots searched, files too large for text ([SEARCH.md](SEARCH.md)); `invalid_input` without a criterion | Yes |
+| `search` | snapshot spec (absent: `main`, or every ref with history), history, name pattern, text, larger, smaller, after, before, tags, limit (default 1000) | `SearchReport`: hits (path, entry, the newest snapshot holding that version and its time, the first line with the text), whether there were more, snapshots searched, files too large for text, files a plugin could not read ([SEARCH.md](SEARCH.md)); `invalid_input` without a criterion | Yes |
 | `duplicates` | snapshot spec, smallest size (default 0; empty files are always left out) | `Vec<Duplicate>`: size of one copy and two or more paths, the groups whose extra copies take the most room first ([SEARCH.md](SEARCH.md) §5) | No |
 | `plugins`, `add_plugin`, `remove_plugin` (free functions) | plugin folder (default: the user's), file or name | `Vec<PluginInfo>`, `PluginAdded` (info, whether one was replaced), `PluginInfo` ([PLUGIN.md](PLUGIN.md)) | No |
 | `conflicts`, `resolve_conflict` (free functions) | folder; the copy, relative to it, and which version to keep (`this` or `copy`) | `Vec<ConflictCopy>`: path, copy and whether the file at the path exists, sorted by path; `ConflictCopy` of the resolved copy ([SYNC.md](SYNC.md) §4) | No |

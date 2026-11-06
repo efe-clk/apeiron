@@ -1916,6 +1916,13 @@
           },
           "type": "array"
         },
+        "text_patterns": {
+          "description": "The files `extract-text` reads, for search; none for most plugins.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "version": {
           "type": "string"
         }
@@ -2986,6 +2993,13 @@
         "truncated": {
           "description": "More results exist than the limit allowed.",
           "type": "boolean"
+        },
+        "unreadable": {
+          "default": 0,
+          "description": "Files a plugin could not read for text.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
         }
       },
       "required": [

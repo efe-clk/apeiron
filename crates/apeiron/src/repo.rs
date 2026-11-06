@@ -806,6 +806,10 @@ impl Repository {
         };
         let repo = self.clone();
         Job::spawn("search", move |ctl| {
+            let plugins = repo.plugins()?;
+            let extractor = plugins
+                .as_deref()
+                .map(|p| p as &dyn services::TextExtractor);
             let core = repo.view()?;
             let options = services::SearchOptions {
                 starts,
@@ -813,7 +817,7 @@ impl Repository {
                 query: request.query,
                 limit: request.limit,
             };
-            Ok(services::search(&core, &options, ctl)?)
+            Ok(services::search_with(&core, &options, extractor, ctl)?)
         })
     }
 

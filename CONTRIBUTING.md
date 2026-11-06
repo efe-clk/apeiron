@@ -10,7 +10,7 @@ This guide explains how to set up a development environment, which checks every 
 | --- | --- |
 | `crates/` | Cargo workspace; one crate per layer, plus `apeiron-sys` for operating system calls. Package names end in `-rs` (`cargo test -p apeiron-core-rs`), as `apeiron` and `apeiron-cli` are taken on crates.io; folders and names in the code do not |
 | `docs/` | Documentation, in English (`X.md`) and Turkish (`X.tr.md`) |
-| `plugins/` | The text plugin, a workspace of its own ([docs/TEXT.md](docs/TEXT.md)) |
+| `plugins/` | The text ([docs/TEXT.md](docs/TEXT.md)) and documents ([docs/SEARCH.md](docs/SEARCH.md) §3) plugins, each a workspace of its own |
 | `scripts/` | The performance measurement ([docs/PERFORMANCE.md](docs/PERFORMANCE.md)) |
 | `sdk/` | The C example, the Python SDK and the shared conformance suite ([docs/SDK.md](docs/SDK.md)) |
 | `.github/workflows/` | CI: formatting, lints and tests |

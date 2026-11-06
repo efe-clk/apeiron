@@ -182,7 +182,7 @@ Senkron yedek değildir: her cihaz kendi geçmişini ve reflog'larını tutar, b
 
 ## 6. Eklenti sınırı
 
-Durum: Devam ediyor. Ortam ve ilk eklenti türü olan tür sürücüleri tamamlandı ([PLUGIN.tr.md](PLUGIN.tr.md)); eklenti API'sinin 0.1 sürümü hiç izin vermez.
+Durum: Devam ediyor. Ortam ve ilk eklenti türü olan tür sürücüleri tamamlandı ([PLUGIN.tr.md](PLUGIN.tr.md)); eklenti API'sinin 0.2 sürümü hiç izin vermez.
 
 ```mermaid
 flowchart LR

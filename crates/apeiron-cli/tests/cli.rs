@@ -983,3 +983,125 @@ fn old_backups_are_pruned_and_a_copy_follows() {
     s.ok(&["restore", "main", restored.to_str().unwrap()]);
     assert_eq!(fs::read(restored.join("a.txt")).unwrap(), b"three");
 }
+
+/// A small PDF with one line of text, with a correct table of its objects.
+fn pdf_with(line: &str) -> Vec<u8> {
+    let stream = format!("BT /F1 12 Tf 50 700 Td ({line}) Tj ET");
+    let objects = [
+        "<< /Type /Catalog /Pages 2 0 R >>".to_owned(),
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_owned(),
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R \
+         /Resources << /Font << /F1 5 0 R >> >> >>"
+            .to_owned(),
+        format!(
+            "<< /Length {} >>\nstream\n{stream}\nendstream",
+            stream.len()
+        ),
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>".to_owned(),
+    ];
+    let mut out = String::from("%PDF-1.5\n");
+    let mut offsets = Vec::new();
+    for (i, object) in objects.iter().enumerate() {
+        offsets.push(out.len());
+        out.push_str(&format!("{} 0 obj\n{object}\nendobj\n", i + 1));
+    }
+    let start = out.len();
+    out.push_str(&format!(
+        "xref\n0 {}\n0000000000 65535 f \n",
+        objects.len() + 1
+    ));
+    for offset in offsets {
+        out.push_str(&format!("{offset:010} 00000 n \n"));
+    }
+    out.push_str(&format!(
+        "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{start}\n%%EOF\n",
+        objects.len() + 1
+    ));
+    out.into_bytes()
+}
+
+/// The documents plugin, built for WebAssembly and installed, gives search
+/// the text inside a PDF and an office file (SEARCH.md §3).
+#[test]
+fn the_documents_plugin_finds_text_inside_files() {
+    use std::io::Write;
+
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let target = root.join("target/documents-plugin");
+    let status = Command::new(env!("CARGO"))
+        .args([
+            "build",
+            "--release",
+            "--target",
+            "wasm32-wasip2",
+            "--manifest-path",
+        ])
+        .arg(root.join("plugins/documents/Cargo.toml"))
+        .arg("--target-dir")
+        .arg(&target)
+        .status()
+        .unwrap();
+    assert!(status.success(), "rustup target add wasm32-wasip2");
+    let wasm = target.join("wasm32-wasip2/release/apeiron_documents.wasm");
+
+    let s = Setup::new();
+    let plugins = s.root.join("plugins");
+    let run = |args: &[&str], with_plugin: bool| {
+        let dir = if with_plugin {
+            plugins.clone()
+        } else {
+            s.root.join("none")
+        };
+        Command::new(env!("CARGO_BIN_EXE_apeiron"))
+            .args(args)
+            .env("APEIRON_REPO", s.repo())
+            .env("APEIRON_PLUGINS", dir)
+            .output()
+            .unwrap()
+    };
+    let ok = |args: &[&str], with_plugin: bool| {
+        let out = run(args, with_plugin);
+        assert_eq!(
+            code(&out),
+            Some(0),
+            "{args:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8(out.stdout).unwrap()
+    };
+
+    fs::write(
+        s.root.join("src/report.pdf"),
+        pdf_with("Annual invoice summary"),
+    )
+    .unwrap();
+    let docx = fs::File::create(s.root.join("src/letter.docx")).unwrap();
+    let mut zip = zip::ZipWriter::new(docx);
+    zip.start_file(
+        "word/document.xml",
+        zip::write::SimpleFileOptions::default(),
+    )
+    .unwrap();
+    zip.write_all(b"<w:document><w:p><w:t>Rent contract</w:t></w:p></w:document>")
+        .unwrap();
+    zip.finish().unwrap();
+    // A damaged one is counted and stops nothing.
+    fs::write(s.root.join("src/broken.pdf"), b"%PDF-1.5 not really").unwrap();
+    ok(&["backup", &s.path("src")], true);
+
+    // Without the plugin an office file holds no text.
+    assert!(ok(&["search", "--text", "contract"], false).starts_with("No matches"));
+
+    ok(&["plugin", "add", wasm.to_str().unwrap()], true);
+    let found = ok(&["search", "--text", "invoice"], true);
+    assert!(
+        found.contains("report.pdf:") && found.contains("Annual invoice summary"),
+        "{found}"
+    );
+    assert!(found.contains("1 file a plugin could not read"), "{found}");
+    let found = ok(&["search", "--text", "rent contract"], true);
+    assert!(found.contains("letter.docx:1: Rent contract"), "{found}");
+    // Plain text is searched as before.
+    let found = ok(&["search", "--text", "first"], true);
+    assert!(found.contains("a.txt:1: first"), "{found}");
+}

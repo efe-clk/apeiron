@@ -34,7 +34,7 @@ Your report is visible only to the maintainers. You will get an answer as soon a
 | Encryption | Client-side; keys belong to the user; the remote target never sees plaintext ([FORMAT.md](docs/FORMAT.md) §14) | Done |
 | Permissions | Separate read, write, delete, share and admin permissions | Done for the web interface ([USERS.md](docs/USERS.md), [SHARE.md](docs/SHARE.md)) |
 | Audit log | Sensitive operations are logged; sensitive data never is | Done for the web interface ([AUDIT.md](docs/AUDIT.md)) |
-| Plugin isolation | Plugins run in a WebAssembly sandbox with declared, user-approved permissions | In place; version 0.1 of the plugin API grants no permissions ([PLUGIN.md](docs/PLUGIN.md)) |
+| Plugin isolation | Plugins run in a WebAssembly sandbox with declared, user-approved permissions | In place; version 0.2 of the plugin API grants no permissions ([PLUGIN.md](docs/PLUGIN.md)) |
 | Secure defaults | Remote access is off by default; telemetry is off by default | In effect (the web server starts only when asked, `apeiron ui` listens only on this computer, and there is no telemetry) |
 | No forced third parties | Data is never sent to a third party as a requirement | In effect |
 

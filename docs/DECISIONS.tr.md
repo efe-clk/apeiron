@@ -49,6 +49,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [039](#adr-039-dışarıda-bırakılan-yola-dokunulmaz-silinmez) | Dışlama | `--exclude` ve `.apeironignore` kalıpları; yedek bu yolları okumaz, senkron onları kaydedildiği gibi tutar | Kabul edildi |
 | [040](#adr-040-budama-doğrusal-bir-geçmişi-yeniden-yazar-uzak-depolar-yalnızca-istenince-izler) | Budama | `apeiron prune`, tutulan snapshot'ları yeni ebeveynlerle kopyalar; korunan ref'ler, senkron ve birleştirmeler reddedilir; uzak depolar için `push --replace` | Kabul edildi |
 | [041](#adr-041-aktarımlar-paket-paket-devam-eder-değişmeyen-dosyalar-okunmaz) | Aktarımlar ve yedekler | Her paketten sonra indeks, ebeveynden önce çocuk; pull yalnızca indekslerin listelediğine güvenir; boyut ve zaman dosyayı okumaktan kurtarır | Kabul edildi |
+| [042](#adr-042-belgelerin-içindeki-metin-yalıtılmış-ortamda-bir-eklentiden-gelir) | Belgelerde metin | Eklenti arayüzünde `extract-text`, sürüm 0.2; PDF ve ofis dosyalarını `plugins/documents` okur, yalnızca adlandırdığı dosyalar için çağrılır | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı. ADR-036 ve ADR-037, kendi kayıtları olmadan daha önce alınan kararları ve eski ADR'lerde değişenleri 2026-11-06'da kaydeder.
 
@@ -901,3 +902,23 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Dosyaları her zaman okumak | Değişmemiş dosya hedefi küçük cihazlarda karşılanamaz |
 
 **Sonuçlar.** Uzak depo, o kopyanın çöp toplaması birleştirene kadar paket başına küçük bir indeks dosyası alır. İçeriğini değiştirip eski zamanını geri koyan program `--reread` olmadan görülmez; `apeiron verify` de bunu fark etmez, çünkü klasörü değil depoyu denetler.
+
+## ADR-042: Belgelerin içindeki metin, yalıtılmış ortamda bir eklentiden gelir
+
+**Durum:** Kabul edildi (2026-11-06)
+
+**Bağlam.** Arama yalnızca UTF-8 dosyaları okuyordu ([SEARCH.tr.md](SEARCH.tr.md) §3). Vizyon, desteklenen biçimlerde tam metin ister. PDF ve ofis dosyaları herkesten gelebilir, ayrıştırıcıları büyüktür ve uzun bir hata geçmişleri vardır; çekirdek onları tanımamalıdır (7. ilke).
+
+**Karar.** Artık 0.2 sürümü olan eklenti arayüzü `extract-text` ile `text-patterns` listesini kazanır. Arama, bir dosyayı `text-patterns` deseni adına uyan ilk eklentiye verir, yoksa eskisi gibi okur. `plugins/documents`, PDF'i `lopdf` ile, zip ve XML tabanlı ofis biçimlerini `zip` ve `quick-xml` ile okur ve metin eklentisi gibi ayrı derlenir.
+
+**Gerekçe.** Yalıtılmış ortam dosya ve ağ vermez, zamanı ve belleği sınırlar; bu yüzden kötü niyetli bir belge en fazla bir dosyanın okunmamasına mal olur. Ayrı liste sayesinde arama, okuyamayacağı bir dosya için eklenti başlatmaz; bu uzun geçmişlerde önemlidir. Bulunan metin, her içerik için bir kez, diğer metinler gibi aranır.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Ayrıştırıcıları `apeiron-services` içine koymak | Bir hata, kullanıcının haklarıyla, anahtarlarının ve dosyalarının yanında çalışırdı |
+| `type-driver` yanında yeni bir arayüz | Küçük bir işlev için başlatılacak iki dünya; hiçbir şey yayımlanmadığı için geride kalan eklenti yok |
+| Çıkarılan metni bir indekste tutmak | ADR-023 saklanan indeks istemedi; metnin kopyası şifrelenmeli ve güncel tutulmalıydı |
+
+**Sonuçlar.** 0.1 sürümü için derlenmiş eklentiler çalışmaz ve yeniden derlenmelidir; o zaman birleştirme, başarısız her eklentide olduğu gibi çatışma kopyası yapar. Çok sayıda belgede arama metinden yavaştır, çünkü her biri yeni bir örnekte çalışır. Taranmış PDF'ler ile eski `.doc` ve `.xls` dosyaları metin vermez.

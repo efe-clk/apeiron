@@ -1,0 +1,23 @@
+# The documents plugin of Apeiron (docs/SEARCH.md §3): gives search the text
+# inside PDF and office files. Build it with
+#   cargo build --release --target wasm32-wasip2 --manifest-path plugins/documents/Cargo.toml
+# and install target/wasm32-wasip2/release/apeiron_documents.wasm with
+# `apeiron plugin add`.
+[package]
+name = "apeiron-documents"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+lopdf = { version = "0.40", default-features = false }
+quick-xml = "0.38"
+wit-bindgen = "0.57.1"
+zip = { version = "7.3.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+
+# Built for WebAssembly on its own, not as part of the Apeiron workspace.
+[workspace]

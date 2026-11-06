@@ -341,6 +341,7 @@ impl Guest for Text {
             version: env!("CARGO_PKG_VERSION").into(),
             description: "Merges text files line by line and shows their differences".into(),
             patterns: PATTERNS.iter().map(|p| (*p).to_owned()).collect(),
+            text_patterns: Vec::new(),
             permissions: Vec::new(),
         }
     }
@@ -355,6 +356,10 @@ impl Guest for Text {
 
     fn diff(old: Vec<u8>, new: Vec<u8>) -> Result<Option<String>, String> {
         Ok(diff(&old, &new))
+    }
+
+    fn extract_text(_: Vec<u8>) -> Result<Option<String>, String> {
+        Ok(None)
     }
 }
 

@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 
 use apeiron_plugin::{Error, Plugins};
 use apeiron_services::ContentMerger;
+use apeiron_services::TextExtractor;
 
 fn fixture() -> &'static Path {
     static WASM: OnceLock<PathBuf> = OnceLock::new();
@@ -150,4 +151,30 @@ fn files_that_are_not_plugins_are_refused() {
     assert!(err.contains("not a WebAssembly component"), "{err}");
     assert!(plugins.list().is_empty());
     assert!(!dir.path().join("plugins").exists());
+}
+
+#[test]
+fn text_comes_from_the_plugin_that_reads_the_file() {
+    let (_dir, plugins) = installed();
+    assert!(plugins.reads_text(b"a.extract"));
+    assert!(!plugins.reads_text(b"a.merge"));
+    assert_eq!(
+        plugins.extract_file(b"a.extract", b"inside").unwrap(),
+        Some("INSIDE".to_owned())
+    );
+    assert_eq!(plugins.extract_file(b"a.extract", b"none").unwrap(), None);
+    assert_eq!(plugins.extract_file(b"a.other", b"inside").unwrap(), None);
+    assert!(matches!(
+        plugins.extract_file(b"a.extract", b"refuse"),
+        Err(Error::Failed { .. })
+    ));
+    assert!(matches!(
+        plugins.extract_file(b"a.extract", b"trap"),
+        Err(Error::Failed { .. })
+    ));
+    // A crash leaves the next call as it would be.
+    assert_eq!(
+        plugins.extract_file(b"a.extract", b"again").unwrap(),
+        Some("AGAIN".to_owned())
+    );
 }

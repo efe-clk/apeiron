@@ -49,6 +49,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [039](#adr-039-a-left-out-path-is-left-alone-not-deleted) | Exclusion | Patterns from `--exclude` and `.apeironignore`; a backup does not read such paths, and a sync keeps them as they were recorded | Accepted |
 | [040](#adr-040-pruning-rewrites-a-linear-history-and-remotes-follow-only-when-asked) | Pruning | `apeiron prune` copies the kept snapshots with new parents; protected refs, sync and merges are refused; `push --replace` for remotes | Accepted |
 | [041](#adr-041-transfers-resume-by-pack-and-unchanged-files-are-not-read) | Transfers and backups | An index after each pack, children before parents; a pull trusts only what indexes list; size and time spare reading a file | Accepted |
+| [042](#adr-042-text-inside-documents-comes-from-a-plugin-in-the-sandbox) | Text in documents | `extract-text` in the plugin interface, version 0.2; PDF and office files read by `plugins/documents`, called only for files it names | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28. ADR-036 and ADR-037 record on 2026-11-06 decisions made earlier without a record of their own, including what changed in older ADRs.
 
@@ -901,3 +902,23 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Always reading files | The target for unchanged files cannot be met on small devices |
 
 **Consequences.** A remote gets one small index file per pack until garbage collection of that copy merges them. A program that restores a file's old time after changing its content is not seen without `--reread`; `apeiron verify` does not notice this either, as it checks the repository, not the folder.
+
+## ADR-042: Text inside documents comes from a plugin, in the sandbox
+
+**Status:** Accepted (2026-11-06)
+
+**Context.** Search read only UTF-8 files ([SEARCH.md](SEARCH.md) §3). The vision asks for full text in supported formats. PDF and office files come from anyone, and their parsers are large and have a long history of flaws; the core must not know them (principle 7).
+
+**Decision.** The plugin interface, now version 0.2, gains `extract-text` and a list `text-patterns`. A search gives a file to the first plugin whose `text-patterns` match its name, and otherwise reads it as before. `plugins/documents` reads PDF with `lopdf` and the zip-and-XML office formats with `zip` and `quick-xml`, and is built apart like the text plugin.
+
+**Rationale.** The sandbox allows no files or network and limits time and memory, so a hostile document costs at most one unread file. A separate list means search never starts a plugin for a file it cannot read, which matters across long histories. Text found is searched like any other, once per content.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| Parsers in `apeiron-services` | A flaw would run with the user's rights, beside their keys and files |
+| A new interface beside `type-driver` | Two worlds to instantiate for one small function; nothing is released, so no plugin is left behind |
+| Keeping the extracted text in an index | ADR-023 chose no stored index; a copy of the text would need encrypting and keeping in step |
+
+**Consequences.** Plugins built for version 0.1 stop working and must be rebuilt; a merge then makes a conflict copy, as with any failed plugin. Searching many documents is slower than text, as each runs in a new instance. Scanned PDF files and old `.doc` and `.xls` files give no text.

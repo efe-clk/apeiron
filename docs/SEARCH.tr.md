@@ -55,7 +55,13 @@ flowchart TB
 
 ## 3. Metin arama
 
-Bir dosya metin dosyasıysa metin için aranır: içeriği geçerli UTF-8'dir ve sıfır baytı yoktur. 16 MiB'tan büyük dosyalar metin için okunmaz; sonuç onları atlanmış olarak sayar. PDF ya da ofis belgeleri gibi diğer biçimlerde aramak, onları metne çeviren bir sürücü gerektirir ve eklenti sistemiyle gelir (VISION.tr.md).
+Bir dosya metin dosyasıysa metin için aranır: içeriği geçerli UTF-8'dir ve sıfır baytı yoktur. 16 MiB'tan büyük dosyalar metin için okunmaz; sonuç onları atlanmış olarak sayar. Belgeler eklentisi kuruluysa PDF, Word (`.docx`), Excel (`.xlsx`), PowerPoint (`.pptx`) ve OpenDocument (`.odt`, `.ods`, `.odp`) dosyalarının içindeki metin de 64 MiB'a kadar aranır; satır numarası eklentinin verdiği metnindir. Bu dosyaları okumak, herkesten gelebilecekleri için eklentinin işidir ve onun yalıtılmış ortamında yapılır (PLUGIN.tr.md §3). Okuyamadığı dosya sayılır, hiçbir şeyi durdurmaz. Taranmış bir PDF metin değil resim tutar; eski `.doc` ve `.xls` dosyaları ile Excel hücrelerindeki sayılar okunmaz.
+
+```bash
+rustup target add wasm32-wasip2
+cargo build --release --target wasm32-wasip2 --manifest-path plugins/documents/Cargo.toml
+apeiron plugin add plugins/documents/target/wasm32-wasip2/release/apeiron_documents.wasm
+```
 
 ## 4. Neden dizin yok
 
@@ -90,7 +96,7 @@ Bir ad 1 ile 64 karakter arasıdır ve denetim karakteri içermez; çevresindeki
 
 | Konu | Nerede |
 | --- | --- |
-| PDF, ofis ve diğer biçimlerin içindeki metin | Daha sonra, bir tür sürücüsü olarak; zamanlanmadı ([ROADMAP.tr.md](ROADMAP.tr.md) §8) |
+| Taranmış PDF gibi resimlerdeki metni okumak | Planlanmıyor |
 | Windows'ta etiketler | Planlanmıyor; Windows'ta yoktur |
 | Kullanıcının göremeyeceği sonuçları gizlemek | Web arayüzünde tamamlandı: `member` ya da `reader` gördüğü bir snapshot'ı adlandırmalıdır ([USERS.tr.md](USERS.tr.md) §4) |
 
