@@ -1492,3 +1492,164 @@ mod repair {
         }
     }
 }
+
+/// Interrupted transfers (FORMAT.md §15.5).
+mod transfers {
+    use std::path::PathBuf;
+
+    use super::*;
+    use crate::object::{EntryKind, Snapshot, Time, Tree, TreeEntry};
+    use crate::pack;
+    use crate::remote::{FolderStore, Store};
+
+    /// A repository whose `main` holds more than one pack of data, with a
+    /// copy in a folder and a clone that has only the first snapshot.
+    struct Transfer {
+        _dir: TempDir,
+        base: PathBuf,
+        copy: PathBuf,
+        clone: PathBuf,
+        data: Vec<u8>,
+    }
+
+    fn commit_file(repo: &mut Repository, data: &[u8], parent: Option<ObjectId>) -> ObjectId {
+        let mut writer = repo.writer();
+        let (size, blob) = writer.put_file(data).unwrap();
+        let tree = writer
+            .put_tree(&Tree {
+                entries: vec![TreeEntry {
+                    name: b"big".to_vec(),
+                    kind: EntryKind::File { size, blob },
+                    mode: None,
+                    mtime: None,
+                    uid: None,
+                    gid: None,
+                    xattrs: Vec::new(),
+                }],
+            })
+            .unwrap();
+        let id = writer
+            .put_snapshot(&Snapshot {
+                tree,
+                parents: parent.into_iter().collect(),
+                time: Time {
+                    seconds: 1,
+                    nanos: 0,
+                },
+                author: None,
+                host: None,
+                message: None,
+                meta: Vec::new(),
+            })
+            .unwrap();
+        writer.finish().unwrap();
+        repo.update_ref("main", parent, Some(id)).unwrap();
+        id
+    }
+
+    fn transfer() -> Transfer {
+        let dir = tempfile::tempdir().unwrap();
+        let (base, copy, clone) = (
+            dir.path().join("repo"),
+            dir.path().join("copy"),
+            dir.path().join("clone"),
+        );
+        let mut repo = init(&base, false);
+        let first = commit_file(&mut repo, b"small", None);
+        fs::create_dir(&copy).unwrap();
+        let store = FolderStore::open(&copy).unwrap();
+        repo.push(&store, "main", &mut |_| Ok(())).unwrap();
+        copy_dir(&base, &clone);
+        // Three packs' worth, so that an interruption can fall between them.
+        let data = noise(3 * pack::TARGET_SIZE as usize, 11);
+        commit_file(&mut repo, &data, Some(first));
+        repo.push(&store, "main", &mut |_| Ok(())).unwrap();
+        Transfer {
+            _dir: dir,
+            base,
+            copy,
+            clone,
+            data,
+        }
+    }
+
+    fn assert_holds(repo: &Repository, data: &[u8]) {
+        let head = repo.read_ref("main").unwrap().unwrap();
+        let tree = repo
+            .read_tree(&repo.read_snapshot(&head).unwrap().tree)
+            .unwrap();
+        let EntryKind::File { blob, .. } = tree.entries[0].kind else {
+            panic!("expected a file");
+        };
+        let mut out = Vec::new();
+        repo.read_file(&blob.unwrap(), &mut out).unwrap();
+        assert!(out == data, "the content differs");
+        assert!(repo.verify().unwrap().is_ok());
+    }
+
+    #[test]
+    fn a_pull_run_again_after_a_crash_gets_everything() {
+        let t = transfer();
+        for n in 0.. {
+            let crash = tempfile::tempdir().unwrap();
+            let dest = crash.path().join("repo");
+            let (_work, result, fired) = run_on(
+                &t.clone,
+                n,
+                |repo| Fault::Crash {
+                    repo: repo.to_path_buf(),
+                    dest: dest.clone(),
+                },
+                |repo| {
+                    let store = FolderStore::open(&t.copy).unwrap();
+                    repo.pull(&store, "main", &mut |_| Ok(())).map(drop)
+                },
+            );
+            if !fired {
+                result.unwrap();
+                break;
+            }
+            assert!(result.is_err());
+            let store = FolderStore::open(&t.copy).unwrap();
+            // A ref lock left by the crash is removed by `repair`.
+            age_files(&dest);
+            let mut repo = open(&dest).unwrap();
+            repo.repair().unwrap();
+            repo.pull(&store, "main", &mut |_| Ok(())).unwrap();
+            assert_holds(&repo, &t.data);
+        }
+    }
+
+    #[test]
+    fn a_push_run_again_after_a_stop_sends_only_what_is_left() {
+        let t = transfer();
+        let repo = open(&t.base).unwrap();
+        let fresh = t._dir.path().join("fresh");
+        fs::create_dir(&fresh).unwrap();
+        let store = FolderStore::open(&fresh).unwrap();
+        let total = repo.push(&store, "main", &mut |_| Ok(())).unwrap();
+
+        for stop_after in [1, total.objects / 2, total.objects - 1] {
+            let again = t._dir.path().join(format!("again-{stop_after}"));
+            fs::create_dir(&again).unwrap();
+            let store = FolderStore::open(&again).unwrap();
+            let stopped = repo.push(&store, "main", &mut |r| {
+                if r.objects >= stop_after {
+                    Err(Error::Cancelled)
+                } else {
+                    Ok(())
+                }
+            });
+            assert!(matches!(stopped, Err(Error::Cancelled)));
+            assert_eq!(store.read_ref("main").unwrap(), None);
+            let done = repo.push(&store, "main", &mut |_| Ok(())).unwrap();
+            // What finished packs hold is not sent again.
+            assert!(done.bytes <= total.bytes, "{done:?}");
+            if stop_after > total.objects / 2 {
+                assert!(done.bytes < total.bytes, "{done:?} of {total:?}");
+            }
+            drop(store);
+            assert_holds(&open(&again).unwrap(), &t.data);
+        }
+    }
+}

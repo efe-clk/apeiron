@@ -576,7 +576,7 @@ A file is either completely there or not there at all. A remote that cannot do a
 3. Read the remote index files; together they give the set of objects the remote has.
 4. Read the remote ref. If it points to a snapshot that is not the local ref's snapshot or one of its ancestors, stop with a conflict: the remote has history this copy does not, and must be pulled first.
 5. Walk the objects reachable from the local ref. An object the remote already has is not entered, because everything reachable from it is there too (15.5).
-6. Copy the missing objects as stored bytes, without decrypting them, into new packs; write each pack, then its index, to the remote.
+6. Copy the missing objects as stored bytes, without decrypting them, each after everything it refers to, into new packs; write each pack, then an index of that pack alone, to the remote.
 7. Replace the remote ref, expecting the value read in step 4. A folder remote keeps a reflog like any repository; SFTP and S3 remotes keep none, and there the history of a ref is its chain of parent snapshots.
 
 ### 15.4 Pull
@@ -590,10 +590,10 @@ Pull runs the steps of push in the other direction, with the local repository as
 
 ### 15.5 Rules and interruptions
 
-- Closure: if a copy has an object, it has every object reachable from it. Push and pull write objects before the index that lists them and the index before the ref, so an interruption leaves only unlisted packs, which the next push or pull covers.
+- Closure: if an index of a copy lists an object, the copy has every object reachable from it. A push sends each object after what it refers to and an index after each pack, so whatever is listed keeps this rule at every moment. A pull writes in the order of the remote's packs and lists them only at the end; a pack without an index can hold an object without what it refers to, so a pull walks past what only such packs hold, and reads again only what they lack.
 - A remote ref is replaced only after every object it reaches is written on the remote, as in section 9.2.
 - Two programs pushing the same ref at once: the conditional replace lets one win; the other stops with a conflict and changes nothing.
-- An interrupted push or pull is simply run again; it copies the objects that are still not listed. Packs the interruption left without an index take up space until garbage collection of that copy removes them.
+- An interrupted push or pull is simply run again. It goes on from the pack that was being written: at most that pack, up to about 32 MiB, is sent again, not one chunk. Objects sent for a ref that never moved take up space until garbage collection of that copy removes them.
 - Garbage collection of a remote copy is in 15.8.
 
 ### 15.6 Clone

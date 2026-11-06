@@ -298,8 +298,6 @@ impl Repository {
             |id| have.contains(id),
             |id, ty| self.read_typed(id, ty),
         )?;
-        let copied: Vec<ObjectId> = missing.iter().map(|(id, _)| *id).collect();
-        let mut packs = Vec::new();
         let mut writer: Option<PackWriter> = None;
         for (id, ty) in missing {
             let location = self.index.get(&id).ok_or(Error::ObjectNotFound(id))?;
@@ -317,23 +315,32 @@ impl Repository {
             if w.len() >= pack::TARGET_SIZE
                 && let Some(w) = writer.take()
             {
-                packs.push(write_pack(store, w)?);
+                self.send_pack(store, w, have)?;
             }
         }
         if let Some(w) = writer.take() {
-            packs.push(write_pack(store, w)?);
+            self.send_pack(store, w, have)?;
         }
-        if !packs.is_empty() {
-            let (file, bytes) = index::encode_index(&packs, &self.keys)?;
-            store.write_new(&format!("{INDEX}/{file}"), &bytes)?;
-        }
-        // Listed on the remote now, so the next ref need not copy them.
-        have.extend(copied);
         // A cleanup that began meanwhile may delete objects this push
         // counted on; the ref stays (FORMAT.md §15.8).
         super::remote_gc::check_gc_lock(store)?;
         store.swap_ref(name, previous, local)?;
         Ok(report)
+    }
+
+    /// Writes a pack and then an index of it to `store`. Objects are sent
+    /// after everything they refer to, so whatever is listed holds the rule
+    /// of FORMAT.md §15.5, and a push stopped here goes on from this pack.
+    fn send_pack(
+        &self,
+        store: &dyn Store,
+        writer: PackWriter,
+        have: &mut HashSet<ObjectId>,
+    ) -> Result<()> {
+        let pack = write_pack(store, writer)?;
+        have.extend(pack.1.iter().map(|e| e.id));
+        let (file, bytes) = index::encode_index(std::slice::from_ref(&pack), &self.keys)?;
+        store.write_new(&format!("{INDEX}/{file}"), &bytes)
     }
 
     /// Copies the objects the ref `name` reaches on `store` into this
@@ -463,15 +470,27 @@ impl Repository {
         report: &mut TransferReport,
         on_copy: OnCopy<'_>,
     ) -> Result<()> {
+        // Packs no index lists were left by an interrupted write, and may
+        // hold an object without what it refers to. So they do not stop the
+        // walk (FORMAT.md §15.5); what they hold is simply not read again.
+        let unlisted: HashSet<ObjectId> = self
+            .unindexed
+            .iter()
+            .flat_map(|(_, entries)| entries.iter().map(|e| e.id))
+            .collect();
         let missing = missing_objects(
             report.snapshot,
-            |id| self.contains(id),
+            |id| self.contains(id) && !unlisted.contains(id),
             |id, ty| read_remote(store, have, &self.keys, id, ty),
         )?;
+        let reached: HashSet<ObjectId> = missing.iter().map(|(id, _)| *id).collect();
 
         // Read in pack order so that adjacent objects come in one read.
         let mut wanted: Vec<Location> = Vec::with_capacity(missing.len());
         for (id, ty) in missing {
+            if self.contains(&id) {
+                continue;
+            }
             let location = have.get(&id).ok_or(Error::ObjectNotFound(id))?;
             check_type(id, ty, location)?;
             wanted.push(*location);
@@ -506,7 +525,17 @@ impl Repository {
             }
             start = end;
         }
-        writer.finish()
+        writer.finish()?;
+        // Everything this walk reached is here now, so a pack holding only
+        // such objects can be listed: nothing it refers to is missing.
+        let (done, rest): (Vec<_>, Vec<_>) = std::mem::take(&mut self.unindexed)
+            .into_iter()
+            .partition(|(_, entries)| entries.iter().all(|e| reached.contains(&e.id)));
+        self.unindexed = rest;
+        if !done.is_empty() {
+            index::write_index(&self.dir(TMP), &self.dir(INDEX), &done, &self.keys)?;
+        }
+        Ok(())
     }
 
     /// Checks the remote `config`, or makes `store` a new copy of this
@@ -752,30 +781,45 @@ pub(super) fn missing_objects(
 ) -> Result<Vec<(ObjectId, ObjectType)>> {
     let mut seen = HashSet::new();
     let mut missing = Vec::new();
-    let mut stack = vec![(start, ObjectType::Snapshot)];
-    while let Some((id, ty)) = stack.pop() {
+    // An object is listed once everything it refers to is: `true` marks the
+    // second visit, when its children are done.
+    let mut stack = vec![(start, ObjectType::Snapshot, false)];
+    while let Some((id, ty, children_done)) = stack.pop() {
+        if children_done {
+            missing.push((id, ty));
+            continue;
+        }
         if has(&id) || !seen.insert(id) {
             continue;
         }
-        missing.push((id, ty));
+        stack.push((id, ty, true));
         match ty {
             ObjectType::Snapshot => {
                 let snapshot = Snapshot::decode(&read(&id, ty)?)?;
-                stack.push((snapshot.tree, ObjectType::Tree));
-                stack.extend(snapshot.parents.iter().map(|p| (*p, ObjectType::Snapshot)));
+                stack.push((snapshot.tree, ObjectType::Tree, false));
+                stack.extend(
+                    snapshot
+                        .parents
+                        .iter()
+                        .map(|p| (*p, ObjectType::Snapshot, false)),
+                );
             }
             ObjectType::Tree => {
                 for entry in Tree::decode(&read(&id, ty)?)?.entries {
                     match entry.kind {
-                        EntryKind::File { blob: Some(b), .. } => stack.push((b, ObjectType::Blob)),
-                        EntryKind::Directory { tree } => stack.push((tree, ObjectType::Tree)),
+                        EntryKind::File { blob: Some(b), .. } => {
+                            stack.push((b, ObjectType::Blob, false));
+                        }
+                        EntryKind::Directory { tree } => {
+                            stack.push((tree, ObjectType::Tree, false));
+                        }
                         EntryKind::File { blob: None, .. } | EntryKind::Symlink { .. } => {}
                     }
                 }
             }
             ObjectType::Blob => {
                 for (chunk, _) in Blob::decode(&read(&id, ty)?)?.chunks {
-                    stack.push((chunk, ObjectType::Chunk));
+                    stack.push((chunk, ObjectType::Chunk, false));
                 }
             }
             ObjectType::Chunk => {}
@@ -1298,7 +1342,7 @@ mod tests {
     fn damaged_remote_index_is_skipped_and_its_objects_are_sent_again() {
         let s = setup(true);
         let remote = s.root.join("remote");
-        let sent = push(&s.a, &remote).unwrap().objects;
+        push(&s.a, &remote).unwrap();
         let index = remote.join(INDEX);
         let file = fs::read_dir(&index)
             .unwrap()
@@ -1313,7 +1357,8 @@ mod tests {
         let mut a = s.a;
         let second = commit(&mut a, b"more", Some(s.first));
         let report = push(&a, &remote).unwrap();
-        assert!(report.objects > sent, "{report:?}");
+        // Only what that index listed is unknown now; each pack has its own.
+        assert!(report.objects > 0, "{report:?}");
         let mut copy = Repository::unlock(&remote, PASSWORD).unwrap();
         copy.repair().unwrap();
         assert_eq!(content(&copy, &second), b"more");
@@ -1361,7 +1406,8 @@ mod tests {
         let dry = s.a.gc_remote(&store, true, Some("here")).unwrap();
         assert_eq!((dry.removed_objects, dry.removed_packs), (1, 1), "{dry:?}");
         let indexes = |store: &FolderStore| store.list(INDEX).unwrap().len();
-        assert_eq!(indexes(&store), 3);
+        // One index per pack written.
+        assert!(indexes(&store) >= 3);
 
         let done = s.a.gc_remote(&store, false, Some("here")).unwrap();
         assert_eq!(

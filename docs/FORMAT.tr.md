@@ -576,7 +576,7 @@ Bir dosya ya tamamen vardır ya hiç yoktur. Koşullu `PUT` yapamayan bir uzak d
 3. Uzaktaki indeks dosyalarını oku; birlikte, uzak deponun sahip olduğu nesnelerin kümesini verirler.
 4. Uzaktaki ref'i oku. Yerel ref'in snapshot'ı ya da onun atalarından biri olmayan bir snapshot'ı gösteriyorsa bir çatışmayla dur: uzak depoda bu kopyada olmayan bir geçmiş vardır ve önce pull yapılmalıdır.
 5. Yerel ref'ten ulaşılabilen nesneleri dolaş. Uzak deponun zaten sahip olduğu bir nesnenin içine girilmez; çünkü ondan ulaşılabilen her şey de oradadır (15.5).
-6. Eksik nesneleri saklandıkları baytlarla, şifrelerini çözmeden yeni paketlere kopyala; her paketi, sonra onun indeksini uzak depoya yaz.
+6. Eksik nesneleri saklandıkları baytlarla, şifrelerini çözmeden, her birini başvurduklarından sonra yeni paketlere kopyala; her paketi, sonra yalnızca o paketin indeksini uzak depoya yaz.
 7. Uzaktaki ref'i, 4. adımda okunan değeri bekleyerek değiştir. Bir klasör uzak deposu her depo gibi reflog tutar; SFTP ve S3 uzak depoları tutmaz ve orada bir ref'in geçmişi, ebeveyn snapshot'larının zinciridir.
 
 ### 15.4 Pull
@@ -590,10 +590,10 @@ Pull, push'un adımlarını ters yönde, hedef olarak yerel depoyla çalıştır
 
 ### 15.5 Kurallar ve kesintiler
 
-- Kapanış: bir kopya bir nesneye sahipse, ondan ulaşılabilen her nesneye de sahiptir. Push ve pull nesneleri, onları listeleyen indeksten önce; indeksi de ref'ten önce yazar. Böylece bir kesinti yalnızca listelenmemiş paketler bırakır ve sonraki push ya da pull bunları kapsar.
+- Kapanış: bir kopyanın indeksi bir nesneyi listeliyorsa, kopya ondan ulaşılabilen her nesneye sahiptir. Push her nesneyi başvurduklarından sonra, her paketten sonra da bir indeks gönderir; böylece listelenen her şey bu kuralı her an korur. Pull, uzak deponun paket sırasıyla yazar ve onları ancak sonunda listeler; indeksi olmayan bir paket, bir nesneyi başvurduğu şeyler olmadan tutabilir, bu yüzden pull yalnızca böyle paketlerin tuttuğunu geçip yürür ve yalnızca onlarda eksik olanı yeniden okur.
 - Uzaktaki bir ref, ancak ulaştığı her nesne uzak depoya yazıldıktan sonra değiştirilir (bölüm 9.2'deki gibi).
 - Aynı ref'i aynı anda push eden iki program: koşullu değiştirme birinin kazanmasını sağlar; öteki bir çatışmayla durur ve hiçbir şeyi değiştirmez.
-- Yarıda kalan bir push ya da pull yeniden çalıştırılır; hâlâ listelenmemiş nesneleri kopyalar. Kesintinin indekssiz bıraktığı paketler, o kopyanın çöp toplaması onları silene kadar yer kaplar.
+- Yarıda kalan bir push ya da pull yeniden çalıştırılır. Yazılmakta olan paketten devam eder: yeniden gönderilen en çok o pakettir, yaklaşık 32 MiB'a kadar, tek bir chunk değil. Hiç taşınmayan bir ref için gönderilen nesneler, o kopyanın çöp toplaması onları silene kadar yer kaplar.
 - Bir uzak kopyanın çöp toplaması 15.8'dedir.
 
 ### 15.6 Klon

@@ -22,7 +22,11 @@ pub(crate) const ENTRY_TAIL_LEN: usize = ENTRY_LEN - ID_LEN;
 const ZSTD_LEVEL: i32 = 3;
 
 /// Writers start a new pack once the current one reaches this size.
+#[cfg(not(test))]
 pub(crate) const TARGET_SIZE: u64 = 32 * 1024 * 1024;
+/// Small in tests, so that a few hundred KiB of data make several packs.
+#[cfg(test)]
+pub(crate) const TARGET_SIZE: u64 = 256 * 1024;
 
 /// Name of a pack or index file: plain BLAKE3 of its bytes.
 pub(crate) type FileHash = [u8; 32];
