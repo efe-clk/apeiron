@@ -861,6 +861,47 @@ fn a_report_maps_to_a_standard() {
     assert!(text.contains("## Legal holds"), "{text}");
 }
 
+/// SOC 2 shows the same facts as ISO/IEC 27001, under its own criteria
+/// (REPORTS.md §3.1).
+#[test]
+fn a_report_maps_to_soc2_with_the_same_facts() {
+    let s = Setup::new();
+    s.ok(&["backup", &s.path("src")]);
+    let iso = s.json(&["report", "--standard", "iso27001"]);
+    let soc2 = s.json(&["report", "--standard", "soc2"]);
+    let of = |report: &serde_json::Value, id: &str| {
+        report["standard"]["controls"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["id"] == id)
+            .cloned()
+            .unwrap_or_else(|| panic!("no {id}"))
+    };
+    assert_eq!(soc2["standard"]["controls"].as_array().unwrap().len(), 7);
+    for (from, to) in [
+        ("A.5.17", "CC6.1"),
+        ("A.5.15", "CC6.3"),
+        ("A.8.24", "CC6.7"),
+        ("A.8.15", "CC7.2"),
+        ("A.5.30", "CC9.1"),
+        ("A.8.13", "A1.2"),
+        ("A.5.33", "C1.1"),
+    ] {
+        let (a, b) = (of(&iso, from), of(&soc2, to));
+        assert_eq!(a["status"], b["status"], "{to}");
+        assert_eq!(a["facts"], b["facts"], "{to}");
+    }
+    assert_eq!(of(&soc2, "CC6.7")["status"], "gap");
+    assert_eq!(of(&soc2, "CC6.3")["status"], "not_covered");
+    let text = s.ok(&["report", "--standard", "soc2"]);
+    assert!(text.contains("## SOC 2 Trust Services Criteria"), "{text}");
+    assert!(
+        text.contains("| CC6.7 Protecting data that moves | gap |"),
+        "{text}"
+    );
+}
+
 /// A report written to a file can be signed and checked (REPORTS.md §5.1).
 #[test]
 fn a_signed_report_is_checked() {

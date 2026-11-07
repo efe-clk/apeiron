@@ -11,6 +11,8 @@ use crate::FullReport;
 pub(crate) enum Standard {
     /// ISO/IEC 27001:2022, Annex A
     Iso27001,
+    /// SOC 2, the 2017 Trust Services Criteria
+    Soc2,
 }
 
 /// What the report shows for a control.
@@ -44,6 +46,7 @@ pub(crate) struct Mapping {
 pub(crate) fn map(standard: Standard, full: &FullReport) -> Mapping {
     match standard {
         Standard::Iso27001 => iso27001(full),
+        Standard::Soc2 => soc2(full),
     }
 }
 
@@ -260,6 +263,34 @@ fn iso27001(full: &FullReport) -> Mapping {
 
     Mapping {
         standard: "ISO/IEC 27001:2022 Annex A",
+        controls,
+    }
+}
+
+/// The criteria of SOC 2 that the facts behind an ISO/IEC 27001 control bear
+/// on: the ISO control, then the criterion and a short title of our own.
+const SOC2: [(&str, &str, &str); 7] = [
+    ("A.5.17", "CC6.1", "Logical access security"),
+    ("A.5.15", "CC6.3", "Access based on roles"),
+    ("A.8.24", "CC6.7", "Protecting data that moves"),
+    ("A.8.15", "CC7.2", "Monitoring"),
+    ("A.5.30", "CC9.1", "Mitigating business disruption"),
+    ("A.8.13", "A1.2", "Data backup and recovery"),
+    ("A.5.33", "C1.1", "Keeping confidential information"),
+];
+
+/// The same facts as `iso27001`, so that the two reports cannot disagree.
+fn soc2(full: &FullReport) -> Mapping {
+    let iso = iso27001(full).controls;
+    let controls = SOC2
+        .iter()
+        .filter_map(|(from, id, title)| {
+            let c = iso.iter().find(|c| c.id == *from)?;
+            Some(control(id, title, c.status, c.facts.clone()))
+        })
+        .collect();
+    Mapping {
+        standard: "SOC 2 Trust Services Criteria",
         controls,
     }
 }

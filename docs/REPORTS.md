@@ -33,7 +33,7 @@ apeiron --json report --verify --remotes --web > report-2026-10.json
 | `--tenant <name>` | With `--web`: the tenant whose files to report on ([TENANTS.md](TENANTS.md)) | None |
 | `--all-tenants` | One report for each tenant, each on the tenant's own repository (opened with its password file) and, with `--web`, its own files; the reports follow one another, separated by `---`, or form a JSON array with a `tenant` field each. The exit code is the worst of them | Off |
 | `--since <YYYY-MM-DD>` | With `--web`: count audit events from that day | 30 days ago |
-| `--standard iso27001` | Add the facts mapped to the controls of a standard (§3.1) | None |
+| `--standard iso27001`, `--standard soc2` | Add the facts mapped to the controls of a standard (§3.1) | None |
 
 The report reads only; it changes nothing. Its text form is Markdown, ready to keep or turn into a PDF; `--json` gives the same content for other programs. A scheduled job can make one every month ([DAEMON.md](DAEMON.md) runs commands only through its own jobs, so use the system's scheduler for this).
 
@@ -67,6 +67,18 @@ With `--standard iso27001` the report ends with the controls of ISO/IEC 27001:20
 | A.8.13 Information backup | Backups, none stale, and with `--verify` the data checked | No backups, a stale one, damaged data |
 | A.8.15 Logging | With `--web`: an audit log with a whole chain of hashes | A broken chain |
 | A.8.24 Use of cryptography | An encrypted repository | Not encrypted |
+
+With `--standard soc2` the same facts appear under the 2017 Trust Services Criteria of SOC 2, so the two reports cannot disagree. The titles are short ones of our own. The table was made from secondary descriptions of the criteria, not checked against the AICPA's text; CC6.7 and C1.1 are the least direct, and an auditor should confirm them.
+
+| Criterion | Same facts as |
+| --- | --- |
+| CC6.1 Logical access security | A.5.17 |
+| CC6.3 Access based on roles | A.5.15 |
+| CC6.7 Protecting data that moves | A.8.24 |
+| CC7.2 Monitoring | A.8.15 |
+| CC9.1 Mitigating business disruption | A.5.30 |
+| A1.2 Data backup and recovery | A.8.13 |
+| C1.1 Keeping confidential information | A.5.33 |
 
 ## 4. Findings
 
@@ -107,7 +119,7 @@ The signature covers the report's bytes exactly, so even a changed space breaks 
 
 | Item | Where |
 | --- | --- |
-| Mappings to other standards, such as SOC 2 | Later, with a pilot that names its standard; §3.1 shows the form |
+| Mappings to other standards, such as the GDPR | Later, with a pilot that names its standard; §3.1 shows the form |
 
 ## 7. Crates
 

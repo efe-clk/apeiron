@@ -33,7 +33,7 @@ apeiron --json report --verify --remotes --web > rapor-2026-10.json
 | `--tenant <ad>` | `--web` ile: dosyaları raporlanacak kiracı ([TENANTS.tr.md](TENANTS.tr.md)) | Yok |
 | `--all-tenants` | Her kiracı için bir rapor; her biri kiracının kendi deposunda (parola dosyasıyla açılır) ve `--web` ile kendi dosyalarında. Raporlar `---` ile ayrılarak art arda gelir ya da her birinde `tenant` alanı olan bir JSON dizisi oluşturur. Çıkış kodu, içlerindeki en kötüsüdür | Kapalı |
 | `--since <YYYY-AA-GG>` | `--web` ile: denetim olaylarını o günden itibaren sayar | 30 gün önce |
-| `--standard iso27001` | Bir standardın maddelerine eşlenmiş gerçekleri ekler (§3.1) | Yok |
+| `--standard iso27001`, `--standard soc2` | Bir standardın maddelerine eşlenmiş gerçekleri ekler (§3.1) | Yok |
 
 Rapor yalnızca okur; hiçbir şeyi değiştirmez. Metin biçimi, saklanmaya ya da PDF'e dönüştürülmeye hazır Markdown'dır; `--json` aynı içeriği başka programlar için verir. Zamanlanmış bir iş her ay bir tane oluşturabilir ([DAEMON.tr.md](DAEMON.tr.md) komutları yalnızca kendi işleriyle çalıştırır; bunun için sistemin zamanlayıcısını kullanın).
 
@@ -67,6 +67,18 @@ Kanıt snapshot kimlikleridir: bir kimlik, altındaki her baytı ve ondan öncek
 | A.8.13 Information backup | Hiçbiri eskimemiş yedekler ve `--verify` ile denetlenmiş veri | Yedek olmaması, eskimiş bir yedek, bozuk veri |
 | A.8.15 Logging | `--web` ile: özet zinciri eksiksiz bir denetim kaydı | Kırık bir zincir |
 | A.8.24 Use of cryptography | Şifreli bir depo | Şifresiz |
+
+`--standard soc2` ile aynı gerçekler SOC 2'nin 2017 Trust Services Criteria ölçütleri altında görünür; böylece iki rapor birbiriyle çelişemez. Başlıklar bize ait kısa adlardır. Tablo, ölçütlerin ikincil kaynaklardaki açıklamalarından yapıldı, AICPA'nın metniyle karşılaştırılmadı; en dolaylı olanlar CC6.7 ve C1.1'dir, bir denetçi bunları doğrulamalıdır.
+
+| Ölçüt | Aynı gerçekler |
+| --- | --- |
+| CC6.1 Logical access security | A.5.17 |
+| CC6.3 Access based on roles | A.5.15 |
+| CC6.7 Protecting data that moves | A.8.24 |
+| CC7.2 Monitoring | A.8.15 |
+| CC9.1 Mitigating business disruption | A.5.30 |
+| A1.2 Data backup and recovery | A.8.13 |
+| C1.1 Keeping confidential information | A.5.33 |
 
 ## 4. Bulgular
 
@@ -107,7 +119,7 @@ apeiron report check report-2026-10.md --public-key 3b6a…
 
 | Konu | Nerede |
 | --- | --- |
-| SOC 2 gibi başka standartlara eşlemeler | Sonra, standardını adlandıran bir pilotla; §3.1 biçimi gösterir |
+| KVKK/GDPR gibi başka standartlara eşlemeler | Sonra, standardını adlandıran bir pilotla; §3.1 biçimi gösterir |
 
 ## 7. Crate'ler
 

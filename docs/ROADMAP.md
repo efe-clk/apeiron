@@ -125,7 +125,7 @@ Every work item is done (2026-10-30); the stage ends with its exit criterion, th
 | Operation log | [ARCHITECTURE.md](ARCHITECTURE.md) §2 | Reflogs record ref changes; nothing records other operations outside the web interface |
 | Remote mode of the API and operating the daemon from another device | [API.md](API.md) §2, [DAEMON.md](DAEMON.md) §7 | Only the JSON API of the pages; a tenant's jobs on the Schedule page |
 | Git behind the plugin interface; other plugin types and a plugin store | [DECISIONS.md](DECISIONS.md) ADR-021, [PLUGIN.md](PLUGIN.md) §6 | `apeiron-git` is a crate of its own; plugins are type drivers only |
-| More standards in reports | [REPORTS.md](REPORTS.md) §6 | ISO/IEC 27001 only |
+| More standards in reports | [REPORTS.md](REPORTS.md) §6 | ISO/IEC 27001 and SOC 2 |
 | The C++ SDK, streaming through the C ABI | [SDK.md](SDK.md) §1, §7 | Python SDK over the C ABI, with the library built with Cargo |
 | Review, approval and comments | [VISION.md](VISION.md) | Not written |
 | Format upgrade tool | [FORMAT.md](FORMAT.md) §18 | The format is at version 1 |
