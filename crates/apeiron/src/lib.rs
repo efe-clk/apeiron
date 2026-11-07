@@ -8,6 +8,7 @@
 
 mod conflicts;
 mod error;
+mod file_reader;
 mod job;
 pub mod json;
 mod plugins;
@@ -43,6 +44,7 @@ pub use apeiron_services::{
     WarningKind,
 };
 pub use apeiron_services::{Duplicate, Query, SearchHit, SearchOutcome as SearchReport, TextLine};
+pub use file_reader::FileReader;
 
 /// The tags of the file at `path` on disk (FORMAT.md §6.3); Linux only.
 pub fn file_tags(path: impl AsRef<std::path::Path>) -> Result<Vec<String>> {

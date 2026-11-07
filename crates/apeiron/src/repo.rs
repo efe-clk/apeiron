@@ -714,6 +714,16 @@ impl Repository {
         )?)
     }
 
+    /// Opens the file at a path for reading piece by piece, as the C ABI
+    /// needs; a folder or a link there is `invalid_input`. A `gc` that removes
+    /// the snapshot meanwhile makes a later read fail, never give wrong bytes.
+    pub fn open_file(&self, request: &ListRequest) -> Result<crate::FileReader> {
+        let core = self.view()?;
+        let snapshot = spec::resolve(&core, &request.snapshot)?;
+        let chunks = services::file_chunks(&core, &snapshot, request.path.as_bytes())?;
+        Ok(crate::FileReader::new(self.clone(), chunks))
+    }
+
     /// Writes the folder or file at a path as a zip archive into `out`, as
     /// a stream, for a download; nothing is written to disk.
     pub fn export_zip_to(

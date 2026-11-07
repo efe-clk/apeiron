@@ -8,6 +8,7 @@ after its kind. Long operations return a :class:`Job`.
 from __future__ import annotations
 
 import ctypes
+import io
 import ctypes.util
 import json
 import os
@@ -43,7 +44,7 @@ __all__ = [
 
 # The ABI version this SDK is written for (SDK.md §2).
 ABI_MAJOR = 0
-ABI_MINOR = 1
+ABI_MINOR = 2
 _PENDING = -1
 
 
@@ -181,6 +182,13 @@ def _library() -> ctypes.CDLL:
             ("apeiron_job_cancel", [p], i32),
             ("apeiron_job_wait", [p, ctypes.c_int64, pp], i32),
             ("apeiron_job_free", [p], None),
+            ("apeiron_reader_open", [p, s, pp], i32),
+            ("apeiron_reader_read", [p, p, ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t)], i32),
+            ("apeiron_reader_free", [p], None),
+            ("apeiron_writer_open", [p, s, pp], i32),
+            ("apeiron_writer_write", [p, ctypes.c_char_p, ctypes.c_size_t], i32),
+            ("apeiron_writer_finish", [p, pp], i32),
+            ("apeiron_writer_free", [p], None),
         ]:
             fn = getattr(lib, name)
             fn.argtypes = args
@@ -369,6 +377,81 @@ def forget_search(name: str, file: Any = None) -> Record:
     return _call_global("forget_search", _drop_none({"name": name, "file": file}))
 
 
+class FileReader(io.RawIOBase):
+    """A file of a snapshot, read piece by piece (docs/SDK.md §2.3)."""
+
+    def __init__(self, handle: ctypes.c_void_p):
+        super().__init__()
+        self._handle = handle
+
+    def readable(self) -> bool:
+        return True
+
+    def readinto(self, buffer: Any) -> int:
+        if not self._handle:
+            raise ValueError("the file is closed")
+        size = len(memoryview(buffer).cast("B"))
+        if size == 0:
+            return 0
+        target = (ctypes.c_char * size).from_buffer(buffer)
+        read = ctypes.c_size_t()
+        _check(
+            _library().apeiron_reader_read(
+                self._handle, ctypes.addressof(target), size, ctypes.byref(read)
+            )
+        )
+        return read.value
+
+    def close(self) -> None:
+        if getattr(self, "_handle", None):
+            _library().apeiron_reader_free(self._handle)
+            self._handle = None
+        super().close()
+
+
+class FileWriter:
+    """A file being added to a backup (docs/SDK.md §2.3). Only :meth:`finish`
+    stores it; leaving a ``with`` block normally finishes it, and an exception
+    stores nothing. Other writes to the repository wait until it is closed."""
+
+    def __init__(self, handle: ctypes.c_void_p):
+        self._handle = handle
+        self.report: Optional[Record] = None
+
+    def write(self, data: bytes) -> int:
+        _check(_library().apeiron_writer_write(self._live(), bytes(data), len(data)))
+        return len(data)
+
+    def finish(self) -> Record:
+        out = ctypes.c_void_p()
+        _check(_library().apeiron_writer_finish(self._live(), ctypes.byref(out)))
+        self.report = _take(out)
+        return self.report
+
+    def close(self) -> None:
+        if getattr(self, "_handle", None):
+            _library().apeiron_writer_free(self._handle)
+            self._handle = None
+
+    def _live(self) -> ctypes.c_void_p:
+        if not self._handle:
+            raise InvalidInputError(4, "invalid_input", "the file is closed")
+        return self._handle
+
+    def __enter__(self) -> "FileWriter":
+        return self
+
+    def __exit__(self, kind: Any, *rest: Any) -> None:
+        try:
+            if kind is None and self.report is None:
+                self.finish()
+        finally:
+            self.close()
+
+    def __del__(self) -> None:
+        self.close()
+
+
 class Repository:
     """An open repository. Use it in a ``with`` block or call :meth:`close`."""
 
@@ -455,6 +538,27 @@ class Repository:
     def start(self, operation: str, **request: Any) -> Job:
         """Starts a long operation."""
         return _start(self._live(), operation, request)
+
+    # File content as a stream (docs/SDK.md §2.3).
+
+    def open_file(self, snapshot: str, path: str) -> FileReader:
+        """Opens a file of a snapshot for reading."""
+        out = ctypes.c_void_p()
+        _check(
+            _library().apeiron_reader_open(
+                self._live(), _request({"snapshot": snapshot, "path": path}), ctypes.byref(out)
+            )
+        )
+        return FileReader(out)
+
+    def add_file(
+        self, ref: str, name: str, folder: str = "", message: Optional[str] = None
+    ) -> FileWriter:
+        """Starts adding a file to a backup, as a new snapshot of ``ref``."""
+        request = {"ref": ref, "name": name, "folder": folder, "message": message}
+        out = ctypes.c_void_p()
+        _check(_library().apeiron_writer_open(self._live(), _request(request), ctypes.byref(out)))
+        return FileWriter(out)
 
     # Short operations.
 

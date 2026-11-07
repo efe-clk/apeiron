@@ -462,3 +462,391 @@ fn the_header_is_up_to_date() {
         "include/apeiron.h is out of date; run APEIRON_BLESS=1 cargo test -p apeiron-ffi-rs"
     );
 }
+
+/// Bytes that do not repeat, so a chunk out of place shows.
+fn noise(len: usize) -> Vec<u8> {
+    let mut x = 0x9E37_79B9_7F4A_7C15_u64;
+    (0..len)
+        .map(|_| {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            x as u8
+        })
+        .collect()
+}
+
+fn backup_of(dir: &Path, repo: &Repo, data: &[u8]) {
+    let source = dir.join("source");
+    fs::create_dir_all(&source).unwrap();
+    fs::write(source.join("big.bin"), data).unwrap();
+    fs::write(source.join("empty"), b"").unwrap();
+    repo.start(
+        "backup",
+        &serde_json::json!({"source": source, "ref": "main"}),
+    )
+    .unwrap();
+}
+
+struct Reader(*mut apeiron_reader);
+
+impl Drop for Reader {
+    fn drop(&mut self) {
+        unsafe { apeiron_reader_free(self.0) };
+    }
+}
+
+impl Reader {
+    fn open(repo: &Repo, request: &Value) -> std::result::Result<Reader, String> {
+        let mut out = ptr::null_mut();
+        let request = c(&request.to_string());
+        match unsafe { apeiron_reader_open(repo.0, request.as_ptr(), &mut out) } {
+            0 => Ok(Reader(out)),
+            code => {
+                assert!(out.is_null());
+                Err(error_kind(code))
+            }
+        }
+    }
+
+    fn read(&self, buffer: &mut [u8]) -> std::result::Result<usize, String> {
+        let mut read = 99;
+        let code =
+            unsafe { apeiron_reader_read(self.0, buffer.as_mut_ptr(), buffer.len(), &mut read) };
+        if code == 0 {
+            Ok(read)
+        } else {
+            assert_eq!(read, 0);
+            Err(error_kind(code))
+        }
+    }
+
+    fn all(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        let mut buffer = [0_u8; 4096];
+        loop {
+            match self.read(&mut buffer).unwrap() {
+                0 => return out,
+                n => out.extend_from_slice(&buffer[..n]),
+            }
+        }
+    }
+}
+
+struct Writer(*mut apeiron_writer);
+
+impl Drop for Writer {
+    fn drop(&mut self) {
+        unsafe { apeiron_writer_free(self.0) };
+    }
+}
+
+impl Writer {
+    fn open(repo: &Repo, request: &Value) -> std::result::Result<Writer, String> {
+        let mut out = ptr::null_mut();
+        let request = c(&request.to_string());
+        match unsafe { apeiron_writer_open(repo.0, request.as_ptr(), &mut out) } {
+            0 => Ok(Writer(out)),
+            code => {
+                assert!(out.is_null());
+                Err(error_kind(code))
+            }
+        }
+    }
+
+    fn write(&self, data: &[u8]) -> std::result::Result<(), String> {
+        match unsafe { apeiron_writer_write(self.0, data.as_ptr(), data.len()) } {
+            0 => Ok(()),
+            code => Err(error_kind(code)),
+        }
+    }
+
+    fn finish(&self) -> std::result::Result<Value, String> {
+        let mut out = ptr::null_mut();
+        let code = unsafe { apeiron_writer_finish(self.0, &mut out) };
+        finish(code, out)
+    }
+}
+
+fn files_under(dir: &Path) -> BTreeSet<PathBuf> {
+    let mut found = BTreeSet::new();
+    for entry in fs::read_dir(dir).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            found.extend(files_under(&path));
+        } else {
+            found.insert(path);
+        }
+    }
+    found
+}
+
+#[test]
+fn a_file_is_read_in_pieces() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = init(&dir.path().join("repo"), None);
+    let data = noise(5 << 20);
+    backup_of(dir.path(), &repo, &data);
+
+    let reader = Reader::open(
+        &repo,
+        &serde_json::json!({"snapshot": "main", "path": "big.bin"}),
+    )
+    .unwrap();
+    assert!(reader.all() == data, "the bytes read differ");
+    // The end stays the end.
+    assert_eq!(reader.read(&mut [0; 16]), Ok(0));
+    let empty = Reader::open(
+        &repo,
+        &serde_json::json!({"snapshot": "main", "path": "empty"}),
+    )
+    .unwrap();
+    assert!(empty.all().is_empty());
+
+    // What cannot be read fails when opening, not later.
+    let open = |path: &str, snapshot: &str| {
+        Reader::open(
+            &repo,
+            &serde_json::json!({"snapshot": snapshot, "path": path}),
+        )
+        .map(|_| ())
+    };
+    assert_eq!(open("missing", "main"), Err("not_found".to_owned()));
+    assert_eq!(open("", "main"), Err("invalid_input".to_owned()));
+    assert_eq!(open("big.bin", "no-such"), Err("not_found".to_owned()));
+    // A buffer that cannot take anything is an error, not the end of the file.
+    let mut read = 0;
+    assert_eq!(
+        unsafe { apeiron_reader_read(reader.0, [0_u8; 1].as_mut_ptr(), 0, &mut read) },
+        4
+    );
+    let schema: Value = serde_json::from_str(&fs::read_to_string(schema_file()).unwrap()).unwrap();
+    check_against(
+        &schema,
+        &schema["streams"]["reader"]["request"],
+        &serde_json::json!({"snapshot": "main", "path": "big.bin"}),
+        "reader request",
+    );
+}
+
+/// A reader that waits holds nothing: the same thread can read and write the
+/// repository meanwhile. If it held a lock, this test would never end.
+#[test]
+fn a_waiting_reader_leaves_the_repository_free() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = init(&dir.path().join("repo"), None);
+    let data = noise(3 << 20);
+    backup_of(dir.path(), &repo, &data);
+    let reader = Reader::open(
+        &repo,
+        &serde_json::json!({"snapshot": "main", "path": "big.bin"}),
+    )
+    .unwrap();
+    let mut start = vec![0_u8; 1000];
+    let first = reader.read(&mut start).unwrap();
+
+    repo.call("list", &serde_json::json!({"snapshot": "main"}))
+        .unwrap();
+    repo.start(
+        "backup",
+        &serde_json::json!({"source": dir.path().join("source"), "ref": "other"}),
+    )
+    .unwrap();
+
+    let mut got = start[..first].to_vec();
+    got.extend(reader.all());
+    assert!(got == data, "the bytes read differ");
+}
+
+/// Damage found while reading fails every later read too, so a program that
+/// goes on cannot get a file with a hole in it that looks whole.
+#[test]
+fn damage_stops_a_reader_for_good() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("repo");
+    let repo = init(&path, None);
+    let data = noise(5 << 20);
+    backup_of(dir.path(), &repo, &data);
+    let reader = Reader::open(
+        &repo,
+        &serde_json::json!({"snapshot": "main", "path": "big.bin"}),
+    )
+    .unwrap();
+    let mut damaged = 0;
+    for file in files_under(&path) {
+        if file.extension().is_some_and(|e| e == "pack") {
+            let mut bytes = fs::read(&file).unwrap();
+            // One chunk only: the ones after it are whole, and a reader that
+            // went on past the damage would give them, with a hole before.
+            for byte in bytes.iter_mut().skip(64).take(256) {
+                *byte ^= 0xFF;
+            }
+            let mut permissions = fs::metadata(&file).unwrap().permissions();
+            #[allow(clippy::permissions_set_readonly_false)]
+            permissions.set_readonly(false);
+            fs::set_permissions(&file, permissions).unwrap();
+            fs::write(&file, bytes).unwrap();
+            damaged += 1;
+        }
+    }
+    assert!(damaged > 0, "no pack file was found");
+
+    let mut buffer = [0_u8; 4096];
+    let mut given = 0;
+    let first = loop {
+        match reader.read(&mut buffer) {
+            Ok(0) => panic!("the damage was not found"),
+            Ok(n) => given += n,
+            Err(e) => break e,
+        }
+    };
+    assert_eq!(first, "corrupt");
+    assert!(given < data.len() / 2, "the damage came late: {given}");
+    for _ in 0..10 {
+        assert_eq!(reader.read(&mut buffer), Err(first.clone()));
+    }
+}
+
+#[test]
+fn a_file_is_written_in_pieces_and_read_back() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("repo");
+    // Encrypted too: the bytes pass through the same writer.
+    let repo = init(&path, Some("correct horse"));
+    let data = noise(3 << 20);
+    let writer = Writer::open(
+        &repo,
+        &serde_json::json!({"ref": "inbox", "folder": "in/box", "name": "a.bin", "message": "Stream"}),
+    )
+    .unwrap();
+    // A write larger than the queue's pieces, then small ones.
+    writer.write(&data[..(2 << 20) + 5]).unwrap();
+    for part in data[(2 << 20) + 5..].chunks(4099) {
+        writer.write(part).unwrap();
+    }
+    writer.write(&[]).unwrap();
+    let report = writer.finish().unwrap();
+    assert_eq!(report["path"], "in/box/a.bin");
+    assert_eq!(report["size"], data.len());
+    let schema: Value = serde_json::from_str(&fs::read_to_string(schema_file()).unwrap()).unwrap();
+    check_against(
+        &schema,
+        &schema["streams"]["writer"]["result"],
+        &report,
+        "writer result",
+    );
+    // Finished is finished.
+    assert_eq!(writer.write(b"x"), Err("invalid_input".to_owned()));
+    assert_eq!(writer.finish(), Err("invalid_input".to_owned()));
+    drop(writer);
+
+    let reader = Reader::open(
+        &repo,
+        &serde_json::json!({"snapshot": "inbox", "path": "in/box/a.bin"}),
+    )
+    .unwrap();
+    assert!(reader.all() == data, "the bytes read back differ");
+    repo.start("verify", &serde_json::json!({})).unwrap();
+
+    // Taken names are not replaced.
+    let writer = Writer::open(
+        &repo,
+        &serde_json::json!({"ref": "inbox", "folder": "in/box", "name": "a.bin"}),
+    )
+    .unwrap();
+    assert_eq!(writer.finish().unwrap()["path"], "in/box/a (2).bin");
+}
+
+/// Stopping before the end stores nothing and leaves nothing behind, and the
+/// repository goes on working.
+#[test]
+fn a_writer_not_finished_stores_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("repo");
+    let repo = init(&path, None);
+    backup_of(dir.path(), &repo, &noise(1 << 20));
+    let log = |name: &str| repo.call("log", &serde_json::json!({"start": name}));
+    let before = log("main").unwrap();
+    let files = files_under(&path);
+
+    for target in ["main", "new-ref"] {
+        let writer =
+            Writer::open(&repo, &serde_json::json!({"ref": target, "name": "a.bin"})).unwrap();
+        writer.write(&noise(3 << 20)).unwrap();
+        drop(writer);
+    }
+    // Also with nothing written at all.
+    drop(Writer::open(&repo, &serde_json::json!({"ref": "main", "name": "b"})).unwrap());
+
+    assert_eq!(log("main").unwrap(), before);
+    assert_eq!(log("new-ref"), Err("not_found".to_owned()));
+    assert_eq!(files_under(&path), files, "files were left behind");
+    let report = repo.start("verify", &serde_json::json!({})).unwrap();
+    assert!(report["objects_checked"].as_u64().unwrap() > 0, "{report}");
+    assert_eq!(report["damaged_files"], serde_json::json!([]), "{report}");
+    assert_eq!(report["damaged_objects"], serde_json::json!([]), "{report}");
+
+    let writer = Writer::open(&repo, &serde_json::json!({"ref": "main", "name": "a.bin"})).unwrap();
+    writer.write(b"whole").unwrap();
+    assert_eq!(writer.finish().unwrap()["path"], "a.bin");
+}
+
+/// A bad request fails when opening; a failure found only at the end fails
+/// `finish`, and every call after it, so nothing looks stored.
+#[test]
+fn a_writer_reports_what_went_wrong() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = init(&dir.path().join("repo"), None);
+    backup_of(dir.path(), &repo, b"data");
+    let open = |request: Value| Writer::open(&repo, &request).map(|_| ());
+    for name in ["", "..", "a/b"] {
+        assert_eq!(
+            open(serde_json::json!({"ref": "main", "name": name})),
+            Err("invalid_input".to_owned()),
+            "{name}"
+        );
+    }
+    assert_eq!(
+        open(serde_json::json!({"ref": "bad ref", "name": "a"})),
+        Err("invalid_input".to_owned())
+    );
+
+    let before = repo
+        .call("log", &serde_json::json!({"start": "main"}))
+        .unwrap();
+    let writer = Writer::open(
+        &repo,
+        &serde_json::json!({"ref": "main", "folder": "big.bin", "name": "a"}),
+    )
+    .unwrap();
+    writer.write(b"bytes").unwrap();
+    assert_eq!(writer.finish(), Err("invalid_input".to_owned()));
+    assert_eq!(writer.finish(), Err("invalid_input".to_owned()));
+    assert_eq!(writer.write(b"more"), Err("invalid_input".to_owned()));
+    drop(writer);
+    assert_eq!(
+        repo.call("log", &serde_json::json!({"start": "main"}))
+            .unwrap(),
+        before
+    );
+
+    // NULL handles are errors; freeing NULL is allowed.
+    let mut out = ptr::null_mut();
+    assert_eq!(
+        unsafe { apeiron_writer_finish(ptr::null_mut(), &mut out) },
+        4
+    );
+    assert_eq!(
+        unsafe { apeiron_writer_write(ptr::null_mut(), ptr::null(), 0) },
+        4
+    );
+    let mut read = 0;
+    assert_eq!(
+        unsafe { apeiron_reader_read(ptr::null_mut(), [0_u8; 1].as_mut_ptr(), 1, &mut read) },
+        4
+    );
+    unsafe {
+        apeiron_reader_free(ptr::null_mut());
+        apeiron_writer_free(ptr::null_mut());
+    }
+}

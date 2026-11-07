@@ -363,6 +363,13 @@ pub fn schema() -> Value {
         "git_export" GitRequest => GitExportReport,
         "clone" CloneRequest => CloneReport,
     );
+    let streams = serde_json::json!({
+        "reader": { "request": generator.subschema_for::<ListRequest>() },
+        "writer": {
+            "request": generator.subschema_for::<AddFileRequest>(),
+            "result": generator.subschema_for::<AddFileReport>(),
+        },
+    });
     let progress = generator.subschema_for::<Progress>();
     let error = generator.subschema_for::<Error>();
     let definitions = generator.take_definitions(true);
@@ -373,6 +380,7 @@ pub fn schema() -> Value {
         "progress": progress,
         "error": error,
         "operations": operations,
+        "streams": streams,
         "$defs": definitions,
     })
 }

@@ -134,6 +134,27 @@ pub fn read_to<W: std::io::Write>(
     }
 }
 
+/// The chunks of the file at `path` in `snapshot`, in order; a folder or a
+/// link there is `invalid_input`.
+pub fn file_chunks(
+    repo: &Repository,
+    snapshot: &ObjectId,
+    path: &[u8],
+) -> Result<Vec<(ObjectId, u32)>> {
+    let root = repo.read_snapshot(snapshot)?.tree;
+    let not_file = || Error::InvalidInput(format!("{} is not a file", Name(path.to_vec())));
+    let Node::Entry(entry) = lookup(repo, &root, path)? else {
+        return Err(not_file());
+    };
+    match entry.kind {
+        EntryKind::File {
+            blob: Some(blob), ..
+        } => Ok(repo.read_blob(&blob)?.chunks),
+        EntryKind::File { blob: None, .. } => Ok(Vec::new()),
+        _ => Err(not_file()),
+    }
+}
+
 /// Lists the folder at `path` in `snapshot`, or the single entry if `path` is a file.
 pub fn list(repo: &Repository, snapshot: &ObjectId, path: &[u8]) -> Result<Vec<EntryInfo>> {
     let root = repo.read_snapshot(snapshot)?.tree;

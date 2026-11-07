@@ -2,7 +2,7 @@
 
 # Apeiron C ABI and SDKs
 
-> **Status: In progress.** Stage 3 work item 4 ([ROADMAP.md](ROADMAP.md) §5) is done: the C ABI, the Python SDK and the shared conformance suite. The JSON schemas are done; the C++ SDK and the SDKs of the next wave come later. The decisions behind it are ADR-015, ADR-016 and ADR-024 ([DECISIONS.md](DECISIONS.md)).
+> **Status: In progress.** Stage 3 work item 4 ([ROADMAP.md](ROADMAP.md) §5) is done: the C ABI, the Python SDK and the shared conformance suite. The JSON schemas and file content as a stream are done; the C++ SDK and the SDKs of the next wave come later. The decisions behind it are ADR-015, ADR-016 and ADR-024 ([DECISIONS.md](DECISIONS.md)).
 
 Apeiron is used from many languages through one C interface (the C ABI). Every SDK is a thin layer over that interface; none of them re-implements Apeiron's logic. That way the same operation gives the same result in every language.
 
@@ -42,9 +42,9 @@ The ABI is deliberately small: a handful of functions that never change, while t
 | Input strings | `const char*`, NUL-terminated UTF-8, borrowed only for the duration of the call; NULL or invalid UTF-8 is the error `invalid_input` |
 | Output strings | Written to a `char**` out-parameter; owned by the caller and freed with `apeiron_string_free`. An out-parameter is NULL whenever the call fails |
 | Handles | Created by the `_init`, `_open`, `_unlock` and `_start` functions and released with the matching `_free` function; using a freed handle is not allowed, freeing NULL is |
-| Threads | Repository handles can be used from several threads at once; a job handle from one thread at a time |
+| Threads | Repository handles can be used from several threads at once; a job, reader or writer handle from one thread at a time |
 | No panics | A panic inside Apeiron never crosses the boundary; it becomes error code 11 (`Internal`) |
-| Version check | `apeiron_abi_version()` returns the ABI version, now 0.1; an SDK refuses a library with another major version or an older minor version |
+| Version check | `apeiron_abi_version()` returns the ABI version, now 0.2; an SDK refuses a library with another major version or an older minor version |
 
 ### 2.1 Functions
 
@@ -62,6 +62,13 @@ The ABI is deliberately small: a handful of functions that never change, while t
 | `apeiron_job_cancel(job)` | Asks the job to stop |
 | `apeiron_job_wait(job, timeout_ms, &result_json)` | Waits for the result; returns `APEIRON_PENDING` if the timeout passes first (a negative timeout waits without limit). The result or the job's error is given once |
 | `apeiron_job_free(job)` | Releases a job; a running job is cancelled first |
+| `apeiron_reader_open(repo, request_json, &reader)` | Opens a file of a snapshot for reading (section 2.3) |
+| `apeiron_reader_read(reader, buffer, capacity, &read)` | Reads the next bytes; `read` is 0 at the end of the file |
+| `apeiron_reader_free(reader)` | Releases a reader |
+| `apeiron_writer_open(repo, request_json, &writer)` | Starts adding a file to a backup (section 2.3) |
+| `apeiron_writer_write(writer, data, length)` | Adds bytes to the file |
+| `apeiron_writer_finish(writer, &result_json)` | Ends the file and stores it as a new snapshot |
+| `apeiron_writer_free(writer)` | Releases a writer; if it was not finished, nothing is stored |
 | `apeiron_last_error()` | Error of the last failed call on this thread, as JSON |
 | `apeiron_string_free(s)` | Frees a string returned by the library |
 
@@ -94,6 +101,21 @@ apeiron_string_free(result);
 apeiron_job_free(job);
 apeiron_repo_free(repo);
 ```
+
+### 2.3 File content as a stream
+
+Most operations work on paths. These functions pass the bytes of one file through the ABI, a piece at a time, with memory use independent of the size of the file ([ADR-045](DECISIONS.md#adr-045-the-c-abi-reads-without-a-thread-and-writes-with-one)). The values are in the section `streams` of the schema.
+
+| Reader | Writer |
+| --- | --- |
+| Request `{"snapshot", "path"}` | Request `{"ref", "folder", "name", "message", "host"}`; a taken name gets ` (2)`, as in [SHARE.md](SHARE.md) §7 |
+| A missing file, a folder or a link fails when opening | A bad name or ref fails when opening |
+| Each chunk is checked before any of it is given | The result of `finish` is the snapshot, the path and the size |
+| After a failure every later read fails too, so a file with a hole in it never looks whole | After a failure every later call fails too; only `finish` stores anything, and freeing the writer without it stores nothing |
+| Holds no lock while it waits, so the repository stays free | Other writes to the repository wait until it is finished or freed: the thread holding a writer must not start one in between, or it waits for itself |
+| A `gc` that removes the snapshot meanwhile makes a later read fail, never give wrong bytes | Nothing is lost by a crash before `finish`: the ref has not moved |
+
+In Python, `repo.open_file(snapshot, path)` is a file object, and `repo.add_file(ref, name)` a `with` block that stores the file when it ends and nothing when an exception leaves it.
 
 ## 3. Schemas
 
@@ -145,6 +167,6 @@ Every operation has a method with the same name (`repo.search("*.pdf", history=T
 
 | Limit | Plan |
 | --- | --- |
-| File content does not pass through the ABI; operations work on paths | Streaming read and write handles in a later ABI minor version |
+| A stream adds a file or reads one; it cannot change a file in place or seek | Not planned: objects never change, and nothing has asked for seeking |
 | No typed classes in Python, no wheels | Not planned; Python stays a thin layer used from a clone of the repository |
 | No remote mode | The same JSON values will be sent to the background service |

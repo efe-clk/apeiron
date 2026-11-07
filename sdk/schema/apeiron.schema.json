@@ -1,5 +1,63 @@
 {
   "$defs": {
+    "AddFileOptions": {
+      "description": "Where a file goes and what is written with it.",
+      "properties": {
+        "folder": {
+          "$ref": "#/$defs/Name",
+          "default": "",
+          "description": "The folder inside the snapshot; made when missing."
+        },
+        "host": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "message": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "description": "The file's name; a taken name gets ` (2)`, ` (3)` … before its\nextension.",
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref",
+        "name"
+      ],
+      "type": "object"
+    },
+    "AddFileOutcome": {
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/Name",
+          "description": "Where the file is in it."
+        },
+        "size": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/ObjectId"
+        }
+      },
+      "required": [
+        "snapshot",
+        "path",
+        "size"
+      ],
+      "type": "object"
+    },
     "Added": {
       "description": "The result of installing a plugin.",
       "properties": {
@@ -4248,6 +4306,21 @@
   },
   "progress": {
     "$ref": "#/$defs/Progress"
+  },
+  "streams": {
+    "reader": {
+      "request": {
+        "$ref": "#/$defs/ListRequest"
+      }
+    },
+    "writer": {
+      "request": {
+        "$ref": "#/$defs/AddFileOptions"
+      },
+      "result": {
+        "$ref": "#/$defs/AddFileOutcome"
+      }
+    }
   },
   "title": "Apeiron operations",
   "version": "0.1"

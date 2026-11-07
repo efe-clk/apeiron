@@ -53,7 +53,7 @@ Cancellation is safe by construction: objects become visible only after they are
 
 | Principle | Description | Status |
 | --- | --- | --- |
-| Streams, not buffers | File content goes in and out as streams (`Read`/`Write` in Rust); content is never loaded into memory whole | Done in the Rust API; the C ABI works on paths ([SDK.md](SDK.md) §7) |
+| Streams, not buffers | File content goes in and out as streams (`Read`/`Write` in Rust); content is never loaded into memory whole | Done in the Rust API and the C ABI ([SDK.md](SDK.md) §2.3) |
 | Bounded memory | Memory use is independent of file size; target under 256 MB while adding a 10 GB file on a Raspberry Pi 4 ([VISION.md](VISION.md)) | 134 MiB adding a 10 GiB file on a stronger computer ([PERFORMANCE.md](PERFORMANCE.md)); not measured on a Raspberry Pi 4 |
 | Lazy listing | History, trees and search results are returned as iterators or pages, not as one big list | In progress (history is paged; trees and search results are lists, search with a limit) |
 
@@ -191,7 +191,7 @@ Every operation takes one plain request value and returns one plain result value
 | `git_export` | Git repository path (created bare if missing), ref prefix | `GitExportReport`: commits and tags written, refs updated, skipped refs, Git ids not reproduced | Yes |
 | `sync` | folder, remote name, ref name (default `sync/<folder name>`), mode (`two-way`, `send` or `receive`), dry run, speed limit, patterns to leave alone ([SYNC.md](SYNC.md) §5.1) | `SyncReport`: ref, action (`up_to_date`, `sent`, `received` or `merged`), snapshot, the backup made, what was fetched and pushed, folder changes, conflicts with their copies, files merged by plugins, paths left for the next round, warnings, rounds run ([SYNC.md](SYNC.md)); `conflict` in `send` mode when the remote has snapshots this copy does not | Yes |
 | `switch` | snapshot spec, folder, dry run | `SwitchReport`: the folder ref, the snapshot, the snapshot that recorded the folder first, folder changes, files changed during the switch with their copies, paths left alone, warnings ([BRANCH.md](BRANCH.md) §6) | Yes |
-| `add_file`, `export_zip_to` (Rust only) | a file added to a backup as a new version; a snapshot or a path in it written as a zip file to a `Write` | The file's new path and version; counts ([SHARE.md](SHARE.md)) | No |
+| `add_file`, `open_file` (through the C ABI as streams, [SDK.md](SDK.md) §2.3), `export_zip_to` (Rust only) | a file added to a backup as a new version; a file of a snapshot read piece by piece; a snapshot or a path in it written as a zip file to a `Write` | The file's new path and version; counts ([SHARE.md](SHARE.md)) | No |
 | `share_plugin`, `unshare_plugin`, `shared_plugins`, `install_shared_plugin` (Rust only) | plugin name | Plugins carried in the ref `apeiron/plugins` ([PLUGIN.md](PLUGIN.md) §5) | No |
 | `git_serve_refs`, `git_common`, `git_pack`, `git_receive` (Rust only) | ref prefix and what the Git client asked for | What the server answers to Git over HTTP ([GIT.md](GIT.md) §7) | No |
 

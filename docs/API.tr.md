@@ -53,7 +53,7 @@ Uzun işlemler (yedek, geri yükleme, senkron, doğrulama) **iş** (job) olarak 
 
 | İlke | Açıklama | Durum |
 | --- | --- | --- |
-| Tampon değil akış | Dosya içeriği akış olarak girer ve çıkar (Rust'ta `Read`/`Write`); içerik hiçbir zaman tamamen belleğe alınmaz | Rust API'de tamamlandı; C ABI yollarla çalışır ([SDK.tr.md](SDK.tr.md) §7) |
+| Tampon değil akış | Dosya içeriği akış olarak girer ve çıkar (Rust'ta `Read`/`Write`); içerik hiçbir zaman tamamen belleğe alınmaz | Rust API'de ve C ABI'de tamamlandı ([SDK.tr.md](SDK.tr.md) §2.3) |
 | Sınırlı bellek | Bellek kullanımı dosya boyutundan bağımsızdır; hedef, Raspberry Pi 4'te 10 GB'lık bir dosya eklerken 256 MB altı ([VISION.tr.md](VISION.tr.md)) | Daha güçlü bir bilgisayarda 10 GiB'lık dosya eklerken 134 MiB ([PERFORMANCE.tr.md](PERFORMANCE.tr.md)); Raspberry Pi 4'te ölçülmedi |
 | Tembel listeleme | Geçmiş, tree'ler ve arama sonuçları tek büyük liste olarak değil, yineleyici (iterator) ya da sayfalar olarak döner | Devam ediyor (geçmiş sayfalıdır; tree'ler ve arama sonuçları listedir, arama sınırlıdır) |
 
@@ -191,7 +191,7 @@ Her işlem tek bir düz istek değeri alır ve tek bir düz sonuç değeri dönd
 | `git_export` | Git deposu yolu (yoksa çıplak olarak oluşturulur), ref öneki | `GitExportReport`: yazılan commit ve etiketler, güncellenen ref'ler, atlanan ref'ler, yeniden üretilemeyen Git kimlikleri | Evet |
 | `sync` (`exclude`: dokunulmayacak kalıplar, [SYNC.tr.md](SYNC.tr.md) §5.1) | klasör, uzak depo adı, ref adı (varsayılan `sync/<klasör adı>`), kip (`two-way`, `send` ya da `receive`), hız sınırı, deneme çalışması | `SyncReport`: ref, eylem (`up_to_date`, `sent`, `received` ya da `merged`), snapshot, alınan yedek, ne çekildiği ve push edildiği, klasördeki değişiklikler, kopyalarıyla çatışmalar, eklentilerin birleştirdiği dosyalar, sonraki tura bırakılan yollar, uyarılar, çalışan tur sayısı ([SYNC.tr.md](SYNC.tr.md)); `send` kipinde uzak depoda bu kopyada olmayan snapshot'lar varsa `conflict` | Evet |
 | `switch` | snapshot belirteci, klasör, deneme çalışması | `SwitchReport`: klasör ref'i, snapshot, klasörü önce kaydeden snapshot, klasördeki değişiklikler, geçiş sırasında değişen dosyalar ve kopyaları, dokunulmayan yollar, uyarılar ([BRANCH.tr.md](BRANCH.tr.md) §6) | Evet |
-| `add_file`, `export_zip_to` (yalnızca Rust) | bir yedeğe yeni sürüm olarak eklenen dosya; bir `Write`'a zip olarak yazılan snapshot ya da içindeki yol | Dosyanın yeni yolu ve sürümü; sayılar ([SHARE.tr.md](SHARE.tr.md)) | Hayır |
+| `add_file`, `open_file` (C ABI'den akış olarak, [SDK.tr.md](SDK.tr.md) §2.3), `export_zip_to` (yalnızca Rust) | bir yedeğe yeni sürüm olarak eklenen dosya; bir snapshot'taki dosyanın parça parça okunması; bir `Write`'a zip olarak yazılan snapshot ya da içindeki yol | Dosyanın yeni yolu ve sürümü; sayılar ([SHARE.tr.md](SHARE.tr.md)) | Hayır |
 | `share_plugin`, `unshare_plugin`, `shared_plugins`, `install_shared_plugin` (yalnızca Rust) | eklenti adı | `apeiron/plugins` ref'inde taşınan eklentiler ([PLUGIN.tr.md](PLUGIN.tr.md) §5) | Hayır |
 | `git_serve_refs`, `git_common`, `git_pack`, `git_receive` (yalnızca Rust) | ref öneki ve Git istemcisinin istedikleri | Sunucunun HTTP üzerinden Git'e verdiği yanıtlar ([GIT.tr.md](GIT.tr.md) §7) | Hayır |
 

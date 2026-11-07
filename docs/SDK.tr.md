@@ -2,7 +2,7 @@
 
 # Apeiron C ABI ve SDK'lar
 
-> **Durum: Devam ediyor.** Aşama 3'ün 4. işi ([ROADMAP.tr.md](ROADMAP.tr.md) §5) tamamlandı: C ABI, Python SDK'sı ve ortak uygunluk test paketi. JSON şemaları tamamlandı; C++ SDK'sı ve sonraki dalganın SDK'ları daha sonra gelir. Arkasındaki kararlar ADR-015, ADR-016 ve ADR-024'tür ([DECISIONS.tr.md](DECISIONS.tr.md)).
+> **Durum: Devam ediyor.** Aşama 3'ün 4. işi ([ROADMAP.tr.md](ROADMAP.tr.md) §5) tamamlandı: C ABI, Python SDK'sı ve ortak uygunluk test paketi. JSON şemaları ve akış olarak dosya içeriği tamamlandı; C++ SDK'sı ve sonraki dalganın SDK'ları daha sonra gelir. Arkasındaki kararlar ADR-015, ADR-016 ve ADR-024'tür ([DECISIONS.tr.md](DECISIONS.tr.md)).
 
 Apeiron, tek bir C arayüzü (C ABI) üzerinden birçok dilden kullanılır. Her SDK bu arayüzün üzerinde ince bir katmandır; hiçbiri Apeiron'un mantığını yeniden yazmaz. Böylece aynı işlem her dilde aynı sonucu verir.
 
@@ -42,9 +42,9 @@ ABI bilerek küçük tutulur: hiç değişmeyen birkaç işlev vardır; işlemle
 | Giriş metinleri | `const char*`, NUL ile biten UTF-8; yalnızca çağrı süresince ödünç alınır; NULL ya da geçersiz UTF-8 `invalid_input` hatasıdır |
 | Çıkış metinleri | Bir `char**` çıkış parametresine yazılır; sahibi çağırandır ve `apeiron_string_free` ile serbest bırakılır. Çağrı başarısız olunca çıkış parametresi NULL'dır |
 | Tutamaçlar | `_init`, `_open`, `_unlock` ve `_start` işlevleriyle oluşturulur ve eşleşen `_free` işleviyle bırakılır; bırakılmış bir tutamaç kullanılamaz, NULL bırakılabilir |
-| İş parçacıkları | Depo tutamaçları aynı anda birden fazla iş parçacığından kullanılabilir; bir iş tutamacı aynı anda tek bir iş parçacığından |
+| İş parçacıkları | Depo tutamaçları aynı anda birden fazla iş parçacığından kullanılabilir; bir iş, okuyucu ya da yazıcı tutamacı aynı anda tek bir iş parçacığından |
 | Panik yok | Apeiron içindeki bir panik asla sınırı geçmez; 11 (`Internal`) hata koduna dönüşür |
-| Sürüm denetimi | `apeiron_abi_version()` ABI sürümünü döndürür, şimdi 0.1; bir SDK ana sürümü farklı ya da ara sürümü daha eski bir kütüphaneyi reddeder |
+| Sürüm denetimi | `apeiron_abi_version()` ABI sürümünü döndürür, şimdi 0.2; bir SDK ana sürümü farklı ya da ara sürümü daha eski bir kütüphaneyi reddeder |
 
 ### 2.1 İşlevler
 
@@ -62,6 +62,13 @@ ABI bilerek küçük tutulur: hiç değişmeyen birkaç işlev vardır; işlemle
 | `apeiron_job_cancel(job)` | İşin durmasını ister |
 | `apeiron_job_wait(job, timeout_ms, &result_json)` | Sonucu bekler; süre önce dolarsa `APEIRON_PENDING` döndürür (negatif bir süre sınırsız bekler). Sonuç ya da işin hatası bir kez verilir |
 | `apeiron_job_free(job)` | Bir işi bırakır; çalışan bir iş önce iptal edilir |
+| `apeiron_reader_open(repo, request_json, &reader)` | Bir snapshot'taki dosyayı okumak için açar (bölüm 2.3) |
+| `apeiron_reader_read(reader, buffer, capacity, &read)` | Sonraki baytları okur; dosyanın sonunda `read` 0'dır |
+| `apeiron_reader_free(reader)` | Okuyucuyu bırakır |
+| `apeiron_writer_open(repo, request_json, &writer)` | Bir yedeğe dosya eklemeye başlar (bölüm 2.3) |
+| `apeiron_writer_write(writer, data, length)` | Dosyaya bayt ekler |
+| `apeiron_writer_finish(writer, &result_json)` | Dosyayı bitirir ve yeni bir snapshot olarak saklar |
+| `apeiron_writer_free(writer)` | Yazıcıyı bırakır; bitirilmemişse hiçbir şey saklanmaz |
 | `apeiron_last_error()` | Bu iş parçacığındaki son başarısız çağrının hatası, JSON olarak |
 | `apeiron_string_free(s)` | Kütüphanenin döndürdüğü bir metni serbest bırakır |
 
@@ -94,6 +101,21 @@ apeiron_string_free(result);
 apeiron_job_free(job);
 apeiron_repo_free(repo);
 ```
+
+### 2.3 Akış olarak dosya içeriği
+
+Çoğu işlem yollar üzerinde çalışır. Bu işlevler bir dosyanın baytlarını ABI'den parça parça geçirir; bellek kullanımı dosyanın boyutuna bağlı değildir ([ADR-045](DECISIONS.tr.md#adr-045-c-abi-iş-parçacığı-olmadan-okur-bir-iş-parçacığıyla-yazar)). Değerler şemanın `streams` bölümündedir.
+
+| Okuyucu | Yazıcı |
+| --- | --- |
+| İstek `{"snapshot", "path"}` | İstek `{"ref", "folder", "name", "message", "host"}`; alınmış bir ad [SHARE.tr.md](SHARE.tr.md) §7'deki gibi ` (2)` alır |
+| Olmayan dosya, klasör ya da bağlantı açılırken başarısız olur | Hatalı ad ya da ref açılırken başarısız olur |
+| Her parça, herhangi bir baytı verilmeden önce denetlenir | `finish` sonucu snapshot, yol ve boyuttur |
+| Bir hatadan sonra her okuma da başarısız olur; böylece delikli bir dosya hiçbir zaman sağlam görünmez | Bir hatadan sonra her çağrı da başarısız olur; yalnızca `finish` bir şey saklar, yazıcıyı onsuz bırakmak hiçbir şey saklamaz |
+| Beklerken kilit tutmaz, depo serbest kalır | Depoya başka yazmalar, yazıcı bitene ya da bırakılana kadar bekler: yazıcıyı tutan iş parçacığı arada yazma başlatmamalıdır, yoksa kendini bekler |
+| Bu sırada snapshot'ı silen bir `gc`, sonraki okumayı başarısız yapar, asla yanlış bayt verdirmez | `finish` öncesi bir çökmede hiçbir şey kaybolmaz: ref kımıldamamıştır |
+
+Python'da `repo.open_file(snapshot, path)` bir dosya nesnesidir; `repo.add_file(ref, name)` ise bittiğinde dosyayı saklayan, bir istisnayla çıkıldığında hiçbir şey saklamayan bir `with` bloğudur.
 
 ## 3. Şemalar
 
@@ -145,6 +167,6 @@ Her işlemin aynı adlı bir yöntemi vardır (`repo.search("*.pdf", history=Tru
 
 | Sınır | Plan |
 | --- | --- |
-| Dosya içeriği ABI'den geçmez; işlemler yollar üzerinde çalışır | Sonraki bir ABI ara sürümünde akışlı okuma ve yazma tutamaçları |
+| Akış bir dosya ekler ya da okur; bir dosyayı yerinde değiştiremez ya da içinde atlayamaz | Planlanmıyor: nesneler değişmez ve atlamayı isteyen bir şey yok |
 | Python'da tipli sınıflar ve wheel yok | Planlanmıyor; Python, deponun bir kopyasından kullanılan ince bir katman olarak kalır |
 | Uzak kullanım yok | Aynı JSON değerler arka plan hizmetine gönderilecek |

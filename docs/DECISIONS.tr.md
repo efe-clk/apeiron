@@ -52,6 +52,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [042](#adr-042-belgelerin-içindeki-metin-yalıtılmış-ortamda-bir-eklentiden-gelir) | Belgelerde metin | Eklenti arayüzünde `extract-text`, sürüm 0.2; PDF ve ofis dosyalarını `plugins/documents` okur, yalnızca adlandırdığı dosyalar için çağrılır | Kabul edildi |
 | [043](#adr-043-sunucu-kendi-sertifikasını-tls-alpn-01-ile-alır) | Sertifikalar | `rustls-acme` ile `--acme`, sunucunun dinlediği kapıda TLS-ALPN-01; ADR-027'yi değiştirir | Kabul edildi |
 | [044](#adr-044-paketleri-küçük-betikler-yapar-ve-etiket-yalnızca-taslak-oluşturur) | Paketler | `dpkg-deb`, `hdiutil` ve NSIS kullanan, her sistemde denenen betikler; etiket sürüm değil taslak oluşturur | Kabul edildi |
+| [045](#adr-045-c-abi-iş-parçacığı-olmadan-okur-bir-iş-parçacığıyla-yazar) | C ABI akışları | Kilit tutmayan bir okuyucu; kendi iş parçacığında çalışan ve yalnızca `finish` ile saklayan bir yazıcı | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı. ADR-036 ve ADR-037, kendi kayıtları olmadan daha önce alınan kararları ve eski ADR'lerde değişenleri 2026-11-06'da kaydeder.
 
@@ -965,3 +966,23 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Şimdi imzalamak | Apple ve Windows sertifikaları para ister ve proje sahibinin kimliğini taşır; kararı proje sahibi verir |
 
 **Sonuçlar.** macOS ve Windows imzasız paketler için uyarı verir. Intel macOS ve Arm Windows paketi yoktur. Deneme, uygulamanın başlayıp çalışmayı sürdürdüğünü gösterir, penceresinin nasıl göründüğünü göstermez.
+
+## ADR-045: C ABI iş parçacığı olmadan okur, bir iş parçacığıyla yazar
+
+**Durum:** Kabul edildi (2026-11-07)
+
+**Bağlam.** Bir C programı bayt ister ve bayt verir; Rust API'si tersini yapar: `read_file` bir `Write`'a iter, `add_file` bir `Read`'den çeker. Birini ters çevirmek genellikle bir iş parçacığı ve bir kuyruk ister, ama `read_file` çalıştığı sürece deponun görünümünü tutar.
+
+**Karar.** Okuma, `Repository::open_file` olarak eklenir; iş parçacığı olmadan, kilidi yalnızca bir parçayı getirirken alan bir `FileReader` verir. Yazma, `add_file`'ı kendi iş parçacığında, 1 MiB'lik dört parçalık bir kuyruğun arkasında çalıştırır. Dosya yalnızca açık bir bitiş iletisiyle biter; yalnızca kapanan bir kuyruk eklemeyi başarısız yapar. Hatalar kalıcıdır: sonraki her çağrı aynı hatayı verir. Bu işlev eklediği için ABI 0.1'den 0.2'ye geçer.
+
+**Gerekçe.** İş parçacığındaki bir okuyucu, program beklerken görünümü tutardı; aynı tutamaçtaki her çağrı da sonsuza kadar beklerdi. Yanlışlıkla bırakılan bir yazıcı hiçbir zaman bitmiş bir dosya gibi görünmemelidir; bitişin bir ileti olmasının nedeni budur. Başarısız bir parçadan sonra devam eden okuyucu sonraki parçaları, yani delikli bir dosya verirdi.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| `read_file`'ı yeniden kullanan, iş parçacığındaki okuyucu | Program beklerken tutamaçtaki diğer her çağrıyı engeller |
+| Baytları geçici bir dosyada toplayan yazıcı | Şifreli bir deponun içeriğini diskte okunur bırakır |
+| Yazıcının iş parçacığına ihtiyaç duymaması için `add_file`'ı bölmek | Tek bir çağıran için, güç kesintisine karşı sınanmış kodda parçalamayı ve pack yazmayı değiştirir |
+
+**Sonuçlar.** Bir yazıcı açıkken depoya başka yazmalar bekler; bu yüzden onu tutan iş parçacığı yazma başlatmamalıdır. Okuma sırasındaki bir `gc`, o okumayı başarısız yapabilir.

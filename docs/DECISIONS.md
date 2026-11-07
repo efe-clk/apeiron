@@ -52,6 +52,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [042](#adr-042-text-inside-documents-comes-from-a-plugin-in-the-sandbox) | Text in documents | `extract-text` in the plugin interface, version 0.2; PDF and office files read by `plugins/documents`, called only for files it names | Accepted |
 | [043](#adr-043-the-server-gets-its-own-certificate-with-tls-alpn-01) | Certificates | `--acme` with `rustls-acme`, TLS-ALPN-01 on the port the server listens on; changes ADR-027 | Accepted |
 | [044](#adr-044-packages-are-made-by-small-scripts-and-a-tag-only-makes-a-draft) | Packages | Scripts with `dpkg-deb`, `hdiutil` and NSIS, tried on each system; a tag makes a draft, not a release | Accepted |
+| [045](#adr-045-the-c-abi-reads-without-a-thread-and-writes-with-one) | C ABI streams | A reader that holds no lock; a writer on its own thread that stores only on `finish` | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28. ADR-036 and ADR-037 record on 2026-11-06 decisions made earlier without a record of their own, including what changed in older ADRs.
 
@@ -965,3 +966,23 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Signing now | Apple and Windows certificates cost money and hold the owner's identity; the owner decides |
 
 **Consequences.** macOS and Windows warn about the unsigned packages. There is no Intel macOS or Arm Windows package. The trial shows that the app starts and keeps running, not what its window looks like.
+
+## ADR-045: The C ABI reads without a thread and writes with one
+
+**Status:** Accepted (2026-11-07)
+
+**Context.** A C program asks for bytes and hands bytes over, while the Rust API does the opposite: `read_file` pushes into a `Write` and `add_file` pulls from a `Read`. Turning one around usually takes a thread and a queue, but `read_file` holds the repository's view for as long as it runs.
+
+**Decision.** Reading is added as `Repository::open_file`, which gives a `FileReader` that takes the lock only while it fetches a chunk, with no thread. Writing keeps `add_file` on a thread of its own behind a queue of four pieces of 1 MiB. The file ends only with an explicit end message; a queue that merely closes makes adding fail. Failures stay: every later call gives the same error. This adds functions, so the ABI goes from 0.1 to 0.2.
+
+**Rationale.** A reader on a thread would hold the view while the program waits, and any call on the same handle would then wait for ever. A writer dropped by accident must never look like a file that ended, which is why the end is a message. A reader that went on after a failed chunk would give the chunks after it, a file with a hole in it.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| A reader on a thread, reusing `read_file` | Blocks every other call on the handle while the program waits |
+| A writer that collects the bytes in a temporary file | Leaves the content of an encrypted repository readable on disk |
+| Splitting `add_file` so a writer needs no thread | Changes the chunking and the pack writing for one caller, in code that is tested for power loss |
+
+**Consequences.** While a writer is open, other writes to the repository wait, so the thread holding it must not start one. A `gc` during a read can make that read fail.

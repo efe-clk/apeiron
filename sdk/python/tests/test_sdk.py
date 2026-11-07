@@ -1,6 +1,7 @@
 """What the Python SDK adds on top of the C ABI."""
 
 import sys
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -50,6 +51,31 @@ class Sdk(unittest.TestCase):
 
             with self.assertRaises(AttributeError):
                 report.missing
+
+    def test_a_file_as_a_stream(self):
+        data = os.urandom(3 << 20) + b"\0end"
+        with apeiron.Repository.init(self.root / "repo") as repo:
+            with repo.add_file("inbox", "a.bin", folder="in", message="Stream") as out:
+                out.write(data[:1000])
+                out.write(data[1000:])
+            self.assertEqual(out.report.path, "in/a.bin")
+            self.assertEqual(out.report.size, len(data))
+            with repo.open_file("inbox", "in/a.bin") as stream:
+                self.assertEqual(stream.read(10), data[:10])
+                self.assertEqual(stream.read(), data[10:])
+                self.assertEqual(stream.read(10), b"")
+            with self.assertRaises(apeiron.NotFoundError):
+                repo.open_file("inbox", "missing")
+
+            # An exception stores nothing.
+            before = repo.log("inbox")
+            with self.assertRaises(KeyError):
+                with repo.add_file("inbox", "b.bin") as out:
+                    out.write(b"half")
+                    raise KeyError("stop")
+            self.assertEqual(repo.log("inbox"), before)
+            with self.assertRaises(apeiron.InvalidInputError):
+                out.write(b"more")
 
     def test_errors_are_exceptions_by_kind(self):
         with apeiron.Repository.init(self.root / "repo") as repo:

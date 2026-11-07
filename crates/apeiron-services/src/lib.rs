@@ -33,7 +33,7 @@ pub use error::{Error, Result};
 pub use exclude::IGNORE_FILE;
 pub use export::{ArchiveFormat, ExportOutcome, export, export_zip_to, split_archive};
 pub use import::{ImportFormat, ImportOptions, ImportOutcome, import};
-pub use list::{EntryInfo, Kind, list, read_path, read_to};
+pub use list::{EntryInfo, Kind, file_chunks, list, read_path, read_to};
 pub use merge::{
     Conflict, ConflictKind, ContentMerger, MergeAction, MergeOptions, MergeOutcome, Merged,
     PLUGIN_SIZE_LIMIT, PluginMerge, cherry_pick, merge, rebase,

@@ -19,17 +19,25 @@ use std::time::Duration;
 use api::json as ops;
 use api::{Error, ErrorKind, Repository};
 
+mod stream;
+
 /// The job is not finished yet.
 pub const APEIRON_PENDING: i32 = -1;
 /// Version of this ABI: `major << 16 | minor`. An added function or field
 /// raises the minor; any other change raises the major.
-pub const APEIRON_ABI_VERSION: u32 = 1;
+pub const APEIRON_ABI_VERSION: u32 = 2;
 
 /// An open repository. It can be used from several threads at once.
 pub struct apeiron_repo(Repository);
 
 /// A running long operation. Use it from one thread at a time.
 pub struct apeiron_job(Box<dyn ops::JsonJob>);
+
+/// A file of a snapshot being read. Use it from one thread at a time.
+pub struct apeiron_reader(api::FileReader);
+
+/// A file being added to a backup. Use it from one thread at a time.
+pub struct apeiron_writer(stream::FileWriter);
 
 thread_local! {
     static LAST_ERROR: RefCell<Option<CString>> = const { RefCell::new(None) };
@@ -394,6 +402,184 @@ unsafe fn request(json: *const c_char) -> Result<serde_json::Value> {
     // SAFETY: the function's contract.
     let json = unsafe { text(json, "request_json")? };
     serde_json::from_str(json).map_err(|e| invalid(format!("request_json: {e}")))
+}
+
+/// A request given as JSON to one of the stream functions.
+///
+/// # Safety
+/// `request_json` is null or a NUL-terminated string.
+unsafe fn stream_request<T: serde::de::DeserializeOwned>(request_json: *const c_char) -> Result<T> {
+    // SAFETY: the function's contract.
+    let request = unsafe { request(request_json) }?;
+    serde_json::from_value(request).map_err(|e| invalid(format!("request: {e}")))
+}
+
+/// Opens a file of a snapshot for reading (SDK.md §2.3). The request is
+/// `{"snapshot", "path"}`. Fails here if the file is not there.
+///
+/// # Safety
+/// `repo` is null or a live handle; `request_json` is a NUL-terminated
+/// string; `out_reader` is valid for writes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn apeiron_reader_open(
+    repo: *const apeiron_repo,
+    request_json: *const c_char,
+    out_reader: *mut *mut apeiron_reader,
+) -> i32 {
+    guard(|| {
+        // SAFETY: the function's contract.
+        unsafe {
+            clear(out_reader, "out_reader")?;
+            let request: api::ListRequest = stream_request(request_json)?;
+            let reader = repo_ref(repo)?.open_file(&request)?;
+            *out_reader = Box::into_raw(Box::new(apeiron_reader(reader)));
+        }
+        Ok(0)
+    })
+}
+
+/// Reads up to `capacity` bytes into `buffer` and writes how many to
+/// `out_read`; 0 means the end of the file. After a failure, every later
+/// read fails too: a file with a hole in it never looks whole.
+///
+/// # Safety
+/// `reader` is null or a live handle used by no other thread; `buffer` is
+/// valid for writes of `capacity` bytes; `out_read` is valid for writes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn apeiron_reader_read(
+    reader: *mut apeiron_reader,
+    buffer: *mut u8,
+    capacity: usize,
+    out_read: *mut usize,
+) -> i32 {
+    guard(|| {
+        if out_read.is_null() {
+            return Err(invalid("out_read is NULL"));
+        }
+        // SAFETY: checked for null; the caller passes a writable pointer.
+        unsafe { *out_read = 0 };
+        if buffer.is_null() || capacity == 0 {
+            return Err(invalid("the buffer is NULL or empty"));
+        }
+        // SAFETY: the caller passes a live handle or null.
+        let reader = unsafe { reader.as_mut() }.ok_or_else(|| invalid("reader is NULL"))?;
+        // SAFETY: the caller passes `capacity` writable bytes at `buffer`.
+        // They are cleared first, so no uninitialized byte is ever read.
+        let buffer = unsafe {
+            ptr::write_bytes(buffer, 0, capacity);
+            std::slice::from_raw_parts_mut(buffer, capacity)
+        };
+        let read = reader.0.read_some(buffer)?;
+        // SAFETY: checked for null above.
+        unsafe { *out_read = read };
+        Ok(0)
+    })
+}
+
+/// Releases a reader. NULL is allowed.
+///
+/// # Safety
+/// `reader` is null or a live handle, not used afterwards.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn apeiron_reader_free(reader: *mut apeiron_reader) {
+    if !reader.is_null() {
+        // SAFETY: the handle was made by `Box::into_raw` in `apeiron_reader_open`.
+        drop(unsafe { Box::from_raw(reader) });
+    }
+}
+
+/// Starts adding a file to a backup (SDK.md §2.3). The request is
+/// `{"ref", "folder", "name", "message", "host"}`. Other writes to the
+/// repository wait until the writer is finished or freed, so the same thread
+/// must not start one in between.
+///
+/// # Safety
+/// `repo` is null or a live handle; `request_json` is a NUL-terminated
+/// string; `out_writer` is valid for writes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn apeiron_writer_open(
+    repo: *const apeiron_repo,
+    request_json: *const c_char,
+    out_writer: *mut *mut apeiron_writer,
+) -> i32 {
+    guard(|| {
+        // SAFETY: the function's contract.
+        unsafe {
+            clear(out_writer, "out_writer")?;
+            let request: api::AddFileRequest = stream_request(request_json)?;
+            let writer = stream::FileWriter::open(repo_ref(repo)?, request)?;
+            *out_writer = Box::into_raw(Box::new(apeiron_writer(writer)));
+        }
+        Ok(0)
+    })
+}
+
+/// Adds `length` bytes to the file.
+///
+/// # Safety
+/// `writer` is null or a live handle used by no other thread; `data` is
+/// valid for reads of `length` bytes, or `length` is 0.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn apeiron_writer_write(
+    writer: *mut apeiron_writer,
+    data: *const u8,
+    length: usize,
+) -> i32 {
+    guard(|| {
+        // SAFETY: the caller passes a live handle or null.
+        let writer = unsafe { writer.as_mut() }.ok_or_else(|| invalid("writer is NULL"))?;
+        if length == 0 {
+            writer.0.write(&[])?;
+            return Ok(0);
+        }
+        if data.is_null() {
+            return Err(invalid("data is NULL"));
+        }
+        // SAFETY: the caller passes `length` readable bytes at `data`.
+        writer
+            .0
+            .write(unsafe { std::slice::from_raw_parts(data, length) })?;
+        Ok(0)
+    })
+}
+
+/// Ends the file and stores it as a new snapshot, giving the snapshot, the
+/// path and the size as JSON. Only this call stores anything. The handle is
+/// still freed afterwards.
+///
+/// # Safety
+/// `writer` is null or a live handle used by no other thread;
+/// `out_result_json` is valid for writes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn apeiron_writer_finish(
+    writer: *mut apeiron_writer,
+    out_result_json: *mut *mut c_char,
+) -> i32 {
+    guard(|| {
+        // SAFETY: the function's contract.
+        unsafe {
+            clear(out_result_json, "out_result_json")?;
+            let writer = writer.as_mut().ok_or_else(|| invalid("writer is NULL"))?;
+            let report = writer.0.finish()?;
+            let json = serde_json::to_string(&report)
+                .map_err(|e| Error::new(ErrorKind::Internal, e.to_string()))?;
+            give(out_result_json, json)?;
+        }
+        Ok(0)
+    })
+}
+
+/// Releases a writer. If it was not finished, nothing is stored. NULL is
+/// allowed.
+///
+/// # Safety
+/// `writer` is null or a live handle, not used afterwards.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn apeiron_writer_free(writer: *mut apeiron_writer) {
+    if !writer.is_null() {
+        // SAFETY: the handle was made by `Box::into_raw` in `apeiron_writer_open`.
+        drop(unsafe { Box::from_raw(writer) });
+    }
 }
 
 #[cfg(test)]

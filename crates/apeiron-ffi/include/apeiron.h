@@ -10,13 +10,19 @@
 
 // Version of this ABI: `major << 16 | minor`. An added function or field
 // raises the minor; any other change raises the major.
-#define APEIRON_ABI_VERSION 1
+#define APEIRON_ABI_VERSION 2
 
 // A running long operation. Use it from one thread at a time.
 typedef struct apeiron_job apeiron_job;
 
+// A file of a snapshot being read. Use it from one thread at a time.
+typedef struct apeiron_reader apeiron_reader;
+
 // An open repository. It can be used from several threads at once.
 typedef struct apeiron_repo apeiron_repo;
+
+// A file being added to a backup. Use it from one thread at a time.
+typedef struct apeiron_writer apeiron_writer;
 
 #ifdef __cplusplus
 extern "C" {
@@ -122,6 +128,69 @@ int32_t apeiron_job_wait(struct apeiron_job *job, int64_t timeout_ms, char **out
 // # Safety
 // `job` is null or a live handle no other thread is using.
 void apeiron_job_free(struct apeiron_job *job);
+
+// Opens a file of a snapshot for reading (SDK.md §2.3). The request is
+// `{"snapshot", "path"}`. Fails here if the file is not there.
+//
+// # Safety
+// `repo` is null or a live handle; `request_json` is a NUL-terminated
+// string; `out_reader` is valid for writes.
+int32_t apeiron_reader_open(const struct apeiron_repo *repo,
+                            const char *request_json,
+                            struct apeiron_reader **out_reader);
+
+// Reads up to `capacity` bytes into `buffer` and writes how many to
+// `out_read`; 0 means the end of the file. After a failure, every later
+// read fails too: a file with a hole in it never looks whole.
+//
+// # Safety
+// `reader` is null or a live handle used by no other thread; `buffer` is
+// valid for writes of `capacity` bytes; `out_read` is valid for writes.
+int32_t apeiron_reader_read(struct apeiron_reader *reader,
+                            uint8_t *buffer,
+                            uintptr_t capacity,
+                            uintptr_t *out_read);
+
+// Releases a reader. NULL is allowed.
+//
+// # Safety
+// `reader` is null or a live handle, not used afterwards.
+void apeiron_reader_free(struct apeiron_reader *reader);
+
+// Starts adding a file to a backup (SDK.md §2.3). The request is
+// `{"ref", "folder", "name", "message", "host"}`. Other writes to the
+// repository wait until the writer is finished or freed, so the same thread
+// must not start one in between.
+//
+// # Safety
+// `repo` is null or a live handle; `request_json` is a NUL-terminated
+// string; `out_writer` is valid for writes.
+int32_t apeiron_writer_open(const struct apeiron_repo *repo,
+                            const char *request_json,
+                            struct apeiron_writer **out_writer);
+
+// Adds `length` bytes to the file.
+//
+// # Safety
+// `writer` is null or a live handle used by no other thread; `data` is
+// valid for reads of `length` bytes, or `length` is 0.
+int32_t apeiron_writer_write(struct apeiron_writer *writer, const uint8_t *data, uintptr_t length);
+
+// Ends the file and stores it as a new snapshot, giving the snapshot, the
+// path and the size as JSON. Only this call stores anything. The handle is
+// still freed afterwards.
+//
+// # Safety
+// `writer` is null or a live handle used by no other thread;
+// `out_result_json` is valid for writes.
+int32_t apeiron_writer_finish(struct apeiron_writer *writer, char **out_result_json);
+
+// Releases a writer. If it was not finished, nothing is stored. NULL is
+// allowed.
+//
+// # Safety
+// `writer` is null or a live handle, not used afterwards.
+void apeiron_writer_free(struct apeiron_writer *writer);
 
 #ifdef __cplusplus
 }  // extern "C"
