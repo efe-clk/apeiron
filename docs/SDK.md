@@ -2,7 +2,7 @@
 
 # Apeiron C ABI and SDKs
 
-> **Status: In progress.** Stage 3 work item 4 ([ROADMAP.md](ROADMAP.md) §5) is done: the C ABI, the Python SDK and the shared conformance suite. The JSON schemas and file content as a stream are done; the C++ SDK and the SDKs of the next wave come later. The decisions behind it are ADR-015, ADR-016 and ADR-024 ([DECISIONS.md](DECISIONS.md)).
+> **Status: In progress.** Stage 3 work item 4 ([ROADMAP.md](ROADMAP.md) §5) is done: the C ABI, the Python SDK and the shared conformance suite. The JSON schemas, file content as a stream and the C++ SDK are done; the SDKs of the next wave come later. The decisions behind it are ADR-015, ADR-016 and ADR-024 ([DECISIONS.md](DECISIONS.md)).
 
 Apeiron is used from many languages through one C interface (the C ABI). Every SDK is a thin layer over that interface; none of them re-implements Apeiron's logic. That way the same operation gives the same result in every language.
 
@@ -25,7 +25,8 @@ flowchart TB
 | --- | --- | --- |
 | `apeiron-ffi` | Builds `libapeiron` (shared and static library); its C header is `crates/apeiron-ffi/include/apeiron.h` | Done |
 | Python SDK | `sdk/python`, over the C ABI with `ctypes` | Done |
-| Conformance suite | `sdk/conformance`, run through the C ABI from Rust and through Python (section 6) | Done |
+| C++ SDK | `sdk/cpp`, one header over the C ABI, for C++17 | Done |
+| Conformance suite | `sdk/conformance`, run through the C ABI from Rust and through Python and C++ (section 6) | Done |
 | JSON schemas | `sdk/schema/apeiron.schema.json`: machine-readable description of every request, result, progress and error value (section 3) | Done |
 | Other SDKs | Idiomatic wrappers in each language, generated in part from the schemas | Planned |
 
@@ -127,7 +128,7 @@ In Python, `repo.open_file(snapshot, path)` is a file object, and `repo.add_file
 | --- | --- |
 | No logic of their own | An SDK only converts values and calls the C ABI |
 | Idiomatic | Each SDK follows its language's habits: exceptions per error kind in Python and C++, context managers in Python, RAII in C++ |
-| Typed | Requests and results become typed classes generated from the schemas; until they are generated, Python returns records read by attribute or key |
+| Typed | Requests and results become typed classes generated from the schemas; until they are generated, Python returns records read by attribute or key, and C++ gives JSON text ([ADR-046](DECISIONS.md#adr-046-the-c-sdk-is-one-header-and-passes-json-as-text)) |
 | Jobs | Every SDK offers `progress()`, `cancel()` and `wait()` with a timeout, plus a convenience that reports progress through the language's own mechanism (iterator, callback, event) on top of polling |
 | Packaging | The program and the library are built and installed with Cargo; the owner chose this over Python wheels (2026-11-06). The Python SDK finds the library through `APEIRON_LIB` |
 | Same tests | Every SDK passes the shared conformance suite (section 6) |
@@ -137,7 +138,7 @@ In Python, `repo.open_file(snapshot, path)` is a file object, and `repo.add_file
 | Wave | Languages | Status |
 | --- | --- | --- |
 | First | Rust (the `apeiron` crate itself), C (the ABI), Python | Done |
-| First | C++ | Planned |
+| First | C++ | Done |
 | Next | Go, C#, Java/Kotlin, Swift, JavaScript/TypeScript, Zig | Planned |
 
 ### 5.1 Example in Python
@@ -155,13 +156,34 @@ with apeiron.Repository.open("/mnt/backup/apeiron") as repo:
 
 Every operation has a method with the same name (`repo.search("*.pdf", history=True)` returns a job), and `repo.call(name, **request)` and `repo.start(name, **request)` reach any operation by name. Errors are exceptions named after their kind, such as `apeiron.NotFoundError` and `apeiron.PasswordError`, all subclasses of `apeiron.ApeironError`. `sdk/python/README.md` shows how to point the SDK at the library.
 
+### 5.2 Example in C++
+
+```cpp
+#include <apeiron.hpp>
+#include <iostream>
+
+int main() try {
+    auto repo = apeiron::Repository::open("/mnt/backup/apeiron");
+    auto job = repo.start("backup", R"({"source": "/home/ada/Documents", "ref": "main"})");
+    std::cout << job.watch([](const std::string& progress) { std::cout << progress << "\n"; }) << "\n";
+
+    auto writer = repo.add_file(R"({"ref": "main", "name": "note.txt"})");
+    writer.write("hello");
+    std::cout << writer.finish() << "\n";
+} catch (const apeiron::NotFoundError& e) {
+    std::cerr << "missing: " << e.what() << "\n";
+}
+```
+
+Every operation is reached by name with `repo.call` and `repo.start`; `apeiron::json_string` quotes a string for a request. A second request for a job's result is `InternalError`, as at the C ABI.
+
 ## 6. Conformance suite
 
 | Part | Description | Status |
 | --- | --- | --- |
 | Scenarios | JSON files in `sdk/conformance` that list steps (write a file, open a repository, call or start an operation, read a file) with the expected result or error kind; an expected value matches when the result holds it | Done |
-| Runners | The Rust runner calls the C functions directly; the Python runner goes through the SDK | Done |
-| CI | Both runners run every scenario on Linux, macOS and Windows; a difference between languages fails the build | Done |
+| Runners | The Rust runner calls the C functions directly; the Python and C++ runners go through their SDKs | Done |
+| CI | All three runners run every scenario on Linux, macOS and Windows; a difference between languages fails the build | Done |
 
 ## 7. Limits of the first version
 

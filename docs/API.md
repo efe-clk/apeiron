@@ -23,7 +23,7 @@ flowchart TB
 | --- | --- | --- |
 | Rust API | The single source of truth; every operation is defined here | In progress (the `apeiron` crate, section 8) |
 | C ABI | A stable C interface over the Rust API; one of the two crates allowed to use `unsafe` (with `apeiron-sys`) | Done (`apeiron-ffi`) |
-| SDKs | Thin wrappers over the C ABI that follow each language's habits | In progress (Python done) |
+| SDKs | Thin wrappers over the C ABI that follow each language's habits | In progress (Python and C++ done) |
 
 SDKs never re-implement logic; they only wrap the C ABI. That is how the same operation gives the same result in every language.
 
@@ -92,7 +92,7 @@ Cancellation is safe by construction: objects become visible only after they are
 | SDK wave | Languages | Status |
 | --- | --- | --- |
 | First | Rust (native), C (ABI), Python | Done |
-| First | C++ | Planned |
+| First | C++ | Done |
 | Next | Go, C#, Java/Kotlin, Swift, JavaScript/TypeScript, Zig | Planned |
 
 ## 8. Rust API specification

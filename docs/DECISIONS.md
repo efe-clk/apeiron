@@ -53,6 +53,7 @@ This document records every technical decision made so far, in ADR (architecture
 | [043](#adr-043-the-server-gets-its-own-certificate-with-tls-alpn-01) | Certificates | `--acme` with `rustls-acme`, TLS-ALPN-01 on the port the server listens on; changes ADR-027 | Accepted |
 | [044](#adr-044-packages-are-made-by-small-scripts-and-a-tag-only-makes-a-draft) | Packages | Scripts with `dpkg-deb`, `hdiutil` and NSIS, tried on each system; a tag makes a draft, not a release | Accepted |
 | [045](#adr-045-the-c-abi-reads-without-a-thread-and-writes-with-one) | C ABI streams | A reader that holds no lock; a writer on its own thread that stores only on `finish` | Accepted |
+| [046](#adr-046-the-c-sdk-is-one-header-and-passes-json-as-text) | C++ SDK | One C++17 header; RAII handles, one exception class per kind, requests and results as JSON text | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28. ADR-036 and ADR-037 record on 2026-11-06 decisions made earlier without a record of their own, including what changed in older ADRs.
 
@@ -986,3 +987,23 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Splitting `add_file` so a writer needs no thread | Changes the chunking and the pack writing for one caller, in code that is tested for power loss |
 
 **Consequences.** While a writer is open, other writes to the repository wait, so the thread holding it must not start one. A `gc` during a read can make that read fail.
+
+## ADR-046: The C++ SDK is one header and passes JSON as text
+
+**Status:** Accepted (2026-11-07)
+
+**Context.** The first wave of SDKs includes C++. An SDK holds no logic of its own (section 4 of [SDK.md](SDK.md)), and C++ has no standard JSON type or package manager.
+
+**Decision.** `sdk/cpp/include/apeiron.hpp` is one header for C++17, over `apeiron.h`. Handles free themselves and move but do not copy, and each kind of error is an exception class. Requests and results stay JSON text. The conformance runner has a small JSON reader of its own, for the test only.
+
+**Rationale.** With text, a program uses the JSON library it already has, and the SDK needs no dependency and no change when an operation is added. One header needs no build system of its own.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| Typed classes generated from the schema | Much generated code and a JSON library for every user, before anyone has asked for them |
+| Depending on a JSON library such as nlohmann/json | Forces one choice and version on every program that uses the SDK |
+| A compiled C++ library | Adds a build and a binary interface that differ by compiler, for no gain over the C ABI |
+
+**Consequences.** A C++ program reads results itself, so a wrong field name shows up when it runs, not when it compiles. Typed classes can come later on top of this header without changing it.

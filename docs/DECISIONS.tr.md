@@ -53,6 +53,7 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [043](#adr-043-sunucu-kendi-sertifikasını-tls-alpn-01-ile-alır) | Sertifikalar | `rustls-acme` ile `--acme`, sunucunun dinlediği kapıda TLS-ALPN-01; ADR-027'yi değiştirir | Kabul edildi |
 | [044](#adr-044-paketleri-küçük-betikler-yapar-ve-etiket-yalnızca-taslak-oluşturur) | Paketler | `dpkg-deb`, `hdiutil` ve NSIS kullanan, her sistemde denenen betikler; etiket sürüm değil taslak oluşturur | Kabul edildi |
 | [045](#adr-045-c-abi-iş-parçacığı-olmadan-okur-bir-iş-parçacığıyla-yazar) | C ABI akışları | Kilit tutmayan bir okuyucu; kendi iş parçacığında çalışan ve yalnızca `finish` ile saklayan bir yazıcı | Kabul edildi |
+| [046](#adr-046-c-sdksı-tek-başlık-dosyasıdır-ve-jsonı-metin-olarak-geçirir) | C++ SDK'sı | Tek C++17 başlık dosyası; RAII tutamaçlar, tür başına bir istisna sınıfı, JSON metni olarak istek ve sonuçlar | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı. ADR-036 ve ADR-037, kendi kayıtları olmadan daha önce alınan kararları ve eski ADR'lerde değişenleri 2026-11-06'da kaydeder.
 
@@ -986,3 +987,23 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Yazıcının iş parçacığına ihtiyaç duymaması için `add_file`'ı bölmek | Tek bir çağıran için, güç kesintisine karşı sınanmış kodda parçalamayı ve pack yazmayı değiştirir |
 
 **Sonuçlar.** Bir yazıcı açıkken depoya başka yazmalar bekler; bu yüzden onu tutan iş parçacığı yazma başlatmamalıdır. Okuma sırasındaki bir `gc`, o okumayı başarısız yapabilir.
+
+## ADR-046: C++ SDK'sı tek başlık dosyasıdır ve JSON'ı metin olarak geçirir
+
+**Durum:** Kabul edildi (2026-11-07)
+
+**Bağlam.** SDK'ların ilk dalgasında C++ vardır. Bir SDK kendi mantığını taşımaz ([SDK.tr.md](SDK.tr.md) bölüm 4); C++'ın da standart bir JSON türü ya da paket yöneticisi yoktur.
+
+**Karar.** `sdk/cpp/include/apeiron.hpp`, `apeiron.h` üzerinde C++17 için tek bir başlık dosyasıdır. Tutamaçlar kendini serbest bırakır, taşınır ama kopyalanmaz; her hata türü bir istisna sınıfıdır. İstekler ve sonuçlar JSON metni olarak kalır. Uygunluk çalıştırıcısının yalnızca test için küçük bir JSON okuyucusu vardır.
+
+**Gerekçe.** Metinle, bir program zaten kullandığı JSON kütüphanesini kullanır; SDK bağımlılık istemez ve bir işlem eklendiğinde değişmez. Tek başlık dosyası kendi derleme sistemini istemez.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Şemadan üretilen tipli sınıflar | İsteyen olmadan çok miktarda üretilmiş kod ve her kullanıcıya bir JSON kütüphanesi |
+| nlohmann/json gibi bir JSON kütüphanesine bağlanmak | SDK'yı kullanan her programa tek bir seçim ve sürüm dayatır |
+| Derlenmiş bir C++ kütüphanesi | C ABI'ye göre kazanç olmadan, derleyiciye göre değişen bir derleme ve ikili arayüz ekler |
+
+**Sonuçlar.** Bir C++ programı sonuçları kendisi okur; yanlış bir alan adı derlenirken değil, çalışırken görünür. Tipli sınıflar daha sonra, bu başlığı değiştirmeden üzerine eklenebilir.

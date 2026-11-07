@@ -23,7 +23,7 @@ flowchart TB
 | --- | --- | --- |
 | Rust API | Tek doğruluk kaynağı; her işlem burada tanımlanır | Devam ediyor (`apeiron` crate'i, bölüm 8) |
 | C ABI | Rust API üzerinde kararlı bir C arayüzü; `unsafe` kullanabilen iki crate'ten biri (`apeiron-sys` ile birlikte) | Tamamlandı (`apeiron-ffi`) |
-| SDK'lar | C ABI'yi saran, her dilin alışkanlıklarına uyan ince katmanlar | Devam ediyor (Python tamamlandı) |
+| SDK'lar | C ABI'yi saran, her dilin alışkanlıklarına uyan ince katmanlar | Devam ediyor (Python ve C++ tamamlandı) |
 
 SDK'lar mantığı yeniden yazmaz, yalnızca C ABI'yi sarar. Aynı işlemin her dilde aynı sonucu vermesi böyle sağlanır.
 
@@ -92,7 +92,7 @@ Uzun işlemler (yedek, geri yükleme, senkron, doğrulama) **iş** (job) olarak 
 | SDK dalgası | Diller | Durum |
 | --- | --- | --- |
 | İlk | Rust (yerel), C (ABI), Python | Tamamlandı |
-| İlk | C++ | Planlandı |
+| İlk | C++ | Tamamlandı |
 | Sonraki | Go, C#, Java/Kotlin, Swift, JavaScript/TypeScript, Zig | Planlandı |
 
 ## 8. Rust API spesifikasyonu

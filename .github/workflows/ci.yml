@@ -47,7 +47,7 @@ jobs:
           APEIRON_SFTP_TEST: ${{ runner.os != 'Windows' && '1' || '' }}
       - run: cargo test --manifest-path plugins/text/Cargo.toml
       - run: cargo test --manifest-path plugins/documents/Cargo.toml
-      # The C ABI through the Python SDK and a C program (docs/SDK.md).
+      # The C ABI through the Python and C++ SDKs and a C program (docs/SDK.md).
       - run: cargo build -p apeiron-ffi-rs
       - name: Python SDK and C example
         shell: bash
@@ -63,6 +63,18 @@ jobs:
             cc -std=c99 -Wall -Wextra -Werror -I crates/apeiron-ffi/include sdk/c/example.c \
               -L target/debug -lapeiron -Wl,-rpath,"$PWD/target/debug" -o target/c/example
             target/c/example "$PWD/target/c/repo" "$PWD/target/c/src"
+          fi
+      - name: C++ SDK
+        shell: bash
+        run: |
+          mkdir -p target/cpp
+          flags="-std=c++17 -Wall -Wextra -Wpedantic -Werror -I crates/apeiron-ffi/include -I sdk/cpp/include"
+          if [ "$RUNNER_OS" = Windows ]; then
+            clang++ $flags sdk/cpp/tests/run.cpp target/debug/apeiron.dll.lib -o target/cpp/run.exe
+            PATH="$PWD/target/debug:$PATH" target/cpp/run.exe sdk/conformance
+          else
+            c++ $flags sdk/cpp/tests/run.cpp -L target/debug -lapeiron -Wl,-rpath,"$PWD/target/debug" -o target/cpp/run
+            target/cpp/run sdk/conformance
           fi
 
   # S3 remotes against LocalStack, an S3-compatible service with conditional writes.

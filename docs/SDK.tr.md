@@ -2,7 +2,7 @@
 
 # Apeiron C ABI ve SDK'lar
 
-> **Durum: Devam ediyor.** Aşama 3'ün 4. işi ([ROADMAP.tr.md](ROADMAP.tr.md) §5) tamamlandı: C ABI, Python SDK'sı ve ortak uygunluk test paketi. JSON şemaları ve akış olarak dosya içeriği tamamlandı; C++ SDK'sı ve sonraki dalganın SDK'ları daha sonra gelir. Arkasındaki kararlar ADR-015, ADR-016 ve ADR-024'tür ([DECISIONS.tr.md](DECISIONS.tr.md)).
+> **Durum: Devam ediyor.** Aşama 3'ün 4. işi ([ROADMAP.tr.md](ROADMAP.tr.md) §5) tamamlandı: C ABI, Python SDK'sı ve ortak uygunluk test paketi. JSON şemaları, akış olarak dosya içeriği ve C++ SDK'sı tamamlandı; sonraki dalganın SDK'ları daha sonra gelir. Arkasındaki kararlar ADR-015, ADR-016 ve ADR-024'tür ([DECISIONS.tr.md](DECISIONS.tr.md)).
 
 Apeiron, tek bir C arayüzü (C ABI) üzerinden birçok dilden kullanılır. Her SDK bu arayüzün üzerinde ince bir katmandır; hiçbiri Apeiron'un mantığını yeniden yazmaz. Böylece aynı işlem her dilde aynı sonucu verir.
 
@@ -25,7 +25,8 @@ flowchart TB
 | --- | --- | --- |
 | `apeiron-ffi` | `libapeiron`'u (paylaşılan ve statik kütüphane) üretir; C başlık dosyası `crates/apeiron-ffi/include/apeiron.h`'dir | Tamamlandı |
 | Python SDK | `sdk/python`; C ABI'yi `ctypes` ile kullanır | Tamamlandı |
-| Uygunluk test paketi | `sdk/conformance`; Rust'tan C ABI üzerinden ve Python üzerinden çalıştırılır (bölüm 6) | Tamamlandı |
+| C++ SDK | `sdk/cpp`; C ABI üzerinde tek başlık dosyası, C++17 için | Tamamlandı |
+| Uygunluk test paketi | `sdk/conformance`; Rust'tan C ABI üzerinden, Python ve C++ üzerinden çalıştırılır (bölüm 6) | Tamamlandı |
 | JSON şemaları | `sdk/schema/apeiron.schema.json`: her istek, sonuç, ilerleme ve hata değerinin makinece okunabilir tanımı (bölüm 3) | Tamamlandı |
 | Diğer SDK'lar | Her dilde o dile uygun sarmalayıcılar; bir kısmı şemalardan üretilir | Planlandı |
 
@@ -127,7 +128,7 @@ Python'da `repo.open_file(snapshot, path)` bir dosya nesnesidir; `repo.add_file(
 | --- | --- |
 | Kendi mantığı yok | Bir SDK yalnızca değerleri dönüştürür ve C ABI'yi çağırır |
 | Dile uygun | Her SDK kendi dilinin alışkanlıklarına uyar: Python ve C++'ta hata türü başına istisna, Python'da context manager, C++'ta RAII |
-| Tipli | İstekler ve sonuçlar şemalardan üretilen tipli sınıflar olur; üretilene kadar Python, alan adıyla ya da anahtarla okunan kayıtlar döndürür |
+| Tipli | İstekler ve sonuçlar şemalardan üretilen tipli sınıflar olur; üretilene kadar Python, alan adıyla ya da anahtarla okunan kayıtlar döndürür, C++ ise JSON metni verir ([ADR-046](DECISIONS.tr.md#adr-046-c-sdksı-tek-başlık-dosyasıdır-ve-jsonı-metin-olarak-geçirir)) |
 | İşler | Her SDK `progress()`, `cancel()` ve zaman aşımlı `wait()` sunar; ayrıca sorgulamanın üzerine, ilerlemeyi dilin kendi yöntemiyle (yineleyici, geri çağrı, olay) bildiren bir kolaylık ekler |
 | Paketleme | Program ve kütüphane Cargo ile derlenir ve kurulur; proje sahibi bunu Python wheel'lerine tercih etti (2026-11-06). Python SDK'sı kütüphaneyi `APEIRON_LIB` ile bulur |
 | Aynı testler | Her SDK ortak uygunluk test paketinden geçer (bölüm 6) |
@@ -137,7 +138,7 @@ Python'da `repo.open_file(snapshot, path)` bir dosya nesnesidir; `repo.add_file(
 | Dalga | Diller | Durum |
 | --- | --- | --- |
 | İlk | Rust (`apeiron` crate'inin kendisi), C (ABI), Python | Tamamlandı |
-| İlk | C++ | Planlandı |
+| İlk | C++ | Tamamlandı |
 | Sonraki | Go, C#, Java/Kotlin, Swift, JavaScript/TypeScript, Zig | Planlandı |
 
 ### 5.1 Python ile örnek
@@ -155,13 +156,34 @@ with apeiron.Repository.open("/mnt/backup/apeiron") as repo:
 
 Her işlemin aynı adlı bir yöntemi vardır (`repo.search("*.pdf", history=True)` bir iş döndürür); `repo.call(name, **request)` ve `repo.start(name, **request)` her işleme adıyla ulaşır. Hatalar, türlerine göre adlandırılmış istisnalardır; örneğin `apeiron.NotFoundError` ve `apeiron.PasswordError`, hepsi `apeiron.ApeironError`'ın alt sınıfıdır. `sdk/python/README.md`, SDK'nın kütüphaneyi nasıl bulacağını gösterir.
 
+### 5.2 C++ ile örnek
+
+```cpp
+#include <apeiron.hpp>
+#include <iostream>
+
+int main() try {
+    auto repo = apeiron::Repository::open("/mnt/backup/apeiron");
+    auto job = repo.start("backup", R"({"source": "/home/ada/Documents", "ref": "main"})");
+    std::cout << job.watch([](const std::string& progress) { std::cout << progress << "\n"; }) << "\n";
+
+    auto writer = repo.add_file(R"({"ref": "main", "name": "note.txt"})");
+    writer.write("hello");
+    std::cout << writer.finish() << "\n";
+} catch (const apeiron::NotFoundError& e) {
+    std::cerr << "missing: " << e.what() << "\n";
+}
+```
+
+Her işleme `repo.call` ve `repo.start` ile adıyla ulaşılır; `apeiron::json_string` bir metni istek için tırnaklar. Bir işin sonucunu ikinci kez istemek, C ABI'de olduğu gibi `InternalError` verir.
+
 ## 6. Uygunluk test paketi
 
 | Parça | Açıklama | Durum |
 | --- | --- | --- |
 | Senaryolar | `sdk/conformance` içinde, adımları (dosya yaz, depo aç, işlem çağır ya da başlat, dosya oku) beklenen sonuç ya da hata türüyle listeleyen JSON dosyaları; beklenen değer, sonuç onu içerdiğinde uyar | Tamamlandı |
-| Çalıştırıcılar | Rust çalıştırıcısı C işlevlerini doğrudan çağırır; Python çalıştırıcısı SDK üzerinden gider | Tamamlandı |
-| CI | İki çalıştırıcı da her senaryoyu Linux, macOS ve Windows'ta çalıştırır; diller arasındaki bir fark derlemeyi başarısız yapar | Tamamlandı |
+| Çalıştırıcılar | Rust çalıştırıcısı C işlevlerini doğrudan çağırır; Python ve C++ çalıştırıcıları kendi SDK'ları üzerinden gider | Tamamlandı |
+| CI | Üç çalıştırıcı da her senaryoyu Linux, macOS ve Windows'ta çalıştırır; diller arasındaki bir fark derlemeyi başarısız yapar | Tamamlandı |
 
 ## 7. İlk sürümün sınırları
 
