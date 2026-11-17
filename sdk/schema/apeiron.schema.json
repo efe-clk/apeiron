@@ -1318,6 +1318,13 @@
             }
           ]
         },
+        "plugin": {
+          "description": "The plugin that read a format Apeiron does not know (PLUGIN.md §2.1).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "snapshot": {
           "$ref": "#/$defs/ObjectId"
         },
@@ -1457,6 +1464,26 @@
         "symlink"
       ],
       "type": "string"
+    },
+    "Kind2": {
+      "description": "What a plugin does (PLUGIN.md §2).",
+      "oneOf": [
+        {
+          "const": "type-driver",
+          "description": "Merges files and shows their differences, and reads their text.",
+          "type": "string"
+        },
+        {
+          "const": "importer",
+          "description": "Reads archive formats for `apeiron import`.",
+          "type": "string"
+        },
+        {
+          "const": "hook",
+          "description": "Looks at operations before they take effect and may stop them.",
+          "type": "string"
+        }
+      ]
     },
     "LegalHold": {
       "description": "A hold with its id and, once lifted, its lift.",
@@ -2081,10 +2108,23 @@
         "description": {
           "type": "string"
         },
+        "events": {
+          "description": "For a hook, the events it is called for, such as `backup`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/$defs/Kind2",
+          "default": "type-driver",
+          "description": "What it does; descriptions written before there were other kinds\nare type drivers."
+        },
         "name": {
           "type": "string"
         },
         "patterns": {
+          "description": "For a type driver, the files it merges; for an importer, the\narchives it reads.",
           "items": {
             "type": "string"
           },
@@ -3616,6 +3656,83 @@
       ],
       "type": "object"
     },
+    "Store": {
+      "properties": {
+        "store": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "StoreEntry": {
+      "description": "One plugin of a store's index.",
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "file": {
+          "description": "Where the `.wasm` file is: an address, or a name beside the index.",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/Kind2",
+          "default": "type-driver"
+        },
+        "name": {
+          "type": "string"
+        },
+        "sha256": {
+          "description": "SHA-256 of the file, hex; a download that differs is refused.",
+          "type": "string"
+        },
+        "size": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "description",
+        "file",
+        "sha256",
+        "size"
+      ],
+      "type": "object"
+    },
+    "StoreInstall": {
+      "properties": {
+        "dir": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "store": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
     "SwitchOutcome": {
       "properties": {
         "changes": {
@@ -4337,6 +4454,15 @@
         "$ref": "#/$defs/RepoInfo"
       }
     },
+    "install_plugin": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/StoreInstall"
+      },
+      "result": {
+        "$ref": "#/$defs/Added"
+      }
+    },
     "keys": {
       "long": false,
       "request": {
@@ -4689,6 +4815,18 @@
       },
       "result": {
         "$ref": "#/$defs/SearchOutcome"
+      }
+    },
+    "store_plugins": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/Store"
+      },
+      "result": {
+        "items": {
+          "$ref": "#/$defs/StoreEntry"
+        },
+        "type": "array"
       }
     },
     "switch": {

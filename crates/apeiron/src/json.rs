@@ -137,6 +137,21 @@ struct PluginName {
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]
+struct Store {
+    #[serde(default)]
+    store: Option<String>,
+}
+
+#[derive(Deserialize, schemars::JsonSchema)]
+struct StoreInstall {
+    name: String,
+    #[serde(default)]
+    store: Option<String>,
+    #[serde(default)]
+    dir: Option<PathBuf>,
+}
+
+#[derive(Deserialize, schemars::JsonSchema)]
 struct NewRemote {
     name: String,
     url: String,
@@ -242,6 +257,17 @@ pub fn call_global(operation: &str, request: Value) -> Result<Value> {
         "plugin_remove" => {
             let r: PluginName = parse(request)?;
             json(&crate::remove_plugin(&r.name, r.dir.as_deref())?)
+        }
+        "store_plugins" => json(&crate::store_plugins(
+            parse::<Store>(request)?.store.as_deref(),
+        )?),
+        "install_plugin" => {
+            let r: StoreInstall = parse(request)?;
+            json(&crate::install_plugin(
+                &r.name,
+                r.store.as_deref(),
+                r.dir.as_deref(),
+            )?)
         }
         "saved_searches" => json(&crate::saved_searches(
             parse::<SearchesFile>(request)?.file.as_deref(),
@@ -353,6 +379,8 @@ pub fn schema() -> Value {
         "plugins" PluginDir => Vec<PluginInfo>,
         "plugin_add" PluginFile => PluginAdded,
         "plugin_remove" PluginName => PluginInfo,
+        "store_plugins" Store => Vec<StoreEntry>,
+        "install_plugin" StoreInstall => PluginAdded,
         "saved_searches" SearchesFile => Vec<SavedSearch>,
         "save_search" SaveSearch => (),
         "forget_search" SearchName => SavedSearch,

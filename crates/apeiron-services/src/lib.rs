@@ -11,6 +11,7 @@ mod diff;
 mod error;
 mod exclude;
 mod export;
+mod hooks;
 mod import;
 mod list;
 mod merge;
@@ -25,14 +26,17 @@ mod sync;
 mod tags;
 mod upload;
 
-pub use backup::{BackupOptions, BackupOutcome, backup};
+pub use backup::{BackupOptions, BackupOutcome, backup, backup_with};
 pub use conflicts::{ConflictCopy, Keep, find_conflicts, original_name, resolve_conflict};
 pub use control::{Control, Phase, Progress, Warning, WarningKind};
-pub use diff::{Change, ChangeKind, diff};
+pub use diff::{Change, ChangeKind, diff, diff_from};
 pub use error::{Error, Result};
 pub use exclude::IGNORE_FILE;
 pub use export::{ArchiveFormat, ExportOutcome, export, export_zip_to, split_archive};
-pub use import::{ImportFormat, ImportOptions, ImportOutcome, import};
+pub use hooks::{
+    ArchiveReader, HOOK_CONTENT_LIMIT, HOOK_TOTAL_LIMIT, HookChange, Hooks, ReadFiles, Verdict,
+};
+pub use import::{ImportFormat, ImportOptions, ImportOutcome, import, import_with};
 pub use list::{EntryInfo, Kind, file_chunks, list, read_path, read_to};
 pub use merge::{
     Conflict, ConflictKind, ContentMerger, MergeAction, MergeOptions, MergeOutcome, Merged,

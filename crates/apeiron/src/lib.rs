@@ -33,7 +33,9 @@ pub use apeiron_git::{
     PushedRef as GitPushedRef, RefUpdate as GitRefUpdate, ServedRef as GitServedRef,
     Skipped as GitSkipped,
 };
-pub use apeiron_plugin::{Added as PluginAdded, PluginInfo};
+pub use apeiron_plugin::{
+    Added as PluginAdded, Kind as PluginKind, PluginInfo, StoreEntry, StoreIndex,
+};
 pub use apeiron_services::PluginMerge;
 pub use apeiron_services::{
     AddFileOptions as AddFileRequest, AddFileOutcome as AddFileReport, ArchiveFormat,
@@ -62,7 +64,9 @@ pub use apeiron_services::{MergeAction, MergeOutcome as MergeReport};
 pub use conflicts::{conflicts, resolve_conflict};
 pub use error::{Error, ErrorKind, Result};
 pub use job::Job;
-pub use plugins::{add_plugin, plugin_dir, plugins, remove_plugin};
+pub use plugins::{
+    add_plugin, install_plugin, plugin_dir, plugin_index, plugins, remove_plugin, store_plugins,
+};
 pub use repo::Repository;
 pub use report::{
     ComplianceReport, CopyKind, CopyState, Finding, FindingKind, Level, RefFacts, RemoteFacts,

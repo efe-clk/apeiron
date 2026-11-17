@@ -22,6 +22,8 @@ __all__ = [
     "plugins",
     "add_plugin",
     "remove_plugin",
+    "store_plugins",
+    "install_plugin",
     "saved_searches",
     "save_search",
     "forget_search",
@@ -344,6 +346,20 @@ def add_plugin(file: Any, dir: Any = None) -> Record:
 def remove_plugin(name: str, dir: Any = None) -> Record:
     """Removes an installed plugin."""
     return _call_global("plugin_remove", _drop_none({"name": name, "dir": dir}))
+
+
+def store_plugins(store: Optional[str] = None) -> list:
+    """The plugins a store offers (docs/PLUGIN.md §6); ``store`` is its
+    index, the latest release of Apeiron by default."""
+    return _call_global("store_plugins", _drop_none({"store": store}))
+
+
+def install_plugin(name: str, store: Optional[str] = None, dir: Any = None) -> Record:
+    """Downloads a plugin from a store, checks it against the store's index
+    and installs it."""
+    return _call_global(
+        "install_plugin", _drop_none({"name": name, "store": store, "dir": dir})
+    )
 
 
 def conflicts(folder: Any) -> list:

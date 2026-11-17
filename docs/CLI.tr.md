@@ -60,7 +60,8 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | `apeiron diff <snapshot> <snapshot> [--text]` | İki snapshot arasında eklenen, silinen ve değişen dosyaları listeler; `--text` bir eklentinin işlediği dosyaların değişen satırlarını da gösterir ([TEXT.tr.md](TEXT.tr.md)) | Tamamlandı |
 | `apeiron restore <snapshot> <target> [--path <path>]` | Bir snapshot'ı (ya da içindeki bir yolu) yeni ya da boş bir klasöre yazar | Tamamlandı |
 | `apeiron export <snapshot> <file> [--format <format>] [--path <path>] [--split <size>]` | Bir snapshot'ı (ya da içindeki bir yolu) yeni bir `.tar`, `.zip` ya da `.7z` dosyasına yazar; `--format` verilmezse biçimi dosya uzantısı belirler `--split` onu ardından bu boyutta `<file>.001`, `<file>.002` … parçalarına böler; sınırı olan bir disk ya da hizmet içindir, kısa süre ikisinin yerini ister, parçaları sırayla birleştirmek dosyayı geri verir (Linux ve macOS'ta `cat file.0* > file`, Windows'ta `copy /b`) | Tamamlandı |
-| `apeiron import <file> [--ref <name>] [--format tar\|tar.gz\|zip\|7z] [--message <metin>]` | Bir `.tar`, `.tar.gz`, `.tgz`, `.zip` ya da `.7z` arşivini bir ref'in (varsayılan `main`) yeni snapshot'ı olarak saklar, bölüm 4.2 | Tamamlandı |
+| `apeiron import <file> [--ref <name>] [--format tar\|tar.gz\|zip\|7z] [--message <metin>]` | Bir `.tar`, `.tar.gz`, `.tgz`, `.zip` ya da `.7z` arşivini ya da bir içe aktarıcı eklentinin okuduğu başka bir biçimi bir ref'in (varsayılan `main`) yeni snapshot'ı olarak saklar, bölüm 4.2 | Tamamlandı |
+| `apeiron plugin search [<text>] [--store <url>]`, `apeiron plugin install <name> [--store <url>]`, `apeiron plugin index <file.wasm>...` | Bir mağazanın eklentilerini listeler, birini SHA-256'sını mağazanın indeksine göre denetledikten sonra kurar ya da bir indeks yazdırır ([PLUGIN.tr.md](PLUGIN.tr.md) §6) | Tamamlandı |
 | `apeiron restore-test [<snapshot>] [--sample-mb <n>]` | Bir snapshot'tan rastgele bir örneği (varsayılan 100 MiB) geçici bir klasöre geri yükler, her dosyayı denetler ve klasörü siler; bir dosya bozuksa çıkış kodu 4'tür | Tamamlandı |
 | `apeiron daemon run\|once\|status [--priority low\|normal] [--tenant <name>]` | Zamanlanmış işleri, `--priority normal` verilmedikçe düşük işlemci ve disk önceliğiyle çalıştırır; `run`, `--no-notify` verilmedikçe bir iş başarısız olmaya başlayınca masaüstü bildirimi gösterir ([DAEMON.tr.md](DAEMON.tr.md) §2); `--tenant` bir web sunucusu kiracısının işlerini çalıştırır (§3.1) | Tamamlandı |
 | `apeiron refs` | Tüm ref'leri ve gösterdikleri snapshot'ları listeler | Tamamlandı |
@@ -155,7 +156,7 @@ Okunurken değişen bir dosya okunduğu hâliyle saklanır ve uyarı olarak rapo
 | Aynı yol iki kez | Açarken olduğu gibi sonraki girdi geçerlidir |
 | Kesik ya da bozuk veri | Komut başarısız olur, ref taşınmaz; saklananı `gc` siler |
 
-Bir 7z arşivi LZMA, LZMA2 kullanmalı ya da sıkıştırmasız olmalı ve parolasız olmalıdır; diğerleri hatayla durur. RAR arşivleri içe aktarılamaz.
+Bir 7z arşivi LZMA, LZMA2 kullanmalı ya da sıkıştırmasız olmalı ve parolasız olmalıdır; diğerleri hatayla durur. RAR arşivleri içe aktarılamaz. Başka bir biçimi, deseni dosyanın adına uyan bir içe aktarıcı eklenti okur ([PLUGIN.tr.md](PLUGIN.tr.md) §2.1).
 
 ## 5. Çıkış kodları
 

@@ -60,7 +60,8 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | `apeiron diff <snapshot> <snapshot> [--text]` | Lists files added, removed and changed between two snapshots; `--text` also shows the changed lines of files a plugin handles ([TEXT.md](TEXT.md)) | Done |
 | `apeiron restore <snapshot> <target> [--path <path>]` | Writes a snapshot (or one path in it) into a new or empty folder | Done |
 | `apeiron export <snapshot> <file> [--format <format>] [--path <path>] [--split <size>]` | Writes a snapshot (or one path in it) into a new `.tar`, `.zip` or `.7z` file; the extension chooses the format unless `--format` is given. `--split` then cuts it into `<file>.001`, `<file>.002` … of that size, for a disk or a service with a limit; for a moment it needs the room of both, and joining them in order gives the file back (`cat file.0* > file` on Linux and macOS, `copy /b` on Windows) | Done |
-| `apeiron import <file> [--ref <name>] [--format tar\|tar.gz\|zip\|7z] [--message <text>]` | Stores a `.tar`, `.tar.gz`, `.tgz`, `.zip` or `.7z` archive as a new snapshot of a ref (default `main`), section 4.2 | Done |
+| `apeiron import <file> [--ref <name>] [--format tar\|tar.gz\|zip\|7z] [--message <text>]` | Stores a `.tar`, `.tar.gz`, `.tgz`, `.zip` or `.7z` archive, or another format an importer plugin reads, as a new snapshot of a ref (default `main`), section 4.2 | Done |
+| `apeiron plugin search [<text>] [--store <url>]`, `apeiron plugin install <name> [--store <url>]`, `apeiron plugin index <file.wasm>...` | Lists the plugins of a store, installs one after checking its SHA-256 against the store's index, or prints an index ([PLUGIN.md](PLUGIN.md) §6) | Done |
 | `apeiron restore-test [<snapshot>] [--sample-mb <n>]` | Restores a random sample (default 100 MiB) of a snapshot into a temporary folder, checks every file and removes the folder; exit code 4 if a file is damaged | Done |
 | `apeiron daemon run\|once\|status [--priority low\|normal] [--tenant <name>]` | Runs scheduled jobs, at low CPU and disk priority unless `--priority normal`; `run` shows a desktop notification when a job starts failing, unless `--no-notify` ([DAEMON.md](DAEMON.md) §2); `--tenant` runs the jobs of a web server's tenant (§3.1) | Done |
 | `apeiron refs` | Lists all refs and the snapshots they point to | Done |
@@ -155,7 +156,7 @@ A file with the size and time the last snapshot of the ref recorded, and a time 
 | The same path twice | The later entry counts, as when unpacking |
 | Truncated or damaged data | The command fails and the ref does not move; what was stored is removed by `gc` |
 
-A 7z archive must use LZMA, LZMA2 or no compression and no password; others stop with an error. RAR archives cannot be imported.
+A 7z archive must use LZMA, LZMA2 or no compression and no password; others stop with an error. RAR archives cannot be imported. Another format is read by an importer plugin whose pattern matches the file's name ([PLUGIN.md](PLUGIN.md) §2.1).
 
 ## 5. Exit codes
 

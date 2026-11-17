@@ -87,6 +87,18 @@ pub fn backup(
     options: &BackupOptions,
     ctl: &Control,
 ) -> Result<BackupOutcome> {
+    backup_with(repo, options, ctl, None)
+}
+
+/// [`backup`], showing the snapshot to the `backup` hooks of `hooks` before
+/// the ref moves (PLUGIN.md §2.2); one that refuses leaves the ref where it
+/// was.
+pub fn backup_with(
+    repo: &mut Repository,
+    options: &BackupOptions,
+    ctl: &Control,
+    hooks: Option<&dyn crate::hooks::Hooks>,
+) -> Result<BackupOutcome> {
     apeiron_core::validate_ref_name(&options.ref_name)?;
     let parent = repo.read_ref(&options.ref_name)?;
     let before = match parent {
@@ -127,6 +139,17 @@ pub fn backup(
     ctl.check()?;
     ctl.set_phase(Phase::Finishing);
     writer.finish()?;
+    let hooked = match hooks {
+        Some(hooks) => crate::hooks::run_hooks(
+            repo,
+            hooks,
+            "backup",
+            &options.ref_name,
+            parent.as_ref(),
+            &id,
+        )?,
+        None => Vec::new(),
+    };
     repo.update_ref(&options.ref_name, parent, Some(id))?;
     ctl.set_phase(Phase::Done);
     Ok(BackupOutcome {
@@ -139,7 +162,7 @@ pub fn backup(
         new_bytes,
         excluded: stored.excluded,
         unchanged: stored.unchanged,
-        warnings: stored.warnings,
+        warnings: stored.warnings.into_iter().chain(hooked).collect(),
     })
 }
 

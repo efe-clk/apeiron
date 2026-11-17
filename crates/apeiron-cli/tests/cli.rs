@@ -618,6 +618,11 @@ fn search_by_name_text_size_and_history() {
 
 /// The fixture plugin of apeiron-plugin's tests, built for wasm32-wasip2.
 fn fixture_plugin() -> PathBuf {
+    fixture("fixture", "test_driver")
+}
+
+/// A fixture plugin of apeiron-plugin's tests in `tests/<folder>`.
+fn fixture(folder: &str, file: &str) -> PathBuf {
     let plugin = Path::new(env!("CARGO_MANIFEST_DIR")).join("../apeiron-plugin");
     let target = plugin.join("../../target/plugin-fixture");
     let status = Command::new(env!("CARGO"))
@@ -628,13 +633,138 @@ fn fixture_plugin() -> PathBuf {
             "wasm32-wasip2",
             "--manifest-path",
         ])
-        .arg(plugin.join("tests/fixture/Cargo.toml"))
+        .arg(plugin.join("tests").join(folder).join("Cargo.toml"))
         .arg("--target-dir")
         .arg(&target)
         .status()
         .unwrap();
     assert!(status.success(), "rustup target add wasm32-wasip2");
-    target.join("wasm32-wasip2/release/test_driver.wasm")
+    target.join(format!("wasm32-wasip2/release/{file}.wasm"))
+}
+
+/// A store's index lists plugins; one installs from it only when its file
+/// matches the index (PLUGIN.md §6).
+#[test]
+fn plugins_install_from_a_store() {
+    let s = Setup::new();
+    let plugins = s.root.join("plugins");
+    let store = s.root.join("store");
+    fs::create_dir_all(&store).unwrap();
+    let run = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_apeiron"))
+            .args(args)
+            .env("APEIRON_REPO", s.repo())
+            .env("APEIRON_PLUGINS", &plugins)
+            .env("APEIRON_PLUGIN_STORE", store.join("plugins.json"))
+            .output()
+            .unwrap()
+    };
+    let ok = |args: &[&str]| {
+        let out = run(args);
+        assert_eq!(
+            code(&out),
+            Some(0),
+            "{args:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8(out.stdout).unwrap()
+    };
+    let hook = fixture("fixture-hook", "test_hook");
+    let wasm = store.join("test_hook.wasm");
+    fs::copy(&hook, &wasm).unwrap();
+    let index = ok(&["plugin", "index", wasm.to_str().unwrap()]);
+    fs::write(store.join("plugins.json"), &index).unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&index).unwrap();
+    assert_eq!(parsed["plugins"][0]["file"], "test_hook.wasm");
+    assert_eq!(parsed["plugins"][0]["kind"], "hook");
+
+    assert!(ok(&["plugin", "search", "secret"]).starts_with("test-hook 1.0  hook"));
+    assert!(ok(&["plugin", "search", "nothing"]).contains("no such plugin"));
+    let out = ok(&["plugin", "install", "test-hook"]);
+    assert!(out.starts_with("Installed test-hook 1.0"), "{out}");
+    assert!(ok(&["plugin", "list"]).starts_with("test-hook"));
+    assert_ne!(code(&run(&["plugin", "install", "nothing"])), Some(0));
+
+    // A file that is not the one the index lists is refused.
+    ok(&["plugin", "remove", "test-hook"]);
+    let mut data = fs::read(&wasm).unwrap();
+    data.push(0);
+    fs::write(&wasm, data).unwrap();
+    let out = run(&["plugin", "install", "test-hook"]);
+    assert_ne!(code(&out), Some(0));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("not the file the store lists"));
+    assert!(ok(&["plugin", "list"]).starts_with("No plugins"));
+}
+
+/// An importer plugin reads an archive format for `import`, and a hook
+/// plugin warns about a backup or stops it (PLUGIN.md §2.1, §2.2).
+#[test]
+fn importer_and_hook_plugins_work_in_import_and_backup() {
+    let s = Setup::new();
+    let plugins = s.root.join("plugins");
+    let run = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_apeiron"))
+            .args(args)
+            .env("APEIRON_REPO", s.repo())
+            .env("APEIRON_PLUGINS", &plugins)
+            .output()
+            .unwrap()
+    };
+    let ok = |args: &[&str]| {
+        let out = run(args);
+        assert_eq!(
+            code(&out),
+            Some(0),
+            "{args:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8(out.stdout).unwrap()
+    };
+    let importer = fixture("fixture-importer", "test_importer");
+    let out = ok(&["plugin", "add", importer.to_str().unwrap()]);
+    assert!(out.contains("apeiron import reads *.lines"), "{out}");
+    let archive = s.root.join("mail.lines");
+    fs::write(&archive, "inbox/1.txt=hello\ninbox/2.txt=again\n").unwrap();
+    let imported: serde_json::Value = serde_json::from_slice(
+        &run(&[
+            "--json",
+            "import",
+            archive.to_str().unwrap(),
+            "--ref",
+            "mail",
+        ])
+        .stdout,
+    )
+    .unwrap();
+    assert_eq!(imported["plugin"], "test-importer", "{imported}");
+    assert_eq!(imported["files"], 2);
+    assert!(ok(&["ls", "mail", "inbox"]).contains("2.txt"));
+
+    let hook = fixture("fixture-hook", "test_hook");
+    let out = ok(&["plugin", "add", hook.to_str().unwrap()]);
+    assert!(out.contains("checks every backup"), "{out}");
+    assert!(ok(&["plugin", "list"]).contains("test-hook 1.0  hook  backup"));
+    let src = s.path("src");
+    ok(&["backup", &src]);
+    fs::write(s.root.join("src/run.log"), "fine").unwrap();
+    let out = run(&["backup", &src]);
+    assert_eq!(code(&out), Some(3), "warnings give exit code 3");
+    let said =
+        String::from_utf8_lossy(&out.stderr).into_owned() + &String::from_utf8_lossy(&out.stdout);
+    assert!(
+        said.contains("test-hook: backup of main holds run.log"),
+        "{said}"
+    );
+    let before = ok(&["log", "main"]);
+    fs::write(s.root.join("src/.env"), "KEY=SECRET").unwrap();
+    let out = run(&["backup", &src]);
+    assert_eq!(code(&out), Some(1));
+    let said = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        said.contains("the plugin test-hook stopped the backup: .env holds a secret"),
+        "{said}"
+    );
+    assert_eq!(ok(&["log", "main"]), before, "the ref did not move");
 }
 
 #[test]
@@ -664,7 +794,7 @@ fn a_plugin_merges_what_would_be_a_conflict() {
     let wasm = fixture_plugin();
     let out = ok(&["plugin", "add", wasm.to_str().unwrap()]);
     assert!(out.starts_with("Installed test-driver 1.0"), "{out}");
-    assert!(ok(&["plugin", "list"]).starts_with("test-driver 1.0  *.merge"));
+    assert!(ok(&["plugin", "list"]).starts_with("test-driver 1.0  type driver  *.merge"));
 
     // The repository carries a plugin to its other copies (PLUGIN.md §5).
     ok(&["plugin", "share", "test-driver"]);

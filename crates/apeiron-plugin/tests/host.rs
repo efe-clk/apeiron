@@ -12,12 +12,23 @@ use apeiron_services::TextExtractor;
 
 fn fixture() -> &'static Path {
     static WASM: OnceLock<PathBuf> = OnceLock::new();
-    WASM.get_or_init(|| {
+    WASM.get_or_init(|| build("fixture", "test_driver"))
+}
+
+/// Builds the fixture plugin in `tests/<folder>` and gives its file.
+fn build(folder: &str, file: &str) -> PathBuf {
+    {
         let here = Path::new(env!("CARGO_MANIFEST_DIR"));
         let target = here.join("../../target/plugin-fixture");
         let status = Command::new(env!("CARGO"))
-            .args(["build", "--release", "--target", "wasm32-wasip2", "--manifest-path"])
-            .arg(here.join("tests/fixture/Cargo.toml"))
+            .args([
+                "build",
+                "--release",
+                "--target",
+                "wasm32-wasip2",
+                "--manifest-path",
+            ])
+            .arg(here.join("tests").join(folder).join("Cargo.toml"))
             .arg("--target-dir")
             .arg(&target)
             .status()
@@ -26,8 +37,8 @@ fn fixture() -> &'static Path {
             status.success(),
             "building the fixture plugin failed; is the target installed? rustup target add wasm32-wasip2"
         );
-        target.join("wasm32-wasip2/release/test_driver.wasm")
-    })
+        target.join(format!("wasm32-wasip2/release/{file}.wasm"))
+    }
 }
 
 fn installed() -> (tempfile::TempDir, Plugins) {
@@ -177,4 +188,92 @@ fn text_comes_from_the_plugin_that_reads_the_file() {
         plugins.extract_file(b"a.extract", b"again").unwrap(),
         Some("AGAIN".to_owned())
     );
+}
+
+/// An importer reads its archives; a crash or a refusal is an error
+/// (PLUGIN.md §2.1).
+#[test]
+fn an_importer_reads_its_archives() {
+    use apeiron_plugin::Kind;
+    use apeiron_services::ArchiveReader;
+    let dir = tempfile::tempdir().unwrap();
+    let mut plugins = Plugins::open(dir.path().join("plugins"))
+        .unwrap()
+        .with_time_limit(Duration::from_secs(1));
+    let added = plugins
+        .add(&build("fixture-importer", "test_importer"))
+        .unwrap();
+    assert_eq!(added.info.kind, Kind::Importer);
+    assert!(plugins.reads(b"mail.lines"));
+    assert!(!plugins.reads(b"a.merge"));
+    // An importer merges nothing.
+    assert!(!plugins.handles(b"a.lines"));
+    let (by, files) = plugins
+        .read(b"a.lines", b"a.txt=one\nsub/b.txt=two")
+        .unwrap();
+    assert_eq!(by, "test-importer");
+    assert_eq!(
+        files,
+        [
+            (b"a.txt".to_vec(), b"one".to_vec()),
+            (b"sub/b.txt".to_vec(), b"two".to_vec())
+        ]
+    );
+    assert!(
+        plugins
+            .read(b"a.lines", b"refuse")
+            .unwrap_err()
+            .contains("refused")
+    );
+    assert!(
+        plugins
+            .read(b"a.lines", b"trap")
+            .unwrap_err()
+            .contains("crashed")
+    );
+    let reopened = Plugins::open(dir.path().join("plugins")).unwrap();
+    assert_eq!(reopened.list()[0].kind, Kind::Importer);
+}
+
+/// A hook warns, refuses, and is taken as a refusal when it runs too long
+/// (PLUGIN.md §2.2).
+#[test]
+fn a_hook_warns_or_stops_a_backup() {
+    use apeiron_services::{ChangeKind, HookChange, Hooks, Name, Verdict};
+    let dir = tempfile::tempdir().unwrap();
+    let mut plugins = Plugins::open(dir.path().join("plugins"))
+        .unwrap()
+        .with_time_limit(Duration::from_secs(1));
+    plugins.add(&build("fixture-hook", "test_hook")).unwrap();
+    assert!(plugins.has_hooks("backup"));
+    assert!(!plugins.has_hooks("push"));
+    let change = |path: &str, content: &[u8]| HookChange {
+        path: Name::from(path),
+        kind: ChangeKind::Added,
+        content: Some(content.to_vec()),
+    };
+    assert_eq!(
+        plugins.check("backup", "main", &[change("a.txt", b"fine")]),
+        Verdict::Allow(Vec::new())
+    );
+    assert_eq!(
+        plugins.check("backup", "main", &[change("run.log", b"fine")]),
+        Verdict::Allow(vec![(
+            "test-hook".to_owned(),
+            "backup of main holds run.log".to_owned()
+        )])
+    );
+    assert_eq!(
+        plugins.check("backup", "main", &[change(".env", b"KEY=SECRET")]),
+        Verdict::Refuse("test-hook".to_owned(), ".env holds a secret".to_owned())
+    );
+    let start = Instant::now();
+    match plugins.check("backup", "backup/loop", &[]) {
+        Verdict::Refuse(name, why) => {
+            assert_eq!(name, "test-hook");
+            assert!(why.contains("longer"), "{why}");
+        }
+        other => panic!("{other:?}"),
+    }
+    assert!(start.elapsed() < Duration::from_secs(10));
 }

@@ -272,8 +272,10 @@ impl Repository {
                 let _writer = repo.lock_writer();
                 // The index is loaded after the lock is taken (FORMAT.md §12).
                 let _lock = core::RepoLock::shared(repo.path())?;
+                let plugins = repo.plugins()?;
                 let mut core = repo.read().reopen()?;
-                let report = services::backup(&mut core, &request, ctl)?;
+                let hooks = plugins.as_deref().map(|p| p as &dyn services::Hooks);
+                let report = services::backup_with(&mut core, &request, ctl, hooks)?;
                 *repo.write() = core;
                 Ok(report)
             })();
@@ -290,8 +292,12 @@ impl Repository {
             let result = (|| {
                 let _writer = repo.lock_writer();
                 let _lock = core::RepoLock::shared(repo.path())?;
+                let plugins = repo.plugins()?;
                 let mut core = repo.read().reopen()?;
-                let report = services::import(&mut core, &request, ctl)?;
+                let reader = plugins
+                    .as_deref()
+                    .map(|p| p as &dyn services::ArchiveReader);
+                let report = services::import_with(&mut core, &request, ctl, reader)?;
                 *repo.write() = core;
                 Ok(report)
             })();

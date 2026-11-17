@@ -33,3 +33,69 @@ interface type-driver {
 world type-driver-plugin {
   export type-driver;
 }
+
+// An importer reads an archive format Apeiron does not know into files, for
+// `apeiron import` (docs/PLUGIN.md §2.1).
+interface importer {
+  record info {
+    // Lowercase letters, digits and `-`.
+    name: string,
+    version: string,
+    description: string,
+    // File name patterns of the archives it reads, such as `*.mbox`.
+    patterns: list<string>,
+    // Permissions the plugin asks for; this version grants none.
+    permissions: list<string>,
+  }
+
+  // One file of the archive: a `/`-separated path and its content.
+  record file {
+    path: string,
+    content: list<u8>,
+  }
+
+  describe: func() -> info;
+
+  // The files inside `content`, or why it cannot read it.
+  read: func(content: list<u8>) -> result<list<file>, string>;
+}
+
+// A hook looks at an operation before it takes effect and may stop it
+// (docs/PLUGIN.md §2.2).
+interface hook {
+  record info {
+    name: string,
+    version: string,
+    description: string,
+    // The events it is called for; `backup` is the only one so far.
+    events: list<string>,
+    permissions: list<string>,
+  }
+
+  enum change-kind {
+    added,
+    removed,
+    modified,
+  }
+
+  // A path the operation changes. `content` is the new content of an added
+  // or changed file of at most 1 MiB.
+  record change {
+    path: string,
+    kind: change-kind,
+    content: option<list<u8>>,
+  }
+
+  describe: func() -> info;
+
+  // Warnings to show and go on, or why to stop.
+  check: func(event: string, ref-name: string, changes: list<change>) -> result<list<string>, string>;
+}
+
+world importer-plugin {
+  export importer;
+}
+
+world hook-plugin {
+  export hook;
+}

@@ -84,6 +84,13 @@ jobs:
           apeiron plugin add plugins-built/apeiron_text.wasm
           apeiron plugin add plugins-built/apeiron_documents.wasm
           test "$(apeiron plugin list | wc -l)" -ge 2
+          # The store's index lists the plugins beside it (docs/PLUGIN.md §6).
+          if [ "${{ matrix.os }}" = ubuntu-22.04 ]; then
+            (cd plugins-built && apeiron plugin index apeiron_*.wasm > ../dist/plugins.json)
+            mkdir store && cp plugins-built/*.wasm dist/plugins.json store/
+            apeiron plugin remove text
+            APEIRON_PLUGIN_STORE="$PWD/store/plugins.json" apeiron plugin install text
+          fi
           sudo dpkg -r apeiron
       - name: Try the archive
         run: |

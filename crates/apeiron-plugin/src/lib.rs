@@ -13,17 +13,36 @@ use std::sync::{Mutex, OnceLock, PoisonError};
 use std::thread;
 use std::time::Duration;
 
-use apeiron_services::{ContentMerger, Merged, TextExtractor, name_matches};
+use apeiron_services::{
+    ArchiveReader, ChangeKind, ContentMerger, HookChange, Hooks, Merged, ReadFiles, TextExtractor,
+    Verdict, name_matches,
+};
 use serde::{Deserialize, Serialize};
 use wasmtime::component::{Component, Linker, ResourceTable};
 use wasmtime::{Config, Engine, Store, StoreLimits, StoreLimitsBuilder, Trap};
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
 
+mod store;
+
+pub use store::{
+    DEFAULT_STORE, MAX_DOWNLOAD, StoreEntry, StoreIndex, default_store, download, index, make_index,
+};
+
 mod bindings {
     wasmtime::component::bindgen!({ path: "wit", world: "type-driver-plugin" });
 }
 
+mod importer {
+    wasmtime::component::bindgen!({ path: "wit", world: "importer-plugin" });
+}
+
+mod hook {
+    wasmtime::component::bindgen!({ path: "wit", world: "hook-plugin" });
+}
+
 use bindings::TypeDriverPlugin;
+use hook::HookPlugin;
+use importer::ImporterPlugin;
 
 /// The longest a call may run (PLUGIN.md §3).
 pub const TIME_LIMIT: Duration = Duration::from_secs(30);
@@ -59,18 +78,45 @@ fn io_at(path: &Path) -> impl FnOnce(io::Error) -> Error + '_ {
     }
 }
 
+/// What a plugin does (PLUGIN.md §2).
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum Kind {
+    /// Merges files and shows their differences, and reads their text.
+    #[default]
+    TypeDriver,
+    /// Reads archive formats for `apeiron import`.
+    Importer,
+    /// Looks at operations before they take effect and may stop them.
+    Hook,
+}
+
 /// What a plugin says about itself (PLUGIN.md §2).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct PluginInfo {
     pub name: String,
     pub version: String,
     pub description: String,
+    /// What it does; descriptions written before there were other kinds
+    /// are type drivers.
+    #[serde(default)]
+    pub kind: Kind,
+    /// For a type driver, the files it merges; for an importer, the
+    /// archives it reads.
     pub patterns: Vec<String>,
     /// The files `extract-text` reads, for search; none for most plugins.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub text_patterns: Vec<String>,
+    /// For a hook, the events it is called for, such as `backup`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub events: Vec<String>,
     pub permissions: Vec<String>,
 }
+
+/// The events a hook may be called for (PLUGIN.md §2.2).
+pub const EVENTS: &[&str] = &["backup"];
 
 impl From<bindings::exports::apeiron::plugin::type_driver::Info> for PluginInfo {
     fn from(i: bindings::exports::apeiron::plugin::type_driver::Info) -> Self {
@@ -78,8 +124,40 @@ impl From<bindings::exports::apeiron::plugin::type_driver::Info> for PluginInfo 
             name: i.name,
             version: i.version,
             description: i.description,
+            kind: Kind::TypeDriver,
             patterns: i.patterns,
             text_patterns: i.text_patterns,
+            events: Vec::new(),
+            permissions: i.permissions,
+        }
+    }
+}
+
+impl From<importer::exports::apeiron::plugin::importer::Info> for PluginInfo {
+    fn from(i: importer::exports::apeiron::plugin::importer::Info) -> Self {
+        PluginInfo {
+            name: i.name,
+            version: i.version,
+            description: i.description,
+            kind: Kind::Importer,
+            patterns: i.patterns,
+            text_patterns: Vec::new(),
+            events: Vec::new(),
+            permissions: i.permissions,
+        }
+    }
+}
+
+impl From<hook::exports::apeiron::plugin::hook::Info> for PluginInfo {
+    fn from(i: hook::exports::apeiron::plugin::hook::Info) -> Self {
+        PluginInfo {
+            name: i.name,
+            version: i.version,
+            description: i.description,
+            kind: Kind::Hook,
+            patterns: Vec::new(),
+            text_patterns: Vec::new(),
+            events: i.events,
             permissions: i.permissions,
         }
     }
@@ -99,8 +177,24 @@ impl PluginInfo {
                 "plugin name {n:?} must be lowercase letters, digits and -"
             )));
         }
-        if self.patterns.is_empty() && self.text_patterns.is_empty() {
-            return Err(Error::Invalid(format!("plugin {n} names no file patterns")));
+        match self.kind {
+            Kind::TypeDriver | Kind::Importer
+                if self.patterns.is_empty() && self.text_patterns.is_empty() =>
+            {
+                return Err(Error::Invalid(format!("plugin {n} names no file patterns")));
+            }
+            Kind::Hook => {
+                if self.events.is_empty() {
+                    return Err(Error::Invalid(format!("hook {n} names no events")));
+                }
+                if let Some(e) = self.events.iter().find(|e| !EVENTS.contains(&e.as_str())) {
+                    return Err(Error::Invalid(format!(
+                        "hook {n} asks for the event {e:?}; there are only {}",
+                        EVENTS.join(", ")
+                    )));
+                }
+            }
+            _ => {}
         }
         if !self.permissions.is_empty() {
             return Err(Error::Invalid(format!(
@@ -184,12 +278,57 @@ impl Runtime {
         Component::new(&self.engine, wasm).map_err(|e| format!("not a WebAssembly component: {e}"))
     }
 
-    /// Runs `f` on a new instance of `component`, within the limits.
+    /// Runs `f` on a new type driver instance of `component`.
     fn call<T>(
         &self,
         component: &Component,
         time_limit: Duration,
         f: impl FnOnce(&TypeDriverPlugin, &mut Store<State>) -> wasmtime::Result<T>,
+    ) -> std::result::Result<T, String> {
+        self.run(time_limit, |store, linker| {
+            let p = TypeDriverPlugin::instantiate(&mut *store, component, linker)
+                .map_err(|e| format!("does not fit version 0.2 of the plugin interface: {e}"))?;
+            Ok(f(&p, store))
+        })
+    }
+
+    /// Runs `f` on a new importer instance of `component`.
+    fn call_importer<T>(
+        &self,
+        component: &Component,
+        time_limit: Duration,
+        f: impl FnOnce(&ImporterPlugin, &mut Store<State>) -> wasmtime::Result<T>,
+    ) -> std::result::Result<T, String> {
+        self.run(time_limit, |store, linker| {
+            let p = ImporterPlugin::instantiate(&mut *store, component, linker)
+                .map_err(|e| format!("is not an importer: {e}"))?;
+            Ok(f(&p, store))
+        })
+    }
+
+    /// Runs `f` on a new hook instance of `component`.
+    fn call_hook<T>(
+        &self,
+        component: &Component,
+        time_limit: Duration,
+        f: impl FnOnce(&HookPlugin, &mut Store<State>) -> wasmtime::Result<T>,
+    ) -> std::result::Result<T, String> {
+        self.run(time_limit, |store, linker| {
+            let p = HookPlugin::instantiate(&mut *store, component, linker)
+                .map_err(|e| format!("is not a hook: {e}"))?;
+            Ok(f(&p, store))
+        })
+    }
+
+    /// Makes a store within the limits and runs `call` on it; `call`
+    /// instantiates the component and makes its calls.
+    fn run<T>(
+        &self,
+        time_limit: Duration,
+        call: impl FnOnce(
+            &mut Store<State>,
+            &Linker<State>,
+        ) -> std::result::Result<wasmtime::Result<T>, String>,
     ) -> std::result::Result<T, String> {
         let state = State {
             wasi: WasiCtxBuilder::new().build(),
@@ -203,9 +342,7 @@ impl Runtime {
         store.limiter(|s| &mut s.limits);
         store.set_epoch_deadline((time_limit.as_millis() / TICK.as_millis()).max(1) as u64);
         store.epoch_deadline_trap();
-        let run = TypeDriverPlugin::instantiate(&mut store, component, &self.linker)
-            .map_err(|e| format!("does not fit version 0.2 of the plugin interface: {e}"))?;
-        f(&run, &mut store).map_err(|e| match e.downcast_ref::<Trap>() {
+        call(&mut store, &self.linker)?.map_err(|e| match e.downcast_ref::<Trap>() {
             Some(Trap::Interrupt) => format!("took longer than {} s", time_limit.as_secs()),
             Some(trap) => format!("crashed: {trap}"),
             // Growing memory past the limit is not a trap of WebAssembly.
@@ -215,6 +352,30 @@ impl Runtime {
             ),
             None => format!("crashed: {}", e.root_cause()),
         })
+    }
+}
+
+/// What a component says about itself, as whichever kind of plugin it is.
+fn describe(
+    runtime: &Runtime,
+    component: &Component,
+    limit: Duration,
+) -> std::result::Result<PluginInfo, String> {
+    match runtime.call(component, limit, |p, store| {
+        p.apeiron_plugin_type_driver().call_describe(store)
+    }) {
+        Ok(info) => Ok(info.into()),
+        Err(driver) => match runtime.call_importer(component, limit, |p, store| {
+            p.apeiron_plugin_importer().call_describe(store)
+        }) {
+            Ok(info) => Ok(info.into()),
+            Err(_) => runtime
+                .call_hook(component, limit, |p, store| {
+                    p.apeiron_plugin_hook().call_describe(store)
+                })
+                .map(PluginInfo::from)
+                .map_err(|_| driver),
+        },
     }
 }
 
@@ -280,6 +441,18 @@ impl Plugins {
             .map_err(|e| Error::Invalid(e.clone()))
     }
 
+    /// What the plugin in `file` says about itself, after the checks of
+    /// installing; nothing is installed.
+    pub fn describe_file(file: &Path) -> Result<PluginInfo> {
+        let wasm = fs::read(file).map_err(io_at(file))?;
+        let runtime = Runtime::new()?;
+        let invalid = |m: String| Error::Invalid(format!("{}: {m}", file.display()));
+        let component = runtime.compile(&wasm).map_err(invalid)?;
+        let info = describe(&runtime, &component, TIME_LIMIT).map_err(invalid)?;
+        info.check()?;
+        Ok(info)
+    }
+
     /// Checks the component in `file` and installs it, replacing a plugin of
     /// the same name (PLUGIN.md §1).
     pub fn add(&mut self, file: &Path) -> Result<Added> {
@@ -287,12 +460,7 @@ impl Plugins {
         let runtime = self.runtime()?;
         let invalid = |m: String| Error::Invalid(format!("{}: {m}", file.display()));
         let component = runtime.compile(&wasm).map_err(invalid)?;
-        let info: PluginInfo = runtime
-            .call(&component, self.time_limit, |p, store| {
-                p.apeiron_plugin_type_driver().call_describe(store)
-            })
-            .map_err(invalid)?
-            .into();
+        let info = describe(runtime, &component, self.time_limit).map_err(invalid)?;
         info.check()?;
         fs::create_dir_all(&self.dir).map_err(io_at(&self.dir))?;
         write_atomic(&self.dir.join(format!("{}.wasm", info.name)), &wasm)?;
@@ -334,18 +502,97 @@ impl Plugins {
         Ok(self.infos.remove(index))
     }
 
-    /// The first plugin, by name, with a pattern matching `name`.
-    fn driver_for(&self, name: &[u8]) -> Option<&PluginInfo> {
+    /// The first plugin of `kind`, by name, with a pattern matching `name`.
+    fn first(&self, kind: Kind, name: &[u8]) -> Option<&PluginInfo> {
         self.infos
             .iter()
+            .filter(|i| i.kind == kind)
             .find(|i| i.patterns.iter().any(|p| name_matches(p, name)))
+    }
+
+    /// The first type driver, by name, with a pattern matching `name`.
+    fn driver_for(&self, name: &[u8]) -> Option<&PluginInfo> {
+        self.first(Kind::TypeDriver, name)
     }
 
     /// The first plugin, by name, that reads the text of files named `name`.
     fn extractor_for(&self, name: &[u8]) -> Option<&PluginInfo> {
         self.infos
             .iter()
+            .filter(|i| i.kind == Kind::TypeDriver)
             .find(|i| i.text_patterns.iter().any(|p| name_matches(p, name)))
+    }
+
+    /// The files inside an archive named `name`, from the first importer
+    /// that reads it (PLUGIN.md §2.1); `None` when none does.
+    pub fn read_archive(&self, name: &[u8], content: &[u8]) -> Result<Option<(String, ReadFiles)>> {
+        let Some(info) = self.first(Kind::Importer, name) else {
+            return Ok(None);
+        };
+        let failed = |message: String| Error::Failed {
+            name: info.name.clone(),
+            message,
+        };
+        let component = self.component(&info.name)?;
+        let files = self
+            .runtime()?
+            .call_importer(&component, self.time_limit, |p, store| {
+                p.apeiron_plugin_importer().call_read(store, content)
+            })
+            .map_err(failed)?
+            .map_err(|message| failed(format!("refused: {message}")))?;
+        Ok(Some((
+            info.name.clone(),
+            files
+                .into_iter()
+                .map(|f| (f.path.into_bytes(), f.content))
+                .collect(),
+        )))
+    }
+
+    /// Asks every hook of `event`, by name, about `changes` (PLUGIN.md
+    /// §2.2). A hook that fails, runs out of time or crashes stops the
+    /// operation as a refusal would: a check that cannot run is not passed.
+    pub fn run_hooks(&self, event: &str, ref_name: &str, changes: &[HookChange]) -> Verdict {
+        use hook::exports::apeiron::plugin::hook as wit;
+        let changes: Vec<wit::Change> = changes
+            .iter()
+            .map(|c| wit::Change {
+                path: c.path.to_string(),
+                kind: match c.kind {
+                    ChangeKind::Added => wit::ChangeKind::Added,
+                    ChangeKind::Removed => wit::ChangeKind::Removed,
+                    ChangeKind::Modified => wit::ChangeKind::Modified,
+                },
+                content: c.content.clone(),
+            })
+            .collect();
+        let mut warnings = Vec::new();
+        for info in self
+            .infos
+            .iter()
+            .filter(|i| i.kind == Kind::Hook && i.events.iter().any(|e| e == event))
+        {
+            let answer = self.component(&info.name).and_then(|component| {
+                self.runtime()?
+                    .call_hook(&component, self.time_limit, |p, store| {
+                        p.apeiron_plugin_hook()
+                            .call_check(store, event, ref_name, &changes)
+                    })
+                    .map_err(|message| Error::Failed {
+                        name: info.name.clone(),
+                        message,
+                    })
+            });
+            match answer {
+                Ok(Ok(said)) => {
+                    warnings.extend(said.into_iter().map(|w| (info.name.clone(), w)));
+                }
+                Ok(Err(why)) => return Verdict::Refuse(info.name.clone(), why),
+                Err(e) => return Verdict::Refuse(info.name.clone(), e.to_string()),
+            }
+        }
+        Verdict::Allow(warnings)
     }
 
     /// The text inside a file, from the plugin that reads files of its name;
@@ -452,6 +699,36 @@ impl std::fmt::Debug for Plugins {
     }
 }
 
+impl Hooks for Plugins {
+    fn has_hooks(&self, event: &str) -> bool {
+        self.infos
+            .iter()
+            .any(|i| i.kind == Kind::Hook && i.events.iter().any(|e| e == event))
+    }
+
+    fn check(&self, event: &str, ref_name: &str, changes: &[HookChange]) -> Verdict {
+        self.run_hooks(event, ref_name, changes)
+    }
+}
+
+impl ArchiveReader for Plugins {
+    fn reads(&self, name: &[u8]) -> bool {
+        self.first(Kind::Importer, name).is_some()
+    }
+
+    fn read(
+        &self,
+        name: &[u8],
+        content: &[u8],
+    ) -> std::result::Result<(String, ReadFiles), String> {
+        match self.read_archive(name, content) {
+            Ok(Some(read)) => Ok(read),
+            Ok(None) => Err("no plugin reads it".to_owned()),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+}
+
 impl TextExtractor for Plugins {
     fn reads_text(&self, name: &[u8]) -> bool {
         self.extractor_for(name).is_some()
@@ -496,8 +773,10 @@ mod tests {
             name: name.to_owned(),
             version: "1".to_owned(),
             description: String::new(),
+            kind: Kind::TypeDriver,
             patterns: vec!["*.txt".to_owned()],
             text_patterns: Vec::new(),
+            events: Vec::new(),
             permissions: permissions.iter().map(|p| (*p).to_owned()).collect(),
         }
     }

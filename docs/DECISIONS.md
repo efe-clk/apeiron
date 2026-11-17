@@ -1047,3 +1047,22 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Jobs anywhere on the server's disk | A remote admin would reach every folder of the user that runs the server |
 
 **Consequences.** Remote use needs a web server; a computer without one is used through SSH and the CLI as before. A token skips the second factor, so it is shown once and kept only as a hash.
+
+## ADR-049: Git stays a crate of its own, not a plugin
+
+**Status:** Accepted (2026-11-18)
+
+**Context.** ADR-021 left moving the Git code behind the plugin interface for later. Plugins now come in three kinds, among them importers, so the question is whether Git should become one.
+
+**Decision.** `apeiron-git` stays a crate of the program. Importers are for archive formats; Git import, export and serving remain native.
+
+**Rationale.** An importer sees one file of at most 64 MiB and returns a tree, in a sandbox that cannot read the disk. Git needs a whole repository with its history, writes commits back with the same ids (GIT.md §5), and serves clients over HTTP and SSH with deltas, which a plugin could do only with access to the disk and the repository that the sandbox exists to deny. Git also belongs to the first users' needs (VISION.md), so it is not an optional add-on.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| A history importer plugin type with access to a folder | A plugin with disk access breaks the rule that plugins see only what they are given (PLUGIN.md §3) |
+| Moving only Git import into a plugin | Export and serving would still need the native code, so two implementations would have to agree |
+
+**Consequences.** The program stays larger by the `gix` library. Other version control systems, such as Mercurial, would come as native code too, or as importers of their bundle files.

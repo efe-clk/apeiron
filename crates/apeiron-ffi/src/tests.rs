@@ -244,6 +244,7 @@ fn conformance_scenarios() {
     let elsewhere = [
         "clone",
         "delete_ref",
+        "install_plugin",
         "lift_hold",
         "merge_review",
         "note_review",
@@ -251,6 +252,7 @@ fn conformance_scenarios() {
         "plugin_remove",
         "remove_key",
         "review",
+        "store_plugins",
     ];
     let schema = api::json::schema();
     let missing: Vec<&String> = schema["operations"]

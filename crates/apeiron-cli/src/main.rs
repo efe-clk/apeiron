@@ -2078,6 +2078,54 @@ enum PluginCommand {
     Share { name: String },
     /// Take a plugin out of the repository; installed copies stay
     Unshare { name: String },
+    /// List the plugins a store offers, those whose name or description
+    /// holds the text
+    Search {
+        text: Option<String>,
+        /// The store's index, an address or a file; the latest release of
+        /// Apeiron by default
+        #[arg(long, env = "APEIRON_PLUGIN_STORE", value_name = "URL")]
+        store: Option<String>,
+    },
+    /// Download a plugin from a store, check it against the store's index
+    /// and install it
+    Install {
+        name: String,
+        #[arg(long, env = "APEIRON_PLUGIN_STORE", value_name = "URL")]
+        store: Option<String>,
+    },
+    /// Print a store's index of plugin files, as plugins.json
+    Index {
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+    },
+}
+
+/// What `plugin add` and `plugin install` say about an installed plugin.
+fn print_added(out: &Output, added: &apeiron::PluginAdded) {
+    out.result(added, |a| {
+        let i = &a.info;
+        let verb = if a.replaced { "Replaced" } else { "Installed" };
+        say!("{verb} {} {}: {}", i.name, i.version, i.description);
+        match i.kind {
+            apeiron::PluginKind::TypeDriver if !i.patterns.is_empty() => {
+                say!("It merges files named {}", i.patterns.join(", "));
+            }
+            apeiron::PluginKind::Importer => {
+                say!("apeiron import reads {} with it", i.patterns.join(", "));
+            }
+            apeiron::PluginKind::Hook => {
+                say!(
+                    "It checks every {} before its ref moves, and may stop it",
+                    i.events.join(", ")
+                );
+            }
+            _ => {}
+        }
+        if !i.text_patterns.is_empty() {
+            say!("Search finds the text in {}", i.text_patterns.join(", "));
+        }
+    });
 }
 
 #[derive(Subcommand)]
@@ -3564,17 +3612,46 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                             return Err(Failure::Usage("give a file or --from-repo".to_owned()));
                         }
                     };
-                    out.result(&added, |a| {
-                        let i = &a.info;
-                        let verb = if a.replaced { "Replaced" } else { "Installed" };
-                        say!("{verb} {} {}: {}", i.name, i.version, i.description);
-                        if !i.patterns.is_empty() {
-                            say!("It merges files named {}", i.patterns.join(", "));
+                    print_added(out, &added);
+                }
+                PluginCommand::Install { name, store } => {
+                    print_added(
+                        out,
+                        &apeiron::install_plugin(&name, store.as_deref(), None)?,
+                    );
+                }
+                PluginCommand::Search { text, store } => {
+                    let needle = text.unwrap_or_default().to_lowercase();
+                    let found: Vec<apeiron::StoreEntry> = apeiron::store_plugins(store.as_deref())?
+                        .into_iter()
+                        .filter(|e| {
+                            e.name.contains(&needle)
+                                || e.description.to_lowercase().contains(&needle)
+                        })
+                        .collect();
+                    out.result(&found, |found| {
+                        for e in found {
+                            let kind = match e.kind {
+                                apeiron::PluginKind::TypeDriver => "type driver",
+                                apeiron::PluginKind::Importer => "importer",
+                                apeiron::PluginKind::Hook => "hook",
+                            };
+                            say!(
+                                "{} {}  {kind}  {}  {}",
+                                e.name,
+                                e.version,
+                                format::bytes(e.size),
+                                e.description
+                            );
                         }
-                        if !i.text_patterns.is_empty() {
-                            say!("Search finds the text in {}", i.text_patterns.join(", "));
+                        if found.is_empty() {
+                            say!("The store offers no such plugin");
                         }
                     });
+                }
+                PluginCommand::Index { files } => {
+                    let index = apeiron::plugin_index(&files)?;
+                    out.json_value(&index);
                 }
                 PluginCommand::List { shared } => {
                     let list = if shared {
@@ -3584,13 +3661,22 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     };
                     out.result(&list, |list| {
                         for i in list {
+                            let kind = match i.kind {
+                                apeiron::PluginKind::TypeDriver => "type driver",
+                                apeiron::PluginKind::Importer => "importer",
+                                apeiron::PluginKind::Hook => "hook",
+                            };
                             say!(
-                                "{} {}  {}  {}",
+                                "{} {}  {kind}  {}  {}",
                                 i.name,
                                 i.version,
-                                [i.patterns.as_slice(), i.text_patterns.as_slice()]
-                                    .concat()
-                                    .join(" "),
+                                [
+                                    i.patterns.as_slice(),
+                                    i.text_patterns.as_slice(),
+                                    i.events.as_slice()
+                                ]
+                                .concat()
+                                .join(" "),
                                 i.description
                             );
                         }

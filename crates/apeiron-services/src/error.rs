@@ -23,6 +23,9 @@ pub enum Error {
     InvalidInput(String),
     #[error("{0}")]
     Unsupported(String),
+    /// A plugin's hook stopped the operation (PLUGIN.md §2.2).
+    #[error("{0}")]
+    Refused(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

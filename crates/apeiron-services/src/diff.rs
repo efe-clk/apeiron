@@ -33,6 +33,18 @@ pub fn diff(repo: &Repository, from: &ObjectId, to: &ObjectId) -> Result<Vec<Cha
     Ok(out)
 }
 
+/// [`diff`] from `from`, or from nothing: then every path of `to` is added.
+pub fn diff_from(repo: &Repository, from: Option<&ObjectId>, to: &ObjectId) -> Result<Vec<Change>> {
+    let Some(from) = from else {
+        let mut out = Vec::new();
+        for entry in repo.read_tree(&repo.read_snapshot(to)?.tree)?.entries {
+            whole(repo, &entry, &Name::default(), ChangeKind::Added, &mut out)?;
+        }
+        return Ok(out);
+    };
+    diff(repo, from, to)
+}
+
 fn diff_trees(
     repo: &Repository,
     a: &ObjectId,

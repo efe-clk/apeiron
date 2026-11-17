@@ -122,7 +122,7 @@ Every work item is done (2026-10-30); the stage ends with its exit criterion, th
 | Need | Asked for in | What happens today |
 | --- | --- | --- |
 | Measuring the performance targets on a Raspberry Pi 4 | [VISION.md](VISION.md), [API.md](API.md) §4 | Measured on a stronger computer ([PERFORMANCE.md](PERFORMANCE.md)); it needs the device |
-| Git behind the plugin interface; other plugin types and a plugin store | [DECISIONS.md](DECISIONS.md) ADR-021, [PLUGIN.md](PLUGIN.md) §6 | `apeiron-git` is a crate of its own; plugins are type drivers only |
+| Storage backends and integrations as plugins | [PLUGIN.md](PLUGIN.md) §7 | Type drivers, importers, hooks and a plugin store; plugins cannot reach the network |
 | More standards in reports | [REPORTS.md](REPORTS.md) §6 | ISO/IEC 27001, SOC 2 and the GDPR |
 | Format upgrade tool | [FORMAT.md](FORMAT.md) §18 | The format is at version 1 |
 | SAML, sync without a remote, publishing the first release | [IDENTITY.md](IDENTITY.md) §6, [SYNC.md](SYNC.md) §7, [DESKTOP.md](DESKTOP.md) §5 | OpenID Connect, sync through a remote, building from source |

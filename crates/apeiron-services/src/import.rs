@@ -103,6 +103,9 @@ pub struct ImportOutcome {
     pub new_bytes: u64,
     /// Entries left out, with the reason.
     pub warnings: Vec<Warning>,
+    /// The plugin that read a format Apeiron does not know (PLUGIN.md §2.1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugin: Option<String>,
 }
 
 /// What one archive entry is, once its content is stored.
@@ -546,16 +549,43 @@ pub fn import(
     options: &ImportOptions,
     ctl: &Control,
 ) -> Result<ImportOutcome> {
+    import_with(repo, options, ctl, None)
+}
+
+/// The largest file an importer plugin is given, as for every plugin
+/// (PLUGIN.md §3).
+const PLUGIN_FILE_LIMIT: u64 = 64 << 20;
+
+/// [`import`], letting the plugins of `reader` read a format Apeiron does
+/// not know (PLUGIN.md §2.1).
+pub fn import_with(
+    repo: &mut Repository,
+    options: &ImportOptions,
+    ctl: &Control,
+    reader: Option<&dyn crate::hooks::ArchiveReader>,
+) -> Result<ImportOutcome> {
     apeiron_core::validate_ref_name(&options.ref_name)?;
+    let name = options
+        .archive
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
     let format = options
         .format
-        .or_else(|| ImportFormat::from_path(&options.archive))
-        .ok_or_else(|| {
-            Error::InvalidInput(format!(
-                "cannot tell the format of {}; name it with --format",
-                options.archive.display()
-            ))
-        })?;
+        .or_else(|| ImportFormat::from_path(&options.archive));
+    let plugin = match (format, reader) {
+        (None, Some(reader)) if reader.reads(name.as_bytes()) => Some(reader),
+        _ => None,
+    };
+    let unknown = || {
+        Error::InvalidInput(format!(
+            "cannot tell the format of {}; name it with --format or install a plugin that reads it",
+            options.archive.display()
+        ))
+    };
+    if format.is_none() && plugin.is_none() {
+        return Err(unknown());
+    }
     let file = File::open(&options.archive).at(&options.archive)?;
     let parent = repo.read_ref(&options.ref_name)?;
 
@@ -569,11 +599,42 @@ pub fn import(
         bytes: 0,
         warnings: Vec::new(),
     };
-    match format {
-        ImportFormat::Tar => read_tar(&mut state, file)?,
-        ImportFormat::TarGz => read_tar(&mut state, flate2::read::GzDecoder::new(file))?,
-        ImportFormat::Zip => read_zip(&mut state, file)?,
-        ImportFormat::SevenZ => read_7z(&mut state, file)?,
+    let mut read_by = None;
+    match (format, plugin) {
+        (Some(ImportFormat::Tar), _) => read_tar(&mut state, file)?,
+        (Some(ImportFormat::TarGz), _) => {
+            read_tar(&mut state, flate2::read::GzDecoder::new(file))?;
+        }
+        (Some(ImportFormat::Zip), _) => read_zip(&mut state, file)?,
+        (Some(ImportFormat::SevenZ), _) => read_7z(&mut state, file)?,
+        (None, Some(reader)) => {
+            let mut content = Vec::new();
+            file.take(PLUGIN_FILE_LIMIT + 1)
+                .read_to_end(&mut content)
+                .at(&options.archive)?;
+            if content.len() as u64 > PLUGIN_FILE_LIMIT {
+                return Err(Error::InvalidInput(format!(
+                    "{} is larger than the 64 MiB a plugin is given",
+                    options.archive.display()
+                )));
+            }
+            let (by, files) = reader
+                .read(name.as_bytes(), &content)
+                .map_err(|e| Error::InvalidInput(format!("{name}: {e}")))?;
+            for (path, data) in files {
+                state.ctl.check()?;
+                let Some(parts) = state.check_path(&path) else {
+                    continue;
+                };
+                if parts.is_empty() {
+                    continue;
+                }
+                let stored = state.store(data.as_slice())?;
+                state.add_item(&parts, item(stored, Attrs::default()));
+            }
+            read_by = Some(by);
+        }
+        (None, None) => return Err(unknown()),
     }
     if state.entries == 0 {
         return Err(Error::InvalidInput(format!(
@@ -616,6 +677,7 @@ pub fn import(
         bytes,
         new_bytes,
         warnings,
+        plugin: read_by,
     })
 }
 

@@ -1047,3 +1047,22 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Sunucunun diskinde her yerde işler | Uzaktaki bir admin sunucuyu çalıştıran kullanıcının her klasörüne ulaşırdı |
 
 **Sonuçlar.** Uzak kullanım bir web sunucusu ister; sunucusu olmayan bir bilgisayar eskisi gibi SSH ve CLI ile kullanılır. Belirteç ikinci adımı atlar; bu yüzden bir kez gösterilir ve yalnızca özeti tutulur.
+
+## ADR-049: Git eklenti değil, kendi crate'i olarak kalır
+
+**Durum:** Kabul edildi (2026-11-18)
+
+**Bağlam.** ADR-021, Git kodunu eklenti arayüzünün arkasına taşımayı sonraya bırakmıştı. Eklentiler artık aralarında içe aktarıcıların da olduğu üç türdedir; soru, Git'in onlardan biri olup olmayacağıdır.
+
+**Karar.** `apeiron-git` programın bir crate'i olarak kalır. İçe aktarıcılar arşiv biçimleri içindir; Git içe aktarma, dışa aktarma ve sunma yerel kalır.
+
+**Gerekçe.** Bir içe aktarıcı en fazla 64 MiB'lık tek bir dosya görür ve diski okuyamayan bir sandbox'ta bir ağaç döndürür. Git ise geçmişiyle bütün bir depoya ihtiyaç duyar, commit'leri aynı kimliklerle geri yazar (GIT.tr.md §5) ve istemcilere HTTP ve SSH üzerinden delta'larla sunar; bir eklenti bunu ancak sandbox'ın engellemek için var olduğu disk ve depo erişimiyle yapabilirdi. Git ilk kullanıcıların ihtiyaçlarına da girer (VISION.tr.md); isteğe bağlı bir ek değildir.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Bir klasöre erişimi olan geçmiş içe aktarıcı eklenti türü | Disk erişimi olan bir eklenti, eklentilerin yalnızca kendilerine verileni gördüğü kuralını bozar (PLUGIN.tr.md §3) |
+| Yalnızca Git içe aktarmayı eklentiye taşımak | Dışa aktarma ve sunma yine yerel koda ihtiyaç duyardı; iki uygulamanın uyuşması gerekirdi |
+
+**Sonuçlar.** Program `gix` kütüphanesi kadar büyük kalır. Mercurial gibi başka sürüm denetim sistemleri de yerel kod olarak ya da paket dosyalarının içe aktarıcıları olarak gelir.
