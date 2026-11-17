@@ -122,7 +122,7 @@ Her iş tamamlandı (2026-10-30); aşama, çıkış kriteri olan ilk kurumsal pi
 | İhtiyaç | İsteyen belge | Bugün ne oluyor |
 | --- | --- | --- |
 | Performans hedeflerini Raspberry Pi 4'te ölçmek | [VISION.tr.md](VISION.tr.md), [API.tr.md](API.tr.md) §4 | Daha güçlü bir bilgisayarda ölçüldü ([PERFORMANCE.tr.md](PERFORMANCE.tr.md)); cihaz gerekir |
-| API'nin uzak kullanımı ve daemon'u başka bir cihazdan yönetmek | [API.tr.md](API.tr.md) §2, [DAEMON.tr.md](DAEMON.tr.md) §7 | Yalnızca sayfaların JSON API'si; bir kiracının işleri Zamanlama sayfasında |
+| API'nin uzak kullanımı | [API.tr.md](API.tr.md) §2 | Yalnızca sayfaların JSON API'si, oturum açmış bir tarayıcı için; bir web sunucusunun işleri Zamanlama sayfasında düzenlenir ([DAEMON.tr.md](DAEMON.tr.md) §3.2) |
 | Git'in eklenti arayüzünün arkasına geçmesi; diğer eklenti türleri ve eklenti mağazası | [DECISIONS.tr.md](DECISIONS.tr.md) ADR-021, [PLUGIN.tr.md](PLUGIN.tr.md) §6 | `apeiron-git` kendi crate'idir; eklentiler yalnızca tür sürücüsüdür |
 | Raporlarda başka standartlar | [REPORTS.tr.md](REPORTS.tr.md) §6 | ISO/IEC 27001, SOC 2 ve GDPR |
 | Format yükseltme aracı | [FORMAT.tr.md](FORMAT.tr.md) §18 | Format 1. sürümde |

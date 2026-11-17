@@ -85,6 +85,7 @@ fn git_clones_the_branches_a_user_sees() {
         folders: Vec::new(),
         replicas: Vec::new(),
         standby: false,
+        jobs: None,
     })
     .unwrap();
     let url = |name: &str, password: &str| {

@@ -85,6 +85,7 @@ fn serve(dir: &Path, repo: Repository, replicas: &[&str], standby: bool) -> (Web
         shares: Shares::new(dir.join("shares.json")),
         replicas: replicas.iter().map(|r| r.to_string()).collect(),
         standby,
+        jobs: None,
     })
     .unwrap();
     let (status, cookie, body) = send(
@@ -151,6 +152,7 @@ fn a_backup_reaches_the_replica_and_the_standby_serves_it() {
         shares: Shares::new(primary_dir.join("x.json")),
         replicas: vec!["nowhere".to_owned()],
         standby: false,
+        jobs: None,
     });
     assert!(unknown.is_err());
 

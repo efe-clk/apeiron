@@ -332,6 +332,10 @@ pub struct WebOptions {
     pub replicas: Vec<String>,
     /// Serves a standby copy: everything but backups (REPLICATION.md §5).
     pub standby: bool,
+    /// Runs these scheduled jobs inside the server, and lets an `admin`
+    /// edit them on the Schedule page (DAEMON.md §3.2). Their scope should
+    /// be the served repository and `folders`.
+    pub jobs: Option<apeiron_daemon::Paths>,
 }
 
 /// One tenant of a web server (TENANTS.md).
@@ -1701,6 +1705,43 @@ pub(crate) fn site(site: Site) -> Result<Arc<App>, Error> {
 pub struct Web {
     address: SocketAddr,
     running: Running,
+    scheduler: Option<Scheduler>,
+}
+
+/// The scheduled jobs a web server runs on a thread of its own; they stop
+/// when it is dropped.
+struct Scheduler {
+    stop: Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl Scheduler {
+    /// Takes the daemon lock of `paths`, so no second service runs the same
+    /// jobs, and starts running them.
+    fn start(paths: apeiron_daemon::Paths) -> Result<Self, Error> {
+        let daemon = apeiron_daemon::Daemon::start(paths).map_err(|e| {
+            let kind = match e {
+                apeiron_daemon::Error::Locked(_) => ErrorKind::Locked,
+                _ => ErrorKind::Io,
+            };
+            Error::new(kind, format!("scheduled jobs: {e}"))
+        })?;
+        let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = stop.clone();
+        std::thread::Builder::new()
+            .name("apeiron-schedule".to_owned())
+            .spawn(move || {
+                // Its own log records why it stopped (DAEMON.md §6).
+                let _ = daemon.run(&flag);
+            })
+            .map_err(|e| Error::new(ErrorKind::Io, e.to_string()))?;
+        Ok(Scheduler { stop })
+    }
+}
+
+impl Drop for Scheduler {
+    fn drop(&mut self) {
+        self.stop.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
 }
 
 impl Web {
@@ -1715,9 +1756,15 @@ impl Web {
             replicas: options.replicas,
             standby: options.standby,
             limits: Limits::default(),
-            jobs: None,
+            jobs: options.jobs.clone(),
         })?;
-        Web::serve(options.listen, options.tls, crate::router(app))
+        let daemon = match options.jobs {
+            Some(paths) => Some(Scheduler::start(paths)?),
+            None => None,
+        };
+        let mut web = Web::serve(options.listen, options.tls, crate::router(app))?;
+        web.scheduler = daemon;
+        Ok(web)
     }
 
     /// Starts a web server for several tenants, each answering at its own
@@ -1785,7 +1832,11 @@ impl Web {
         listener.set_nonblocking(true).map_err(io_error)?;
         let address = listener.local_addr().map_err(io_error)?;
         let running = Running::start(listener, router, tls, background).map_err(io_error)?;
-        Ok(Web { address, running })
+        Ok(Web {
+            address,
+            running,
+            scheduler: None,
+        })
     }
 
     /// The address the server listens on.

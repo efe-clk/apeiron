@@ -107,6 +107,7 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | `apeiron hold add <refs> --reason <text>`, `hold list`, `hold lift <id> --reason <text>` | Ref'leri, sahip oldukları her sürümle kaldırılana kadar tutan bir yasal saklama kilidi koyar; kaldırma kalıcı olarak kaydedilir ([ARCHIVE.tr.md](ARCHIVE.tr.md) §2.1) | Tamamlandı |
 | `apeiron push --all <remote> [--rate <hız>]`, `apeiron pull --all <remote> [--rate <hız>]` | Bir replikayı ya da yedek sunucuyu güncel tutmak için her ref'i push ya da pull eder; çatışmalı bir ref bırakılır ve adlandırılır, diğerleri kopyalanır; o zaman çıkış kodu 3'tür ([REPLICATION.tr.md](REPLICATION.tr.md)) | Tamamlandı |
 | `apeiron web … [--replicate <remote>]... [--standby]` | Her yedekten sonra her ref'i her replikaya push eder ya da yedek almayan bir yedek sunucu kopyası sunar ([REPLICATION.tr.md](REPLICATION.tr.md)) | Tamamlandı |
+| `apeiron web … --schedule` | Zamanlanmış işleri sunucunun içinde, onun deposu ve klasörleri üzerinde çalıştırır; bir admin onları herhangi bir bilgisayardan Zamanlama sayfasında düzenler ([DAEMON.tr.md](DAEMON.tr.md) §3.2) | Tamamlandı |
 | `apeiron web … --audit-syslog <target>` | Her denetim olayını bir syslog sunucusuna (`udp://host:port`) ya da `/dev/log` gibi yerel bir sokete de gönderir ([AUDIT.tr.md](AUDIT.tr.md) §5) | Tamamlandı |
 | `apeiron key remove <id>` | Bir parolayı ya da kurtarma anahtarını siler; sonuncusu silinemez | Tamamlandı |
 

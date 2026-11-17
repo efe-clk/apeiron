@@ -107,6 +107,7 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | `apeiron hold add <refs> --reason <text>`, `hold list`, `hold lift <id> --reason <text>` | Places a legal hold, which keeps refs with every version they had until it is lifted; lifting is recorded for good ([ARCHIVE.md](ARCHIVE.md) §2.1) | Done |
 | `apeiron push --all <remote> [--rate <speed>]`, `apeiron pull --all <remote> [--rate <speed>]` | Pushes or pulls every ref, to keep a replica or a standby; a ref with a conflict is left and named, the others are copied; exit code 3 then ([REPLICATION.md](REPLICATION.md)) | Done |
 | `apeiron web … [--replicate <remote>]... [--standby]` | Pushes every ref to each replica after each backup, or serves a standby copy that takes no backups ([REPLICATION.md](REPLICATION.md)) | Done |
+| `apeiron web … --schedule` | Runs scheduled jobs inside the server, on its repository and folders; an admin edits them on the Schedule page from any computer ([DAEMON.md](DAEMON.md) §3.2) | Done |
 | `apeiron web … --audit-syslog <target>` | Also sends each audit event to a syslog server (`udp://host:port`) or a local socket such as `/dev/log` ([AUDIT.md](AUDIT.md) §5) | Done |
 | `apeiron key remove <id>` | Removes a password or recovery key; the last one cannot be removed | Done |
 

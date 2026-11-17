@@ -453,6 +453,10 @@ enum Command {
         /// Serve a standby copy: everything but backups (docs/REPLICATION.md)
         #[arg(long)]
         standby: bool,
+        /// Run scheduled jobs inside the server, on its repository and
+        /// folders, edited by an admin on the Schedule page (docs/DAEMON.md)
+        #[arg(long, conflicts_with = "tenants")]
+        schedule: bool,
         /// Also send each audit event to syslog: udp://host:port or a local
         /// socket such as /dev/log (docs/AUDIT.md)
         #[arg(long, value_name = "TARGET")]
@@ -3171,6 +3175,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             tenants,
             replicas,
             standby,
+            schedule,
             audit_syslog,
             tenant,
             command,
@@ -3301,6 +3306,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             } else {
                 let files = files()?;
                 apeiron_server::Users::load(&files.users)?.need_admin()?;
+                let repo_path = cli.repo.clone();
                 let repo = open(cli.repo, password_file)?;
                 let folders = if folders.is_empty() {
                     vec![
@@ -3309,6 +3315,28 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     ]
                 } else {
                     folders
+                };
+                let jobs = match (schedule, repo_path) {
+                    (true, Some(path)) => {
+                        let (config, state) = web_roots()?;
+                        let absolute = |p: &Path| {
+                            std::path::absolute(p)
+                                .map_err(|e| Failure::Usage(format!("{}: {e}", p.display())))
+                        };
+                        Some(apeiron_daemon::Paths {
+                            jobs: config.join("web-jobs.toml"),
+                            state_dir: state.join("web-daemon"),
+                            scope: Some(apeiron_daemon::Scope {
+                                repo: absolute(&path)?,
+                                password_file: password_file.map(absolute).transpose()?,
+                                folders: folders
+                                    .iter()
+                                    .map(|f| absolute(f))
+                                    .collect::<Result<_, _>>()?,
+                            }),
+                        })
+                    }
+                    _ => None,
                 };
                 apeiron_server::Web::start(apeiron_server::WebOptions {
                     repo,
@@ -3320,6 +3348,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     shares: files.shares,
                     replicas,
                     standby,
+                    jobs,
                 })?
             };
             let scheme = if plain { "http" } else { "https" };

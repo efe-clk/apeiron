@@ -88,6 +88,12 @@ Bir kiracının iş dosyasında `repo` ve `password_file` yoktur: her iş kirac�
 
 Kiracının bir `admin`'i iş dosyasını web arayüzünün Zamanlama sayfasında düzenler; sayfa, masaüstündeki gibi her işin son ve sonraki çalışmasını gösterir ve yalnızca geçerli bir dosyayı kaydeder. Her kayıt, işlerin adlarıyla birlikte kiracının denetim kaydına `schedule_save` olarak yazılır (AUDIT.tr.md §1).
 
+### 3.2 Bir web sunucusunun işleri
+
+`apeiron web --schedule`, tek bir deponun web sunucusunun içinde işler çalıştırır; böylece bir `admin` bunları herhangi bir bilgisayardan, Zamanlama sayfasında kurar ve izler. Kurallar bir kiracınınkilerdir (bölüm 3.1): her iş, `--password-file` ile açılan sunulan depoda çalışır ve bir `folder` sunucunun bir `--folder`'ının içinde olmalıdır. İş dosyası `<yapılandırma klasörü>/web-jobs.toml`'dur; durum ve kayıt `<durum klasörü>/web-daemon` içindedir.
+
+İşler sunucunun bir iş parçacığında, onun önceliğiyle çalışır ve sunucu durunca durur. Biri bunları çalıştırırken ikinci bir sunucu ya da aynı durum klasörünü kullanan bir `apeiron daemon run` başlayamaz: başlangıç "locked" hatasıyla biter. Her kayıt denetim kaydına `schedule_save` olarak yazılır.
+
 ## 4. Bir iş ne zaman çalışır
 
 ```mermaid
@@ -127,7 +133,7 @@ Bir yedek ancak geri yüklenerek kanıtlanır (VISION.tr.md). Geri yükleme test
 
 | Konu | Nerede |
 | --- | --- |
-| Daemon'u başka bir cihazdan yönetmek (uzak API) | Yazılmadı; yalnızca bir kiracının işleri Zamanlama sayfasındadır (bölüm 3.1); zamanlanmadı ([ROADMAP.tr.md](ROADMAP.tr.md) §8) |
+| Birden çok kiracılı bir web sunucusunun işlerini sunucunun içinde çalıştırmak | Her kiracının işleri kendi `apeiron daemon run --tenant`'ında çalışır (bölüm 3.1) |
 
 ## 8. Crate'ler ve kütüphaneler
 

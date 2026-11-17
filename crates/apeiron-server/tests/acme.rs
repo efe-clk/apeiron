@@ -42,6 +42,7 @@ fn start(dir: &Path, listen: SocketAddr, acme: Acme) -> apeiron::Result<Web> {
         shares: Shares::new(dir.join("shares.json")),
         replicas: Vec::new(),
         standby: false,
+        jobs: None,
     })
 }
 

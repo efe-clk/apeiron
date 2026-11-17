@@ -88,6 +88,12 @@ A tenant's jobs file has no `repo` and no `password_file`: every job works on th
 
 An `admin` of the tenant edits its jobs file on the Schedule page of the web interface, which shows each job's last and next run as on the desktop and saves only a valid file. Each save is recorded as `schedule_save` in the tenant's audit log (AUDIT.md §1), with the names of the jobs.
 
+### 3.2 Jobs of a web server
+
+`apeiron web --schedule` runs jobs inside the web server of one repository, so an `admin` sets them up and watches them from any computer, on the Schedule page. The rules are those of a tenant (section 3.1): every job works on the served repository, opened with its `--password-file`, and a `folder` must be inside a `--folder` of the server. The jobs file is `<configuration folder>/web-jobs.toml`, with the state and log in `<state folder>/web-daemon`.
+
+The jobs run on a thread of the server, at its priority, and stop when it stops. A second server, or an `apeiron daemon run` with the same state folder, cannot start while one runs them: the start fails with a "locked" error. Each save is recorded as `schedule_save` in the audit log.
+
 ## 4. When a job runs
 
 ```mermaid
@@ -127,7 +133,7 @@ A backup is proven only by restoring it (VISION.md). The restore test does this 
 
 | Item | Where |
 | --- | --- |
-| Operating the daemon from another device (remote API) | Not written, except a tenant's jobs on the Schedule page (section 3.1); not scheduled ([ROADMAP.md](ROADMAP.md) §8) |
+| Jobs of a web server for several tenants inside the server | Each tenant's jobs run in an `apeiron daemon run --tenant` of their own (section 3.1) |
 
 ## 8. Crates and libraries
 

@@ -8,7 +8,7 @@ use std::sync::{Arc, OnceLock};
 use std::thread;
 use std::time::Duration;
 
-use apeiron::Repository;
+use apeiron::{ErrorKind, Repository};
 use rustls::pki_types::pem::PemObject;
 
 use apeiron_server::{Audit, Role, Shares, Tls, User, Users, Web, WebOptions, hash_password};
@@ -255,6 +255,7 @@ fn start(dir: &Path) -> (Web, Client, PathBuf) {
         folders: vec![home.clone()],
         replicas: Vec::new(),
         standby: false,
+        jobs: None,
     })
     .unwrap();
     let client = Client {
@@ -521,6 +522,7 @@ fn tls_with_a_kept_certificate() {
         folders: vec![dir.path().to_path_buf()],
         replicas: Vec::new(),
         standby: false,
+        jobs: None,
     })
     .unwrap();
 
@@ -1696,4 +1698,80 @@ fn reviews_belong_to_the_signed_in_user() {
         .json();
     assert_eq!(merged["review"]["state"], "merged", "{merged}");
     assert_eq!(merged["review"]["events"][2]["author"], "ayse");
+}
+
+/// With jobs, the server runs them itself, only one server runs the same
+/// jobs, and an admin edits them from another computer (DAEMON.md §3.2).
+#[test]
+fn the_server_runs_its_scheduled_jobs() {
+    let dir = tempfile::tempdir().unwrap();
+    let home = dir.path().join("home");
+    fs::create_dir_all(home.join("src")).unwrap();
+    fs::write(home.join("src/a.txt"), "hello").unwrap();
+    let home = home.canonicalize().unwrap();
+    let repo_path = dir.path().join("repo");
+    let repo = Repository::init(&repo_path).unwrap();
+    let paths = apeiron_daemon::Paths {
+        jobs: dir.path().join("jobs.toml"),
+        state_dir: dir.path().join("daemon"),
+        scope: Some(apeiron_daemon::Scope {
+            repo: repo_path.clone(),
+            password_file: None,
+            folders: vec![home.clone()],
+        }),
+    };
+    let folder = home.join("src").to_string_lossy().replace('\\', "/");
+    fs::write(
+        &paths.jobs,
+        format!("[job.src]\ndo = \"backup\"\nfolder = \"{folder}\"\nref = \"backup/src\"\nevery = \"day\"\n"),
+    )
+    .unwrap();
+    let options = |repo: Repository, jobs| WebOptions {
+        repo,
+        listen: "127.0.0.1:0".parse().unwrap(),
+        tls: None,
+        users: users_file(dir.path()),
+        audit: Audit::new(dir.path().join("audit.log")),
+        shares: Shares::new(dir.path().join("shares.json")),
+        folders: vec![home.clone()],
+        replicas: Vec::new(),
+        standby: false,
+        jobs,
+    };
+    let server = Web::start(options(repo, Some(paths.clone()))).unwrap();
+    let second = Web::start(options(
+        Repository::open(&repo_path).unwrap(),
+        Some(paths.clone()),
+    ));
+    assert_eq!(second.err().map(|e| e.kind), Some(ErrorKind::Locked));
+
+    let mut root = Client {
+        address: server.address(),
+        tls: None,
+        cookie: None,
+    };
+    root.sign_in();
+    assert_eq!(root.get("/api/session").json()["schedule"], true);
+    let mut ran = false;
+    for _ in 0..300 {
+        let refs = root.post("/api/call/refs", json!({})).json();
+        if refs
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["name"] == "backup/src")
+        {
+            ran = true;
+            break;
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+    assert!(ran, "the job did not run");
+    let job = |folder: &Path| {
+        let folder = folder.to_string_lossy().replace('\\', "/");
+        json!({ "text": format!("[job.other]\ndo = \"backup\"\nfolder = \"{folder}\"\nevery = \"day\"\n") })
+    };
+    assert_eq!(root.post("/api/schedule", job(dir.path())).status, 400);
+    let saved = root.post("/api/schedule", job(&home.join("src"))).json();
+    assert_eq!(saved["jobs"][0]["name"], "other", "{saved}");
 }
