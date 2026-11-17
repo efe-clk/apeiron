@@ -1615,3 +1615,85 @@ fn upload_links_take_files_into_a_backup() {
     let log = fs::read_to_string(dir.path().join("audit.log")).unwrap();
     assert!(log.contains("shared:upload"), "{log}");
 }
+
+/// Reviews in the pages: steps are the signed-in user's, others' reviews
+/// stay hidden and a reader cannot merge (REVIEW.md §5).
+#[test]
+fn reviews_belong_to_the_signed_in_user() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_server, mut root, home) = start(dir.path());
+    let file = dir.path().join("config/web.json");
+    let mut users = Users::load(&file).unwrap();
+    for (name, role) in [("ayse", Role::Member), ("okan", Role::Reader)] {
+        users
+            .add(User {
+                name: name.to_owned(),
+                password: hash(),
+                role,
+                backups: vec!["backup/ayse-*".to_owned()],
+                folders: vec![home.clone()],
+                oidc: None,
+                totp: None,
+                from_groups: false,
+            })
+            .unwrap();
+    }
+    users.save(&file).unwrap();
+    root.sign_in();
+    let backup = |c: &Client, folder: &str, r: &str| {
+        let done = c.run("backup", json!({"source": home.join(folder), "ref": r}));
+        assert!(done["result"]["snapshot"].is_string(), "{done}");
+    };
+    backup(&root, "src", "backup/ayse-docs");
+    backup(&root, "src", "backup/root");
+    // A new file only, so the merge makes no conflict copies.
+    fs::create_dir_all(home.join("draft")).unwrap();
+    fs::write(home.join("draft/b.txt"), "new").unwrap();
+    backup(&root, "draft", "backup/ayse-draft");
+    let hers = root
+        .post("/api/call/open_review", json!({"from": "backup/ayse-draft", "into": "backup/ayse-docs", "title": "Change a", "author": "someone"}))
+        .json();
+    assert_eq!(hers["author"], "root");
+    let roots = root
+        .post(
+            "/api/call/open_review",
+            json!({"from": "backup/ayse-draft", "into": "backup/root", "title": "Not hers"}),
+        )
+        .json();
+
+    let ayse = root.other("ayse");
+    let listed = ayse.post("/api/call/reviews", json!({})).json();
+    assert_eq!(listed.as_array().unwrap().len(), 1, "{listed}");
+    let roots_id = roots["id"].as_str().unwrap();
+    assert_eq!(
+        ayse.kind("/api/call/review", json!({"id": roots_id})).0,
+        404
+    );
+    assert_eq!(
+        ayse.kind(
+            "/api/call/open_review",
+            json!({"from": "backup/ayse-draft", "into": "backup/root", "title": "x"})
+        )
+        .0,
+        404
+    );
+
+    let id = hers["id"].as_str().unwrap();
+    let okan = root.other("okan");
+    let approved = okan
+        .post(
+            "/api/call/note_review",
+            json!({"id": id, "action": "approve", "author": "root"}),
+        )
+        .json();
+    assert_eq!(approved["approvals"], json!(["okan"]), "{approved}");
+    assert_eq!(
+        okan.kind("/api/call/merge_review", json!({"id": id})),
+        (400, "unsupported".to_owned())
+    );
+    let merged = ayse
+        .post("/api/call/merge_review", json!({"id": id}))
+        .json();
+    assert_eq!(merged["review"]["state"], "merged", "{merged}");
+    assert_eq!(merged["review"]["events"][2]["author"], "ayse");
+}

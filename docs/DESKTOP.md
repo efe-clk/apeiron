@@ -41,6 +41,7 @@ The pages call only the JSON API, and the JSON API calls only the public API (AR
 | Passwords | For an encrypted repository: lists its passwords and recovery keys, adds a password, makes a recovery key and shows it once, and removes a key but never the last one (FORMAT.md §14) | Done |
 | Plugins | Lists the installed plugins with the files they handle, installs one from a `.wasm` file and removes one, as `apeiron plugin` does (PLUGIN.md §1) | Done |
 | Schedule | Shows the background service's jobs with their last result and next run, and edits the jobs file; a file with an error is not saved, and one broken by hand is shown with its error (DAEMON.md §3) | Done |
+| Reviews | Lists reviews, asks for one between two refs, and shows one with its steps and how its branch differs, with buttons to comment, approve, ask for changes, close and merge (REVIEW.md) | Done |
 | Retention | Lists the retention rules and adds one after a warning (ARCHIVE.md §5) | Done |
 | Report | Findings, repository and backups of a compliance report, with the choice to verify and to compare with the remotes (REPORTS.md §5) | Done |
 

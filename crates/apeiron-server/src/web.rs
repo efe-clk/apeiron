@@ -69,6 +69,11 @@ const CALLS: &[&str] = &[
     "plugin_remove",
     "conflicts",
     "resolve_conflict",
+    "reviews",
+    "review",
+    "open_review",
+    "note_review",
+    "merge_review",
 ];
 const STARTS: &[&str] = &["backup", "restore", "verify", "search", "report", "sync"];
 /// Operations only an `admin` may use: they reach the whole repository,
@@ -1072,7 +1077,7 @@ impl WebState {
             self.room(repo)?;
         }
         let allowed = match operation {
-            "backup" | "restore" => user.role != Role::Reader,
+            "backup" | "restore" | "open_review" | "merge_review" => user.role != Role::Reader,
             _ if ADMIN_ONLY.contains(&operation) => user.role == Role::Admin,
             _ => true,
         };
@@ -1095,6 +1100,29 @@ impl WebState {
                 .and_then(Value::as_str)
                 .map(str::to_owned)
         };
+        // A step of a review is always the signed-in user's (REVIEW.md §5).
+        if matches!(operation, "open_review" | "note_review" | "merge_review") {
+            request["author"] = json!(user.name);
+        }
+        if operation == "open_review" {
+            for field in ["from", "into"] {
+                let name = text(&request, field).unwrap_or_else(|| "main".to_owned());
+                if !user.owns(&name) {
+                    return Err(hidden());
+                }
+            }
+        }
+        if matches!(operation, "review" | "note_review" | "merge_review") {
+            let id = text(&request, "id").ok_or_else(|| invalid("id is missing"))?;
+            let review = repo.review(&id).map_err(|e| match e.kind {
+                ErrorKind::Ambiguous => hidden(),
+                _ => e,
+            })?;
+            if !(user.owns(&review.from) && user.owns(&review.into)) {
+                return Err(hidden());
+            }
+            request["id"] = json!(review.id);
+        }
         if user.role != Role::Admin {
             for field in SNAPSHOT_FIELDS {
                 if let Some(spec) = text(&request, field) {
@@ -1152,6 +1180,16 @@ impl WebState {
             ("refs", Value::Array(refs)) => Value::Array(
                 refs.into_iter()
                     .filter(|r| r["name"].as_str().is_some_and(|n| user.owns(n)))
+                    .collect(),
+            ),
+            ("reviews", Value::Array(reviews)) => Value::Array(
+                reviews
+                    .into_iter()
+                    .filter(|r| {
+                        ["from", "into"]
+                            .iter()
+                            .all(|f| r[*f].as_str().is_some_and(|n| user.owns(n)))
+                    })
                     .collect(),
             ),
             (_, result) => result,

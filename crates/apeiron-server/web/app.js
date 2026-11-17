@@ -304,6 +304,7 @@ function showNav(current) {
     may.manage() ? item("keys", keys) : null,
     may.manage() ? item("plugins", plugins) : null,
     mode === "local" || scheduling ? item("schedule", schedule) : null,
+    item("reviews", () => reviews()),
     may.share() ? item("shares", shares) : null,
     may.readLog() ? item("activity", activity) : null,
     may.manageUsers() ? item("users", users) : null,
@@ -1142,6 +1143,137 @@ async function retention() {
     h("h2", {}, t("retention_add")),
     h("div", { class: "card" }, form),
     status,
+  );
+}
+
+// ---- Reviews (REVIEW.md) ----
+
+const reviewState = (r) => t(r.state === "open" && r.ready ? "review_ready" : `review_${r.state}`);
+// Refs that hold backups or branches, not the program's own or synced folders.
+const branchRefs = async () =>
+  (await call("refs")).filter((r) => !r.name.startsWith("folder/") && !r.name.startsWith("apeiron/")).map((r) => r.name);
+
+async function reviews(all = false) {
+  showNav("reviews");
+  show(h("p", {}, t("loading")));
+  let list;
+  let names;
+  try {
+    [list, names] = await Promise.all([call("reviews", { all }), branchRefs()]);
+  } catch (err) {
+    show(h("h1", {}, t("reviews_heading")), errorMessage(err));
+    return;
+  }
+  const rows = list.map((r) => h("tr", {},
+    h("td", {}, h("strong", {}, r.title), h("div", { class: "muted" }, `${r.from} → ${r.into} · ${r.author}`)),
+    h("td", {}, h("span", { class: "badge" }, reviewState(r))),
+    h("td", {}, when({ seconds: r.opened })),
+    h("td", {}, h("button", { type: "button", onclick: () => reviewView(r.id) }, t("review_open_button"))),
+  ));
+  const select = (selected) => h("select", { required: true },
+    ...names.map((n) => h("option", { value: n, selected: n === selected }, n)));
+  const from = select(names.find((n) => n !== "main") || "");
+  const into = select(names.includes("main") ? "main" : names[0]);
+  const title = h("input", { type: "text", maxlength: 200, required: true });
+  const text = h("textarea", { rows: 4 });
+  const status = h("div");
+  const form = h("form", { onsubmit: async (e) => {
+    e.preventDefault();
+    status.replaceChildren();
+    try {
+      const made = await call("open_review", { from: from.value, into: into.value, title: title.value, text: text.value || null });
+      reviewView(made.id);
+    } catch (err) {
+      status.replaceChildren(errorMessage(err));
+    }
+  } },
+    ...field(t("review_from"), from, t("review_from_hint")),
+    ...field(t("review_into"), into),
+    ...field(t("review_title"), title),
+    ...field(t("review_text"), text),
+    status,
+    h("div", { class: "actions" }, h("button", { type: "submit", class: "primary" }, t("review_ask"))),
+  );
+  show(
+    h("h1", {}, t("reviews_heading")),
+    h("p", { class: "muted" }, t("reviews_intro")),
+    list.length
+      ? h("div", { class: "card scroll" }, h("table", {}, h("tbody", {}, ...rows)))
+      : h("p", {}, t(all ? "reviews_none_all" : "reviews_none")),
+    h("div", { class: "actions" }, h("button", { type: "button", onclick: () => reviews(!all) }, t(all ? "reviews_open_only" : "reviews_all"))),
+    ...(may.backUp() && names.length > 1 ? [h("h2", {}, t("review_ask")), h("div", { class: "card" }, form)] : []),
+  );
+}
+
+async function reviewView(id) {
+  showNav("reviews");
+  show(h("p", {}, t("loading")));
+  let r;
+  let changes = [];
+  try {
+    r = await call("review", { id });
+    if (r.snapshot) changes = await call("diff_text", { from: r.into, to: r.snapshot });
+  } catch (err) {
+    show(h("h1", {}, t("reviews_heading")), errorMessage(err));
+    return;
+  }
+  const action = { open: "review_did_open", comment: "review_did_comment", approve: "review_did_approve",
+    request_changes: "review_did_request_changes", merge: "review_did_merge", close: "review_did_close" };
+  const steps = r.events.map((e) => h("div", { class: "change" },
+    h("h3", {}, h("span", { class: "badge" }, t(action[e.action])), e.author, e.path ? ` · ${e.path}` : null,
+      h("span", { class: "muted" }, ` · ${when({ seconds: e.time })}`)),
+    e.text ? h("p", { style: "white-space: pre-wrap" }, e.text) : null,
+  ));
+  const text = h("textarea", { rows: 4 });
+  const path = h("select", {}, h("option", { value: "" }, t("review_whole")),
+    ...changes.map((c) => h("option", { value: c.path }, c.path)));
+  const status = h("div");
+  const step = (actionName) => async () => {
+    status.replaceChildren();
+    try {
+      await call("note_review", { id: r.id, action: actionName, text: text.value || null, path: actionName === "comment" ? path.value || null : null });
+      reviewView(r.id);
+    } catch (err) {
+      status.replaceChildren(errorMessage(err));
+    }
+  };
+  const merge = async () => {
+    status.replaceChildren();
+    if (!confirm(t("review_merge_ask", { from: r.from, into: r.into }))) return;
+    try {
+      await call("merge_review", { id: r.id });
+      reviewView(r.id);
+    } catch (err) {
+      status.replaceChildren(errorMessage(err));
+    }
+  };
+  const open = r.state === "open";
+  const who = (names) => (names.length ? names.join(", ") : t("review_no_one"));
+  show(
+    h("h1", {}, r.title),
+    h("p", { class: "muted" }, `${r.from} → ${r.into} · ${r.author} · `, h("span", { class: "badge" }, reviewState(r))),
+    h("p", {}, `${t("review_approved_by")}: ${who(r.approvals)}`,
+      r.changes_requested.length ? h("div", {}, `${t("review_changes_by")}: ${who(r.changes_requested)}`) : null),
+    h("div", { class: "card" }, steps),
+    h("div", { class: "card" },
+      ...field(t("review_text"), text),
+      changes.length ? field(t("review_about"), path) : null,
+      status,
+      h("div", { class: "actions" },
+        h("button", { type: "button", onclick: step("comment") }, t("review_comment")),
+        open ? h("button", { type: "button", onclick: step("approve") }, t("review_approve")) : null,
+        open ? h("button", { type: "button", onclick: step("request_changes") }, t("review_request_changes")) : null,
+        open ? h("button", { type: "button", onclick: step("close") }, t("review_close")) : null,
+        open && r.ready && may.backUp() ? h("button", { type: "button", class: "primary", onclick: merge }, t("review_merge")) : null,
+      ),
+    ),
+    open ? h("h2", {}, t("review_changes_heading", { into: r.into })) : null,
+    open ? h("div", { class: "card" }, changes.length
+      ? changes.map((c) => h("div", { class: "change" },
+        h("h3", {}, h("span", { class: "badge" }, t(c.kind)), c.path),
+        c.text ? diffLines(c.text) : null))
+      : h("p", {}, t("compare_none"))) : null,
+    h("div", { class: "actions" }, h("button", { type: "button", onclick: () => reviews() }, t("reviews_back"))),
   );
 }
 

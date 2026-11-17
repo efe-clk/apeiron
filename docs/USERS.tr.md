@@ -73,6 +73,7 @@ Sunucu dosya değişince onu yeniden okur; böylece çalışırken eklenen, değ
 | `POST /api/call/refs` | Yalnızca kullanıcının yedeklerinin ref'leri |
 | Bir snapshot adlandıran istekler (`spec`, `start`, `snapshot`, `from`, `to`) | Snapshot kullanıcıya görünür olmalıdır (§1); kimliğiyle değiştirilir, böylece denetlenen neyse kullanılan da odur |
 | `POST /api/call/reflog` | Yalnızca kullanıcının yedeklerinin ref'leri için |
+| İncelemeler (`reviews`, `review`, `open_review`, `note_review`, `merge_review`) | Yalnızca iki ref'i de kullanıcının yedekleri olan incelemeler; `author` ne derse desin her adım oturum açan kullanıcının adıyla yazılır ([REVIEW.tr.md](REVIEW.tr.md)) |
 | `POST /api/start/search` | Bir `member` ya da `reader` bir snapshot belirtmelidir |
 | `GET /api/folders` | Yalnızca kullanıcının klasörlerinin içinde |
 | Rolün ötesindeki her şey | `unsupported` ile reddedilir; başka bir ref'e yedek ya da klasörlerin dışındaki bir yol `invalid_input` ile |

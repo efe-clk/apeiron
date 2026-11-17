@@ -41,6 +41,7 @@ Sayfalar yalnızca JSON API'yi, JSON API de yalnızca herkese açık API'yi ça�
 | Parolalar | Şifreli bir depo için: parolalarını ve kurtarma anahtarlarını listeler, parola ekler, bir kurtarma anahtarı oluşturup bir kez gösterir ve bir anahtarı siler ama sonuncusunu asla (FORMAT.tr.md §14) | Tamamlandı |
 | Eklentiler | Kurulu eklentileri işledikleri dosyalarla listeler, bir `.wasm` dosyasından eklenti kurar ve kaldırır; `apeiron plugin` gibi (PLUGIN.tr.md §1) | Tamamlandı |
 | Zamanlama | Arka plan hizmetinin işlerini son sonuçları ve sonraki çalışmalarıyla gösterir ve iş dosyasını düzenler; hatalı bir dosya kaydedilmez, elle bozulmuş bir dosya hatasıyla birlikte gösterilir (DAEMON.tr.md §3) | Tamamlandı |
+| İncelemeler | İncelemeleri listeler, iki ref arasında inceleme ister ve birini adımlarıyla ve dalının farkıyla gösterir; yorum, onay, değişiklik isteme, kapatma ve birleştirme düğmeleriyle (REVIEW.tr.md) | Tamamlandı |
 | Saklama | Saklama kurallarını listeler ve uyarıdan sonra kural ekler (ARCHIVE.tr.md §5) | Tamamlandı |
 | Rapor | Bir uyumluluk raporunun bulguları, deposu ve yedekleri; doğrulama ve uzak depolarla karşılaştırma seçeneğiyle (REPORTS.tr.md §5) | Tamamlandı |
 

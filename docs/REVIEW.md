@@ -29,7 +29,7 @@ A review does not copy the branch: it names it, so a new backup on the branch is
 | Merging | Merges exactly the approved snapshot as `apeiron merge` does ([BRANCH.md](BRANCH.md) §2). If the merge would make conflict copies, nothing changes and the review stays open: merge `into` into the branch first, then ask for an approval again |
 | After merging or closing | Only comments are taken; a closed review cannot be opened again, open a new one |
 
-Names are the ones given with `--author`, or the user of the operating system. On one computer anyone who can write to the repository can write any name, as with the author of a backup; a review is a record of agreement between people who trust each other, not access control. Who may change a ref at all is decided by permissions ([USERS.md](USERS.md)) and retention rules ([ARCHIVE.md](ARCHIVE.md)).
+Names are the ones given with `--author`, or the user of the operating system. In the web interface every step is the signed-in user's, a member or reader sees only reviews whose two refs are both theirs, and a reader cannot open or merge one ([USERS.md](USERS.md) §4). On one computer anyone who can write to the repository can write any name, as with the author of a backup; a review is a record of agreement between people who trust each other, not access control. Who may change a ref at all is decided by permissions ([USERS.md](USERS.md)) and retention rules ([ARCHIVE.md](ARCHIVE.md)).
 
 ## 3. Commands
 
@@ -54,7 +54,7 @@ $ apeiron review merge 3f9a --author zeynep
 Merged review 3f9a01c2 into main: 7c2b04e1
 ```
 
-The same steps are the operations `reviews`, `review`, `open_review`, `note_review` and `merge_review` of the API ([API.md](API.md) §8.3) and the SDKs ([SDK.md](SDK.md)). The text plugin shows what changed in a text file ([TEXT.md](TEXT.md)); `apeiron diff --text main draft/spring` does that from the command line.
+The Reviews page of the desktop and web interfaces does the same with buttons ([DESKTOP.md](DESKTOP.md)). The same steps are the operations `reviews`, `review`, `open_review`, `note_review` and `merge_review` of the API ([API.md](API.md) §8.3) and the SDKs ([SDK.md](SDK.md)). The text plugin shows what changed in a text file ([TEXT.md](TEXT.md)); `apeiron diff --text main draft/spring` does that from the command line.
 
 ## 4. Where reviews are kept
 
@@ -66,7 +66,6 @@ Because they are in a ref, reviews are encrypted with the repository, copied by 
 
 | Item | Where |
 | --- | --- |
-| Reviews in the web and desktop interfaces | Later; [ROADMAP.md](ROADMAP.md) §8 |
 | Requiring an approval before a ref may change | Later; today a review is an agreement, and anyone who may change the ref can still merge without one |
 | Comments on one line of a file | Later; a comment names a file |
 
@@ -76,3 +75,4 @@ Because they are in a ref, reviews are encrypted with the repository, copied by 
 | --- | --- |
 | `apeiron` | `review.rs`: steps, rules and merging |
 | `apeiron-cli` | `apeiron review` |
+| `apeiron-server` | The Reviews page and the checks of the web interface |

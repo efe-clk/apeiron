@@ -29,7 +29,7 @@ Zeynep bir makaleyi `draft/spring` dalında yazar ([BRANCH.tr.md](BRANCH.tr.md))
 | Birleştirme | Tam olarak onaylanan snapshot'ı `apeiron merge` gibi birleştirir ([BRANCH.tr.md](BRANCH.tr.md) §2). Birleştirme çakışma kopyaları üretecekse hiçbir şey değişmez ve inceleme açık kalır: önce `into`'yu dala birleştirin, sonra yeniden onay isteyin |
 | Birleştirme ya da kapatmadan sonra | Yalnızca yorum alınır; kapatılmış bir inceleme yeniden açılamaz, yenisi açılır |
 
-Adlar `--author` ile verilenlerdir ya da işletim sisteminin kullanıcısıdır. Bir bilgisayarda depoya yazabilen herkes, bir yedeğin yazarında olduğu gibi, istediği adı yazabilir; inceleme birbirine güvenen kişiler arasındaki uzlaşmanın kaydıdır, erişim denetimi değildir. Bir ref'i kimin değiştirebileceğine izinler ([USERS.tr.md](USERS.tr.md)) ve saklama kuralları ([ARCHIVE.tr.md](ARCHIVE.tr.md)) karar verir.
+Adlar `--author` ile verilenlerdir ya da işletim sisteminin kullanıcısıdır. Web arayüzünde her adım oturum açan kullanıcınındır; bir `member` ya da `reader` yalnızca iki ref'i de kendisinin olan incelemeleri görür ve bir `reader` inceleme açamaz ya da birleştiremez ([USERS.tr.md](USERS.tr.md) §4). Bir bilgisayarda depoya yazabilen herkes, bir yedeğin yazarında olduğu gibi, istediği adı yazabilir; inceleme birbirine güvenen kişiler arasındaki uzlaşmanın kaydıdır, erişim denetimi değildir. Bir ref'i kimin değiştirebileceğine izinler ([USERS.tr.md](USERS.tr.md)) ve saklama kuralları ([ARCHIVE.tr.md](ARCHIVE.tr.md)) karar verir.
 
 ## 3. Komutlar
 
@@ -54,7 +54,7 @@ $ apeiron review merge 3f9a --author zeynep
 Merged review 3f9a01c2 into main: 7c2b04e1
 ```
 
-Aynı adımlar API'nin ([API.tr.md](API.tr.md) §8.3) ve SDK'ların ([SDK.tr.md](SDK.tr.md)) `reviews`, `review`, `open_review`, `note_review` ve `merge_review` işlemleridir. Bir metin dosyasında neyin değiştiğini metin eklentisi gösterir ([TEXT.tr.md](TEXT.tr.md)); komut satırında bunu `apeiron diff --text main draft/spring` yapar.
+Masaüstü ve web arayüzlerinin İncelemeler sayfası aynısını düğmelerle yapar ([DESKTOP.tr.md](DESKTOP.tr.md)). Aynı adımlar API'nin ([API.tr.md](API.tr.md) §8.3) ve SDK'ların ([SDK.tr.md](SDK.tr.md)) `reviews`, `review`, `open_review`, `note_review` ve `merge_review` işlemleridir. Bir metin dosyasında neyin değiştiğini metin eklentisi gösterir ([TEXT.tr.md](TEXT.tr.md)); komut satırında bunu `apeiron diff --text main draft/spring` yapar.
 
 ## 4. İncelemeler nerede tutulur
 
@@ -66,7 +66,6 @@ Bir ref'te durdukları için incelemeler depoyla birlikte şifrelenir, push ve p
 
 | Konu | Nerede |
 | --- | --- |
-| Web ve masaüstü arayüzlerinde incelemeler | Sonra; [ROADMAP.tr.md](ROADMAP.tr.md) §8 |
 | Bir ref değişmeden önce onay şartı | Sonra; bugün inceleme bir uzlaşmadır ve ref'i değiştirebilen herkes onaysız da birleştirebilir |
 | Bir dosyanın tek satırına yorum | Sonra; yorum bir dosyayı adlandırır |
 
@@ -76,3 +75,4 @@ Bir ref'te durdukları için incelemeler depoyla birlikte şifrelenir, push ve p
 | --- | --- |
 | `apeiron` | `review.rs`: adımlar, kurallar ve birleştirme |
 | `apeiron-cli` | `apeiron review` |
+| `apeiron-server` | İncelemeler sayfası ve web arayüzünün denetimleri |

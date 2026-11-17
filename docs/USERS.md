@@ -73,6 +73,7 @@ The server reads the file again when it changes, so a user added, changed or rem
 | `POST /api/call/refs` | Only the refs of the user's backups |
 | Requests naming a snapshot (`spec`, `start`, `snapshot`, `from`, `to`) | The snapshot must be visible to the user (§1); it is replaced by its id, so what was checked is what is used |
 | `POST /api/call/reflog` | Only for refs of the user's backups |
+| Reviews (`reviews`, `review`, `open_review`, `note_review`, `merge_review`) | Only reviews whose two refs are both the user's backups; every step is written under the signed-in user's name, whatever `author` says ([REVIEW.md](REVIEW.md)) |
 | `POST /api/start/search` | A `member` or `reader` must name a snapshot |
 | `GET /api/folders` | Only inside the user's folders |
 | Anything else beyond the role | Refused with `unsupported`; a backup into another ref or a path outside the folders with `invalid_input` |
