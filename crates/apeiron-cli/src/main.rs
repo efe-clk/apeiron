@@ -798,6 +798,11 @@ enum WebCommand {
         #[command(subcommand)]
         command: OidcCommand,
     },
+    /// Sign in through an identity provider with SAML 2.0 (docs/IDENTITY.md)
+    Saml {
+        #[command(subcommand)]
+        command: SamlCommand,
+    },
     /// Manage the organizations served, each at its own host (docs/TENANTS.md)
     Tenant {
         #[command(subcommand)]
@@ -1075,6 +1080,166 @@ enum OidcCommand {
     Check,
     /// Turn signing in through the provider off
     Remove,
+}
+
+#[derive(Subcommand)]
+enum SamlCommand {
+    /// Set up the identity provider from its metadata file
+    Set {
+        /// The provider's metadata, an XML file downloaded from it
+        #[arg(long, value_name = "PATH")]
+        metadata: PathBuf,
+        /// The address browsers reach this server at, such as https://backup.example.com
+        #[arg(long)]
+        address: String,
+        /// The attribute that names a user; the subject's NameID by default
+        #[arg(long)]
+        attribute: Option<String>,
+        /// The attribute that lists the user's groups
+        #[arg(long, default_value = "groups")]
+        groups_attribute: String,
+    },
+    /// Make users from a group of the provider, as `web oidc group` does
+    Group {
+        group: String,
+        #[arg(long, value_enum)]
+        role: RoleArg,
+        #[arg(long = "backup", value_name = "PATTERN")]
+        backups: Vec<String>,
+        #[arg(long = "folder", value_name = "PATH")]
+        folders: Vec<String>,
+    },
+    /// Stop making users from a group
+    Ungroup { group: String },
+    /// Show the settings and this server's metadata for the provider
+    Show,
+    /// Turn signing in through the provider off
+    Remove,
+}
+
+fn web_saml(files: &WebFiles, command: SamlCommand, out: &Output) -> Result<(), Failure> {
+    let file = &files.users;
+    let _lock = apeiron_server::Users::lock(file)?;
+    let mut users = apeiron_server::Users::load(file)?;
+    let not_set =
+        || Failure::Usage("no SAML provider is set up; use `apeiron web saml set`".to_owned());
+    let record = |event: &str, detail: serde_json::Value| {
+        files
+            .audit
+            .record(&apeiron_server::Actor::default(), event, detail, "ok")
+    };
+    match command {
+        SamlCommand::Set {
+            metadata,
+            address,
+            attribute,
+            groups_attribute,
+        } => {
+            if users.oidc.is_some() {
+                return Err(Failure::Usage(
+                    "an OpenID Connect provider is set up; remove it first with `apeiron web oidc remove`"
+                        .to_owned(),
+                ));
+            }
+            let xml = std::fs::read_to_string(&metadata)
+                .map_err(|e| Failure::Usage(format!("cannot read {}: {e}", metadata.display())))?;
+            let mut config = apeiron_server::SamlConfig::new(xml, address)?;
+            if let Some(old) = &users.saml {
+                config.keep_keys(old);
+            }
+            config.attribute = attribute;
+            config.groups_attribute = groups_attribute;
+            // Setting the provider again keeps the group rules.
+            config.groups = users
+                .saml
+                .as_ref()
+                .map(|c| c.groups.clone())
+                .unwrap_or_default();
+            say!("Provider: {}", config.idp_entity_id);
+            say!(
+                "This server's entity id and metadata: {}",
+                config.entity_id()
+            );
+            say!("Address the provider posts to: {}", config.acs());
+            let detail = serde_json::json!({
+                "provider": config.idp_entity_id, "address": config.address,
+                "attribute": config.attribute,
+            });
+            users.saml = Some(config);
+            users.save(file)?;
+            record("saml_set", detail)?;
+        }
+        SamlCommand::Group {
+            group,
+            role,
+            backups,
+            folders,
+        } => {
+            let config = users.saml.as_mut().ok_or_else(not_set)?;
+            let rule = apeiron_server::GroupRule {
+                group,
+                role: role.into(),
+                backups,
+                folders,
+            };
+            match config.groups.iter_mut().find(|r| r.group == rule.group) {
+                Some(known) => *known = rule.clone(),
+                None => config.groups.push(rule.clone()),
+            }
+            users.save(file)?;
+            record(
+                "saml_group",
+                serde_json::to_value(&rule).unwrap_or_default(),
+            )?;
+            out.result(&rule, |r| {
+                say!("Members of {} sign in as {} users", r.group, r.role.name())
+            });
+        }
+        SamlCommand::Ungroup { group } => {
+            let config = users.saml.as_mut().ok_or_else(not_set)?;
+            let before = config.groups.len();
+            config.groups.retain(|r| r.group != group);
+            if config.groups.len() == before {
+                return Err(Failure::Usage(format!("no rule for the group {group}")));
+            }
+            users.save(file)?;
+            record("saml_ungroup", serde_json::json!({ "group": group }))?;
+            say!("Members of {group} are no longer made users.");
+        }
+        SamlCommand::Show => {
+            let config = users.saml.as_ref().ok_or_else(not_set)?;
+            let metadata = config.metadata()?;
+            let view = serde_json::json!({
+                "provider": config.idp_entity_id, "address": config.address,
+                "entity_id": config.entity_id(), "acs": config.acs(),
+                "attribute": config.attribute, "groups_attribute": config.groups_attribute,
+                "groups": config.groups, "metadata": metadata,
+            });
+            out.result(&view, |_| {
+                say!("provider: {}", config.idp_entity_id);
+                say!("address: {}", config.address);
+                say!("entity id: {}", config.entity_id());
+                say!("assertion consumer service: {}", config.acs());
+                say!(
+                    "names a user by: {}",
+                    config.attribute.as_deref().unwrap_or("NameID")
+                );
+                say!("groups attribute: {}", config.groups_attribute);
+                for r in &config.groups {
+                    say!("group {}: {}", r.group, r.role.name());
+                }
+                say!("");
+                say!("{metadata}");
+            });
+        }
+        SamlCommand::Remove => {
+            users.saml.take().ok_or_else(not_set)?;
+            users.save(file)?;
+            record("saml_remove", serde_json::Value::Null)?;
+            say!("Signing in through the SAML provider is off.");
+        }
+    }
+    Ok(())
 }
 
 fn web_oidc(files: &WebFiles, command: OidcCommand, out: &Output) -> Result<(), Failure> {
@@ -1453,7 +1618,7 @@ enum UserCommand {
         folders: Vec<PathBuf>,
         /// The user's identity at the identity provider, such as an e-mail
         /// address; the user then needs no password
-        #[arg(long, value_name = "IDENTITY")]
+        #[arg(long, visible_alias = "identity", value_name = "IDENTITY")]
         oidc: Option<String>,
     },
     /// Replace the role, backups or folders of a user
@@ -1466,7 +1631,7 @@ enum UserCommand {
         #[arg(long = "folder", value_name = "PATH")]
         folders: Vec<PathBuf>,
         /// The user's identity at the identity provider
-        #[arg(long, value_name = "IDENTITY")]
+        #[arg(long, visible_alias = "identity", value_name = "IDENTITY")]
         oidc: Option<String>,
         /// Remove the user's password, so it signs in only through the provider
         #[arg(long)]
@@ -3417,6 +3582,10 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                 Some(WebCommand::Audit { command }) => return web_audit(&files()?, command, out),
                 Some(WebCommand::Oidc { command }) => {
                     web_oidc(&files()?, command, out)?;
+                    return Ok(0);
+                }
+                Some(WebCommand::Saml { command }) => {
+                    web_saml(&files()?, command, out)?;
                     return Ok(0);
                 }
                 Some(WebCommand::Share { command }) => {

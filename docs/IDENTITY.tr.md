@@ -131,16 +131,39 @@ Ardından gelen oturum, bir paroladan sonrakiyle aynıdır (WEB.tr.md §5); kull
 | `oidc_group`, `oidc_ungroup` | Kural ya da kuralı kaldırılan grup |
 | `user_add`, `user_change` | Bir gruptan oluşturulan ya da oturum açarken kuralına uydurulan bir kullanıcı, grubuyla birlikte; bunu yapan olarak hiçbir kullanıcı yazılmaz |
 
-## 6. Bu işin parçası olmayanlar
+## 6. SAML
+
+Sağlayıcısı yalnızca SAML 2.0 konuşan ya da onu tercih eden bir kuruluş, OpenID Connect yerine SAML kurar; bir sunucuda ya biri ya diğeri vardır. Roller, yedekler, klasörler, grup kuralları ve denetim kaydı yukarıdaki gibi çalışır: sağlayıcı kullanıcıyı adlandırır, kullanıcının neler yapabileceğini Apeiron söyler.
+
+| Adım | Ne olur |
+| --- | --- |
+| Kurulum | `apeiron web saml set --metadata <idp.xml> --address <url>` sağlayıcının meta verisini admin'in indirdiği bir dosyadan okur, bu yüzden ona verildiği gibi güvenilir; bu sunucunun imzalama anahtarını üretir: 2048 bitlik bir RSA anahtarı ve kendinden imzalı bir sertifika; yalnızca sahibinin okuyabildiği `web.json` içinde tutulur. Yeniden kurmak anahtarı korur |
+| Sağlayıcıda | Bu sunucuyu meta verisiyle kaydedin: `<address>/api/saml/metadata` ya da `apeiron web saml show`; varlık kimliği bu adrestir, onay tüketici hizmeti `<address>/api/saml/acs`'dir (HTTP-POST) ve oturum açma istekleri yukarıdaki anahtarla imzalanır |
+| Oturum açma | Düğme tarayıcıyı imzalı bir `AuthnRequest` (HTTP-Redirect) ve yanıtı bu tarayıcıya bağlayan bir `apeiron_saml` çereziyle (sağlayıcı onu kendi sitesinden gönderdiği için `SameSite=None`, on dakika) sağlayıcıya gönderir. Sağlayıcı imzalı bir yanıtı geri gönderir |
+| Denetim | `saml-rs`, imzayı sağlayıcının meta verisine göre, yayıncıyı, hedef kitleyi, hedefi, alıcıyı, zaman aralığını, yanıtın bu isteğe ait olduğunu (`InResponseTo` ve `RelayState`) ve onayın daha önce kullanılmadığını (bellekte tutulur, yani yalnızca sunucu yeniden başlayana kadar) denetler |
+| Kullanıcı | Konunun `NameID`'si ya da `--attribute <ad>` özniteliği kullanıcının kimliğidir ve kullanıcıların `--identity` (`--oidc`) değeriyle tam olarak karşılaştırılır; `--groups-attribute` özniteliğini (varsayılan `groups`) `apeiron web saml group`'un grup kuralları kullanır (§2.1) |
+| Oturumu kapatma | Oturumu yalnızca burada bitirir; sağlayıcıda oturum kapatma (Single Logout) yapılmaz |
+
+`saml-rs`, C kodu içermeyen, imza sarmaya ve XML dış varlıklarına karşı korumalı, saf Rust bir kütüphanedir. Gençtir ve yazarlarının dediği gibi henüz dışarıdan bir güvenlik denetiminden geçmemiştir; bu yüzden bir sağlayıcı ikisini de sunuyorsa ilk tercih OpenID Connect olarak kalır (ADR-050). Testler imzalı bir yanıtı, tekrar oynatılmış bir yanıtı, başka bir tarayıcıdan geleni ve yolda değiştirilmiş olanı dener; kurulum ayrıca Keycloak 26 ile denendi.
+
+| Komut | Ne yapar |
+| --- | --- |
+| `apeiron web saml set --metadata <file> --address <url> [--attribute <name>] [--groups-attribute <name>]` | Sağlayıcıyı kurar |
+| `apeiron web saml group <group> --role <role> [--backup <pattern>]... [--folder <path>]...`, `saml ungroup <group>` | OpenID Connect'teki gibi grup kuralları |
+| `apeiron web saml show`, `saml remove` | Ayarlar ve bu sunucunun meta verisi, anahtar olmadan; SAML'ı kapatır |
+
+Denetim kaydı `sign_in`'i `"via": "saml"` ile, ayrıca `saml_set`, `saml_group`, `saml_ungroup` ve `saml_remove`'u yazar.
+
+## 7. Bu işin parçası olmayanlar
 
 | Konu | Nerede |
 | --- | --- |
 | Doğrudan LDAP ve Active Directory | Planlanmadı; Keycloak ve Entra ID gibi sağlayıcılar bir dizini OpenID Connect'in arkasına koyar |
-| SAML | Sonra, bir pilot gerektirirse |
+| SAML'ın Single Logout'u | Sonra; oturumu kapatmak oturumu yalnızca burada bitirir |
 
-## 7. Crate'ler
+## 8. Crate'ler
 
 | Crate | Görevi | Durum |
 | --- | --- | --- |
-| `apeiron-server` | Sağlayıcı ayarları, oturum açma akışı, belirteç denetimleri, oturum açma ekranı | Tamamlandı |
+| `apeiron-server` | Sağlayıcı ayarları, oturum açma akışı, belirteç denetimleri, SAML, oturum açma ekranı | Tamamlandı |
 | `apeiron-cli` | `apeiron web oidc`, kullanıcılar için `--oidc` ve `--no-password` | Tamamlandı |

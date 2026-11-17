@@ -447,6 +447,8 @@ fn stamp(user: &User) -> String {
 /// The cookie that ties a sign-in through the identity provider to the
 /// browser that started it (IDENTITY.md §3).
 const OIDC_COOKIE: &str = "apeiron_oidc";
+/// Ties a SAML sign-in to the browser that started it.
+const SAML_COOKIE: &str = "apeiron_saml";
 
 /// The users file as last read.
 struct Loaded {
@@ -496,6 +498,7 @@ pub(crate) struct WebState {
     /// password.
     decoy: String,
     oidc: Oidc,
+    saml: crate::saml::Saml,
     /// Pushes to the replicas, if there are any.
     replicator: Option<Replicator>,
     standby: bool,
@@ -626,13 +629,17 @@ impl WebState {
         self.users().users.oidc.clone()
     }
 
-    /// The user of the request's live session; using it keeps it alive.
+    pub(crate) fn saml_config(&self) -> Option<crate::SamlConfig> {
+        self.users().users.saml.clone()
+    }
+
     /// The user a program's token acts as, with the token's name.
     pub(crate) fn token_user(&self, secret: &str) -> Option<(User, String)> {
         let token = crate::Tokens::beside(&self.users_file).find(secret)?;
         Some((self.user(&token.user)?, token.name))
     }
 
+    /// The user of the request's live session; using it keeps it alive.
     pub(crate) fn current(&self, headers: &HeaderMap) -> Option<User> {
         let id = cookie_value(headers)?;
         let (name, kept) = {
@@ -985,7 +992,7 @@ impl WebState {
                 .map_err(|e| (None, e))?;
             let value = signed.value;
             let user = self
-                .provider_user(&config, &value, &signed.groups, from.clone())
+                .provider_user(&config.groups, &value, &signed.groups, from.clone())
                 .map_err(|e| (Some(value.clone()), e))?;
             Ok((value, user, signed.id_token))
         }
@@ -1009,6 +1016,100 @@ impl WebState {
             }
             Err((value, e)) => {
                 let detail = json!({"via": "oidc", "identity": value, "error": e.message});
+                if let Err(e) = self
+                    .audit
+                    .record(&actor(None), "sign_in", detail, &kind_name(&e))
+                {
+                    return Failure::from(e).into_response();
+                }
+                redirect(&format!("/#oidc_error={}", kind_name(&e)), &[clear])
+            }
+        }
+    }
+
+    /// Sends the browser to the SAML identity provider (IDENTITY.md §6).
+    pub(crate) fn saml_start(&self, from: Option<String>) -> Response {
+        let result = (|| {
+            let config = self.saml_config().ok_or_else(no_provider)?;
+            let state = random_hex()?;
+            let url = self.saml.start(&config, state.clone())?;
+            Ok::<_, Error>((url, state))
+        })();
+        match result {
+            // The provider posts back from its own site, so the cookie must
+            // go with a request from another site: `SameSite=None`.
+            Ok((url, state)) => redirect(
+                &url,
+                &[format!(
+                    "{SAML_COOKIE}={state}; HttpOnly; Secure; SameSite=None; Path=/api/saml; Max-Age=600"
+                )],
+            ),
+            Err(e) => {
+                let actor = Actor { user: None, from };
+                let detail = json!({"via": "saml", "error": e.message});
+                if let Err(e) = self.audit.record(&actor, "sign_in", detail, &kind_name(&e)) {
+                    return Failure::from(e).into_response();
+                }
+                redirect(&format!("/#oidc_error={}", kind_name(&e)), &[])
+            }
+        }
+    }
+
+    /// Where the SAML provider posts its response: checks it, starts a
+    /// session and goes to the pages (IDENTITY.md §6).
+    pub(crate) fn saml_acs(
+        &self,
+        headers: &HeaderMap,
+        form: Vec<(String, String)>,
+        from: Option<String>,
+    ) -> Response {
+        let clear =
+            format!("{SAML_COOKIE}=; HttpOnly; Secure; SameSite=None; Path=/api/saml; Max-Age=0");
+        let result = (|| {
+            let config = self.saml_config().ok_or_else(|| (None, no_provider()))?;
+            let state = named_cookie(headers, SAML_COOKIE).unwrap_or("");
+            let relay = form
+                .iter()
+                .find(|(k, _)| k == "RelayState")
+                .map_or("", |(_, v)| v.as_str());
+            // The response must come back to the browser that started it.
+            if state.is_empty() || relay != state {
+                return Err((
+                    None,
+                    Error::new(
+                        ErrorKind::Key,
+                        "this sign-in was started in another browser",
+                    ),
+                ));
+            }
+            let signed = self
+                .saml
+                .finish(&config, state, form)
+                .map_err(|e| (None, e))?;
+            let user = self
+                .provider_user(&config.groups, &signed.value, &signed.groups, from.clone())
+                .map_err(|e| (Some(signed.value.clone()), e))?;
+            Ok((signed.value, user))
+        })();
+        let actor = |user: Option<&str>| Actor {
+            user: user.map(str::to_owned),
+            from: from.clone(),
+        };
+        match result {
+            Ok((value, user)) => {
+                let recorded = self.audit.record(
+                    &actor(Some(&user.name)),
+                    "sign_in",
+                    json!({"via": "saml", "identity": value}),
+                    "ok",
+                );
+                match recorded.and_then(|()| self.new_session(&user, None)) {
+                    Ok(cookie) => redirect("/", &[cookie, clear]),
+                    Err(e) => Failure::from(e).into_response(),
+                }
+            }
+            Err((value, e)) => {
+                let detail = json!({"via": "saml", "identity": value, "error": e.message});
                 if let Err(e) = self
                     .audit
                     .record(&actor(None), "sign_in", detail, &kind_name(&e))
@@ -1472,7 +1573,7 @@ impl WebState {
     /// and folders follow the rule at every sign-in.
     fn provider_user(
         &self,
-        config: &crate::oidc::OidcConfig,
+        rules: &[crate::GroupRule],
         value: &str,
         groups: &[String],
         from: Option<String>,
@@ -1483,8 +1584,7 @@ impl WebState {
         {
             return Ok(user.clone());
         }
-        let rule = config
-            .groups
+        let rule = rules
             .iter()
             .find(|r| groups.iter().any(|g| g == &r.group))
             .ok_or_else(|| {
@@ -1499,7 +1599,7 @@ impl WebState {
             let index = users.users.iter().position(|u| {
                 u.oidc
                     .as_deref()
-                    .is_some_and(|known| config.same(known, value))
+                    .is_some_and(|known| users.same_identity(known, value))
             });
             match index {
                 Some(i) => {
@@ -1687,6 +1787,7 @@ pub(crate) fn site(site: Site) -> Result<Arc<App>, Error> {
             reachable: Mutex::new(HashMap::new()),
             decoy,
             oidc,
+            saml: crate::saml::Saml::new(),
             replicator: Replicator::start(site.replicas, app.clone()),
             standby: site.standby,
             limits: Mutex::new(site.limits),

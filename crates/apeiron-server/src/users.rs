@@ -124,6 +124,9 @@ pub struct Users {
     /// Signing in through an identity provider (IDENTITY.md §2).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oidc: Option<OidcConfig>,
+    /// Signing in through a SAML identity provider (IDENTITY.md §6).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub saml: Option<crate::SamlConfig>,
     pub users: Vec<User>,
 }
 
@@ -199,6 +202,14 @@ impl Users {
         if let Some(config) = &self.oidc {
             config.check()?;
         }
+        if let Some(config) = &self.saml {
+            if self.oidc.is_some() {
+                return Err(invalid(
+                    "only one identity provider can be set up: OpenID Connect or SAML",
+                ));
+            }
+            config.check()?;
+        }
         for (i, user) in self.users.iter().enumerate() {
             let Some(id) = &user.oidc else { continue };
             if let Some(other) = self.users[..i]
@@ -216,12 +227,23 @@ impl Users {
 
     /// The user the identity provider names with `value` (IDENTITY.md §3).
     pub fn by_identity(&self, value: &str) -> Option<&User> {
-        let config = self.oidc.as_ref()?;
+        if self.oidc.is_none() && self.saml.is_none() {
+            return None;
+        }
         self.users.iter().find(|u| {
             u.oidc
                 .as_deref()
-                .is_some_and(|known| config.same(known, value))
+                .is_some_and(|known| self.same_identity(known, value))
         })
+    }
+
+    /// Whether a provider's `value` is `known`, a user's identity: e-mail
+    /// addresses of OpenID Connect without case, SAML values exactly.
+    pub(crate) fn same_identity(&self, known: &str, value: &str) -> bool {
+        match &self.oidc {
+            Some(config) => config.same(known, value),
+            None => known == value,
+        }
     }
 
     pub fn get(&self, name: &str) -> Option<&User> {

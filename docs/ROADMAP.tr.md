@@ -125,4 +125,4 @@ Her iş tamamlandı (2026-10-30); aşama, çıkış kriteri olan ilk kurumsal pi
 | Eklenti olarak depolama arka uçları ve entegrasyonlar | [PLUGIN.tr.md](PLUGIN.tr.md) §7 | Tür sürücüleri, içe aktarıcılar, kancalar ve bir eklenti mağazası; eklentiler ağa ulaşamaz |
 | Raporlarda başka standartlar | [REPORTS.tr.md](REPORTS.tr.md) §6 | ISO/IEC 27001, SOC 2 ve GDPR |
 | Format yükseltme aracı | [FORMAT.tr.md](FORMAT.tr.md) §18 | Format 1. sürümde |
-| SAML, uzak depo olmadan senkron, ilk sürümün yayımlanması | [IDENTITY.tr.md](IDENTITY.tr.md) §6, [SYNC.tr.md](SYNC.tr.md) §7, [DESKTOP.tr.md](DESKTOP.tr.md) §5 | OpenID Connect, uzak depo üzerinden senkron, kaynaktan derleme |
+| Uzak depo olmadan senkron, ilk sürümün yayımlanması | [SYNC.tr.md](SYNC.tr.md) §7, [DESKTOP.tr.md](DESKTOP.tr.md) §5 | Uzak depo üzerinden senkron, kaynaktan derleme |

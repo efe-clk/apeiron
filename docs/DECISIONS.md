@@ -1066,3 +1066,23 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Moving only Git import into a plugin | Export and serving would still need the native code, so two implementations would have to agree |
 
 **Consequences.** The program stays larger by the `gix` library. Other version control systems, such as Mercurial, would come as native code too, or as importers of their bundle files.
+
+## ADR-050: SAML through saml-rs, a young pure Rust library
+
+**Status:** Accepted (2026-11-18)
+
+**Context.** Some organizations sign in only through SAML 2.0. Checking a SAML response means checking XML signatures, where mistakes let anyone in. The established Rust library, `samael`, checks signatures through the C libraries `libxml2` and `xmlsec1`; `saml-rs` does it in Rust.
+
+**Decision.** SAML uses `saml-rs` 0.8, with the checks it recommends, signed sign-in requests, a replay cache and a cookie that ties each answer to its browser (IDENTITY.md §6). To share its RSA libraries, `russh` moves from 0.63 to 0.65, which the minimum Rust version of 1.97 allows.
+
+**Rationale.** Pure Rust keeps to ADR-001 and builds on Windows without system libraries. `saml-rs` forbids unsafe code, rejects external entities and checks for signature wrapping. The tests check that a changed or replayed answer is refused, and the setup was tried with Keycloak.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| `samael` with `xmlsec1` | C libraries on every system, and hard to build on Windows |
+| Checking XML signatures ourselves | The code where SAML implementations most often fail; a library used by others is checked by more people |
+| No SAML | Organizations whose provider speaks only SAML could not use central identity |
+
+**Consequences.** The library has had no external security audit yet, so the document recommends OpenID Connect where a provider offers both, and its updates should be followed closely. Assertions used before are remembered only until the server restarts.

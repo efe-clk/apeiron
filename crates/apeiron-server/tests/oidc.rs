@@ -232,6 +232,7 @@ fn start(dir: &Path, idp: &Shared) -> (Web, SocketAddr, std::path::PathBuf) {
     let file = dir.join("config/web.json");
     let issuer = idp.lock().unwrap().issuer.clone();
     let users = Users {
+        saml: None,
         oidc: Some(OidcConfig {
             issuer,
             client_id: CLIENT.to_owned(),
@@ -555,6 +556,7 @@ fn settings_that_cannot_work_are_refused() {
         from_groups: false,
     };
     let users = Users {
+        saml: None,
         oidc: Some(config(ok, "https://backup.example.com")),
         users: vec![user("a", "x@example.com"), user("b", "X@example.com")],
     };

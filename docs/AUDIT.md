@@ -26,6 +26,7 @@ When several people share a backup server, the admin must be able to answer "who
 | `user_add`, `user_change`, `user_password`, `user_remove` | `apeiron web user`, or an admin on the Users page | The name, role, backups, folders and identity; never the password |
 | `user_second_factor_on`, `user_second_factor_off` | `apeiron web user second-factor` | The name; never the secret |
 | `oidc_set`, `oidc_remove`, `oidc_group`, `oidc_ungroup` | `apeiron web oidc` | The provider's settings; never the client secret |
+| `saml_set`, `saml_remove`, `saml_group`, `saml_ungroup` | `apeiron web saml` ([IDENTITY.md](IDENTITY.md) §6) | The provider, the address and the attribute, or the rule; never the key |
 | `replicate` | Each push to a replica by the web server | The remote, refs and objects, the refs left by a conflict, or the error ([REPLICATION.md](REPLICATION.md) §7) |
 | `schedule_save` | An `admin` of a tenant saving its jobs file ([DAEMON.md](DAEMON.md) §3.1) | The names of the jobs, or the error of an invalid file |
 | `tenant_add`, `tenant_limit`, `tenant_remove` | `apeiron web tenant`, in that tenant's own log | The tenant's settings ([TENANTS.md](TENANTS.md) §5) |

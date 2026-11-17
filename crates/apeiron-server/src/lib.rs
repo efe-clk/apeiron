@@ -15,6 +15,7 @@ mod git_ssh;
 mod oidc;
 mod operator;
 mod replicate;
+mod saml;
 mod shares;
 mod tenants;
 mod tokens;
@@ -37,6 +38,7 @@ pub use client::{Client, RemoteJob};
 pub use git_ssh::{GitSsh, serve_git_ssh};
 pub use oidc::{GroupRule, OidcConfig, Provider, check_provider};
 pub use operator::Manage;
+pub use saml::SamlConfig;
 pub use shares::{DEFAULT_DAYS, LinkOptions, MAX_DAYS, MAX_DOWNLOADS, Share, Shares};
 pub use tenants::{Tenant, Tenants};
 pub use tokens::{Token, Tokens};
@@ -246,6 +248,9 @@ async fn guard(State(app): State<Arc<App>>, mut request: Request, next: Next) ->
                     | "/api/login"
                     | "/api/oidc/start"
                     | "/api/oidc/callback"
+                    | "/api/saml/start"
+                    | "/api/saml/acs"
+                    | "/api/saml/metadata"
                     | "/api/health"
             ) || request.uri().path().starts_with("/api/shared/");
             // A program shows a token instead of a session (API.md §2.1).
@@ -791,7 +796,12 @@ async fn session(State(app): State<Arc<App>>, user: Option<Extension<Who>>) -> A
         (Mode::Web(web), None) => json!({
             "mode": "web",
             "signed_in": false,
-            "oidc": web.oidc_config().is_some(),
+            "oidc": web.oidc_config().is_some() || web.saml_config().is_some(),
+            "provider": match (web.oidc_config(), web.saml_config()) {
+                (_, Some(_)) => Some("saml"),
+                (Some(_), None) => Some("oidc"),
+                (None, None) => None,
+            },
         }),
         (Mode::Web(web), Some(Extension(who))) => json!({
             "mode": "web",
@@ -1285,6 +1295,52 @@ async fn oidc_callback(
     }
 }
 
+/// Sends the browser to the SAML identity provider (IDENTITY.md §6).
+async fn saml_start(
+    State(app): State<Arc<App>>,
+    from: Option<Extension<ConnectInfo<SocketAddr>>>,
+) -> Response {
+    let from = from.map(|c| c.0.0.to_string());
+    match &app.mode {
+        Mode::Web(web) => web.saml_start(from),
+        Mode::Local { .. } => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+/// Where the SAML provider posts its response.
+async fn saml_acs(
+    State(app): State<Arc<App>>,
+    from: Option<Extension<ConnectInfo<SocketAddr>>>,
+    headers: axum::http::HeaderMap,
+    bytes: Bytes,
+) -> Response {
+    let from = from.map(|c| c.0.0.to_string());
+    let form: Vec<(String, String)> = url::form_urlencoded::parse(&bytes)
+        .map(|(k, v)| (k.into_owned(), v.into_owned()))
+        .collect();
+    match &app.mode {
+        Mode::Web(web) => web.saml_acs(&headers, form, from),
+        Mode::Local { .. } => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+/// This server's SAML metadata, for the identity provider.
+async fn saml_metadata(State(app): State<Arc<App>>) -> Response {
+    let config = match &app.mode {
+        Mode::Web(web) => web.saml_config(),
+        Mode::Local { .. } => None,
+    };
+    match config.map(|c| c.metadata()) {
+        Some(Ok(xml)) => (
+            [(header::CONTENT_TYPE, "application/samlmetadata+xml")],
+            xml,
+        )
+            .into_response(),
+        Some(Err(e)) => Failure::from(e).into_response(),
+        None => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
 /// For a load balancer or a monitor: whether the repository can be read
 /// and whether this is a standby, without signing in (REPLICATION.md §5).
 async fn health(State(app): State<Arc<App>>) -> Response {
@@ -1312,6 +1368,9 @@ fn router(app: Arc<App>) -> Router {
         .route("/api/logout", post(logout))
         .route("/api/oidc/start", get(oidc_start))
         .route("/api/oidc/callback", get(oidc_callback))
+        .route("/api/saml/start", get(saml_start))
+        .route("/api/saml/acs", post(saml_acs))
+        .route("/api/saml/metadata", get(saml_metadata))
         .route("/api/state", get(state))
         .route("/api/open", post(open))
         .route("/api/init", post(init))

@@ -1066,3 +1066,23 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Yalnızca Git içe aktarmayı eklentiye taşımak | Dışa aktarma ve sunma yine yerel koda ihtiyaç duyardı; iki uygulamanın uyuşması gerekirdi |
 
 **Sonuçlar.** Program `gix` kütüphanesi kadar büyük kalır. Mercurial gibi başka sürüm denetim sistemleri de yerel kod olarak ya da paket dosyalarının içe aktarıcıları olarak gelir.
+
+## ADR-050: SAML, genç ve saf Rust bir kütüphane olan saml-rs ile
+
+**Durum:** Kabul edildi (2026-11-18)
+
+**Bağlam.** Bazı kuruluşlar yalnızca SAML 2.0 ile oturum açar. Bir SAML yanıtını denetlemek, hataların herkesi içeri aldığı XML imzalarını denetlemek demektir. Yerleşik Rust kütüphanesi `samael`, imzaları `libxml2` ve `xmlsec1` C kütüphaneleriyle denetler; `saml-rs` bunu Rust'ta yapar.
+
+**Karar.** SAML, önerdiği denetimlerle, imzalı oturum açma istekleriyle, bir tekrar önbelleğiyle ve her yanıtı tarayıcısına bağlayan bir çerezle `saml-rs` 0.8'i kullanır (IDENTITY.tr.md §6). RSA kütüphanelerini paylaşmak için `russh` 0.63'ten, en düşük Rust sürümü 1.97'nin izin verdiği 0.65'e geçer.
+
+**Gerekçe.** Saf Rust, ADR-001'e uyar ve Windows'ta sistem kütüphaneleri olmadan derlenir. `saml-rs` unsafe kodu yasaklar, dış varlıkları reddeder ve imza sarmayı denetler. Testler değiştirilmiş ya da tekrar oynatılmış bir yanıtın reddedildiğini denetler; kurulum Keycloak ile denendi.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| `xmlsec1` ile `samael` | Her sistemde C kütüphaneleri ve Windows'ta zor derleme |
+| XML imzalarını kendimiz denetlemek | SAML uygulamalarının en sık yanıldığı kod; başkalarının kullandığı bir kütüphaneyi daha çok kişi denetler |
+| SAML olmaması | Sağlayıcısı yalnızca SAML konuşan kuruluşlar merkezi kimliği kullanamazdı |
+
+**Sonuçlar.** Kütüphane henüz dışarıdan bir güvenlik denetiminden geçmedi; bu yüzden belge, bir sağlayıcı ikisini de sunuyorsa OpenID Connect'i önerir ve güncellemeleri yakından izlenmelidir. Daha önce kullanılmış onaylar yalnızca sunucu yeniden başlayana kadar hatırlanır.

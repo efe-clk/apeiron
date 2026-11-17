@@ -275,7 +275,7 @@ fn nothing_without_signing_in() {
     assert_eq!(c.get("/").status, 200);
     assert_eq!(
         c.get("/api/session").json(),
-        json!({"mode": "web", "signed_in": false, "oidc": false})
+        json!({"mode": "web", "signed_in": false, "oidc": false, "provider": null})
     );
     let refused = c.get("/api/state");
     assert_eq!(refused.status, 401);

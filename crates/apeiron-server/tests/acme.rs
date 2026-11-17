@@ -15,6 +15,7 @@ fn start(dir: &Path, listen: SocketAddr, acme: Acme) -> apeiron::Result<Web> {
     let users = dir.join("web.json");
     if !users.exists() {
         Users {
+            saml: None,
             oidc: None,
             users: vec![User {
                 name: "efe".to_owned(),

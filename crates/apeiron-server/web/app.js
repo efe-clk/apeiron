@@ -18,6 +18,8 @@ const oidcError = fragment.get("oidc_error");
 if (oidcError) history.replaceState(null, "", "/");
 // Whether the sign-in screen offers the identity provider.
 let oidc = false;
+// "oidc" or "saml": the protocol of the identity provider (IDENTITY.md).
+let providerKind = "oidc";
 // "local" with a token, or "web" with a sign-in cookie.
 let mode = "local";
 // The signed-in user in web mode: {name, role} (USERS.md §4).
@@ -1802,7 +1804,7 @@ function signIn(error = null) {
   const provider = oidc
     ? h("div", { class: "card" },
       h("p", { class: "muted" }, t("oidc_intro")),
-      h("div", { class: "actions" }, h("a", { class: "button primary", href: "/api/oidc/start" }, t("oidc_button"))))
+      h("div", { class: "actions" }, h("a", { class: "button primary", href: `/api/${providerKind}/start` }, t("oidc_button"))))
     : null;
   if (error) status.replaceChildren(message("bad", error === "key" ? t("oidc_refused") : t("oidc_failed")));
   show(h("h1", {}, t("sign_in_heading")), provider, h("div", { class: "card" }, h("p", { class: "muted" }, t("sign_in_intro")), form), status);
@@ -1830,6 +1832,7 @@ async function begin() {
   operator = session?.operator === true;
   scheduling = session?.schedule === true;
   oidc = session?.oidc === true;
+  providerKind = session?.provider === "saml" ? "saml" : "oidc";
   if (!session?.signed_in) return signIn(oidcError);
   const state = await api("GET", "/api/state").catch(() => null);
   if (state?.open) opened(state.open.path);

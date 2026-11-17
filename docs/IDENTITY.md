@@ -131,16 +131,39 @@ The session that follows is the same as after a password (WEB.md §5); it ends w
 | `oidc_group`, `oidc_ungroup` | The rule, or the group whose rule was removed |
 | `user_add`, `user_change` | A user made from a group, or changed at sign-in to follow its rule, with the group; no user is recorded as the one who did it |
 
-## 6. Not part of this work item
+## 6. SAML
+
+An organization whose provider speaks only SAML 2.0, or that prefers it, sets up SAML instead of OpenID Connect; a server has one provider or the other. The roles, backups, folders, group rules and the audit log work as above: the provider names the user, Apeiron says what the user may do.
+
+| Step | What happens |
+| --- | --- |
+| Setting up | `apeiron web saml set --metadata <idp.xml> --address <url>` reads the provider's metadata from a file the admin downloaded, so it is trusted as given, and makes this server's signing key: an RSA key of 2048 bits and a self-signed certificate, kept in `web.json`, readable only by its owner. Setting it again keeps the key |
+| At the provider | Register this server with its metadata, `<address>/api/saml/metadata` or `apeiron web saml show`: its entity id is that address, its assertion consumer service `<address>/api/saml/acs` (HTTP-POST), and its sign-in requests are signed with the key above |
+| Signing in | The button sends the browser to the provider with a signed `AuthnRequest` (HTTP-Redirect) and a cookie `apeiron_saml` that ties the answer to this browser (`SameSite=None`, because the provider posts it from its own site, for ten minutes). The provider posts back a signed response |
+| Checking | `saml-rs` checks the signature against the provider's metadata, the issuer, the audience, the destination, the recipient, the time window, that the response answers this request (`InResponseTo` and `RelayState`), and that the assertion was not used before (kept in memory, so only until the server restarts) |
+| The user | The subject's `NameID`, or the attribute `--attribute <name>`, is the user's identity, compared exactly with the users' `--identity` (`--oidc`); the attribute `--groups-attribute` (default `groups`) is used by the group rules of `apeiron web saml group` (§2.1) |
+| Signing out | Ends the session here only; signing out at the provider (Single Logout) is not done |
+
+`saml-rs` is a pure Rust library without C code, with protection against signature wrapping and XML external entities. It is young and, as its authors say, has had no external security audit yet, which is why OpenID Connect stays the first choice where a provider offers both (ADR-050). The tests check a signed answer, a replayed one, one from another browser and one changed on the way; the setup was also tried with Keycloak 26.
+
+| Command | What it does |
+| --- | --- |
+| `apeiron web saml set --metadata <file> --address <url> [--attribute <name>] [--groups-attribute <name>]` | Sets up the provider |
+| `apeiron web saml group <group> --role <role> [--backup <pattern>]... [--folder <path>]...`, `saml ungroup <group>` | Group rules, as for OpenID Connect |
+| `apeiron web saml show`, `saml remove` | The settings and this server's metadata, without the key; turns SAML off |
+
+The audit log records `sign_in` with `"via": "saml"`, and `saml_set`, `saml_group`, `saml_ungroup` and `saml_remove`.
+
+## 7. Not part of this work item
 
 | Item | Where |
 | --- | --- |
 | LDAP and Active Directory directly | Not planned; providers such as Keycloak and Entra ID put a directory behind OpenID Connect |
-| SAML | Later, if a pilot needs it |
+| Single Logout of SAML | Later; signing out ends the session here only |
 
-## 7. Crates
+## 8. Crates
 
 | Crate | Role | Status |
 | --- | --- | --- |
-| `apeiron-server` | Provider settings, the sign-in flow, token checks, the sign-in screen | Done |
+| `apeiron-server` | Provider settings, the sign-in flow, token checks, SAML, the sign-in screen | Done |
 | `apeiron-cli` | `apeiron web oidc`, `--oidc` and `--no-password` for users | Done |

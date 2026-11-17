@@ -149,7 +149,7 @@ pub(crate) async fn list(State(app): State<Arc<App>>, who: Option<Extension<Who>
         let (web, _) = admin(&app, who)?;
         let users = Users::load(web.users_path())?;
         let views: Vec<View> = users.users.iter().map(View::from).collect();
-        Ok(json!({"users": views, "folders": web.roots(), "oidc": users.oidc.is_some()}))
+        Ok(json!({"users": views, "folders": web.roots(), "oidc": users.oidc.is_some() || users.saml.is_some()}))
     })
     .await?;
     Ok(axum::Json(value))
