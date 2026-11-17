@@ -1736,8 +1736,20 @@ impl Scheduler {
         std::thread::Builder::new()
             .name("apeiron-schedule".to_owned())
             .spawn(move || {
-                // Its own log records why it stopped (DAEMON.md §6).
-                let _ = daemon.run(&flag);
+                // A jobs file that cannot be read stops a run; it is tried
+                // again each minute, so an admin can mend it on the
+                // Schedule page while the lock stays held.
+                while !flag.load(std::sync::atomic::Ordering::Relaxed) {
+                    if daemon.run(&flag).is_ok() {
+                        return;
+                    }
+                    for _ in 0..60 {
+                        if flag.load(std::sync::atomic::Ordering::Relaxed) {
+                            return;
+                        }
+                        std::thread::sleep(std::time::Duration::from_secs(1));
+                    }
+                }
             })
             .map_err(|e| Error::new(ErrorKind::Io, e.to_string()))?;
         Ok(Scheduler { stop })

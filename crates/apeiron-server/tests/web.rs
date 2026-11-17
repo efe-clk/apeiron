@@ -1708,7 +1708,6 @@ fn the_server_runs_its_scheduled_jobs() {
     let home = dir.path().join("home");
     fs::create_dir_all(home.join("src")).unwrap();
     fs::write(home.join("src/a.txt"), "hello").unwrap();
-    let home = home.canonicalize().unwrap();
     let repo_path = dir.path().join("repo");
     let repo = Repository::init(&repo_path).unwrap();
     let paths = apeiron_daemon::Paths {
