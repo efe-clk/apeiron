@@ -125,4 +125,4 @@ Every work item is done (2026-10-30); the stage ends with its exit criterion, th
 | Git behind the plugin interface; other plugin types and a plugin store | [DECISIONS.md](DECISIONS.md) ADR-021, [PLUGIN.md](PLUGIN.md) §6 | `apeiron-git` is a crate of its own; plugins are type drivers only |
 | More standards in reports | [REPORTS.md](REPORTS.md) §6 | ISO/IEC 27001, SOC 2 and the GDPR |
 | Format upgrade tool | [FORMAT.md](FORMAT.md) §18 | The format is at version 1 |
-| Git over SSH, SAML, sync without a remote, publishing the first release | [GIT.md](GIT.md) §8, [IDENTITY.md](IDENTITY.md) §6, [SYNC.md](SYNC.md) §7, [DESKTOP.md](DESKTOP.md) §5 | Git over HTTP, OpenID Connect, sync through a remote, building from source |
+| SAML, sync without a remote, publishing the first release | [IDENTITY.md](IDENTITY.md) §6, [SYNC.md](SYNC.md) §7, [DESKTOP.md](DESKTOP.md) §5 | OpenID Connect, sync through a remote, building from source |

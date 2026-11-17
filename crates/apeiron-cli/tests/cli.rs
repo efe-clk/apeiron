@@ -998,7 +998,10 @@ fn any_operation_runs_with_a_json_request() {
         serde_json::from_str(&s.ok(&["call", "log", r#"{"start": "main", "limit": 1}"#])).unwrap();
     assert_eq!(page["snapshots"].as_array().unwrap().len(), 1);
     let verified: serde_json::Value = serde_json::from_str(&s.ok(&["call", "verify"])).unwrap();
-    assert!(verified["objects_checked"].as_u64().unwrap() > 0, "{verified}");
+    assert!(
+        verified["objects_checked"].as_u64().unwrap() > 0,
+        "{verified}"
+    );
     assert_ne!(code(&s.run(&["call", "nonsense"])), Some(0));
     assert_eq!(code(&s.run(&["call", "log", "not json"])), Some(2));
 }
@@ -1284,4 +1287,115 @@ fn the_documents_plugin_finds_text_inside_files() {
     // Plain text is searched as before.
     let found = ok(&["search", "--text", "first"], true);
     assert!(found.contains("a.txt:1: first"), "{found}");
+}
+
+/// Git clones and pushes over SSH as a user of the web server: the SSH
+/// server runs `apeiron git ssh` for the user's key (GIT.md §7.2). A small
+/// script stands in for ssh and runs it the way the forced command would.
+#[cfg(target_os = "linux")]
+#[test]
+fn git_clones_and_pushes_over_ssh() {
+    let s = Setup::new();
+    let config = s.root.join("config");
+    let state = s.root.join("state");
+    fs::create_dir_all(config.join("apeiron")).unwrap();
+    fs::write(
+        config.join("apeiron/web.json"),
+        r#"{"users": [{"name": "ayse", "role": "member", "backups": ["git/*"]}, {"name": "okan", "role": "reader", "backups": ["git/*"]}]}"#,
+    )
+    .unwrap();
+    let ssh = s.root.join("fake-ssh");
+    fs::write(
+        &ssh,
+        format!(
+            "#!/bin/sh\n# Git calls: <ssh> [options] <host> <command>\nfor last; do :; done\nSSH_ORIGINAL_COMMAND=\"$last\" SSH_CONNECTION='192.0.2.1 5555 192.0.2.2 22' XDG_CONFIG_HOME='{}' XDG_STATE_HOME='{}' exec '{}' --repo '{}' git ssh --user \"$APEIRON_TEST_USER\"\n",
+            config.display(),
+            state.display(),
+            env!("CARGO_BIN_EXE_apeiron"),
+            s.repo().display()
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(&ssh, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+    let git = |dir: &Path, user: &str, args: &[&str]| {
+        let out = Command::new("git")
+            .args(args)
+            .current_dir(dir)
+            .env("GIT_SSH_COMMAND", &ssh)
+            .env("APEIRON_TEST_USER", user)
+            .env("GIT_AUTHOR_NAME", "Ayse")
+            .env("GIT_AUTHOR_EMAIL", "ayse@example.com")
+            .env("GIT_COMMITTER_NAME", "Ayse")
+            .env("GIT_COMMITTER_EMAIL", "ayse@example.com")
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .output()
+            .unwrap();
+        (
+            out.status.success(),
+            String::from_utf8_lossy(&out.stderr).into_owned(),
+        )
+    };
+
+    // A Git project goes in through `git import`, then comes out over SSH.
+    let project = s.root.join("project");
+    fs::create_dir_all(&project).unwrap();
+    assert!(git(&project, "ayse", &["init", "-q", "-b", "main"]).0);
+    fs::write(project.join("a.txt"), "one\n").unwrap();
+    assert!(git(&project, "ayse", &["add", "a.txt"]).0);
+    assert!(git(&project, "ayse", &["commit", "-q", "-m", "first"]).0);
+    s.ok(&["git", "import", &project.to_string_lossy()]);
+
+    let (ok, err) = git(&s.root, "ayse", &["clone", "-q", "ssh://nas/git", "copy"]);
+    assert!(ok, "{err}");
+    let copy = s.root.join("copy");
+    assert_eq!(fs::read_to_string(copy.join("a.txt")).unwrap(), "one\n");
+
+    fs::write(copy.join("b.txt"), "two\n").unwrap();
+    assert!(git(&copy, "ayse", &["add", "b.txt"]).0);
+    assert!(git(&copy, "ayse", &["commit", "-q", "-m", "second"]).0);
+    let (ok, err) = git(&copy, "ayse", &["push", "-q", "origin", "main"]);
+    assert!(ok, "{err}");
+    let log = s.ok(&["log", "git/heads/main"]);
+    assert!(log.contains("second"), "{log}");
+
+    // A fetch after the push sends only what is new.
+    let (ok, err) = git(&project, "ayse", &["pull", "-q", "ssh://nas/git", "main"]);
+    assert!(ok, "{err}");
+    assert!(project.join("b.txt").exists());
+
+    // A reader may clone but not push.
+    fs::write(copy.join("c.txt"), "three\n").unwrap();
+    assert!(git(&copy, "okan", &["add", "c.txt"]).0);
+    assert!(git(&copy, "okan", &["commit", "-q", "-m", "third"]).0);
+    let (ok, err) = git(&copy, "okan", &["push", "-q", "origin", "main"]);
+    assert!(!ok);
+    assert!(err.contains("reader"), "{err}");
+
+    let audit = fs::read_to_string(state.join("apeiron/audit.log")).unwrap();
+    assert!(
+        audit.contains("\"git_push\"") && audit.contains("192.0.2.1:5555 ssh"),
+        "{audit}"
+    );
+
+    // The line for authorized_keys runs this program for the key.
+    let key = s.root.join("id.pub");
+    fs::write(
+        &key,
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExample ayse@laptop\n",
+    )
+    .unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_apeiron"))
+        .args(["git", "ssh-key", "ayse", &key.to_string_lossy()])
+        .env("APEIRON_REPO", s.repo())
+        .env("XDG_CONFIG_HOME", &config)
+        .output()
+        .unwrap();
+    let line = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        line.starts_with("command=\"")
+            && line.contains(" git ssh --user ayse --repo ")
+            && line.contains("\",restrict ssh-ed25519 AAAA"),
+        "{line}"
+    );
 }

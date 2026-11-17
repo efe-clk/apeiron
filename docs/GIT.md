@@ -116,11 +116,25 @@ The server speaks Git's smart HTTP protocol, version 0, without side-band; newer
 4. The commits the accepted refs reach and that are not stored yet become snapshots, with the Git fields of section 2.2, so exporting them gives the same ids. Then each ref moves with compare-and-swap; one that another program moved meanwhile is refused.
 5. Git shows `ok` or the reason per ref. The push is recorded as `git_push` with each ref, its new id and its error (AUDIT.md §1), and a push that moved a ref is copied to the replicas, as a backup is (REPLICATION.md §4).
 
+### 7.2 Over SSH
+
+The system's SSH server (OpenSSH) checks the key and runs `apeiron git ssh` for it, which serves the same refs to the same rules as HTTP: what the user sees is fetched, what the user owns is pushed, a reader cannot push, and every fetch and push is in the audit log with `"via": "ssh"` and the client's address. There is no password and no second factor: the key is the sign-in.
+
+1. The server's administrator adds one line per key to `~/.ssh/authorized_keys` of the user that runs `apeiron web`. `apeiron git ssh-key <user> <key.pub>` prints it, with this program's path and the `--repo` and `--password-file` given (or `--tenant <name>`):
+
+   ```text
+   command="/usr/bin/apeiron git ssh --user ayse --repo /srv/apeiron",restrict ssh-ed25519 AAAA… ayse@laptop
+   ```
+
+   `restrict` turns off terminals and forwarding, so the key can do nothing else. Removing the line takes the key away.
+2. The user then works as with any Git server: `git clone ssh://apeiron@nas/git` or `apeiron@nas:git.git`, where `git` is the ref prefix. `ssh://nas/git/<prefix>`, as in the web address, works too.
+3. `apeiron git ssh` reads `SSH_ORIGINAL_COMMAND`: only `git-upload-pack` and `git-receive-pack` are served, and a prefix of `a-z 0-9 . _ -`. The user must be in the users file of the web server (USERS.md). An encrypted repository needs `--password-file`, because the standard input carries Git's protocol.
+4. It speaks Git's protocol, version 0, as in sections 7 and 7.1, and shares the Git copy of the web server; a lock beside the copy keeps the two from writing into it at once. A push may be at most 256 MiB. It does not know whether the server is a standby (REPLICATION.md §5); on a standby, give keys only to readers.
+
 ## 8. Not part of this work item
 
 | Item | Where |
 | --- | --- |
-| Git over SSH | Later; HTTP (section 7) takes a project in and out of Apeiron |
 | Checking out into a Git working tree | `apeiron restore` writes a snapshot into a folder |
 | Branching and merging inside Apeiron | [BRANCH.md](BRANCH.md) |
 | Moving the code behind the plugin interface | Not done; it needs an importer plugin type ([ROADMAP.md](ROADMAP.md) §8) |

@@ -116,11 +116,25 @@ Sunucu Git'in akıllı HTTP protokolünün 0. sürümünü side-band olmadan kon
 4. Kabul edilen ref'lerin ulaştığı ve henüz saklanmamış commit'ler bölüm 2.2'deki Git alanlarıyla snapshot olur; böylece dışa aktarıldıklarında aynı kimlikleri alırlar. Sonra her ref karşılaştır-ve-değiştir ile taşınır; bu arada başka bir programın taşıdığı ref reddedilir.
 5. Git her ref için `ok` ya da nedenini gösterir. Push, her ref, yeni kimliği ve hatasıyla `git_push` olarak kaydedilir (AUDIT.tr.md §1) ve bir ref'i taşıyan push, bir yedek gibi yedek sunuculara kopyalanır (REPLICATION.tr.md §4).
 
+### 7.2 SSH üzerinden
+
+Sistemin SSH sunucusu (OpenSSH) anahtarı denetler ve onun için `apeiron git ssh`'ı çalıştırır; bu, aynı ref'leri HTTP'deki kurallarla sunar: kullanıcının gördüğü çekilir, sahip olduğu push edilir, bir `reader` push edemez ve her çekme ve push denetim kaydında `"via": "ssh"` ve istemcinin adresiyle yer alır. Parola ve ikinci adım yoktur: oturum açma anahtarın kendisidir.
+
+1. Sunucunun yöneticisi, `apeiron web`'i çalıştıran kullanıcının `~/.ssh/authorized_keys` dosyasına her anahtar için bir satır ekler. `apeiron git ssh-key <user> <key.pub>` bu satırı bu programın yolu ve verilen `--repo` ile `--password-file` (ya da `--tenant <ad>`) ile yazdırır:
+
+   ```text
+   command="/usr/bin/apeiron git ssh --user ayse --repo /srv/apeiron",restrict ssh-ed25519 AAAA… ayse@laptop
+   ```
+
+   `restrict` uçbirimleri ve yönlendirmeyi kapatır; anahtar başka hiçbir şey yapamaz. Satırı silmek anahtarı geri alır.
+2. Kullanıcı sonra herhangi bir Git sunucusundaki gibi çalışır: `git clone ssh://apeiron@nas/git` ya da `apeiron@nas:git.git`; burada `git` ref önekidir. Web adresindeki gibi `ssh://nas/git/<önek>` de çalışır.
+3. `apeiron git ssh`, `SSH_ORIGINAL_COMMAND`'ı okur: yalnızca `git-upload-pack` ve `git-receive-pack` ile `a-z 0-9 . _ -` karakterlerinden bir önek sunulur. Kullanıcı web sunucusunun kullanıcılar dosyasında olmalıdır (USERS.tr.md). Standart girdi Git'in protokolünü taşıdığı için şifreli bir depo `--password-file` ister.
+4. Bölüm 7 ve 7.1'deki gibi Git'in protokolünün 0. sürümünü konuşur ve web sunucusunun Git kopyasını paylaşır; kopyanın yanındaki bir kilit ikisinin aynı anda içine yazmasını önler. Bir push en fazla 256 MiB olabilir. Sunucunun yedek sunucu olup olmadığını bilmez (REPLICATION.tr.md §5); bir yedek sunucuda anahtarları yalnızca okuyuculara verin.
+
 ## 8. Bu işin parçası olmayanlar
 
 | Konu | Nerede |
 | --- | --- |
-| SSH üzerinden Git | Daha sonra; HTTP (bölüm 7) bir projeyi Apeiron'a alır ve oradan çıkarır |
 | Bir Git çalışma ağacına checkout | `apeiron restore` bir snapshot'ı bir klasöre yazar |
 | Apeiron içinde dallanma ve birleştirme | [BRANCH.tr.md](BRANCH.tr.md) |
 | Kodu eklenti arayüzünün arkasına taşımak | Yapılmadı; içe aktarıcı eklenti türü gerekir ([ROADMAP.tr.md](ROADMAP.tr.md) §8) |

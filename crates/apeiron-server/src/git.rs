@@ -66,6 +66,19 @@ pub(crate) async fn info_refs(
     let mut out = Vec::new();
     pkt(&mut out, format!("# service={service}\n").as_bytes());
     out.extend_from_slice(b"0000");
+    out.extend_from_slice(&advertisement(&refs, push));
+    let content_type = if push {
+        "application/x-git-receive-pack-advertisement"
+    } else {
+        "application/x-git-upload-pack-advertisement"
+    };
+    git_response(content_type, Body::from(out))
+}
+
+/// The refs and capabilities a server offers, ending with a flush: the
+/// same over HTTP and SSH.
+pub(crate) fn advertisement(refs: &[GitServedRef], push: bool) -> Vec<u8> {
+    let mut out = Vec::new();
     let agent = format!("agent=apeiron/{}", env!("CARGO_PKG_VERSION"));
     // A push gets a report per ref, and no packs that lean on objects
     // outside them.
@@ -84,7 +97,7 @@ pub(crate) async fn info_refs(
         Some(head) => {
             caps = format!("symref=HEAD:{} {caps}", head.git);
             pkt(&mut out, format!("{} HEAD\0{caps}\n", head.id).as_bytes());
-            for r in &refs {
+            for r in refs {
                 pkt(&mut out, format!("{} {}\n", r.id, r.git).as_bytes());
             }
         }
@@ -105,12 +118,7 @@ pub(crate) async fn info_refs(
         },
     }
     out.extend_from_slice(b"0000");
-    let content_type = if push {
-        "application/x-git-receive-pack-advertisement"
-    } else {
-        "application/x-git-upload-pack-advertisement"
-    };
-    git_response(content_type, Body::from(out))
+    out
 }
 
 /// Whether the user may push: a writing role, on a server that takes
@@ -171,6 +179,7 @@ pub(crate) async fn receive_pack(
         let pack = pack.to_vec();
         blocking(move || {
             let _one = lock(&EXPORTING);
+            let _copy = copy_lock(&cache)?;
             let request = GitRequest {
                 path: cache,
                 prefix,
@@ -179,6 +188,34 @@ pub(crate) async fn receive_pack(
         })
         .await
     };
+    let (out, results) = report(results, &updates);
+    if let Mode::Web(web) = &app.mode {
+        let actor = Actor {
+            user: Some(user.name.clone()),
+            from,
+        };
+        let (refs, moved) = pushed(&updates, &results);
+        let outcome = if moved { "ok" } else { "conflict" };
+        if let Err(e) = web.audit.record(
+            &actor,
+            "git_push",
+            json!({ "prefix": prefix, "refs": refs }),
+            outcome,
+        ) {
+            return Failure::from(e).into_response();
+        }
+        if moved {
+            web.replicate_now();
+        }
+    }
+    git_response("application/x-git-receive-pack-result", Body::from(out))
+}
+
+/// What `git push` shows per ref, ending with a flush, and the results.
+pub(crate) fn report(
+    results: Result<Vec<apeiron::GitPushResult>, Error>,
+    updates: &[GitPushedRef],
+) -> (Vec<u8>, Vec<apeiron::GitPushResult>) {
     let mut out = Vec::new();
     let results = match results {
         Ok(results) => {
@@ -197,7 +234,7 @@ pub(crate) async fn receive_pack(
                 &mut out,
                 format!("unpack {}\n", e.message.replace('\n', " ")).as_bytes(),
             );
-            for u in &updates {
+            for u in updates {
                 pkt(
                     &mut out,
                     format!("ng {} unpacker error\n", u.git).as_bytes(),
@@ -207,43 +244,32 @@ pub(crate) async fn receive_pack(
         }
     };
     out.extend_from_slice(b"0000");
-    if let Mode::Web(web) = &app.mode {
-        let actor = Actor {
-            user: Some(user.name.clone()),
-            from,
-        };
-        let refs: Vec<_> = updates
-            .iter()
-            .map(|u| {
-                let error = results
-                    .iter()
-                    .find(|r| r.git == u.git)
-                    .map_or(Some("unpacker error"), |r| r.error.as_deref());
-                json!({"git": u.git, "new": u.new, "error": error})
-            })
-            .collect();
-        let moved = results.iter().any(|r| r.error.is_none());
-        let outcome = if moved { "ok" } else { "conflict" };
-        if let Err(e) = web.audit.record(
-            &actor,
-            "git_push",
-            json!({ "prefix": prefix, "refs": refs }),
-            outcome,
-        ) {
-            return Failure::from(e).into_response();
-        }
-        if moved {
-            web.replicate_now();
-        }
-    }
-    git_response("application/x-git-receive-pack-result", Body::from(out))
+    (out, results)
+}
+
+/// What the audit log keeps of a push: each ref, its new id and its error.
+pub(crate) fn pushed(
+    updates: &[GitPushedRef],
+    results: &[apeiron::GitPushResult],
+) -> (Vec<serde_json::Value>, bool) {
+    let refs = updates
+        .iter()
+        .map(|u| {
+            let error = results
+                .iter()
+                .find(|r| r.git == u.git)
+                .map_or(Some("unpacker error"), |r| r.error.as_deref());
+            json!({"git": u.git, "new": u.new, "error": error})
+        })
+        .collect();
+    (refs, results.iter().any(|r| r.error.is_none()))
 }
 
 /// The largest push taken in one request.
-const PUSH_LIMIT: usize = 256 << 20;
+pub(crate) const PUSH_LIMIT: usize = 256 << 20;
 
 /// The ref changes of a push and the pack after them.
-fn parse_commands(mut data: &[u8]) -> Option<(Vec<GitPushedRef>, &[u8])> {
+pub(crate) fn parse_commands(mut data: &[u8]) -> Option<(Vec<GitPushedRef>, &[u8])> {
     let mut updates = Vec::new();
     loop {
         let len = usize::from_str_radix(std::str::from_utf8(data.get(..4)?).ok()?, 16).ok()?;
@@ -406,12 +432,7 @@ async fn signed_in(
         )));
     };
     let prefix = prefix.strip_suffix(".git").unwrap_or(prefix).to_owned();
-    let valid = !prefix.is_empty()
-        && !prefix.starts_with('.')
-        && prefix
-            .bytes()
-            .all(|b| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'.' | b'_' | b'-'));
-    if !valid {
+    if !valid_prefix(&prefix) {
         return Err(Box::new(text(StatusCode::NOT_FOUND, "no such ref prefix")));
     }
     let user = match web.basic_user(headers, from).await {
@@ -450,6 +471,7 @@ async fn visible_refs(
     };
     let refs = blocking(move || {
         let _one = lock(&EXPORTING);
+        let _copy = copy_lock(&request.path)?;
         repo.git_serve_refs(&request)
     })
     .await?;
@@ -459,11 +481,42 @@ async fn visible_refs(
         .collect())
 }
 
+/// Whether `prefix` can name refs served to Git: lowercase letters, digits,
+/// `.`, `_` and `-`, not starting with `.`.
+pub(crate) fn valid_prefix(prefix: &str) -> bool {
+    !prefix.is_empty()
+        && !prefix.starts_with('.')
+        && prefix
+            .bytes()
+            .all(|b| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'.' | b'_' | b'-'))
+}
+
+/// Holds `<prefix>.lock` beside the Git copy until dropped, so the web
+/// server and `apeiron git ssh` never write into it at once.
+pub(crate) fn copy_lock(cache: &Path) -> Result<std::fs::File, Error> {
+    let io = |e: std::io::Error| Error::new(ErrorKind::Io, format!("{}: {e}", cache.display()));
+    if let Some(dir) = cache.parent() {
+        std::fs::create_dir_all(dir).map_err(io)?;
+    }
+    let file = std::fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(cache.with_extension("lock"))
+        .map_err(io)?;
+    file.lock().map_err(io)?;
+    Ok(file)
+}
+
 /// Where the Git copy of `prefix` lives: `git/<prefix>.git` in the folder
 /// of the site's audit log, the server's own state; it can always be made
 /// again.
 fn cache_path(web: &WebState, prefix: &str) -> PathBuf {
-    let state = web.audit.file().parent().unwrap_or(Path::new("."));
+    copy_path(&web.audit, prefix)
+}
+
+pub(crate) fn copy_path(audit: &crate::Audit, prefix: &str) -> PathBuf {
+    let state = audit.file().parent().unwrap_or(Path::new("."));
     state.join("git").join(format!("{prefix}.git"))
 }
 
@@ -511,7 +564,7 @@ fn parse_request(mut data: &[u8]) -> Option<UploadRequest> {
 }
 
 /// Appends one packet line: four hex digits of length, then the data.
-fn pkt(out: &mut Vec<u8>, data: &[u8]) {
+pub(crate) fn pkt(out: &mut Vec<u8>, data: &[u8]) {
     out.extend_from_slice(format!("{:04x}", data.len() + 4).as_bytes());
     out.extend_from_slice(data);
 }

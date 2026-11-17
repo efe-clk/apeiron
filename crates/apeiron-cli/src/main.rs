@@ -2096,6 +2096,25 @@ enum GitCommand {
         #[arg(long, default_value = "git")]
         prefix: String,
     },
+    /// Serve git clone, fetch and push over SSH as a user of the web
+    /// server; run by the SSH server for a key (docs/GIT.md)
+    Ssh {
+        /// The user of the web server the key belongs to
+        #[arg(long)]
+        user: String,
+        /// A tenant of the web server, instead of --repo
+        #[arg(long, value_name = "NAME")]
+        tenant: Option<String>,
+    },
+    /// Print the authorized_keys line that lets a public key use Git over
+    /// SSH as a user
+    SshKey {
+        user: String,
+        /// The public key file, such as id_ed25519.pub
+        key: PathBuf,
+        #[arg(long, value_name = "NAME")]
+        tenant: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -3604,6 +3623,119 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             }
             Ok(0)
         }
+        Command::Git {
+            command: GitCommand::Ssh { user, tenant },
+        } => {
+            let files = WebFiles::of(tenant.as_deref())?;
+            let (repo_path, password) = match &tenant {
+                Some(name) => {
+                    let tenants = apeiron_server::Tenants::load(&tenants_file()?)?;
+                    let t = tenants.get(name)?;
+                    (t.repo.clone(), t.password_file.clone())
+                }
+                None => (
+                    cli.repo.clone().ok_or_else(|| {
+                        Failure::Usage("no repository given; use --repo or --tenant".to_owned())
+                    })?,
+                    password_file.map(Path::to_path_buf),
+                ),
+            };
+            // Standard input carries Git's protocol: no password is asked.
+            let repo = match Repository::open(&repo_path) {
+                Err(e) if e.kind == ErrorKind::Key => match &password {
+                    Some(file) => Repository::unlock(&repo_path, &read_password_file(file)?)?,
+                    None => {
+                        return Err(Failure::Usage(
+                            "the repository is encrypted; give --password-file".to_owned(),
+                        ));
+                    }
+                },
+                result => result?,
+            };
+            let command = std::env::var("SSH_ORIGINAL_COMMAND").map_err(|_| {
+                Failure::Usage(
+                    "SSH_ORIGINAL_COMMAND is not set; this runs from the SSH server, for a key"
+                        .to_owned(),
+                )
+            })?;
+            let from = std::env::var("SSH_CONNECTION").ok().and_then(|c| {
+                let mut parts = c.split(' ');
+                Some(format!("{}:{} ssh", parts.next()?, parts.next()?))
+            });
+            let ssh = apeiron_server::GitSsh {
+                repo,
+                users: files.users,
+                audit: files.audit,
+                user,
+                from,
+            };
+            apeiron_server::serve_git_ssh(
+                &ssh,
+                &command,
+                std::io::stdin().lock(),
+                std::io::stdout().lock(),
+            )?;
+            Ok(0)
+        }
+        Command::Git {
+            command: GitCommand::SshKey { user, key, tenant },
+        } => {
+            let files = WebFiles::of(tenant.as_deref())?;
+            if apeiron_server::Users::load(&files.users)?
+                .get(&user)
+                .is_none()
+            {
+                return Err(Failure::Api(Error::new(
+                    ErrorKind::NotFound,
+                    format!("no user named {user}"),
+                )));
+            }
+            let text = std::fs::read_to_string(&key)
+                .map_err(|e| Failure::Usage(format!("{}: {e}", key.display())))?;
+            let key_line = text.lines().next().unwrap_or("").trim();
+            let kind = key_line.split(' ').next().unwrap_or("");
+            if !(kind.starts_with("ssh-") || kind.starts_with("ecdsa-") || kind.starts_with("sk-"))
+            {
+                return Err(Failure::Usage(format!(
+                    "{} is not an SSH public key",
+                    key.display()
+                )));
+            }
+            let quote = |p: &Path| -> Result<String, Failure> {
+                let text = std::path::absolute(p)
+                    .map_err(|e| Failure::Usage(format!("{}: {e}", p.display())))?
+                    .to_string_lossy()
+                    .into_owned();
+                if text.contains(['"', '\'', '\\', ' ', '\n']) {
+                    return Err(Failure::Usage(format!(
+                        "{text} has a space or quote; move it to a simpler path"
+                    )));
+                }
+                Ok(text)
+            };
+            if user.contains(['"', '\'', '\\', ' ', '\n']) {
+                return Err(Failure::Usage(format!(
+                    "the name {user} has a space or quote"
+                )));
+            }
+            let exe = std::env::current_exe()
+                .map_err(|e| Failure::Usage(format!("cannot find this program: {e}")))?;
+            let mut command = format!("{} git ssh --user {user}", quote(&exe)?);
+            match &tenant {
+                Some(name) => command.push_str(&format!(" --tenant {name}")),
+                None => {
+                    let repo = cli.repo.as_deref().ok_or_else(|| {
+                        Failure::Usage("no repository given; use --repo or --tenant".to_owned())
+                    })?;
+                    command.push_str(&format!(" --repo {}", quote(repo)?));
+                    if let Some(file) = password_file {
+                        command.push_str(&format!(" --password-file {}", quote(file)?));
+                    }
+                }
+            }
+            say!("command=\"{command}\",restrict {key_line}");
+            Ok(0)
+        }
         Command::Git { command } => {
             let repo = open(cli.repo, password_file)?;
             match command {
@@ -3649,6 +3781,8 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                         return Ok(EXIT_WARNINGS);
                     }
                 }
+                // Handled above, without opening `--repo` first.
+                GitCommand::Ssh { .. } | GitCommand::SshKey { .. } => unreachable!(),
             }
             Ok(0)
         }

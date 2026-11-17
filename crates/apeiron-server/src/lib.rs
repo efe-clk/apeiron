@@ -11,6 +11,7 @@ mod accounts;
 mod audit;
 mod client;
 mod git;
+mod git_ssh;
 mod oidc;
 mod operator;
 mod replicate;
@@ -33,6 +34,7 @@ use std::time::Duration;
 
 pub use audit::{Actor, Audit, Event, Syslog, Verified};
 pub use client::{Client, RemoteJob};
+pub use git_ssh::{GitSsh, serve_git_ssh};
 pub use oidc::{GroupRule, OidcConfig, Provider, check_provider};
 pub use operator::Manage;
 pub use shares::{DEFAULT_DAYS, LinkOptions, MAX_DAYS, MAX_DOWNLOADS, Share, Shares};
