@@ -594,6 +594,42 @@ class Repository:
         """The operations that changed the repository, newest first."""
         return self.call("operations", limit=limit)
 
+    def reviews(self, all: bool = False) -> list:
+        """The open reviews, newest first; merged and closed ones too with `all`."""
+        return self.call("reviews", all=all)
+
+    def review(self, id: str) -> dict:
+        return self.call("review", id=id)
+
+    def open_review(
+        self,
+        source: str,
+        title: str,
+        into: str = "main",
+        text: Optional[str] = None,
+        author: Optional[str] = None,
+    ) -> dict:
+        """Asks for the changes of the ref `source` to be merged into `into`."""
+        return self.call(
+            "open_review", **{"from": source}, into=into, title=title, text=text, author=author
+        )
+
+    def note_review(
+        self,
+        id: str,
+        action: str,
+        text: Optional[str] = None,
+        path: Optional[str] = None,
+        author: Optional[str] = None,
+    ) -> dict:
+        """`comment`, `approve`, `request_changes` or `close`."""
+        return self.call("note_review", id=id, action=action, text=text, path=path, author=author)
+
+    def merge_review(
+        self, id: str, message: Optional[str] = None, author: Optional[str] = None
+    ) -> dict:
+        return self.call("merge_review", id=id, message=message, author=author)
+
     def create_ref(self, name: str, snapshot: str = "main") -> str:
         return self.call("create_ref", name=name, snapshot=snapshot)
 

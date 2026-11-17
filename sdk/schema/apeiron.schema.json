@@ -1745,6 +1745,32 @@
       ],
       "type": "object"
     },
+    "MergeReviewRequest": {
+      "description": "Merges an approved review.",
+      "properties": {
+        "author": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "message": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
     "MirrorReport": {
       "description": "What pushing or pulling every ref did, ref by ref.",
       "properties": {
@@ -1894,6 +1920,41 @@
       "description": "An object id: 64 lowercase hexadecimal characters.",
       "pattern": "^[0-9a-f]{64}$",
       "type": "string"
+    },
+    "OpenReviewRequest": {
+      "description": "Asks for the changes of a ref to be merged into another.",
+      "properties": {
+        "author": {
+          "default": null,
+          "description": "The operating system user when absent.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "from": {
+          "type": "string"
+        },
+        "into": {
+          "default": "main",
+          "type": "string"
+        },
+        "text": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "from",
+        "title"
+      ],
+      "type": "object"
     },
     "Operation": {
       "description": "One line of the operation log.",
@@ -2801,6 +2862,239 @@
       "required": [
         "snapshot"
       ],
+      "type": "object"
+    },
+    "Review": {
+      "description": "A review as its steps make it.",
+      "properties": {
+        "approvals": {
+          "description": "Who approved `snapshot`; an approval of an older snapshot does not\ncount.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "author": {
+          "type": "string"
+        },
+        "changes_requested": {
+          "description": "Who asked for changes and has not approved since.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "events": {
+          "description": "Every step, oldest first.",
+          "items": {
+            "$ref": "#/$defs/ReviewEvent"
+          },
+          "type": "array"
+        },
+        "from": {
+          "description": "The ref whose changes are asked to be merged.",
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "into": {
+          "description": "The ref they would be merged into.",
+          "type": "string"
+        },
+        "opened": {
+          "description": "Unix time in seconds when it was opened.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ready": {
+          "description": "Whether `merge_review` would merge it now.",
+          "type": "boolean"
+        },
+        "snapshot": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What `from` points to now; for a merged review, what was merged.\n`None` when the ref is gone."
+        },
+        "state": {
+          "$ref": "#/$defs/ReviewState"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "from",
+        "into",
+        "author",
+        "opened",
+        "state",
+        "approvals",
+        "changes_requested",
+        "ready",
+        "events"
+      ],
+      "type": "object"
+    },
+    "ReviewAction": {
+      "description": "What a step of a review does.",
+      "enum": [
+        "open",
+        "comment",
+        "approve",
+        "request_changes",
+        "merge",
+        "close"
+      ],
+      "type": "string"
+    },
+    "ReviewEvent": {
+      "description": "One step of a review, as it is stored.",
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/ReviewAction"
+        },
+        "author": {
+          "type": "string"
+        },
+        "from": {
+          "description": "For `open` only.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "into": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "path": {
+          "description": "The file a comment is about.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "snapshot": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "For `open`, `approve`, `request_changes` and `merge`: the snapshot\n`from` pointed to then; a merge merges that one."
+        },
+        "text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "time": {
+          "description": "Unix time in seconds.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "action",
+        "author",
+        "time"
+      ],
+      "type": "object"
+    },
+    "ReviewMerged": {
+      "description": "The review after the merge, and the merge.",
+      "properties": {
+        "merge": {
+          "$ref": "#/$defs/MergeOutcome"
+        },
+        "review": {
+          "$ref": "#/$defs/Review"
+        }
+      },
+      "required": [
+        "review",
+        "merge"
+      ],
+      "type": "object"
+    },
+    "ReviewNoteRequest": {
+      "description": "A comment, an approval, a request for changes or closing a review.",
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/ReviewAction",
+          "description": "`comment`, `approve`, `request_changes` or `close`."
+        },
+        "author": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "The id of the review or its first characters.",
+          "type": "string"
+        },
+        "path": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "text": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "action"
+      ],
+      "type": "object"
+    },
+    "ReviewState": {
+      "enum": [
+        "open",
+        "merged",
+        "closed"
+      ],
+      "type": "string"
+    },
+    "ReviewsRequest": {
+      "description": "Which reviews to list.",
+      "properties": {
+        "all": {
+          "default": false,
+          "description": "Merged and closed ones too.",
+          "type": "boolean"
+        }
+      },
       "type": "object"
     },
     "Rule": {
@@ -4094,6 +4388,33 @@
         "$ref": "#/$defs/MergeOutcome"
       }
     },
+    "merge_review": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/MergeReviewRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/ReviewMerged"
+      }
+    },
+    "note_review": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/ReviewNoteRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/Review"
+      }
+    },
+    "open_review": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/OpenReviewRequest"
+      },
+      "result": {
+        "$ref": "#/$defs/Review"
+      }
+    },
     "operations": {
       "long": false,
       "request": {
@@ -4315,6 +4636,27 @@
       "result": {
         "items": {
           "$ref": "#/$defs/Rule"
+        },
+        "type": "array"
+      }
+    },
+    "review": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/KeyId"
+      },
+      "result": {
+        "$ref": "#/$defs/Review"
+      }
+    },
+    "reviews": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/ReviewsRequest"
+      },
+      "result": {
+        "items": {
+          "$ref": "#/$defs/Review"
         },
         "type": "array"
       }

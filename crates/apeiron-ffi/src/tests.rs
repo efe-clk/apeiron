@@ -245,9 +245,12 @@ fn conformance_scenarios() {
         "clone",
         "delete_ref",
         "lift_hold",
+        "merge_review",
+        "note_review",
         "plugin_add",
         "plugin_remove",
         "remove_key",
+        "review",
     ];
     let schema = api::json::schema();
     let missing: Vec<&String> = schema["operations"]

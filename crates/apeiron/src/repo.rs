@@ -153,7 +153,7 @@ impl Repository {
 
     /// Records an operation that may have changed the repository and
     /// returns its result; a dry run is not recorded.
-    fn recorded<T>(
+    pub(crate) fn recorded<T>(
         &self,
         op: &str,
         dry_run: Option<bool>,
@@ -206,7 +206,7 @@ impl Repository {
         Ok(plugins)
     }
 
-    fn read(&self) -> RwLockReadGuard<'_, core::Repository> {
+    pub(crate) fn read(&self) -> RwLockReadGuard<'_, core::Repository> {
         self.inner
             .core
             .read()
@@ -224,14 +224,14 @@ impl Repository {
         })
     }
 
-    fn write(&self) -> RwLockWriteGuard<'_, core::Repository> {
+    pub(crate) fn write(&self) -> RwLockWriteGuard<'_, core::Repository> {
         self.inner
             .core
             .write()
             .unwrap_or_else(PoisonError::into_inner)
     }
 
-    fn lock_writer(&self) -> MutexGuard<'_, ()> {
+    pub(crate) fn lock_writer(&self) -> MutexGuard<'_, ()> {
         self.inner
             .writer
             .lock()

@@ -1007,3 +1007,23 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Derlenmiş bir C++ kütüphanesi | C ABI'ye göre kazanç olmadan, derleyiciye göre değişen bir derleme ve ikili arayüz ekler |
 
 **Sonuçlar.** Bir C++ programı sonuçları kendisi okur; yanlış bir alan adı derlenirken değil, çalışırken görünür. Tipli sınıflar daha sonra, bu başlığı değiştirmeden üzerine eklenebilir.
+
+## ADR-047: İncelemeler, kendi ref'inde dosya olarak tutulan adımlardır
+
+**Durum:** Kabul edildi (2026-11-17)
+
+**Bağlam.** Vizyon her tür veri için inceleme, onay ve yorum ister. İncelemeler deponun kopyalarında kalmalı, şifreli bir depoda gizli kalmalı ve aynı anda yorum yapan iki kişi bir yorumu kaybetmemelidir.
+
+**Karar.** Bir incelemenin her adımı `apeiron/reviews` ref'inde yeni bir JSON dosyasıdır; durum adımlardan hesaplanır. Bir onay onayladığı snapshot'ı adlandırır; birleştirme tam olarak o snapshot'ı birleştirir ve çakışma kopyaları üretecek bir birleştirmeyi reddeder ([REVIEW.tr.md](REVIEW.tr.md)).
+
+**Gerekçe.** Bir ref zaten şifrelenir, kopyalanır ve saklama kurallarıyla korunur; incelemeler yeni bir depolamaya gerek duymaz. Dosya eklemek ve hiçbirini değiştirmemek, iki yazıcıyı kaybolan bir güncelleme değil iki adım yapar. Onayı bir snapshot'a bağlamak, kimsenin görmediği bir şeyin birleştirilmemesi demektir.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Her adımda yeniden yazılan, inceleme başına bir dosya | Aynı anda iki adım birbirinin yerine geçerdi |
+| Paylaşımlardaki gibi web sunucusunun veritabanı | Komut satırı ve deponun kopyaları incelemeleri görmezdi |
+| Dalı izleyen onaylar | Onaydan sonraki bir değişiklik görülmeden birleştirilirdi |
+
+**Sonuçlar.** Bir bilgisayarda adlar denetlenmez: inceleme bir uzlaşma kaydıdır, erişim denetimi değildir. Dalındaki her yeni snapshot'tan sonra inceleme yeniden onay ister.

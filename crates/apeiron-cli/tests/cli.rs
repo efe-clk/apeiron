@@ -944,6 +944,50 @@ fn the_operation_log_records_changes() {
     );
 }
 
+/// A review goes from opening to merging on the command line
+/// (REVIEW.md §3).
+#[test]
+fn a_review_is_opened_approved_and_merged() {
+    let s = Setup::new();
+    s.ok(&["backup", &s.path("src")]);
+    s.ok(&["ref", "create", "draft", "main"]);
+    fs::write(s.root.join("src/a.txt"), b"changed").unwrap();
+    s.ok(&["backup", &s.path("src"), "--ref", "draft"]);
+    let opened = s.json(&[
+        "review", "open", "draft", "--title", "Change a", "--author", "ayse",
+    ]);
+    let id = opened["id"].as_str().unwrap().to_owned();
+    let listed = s.ok(&["review", "list"]);
+    assert!(
+        listed.contains(&id) && listed.contains("Change a"),
+        "{listed}"
+    );
+    let merge = ["review", "merge", &id, "--author", "ayse"];
+    assert_eq!(code(&s.run(&merge)), Some(1));
+    s.ok(&[
+        "review",
+        "comment",
+        &id,
+        "Looks right",
+        "--path",
+        "a.txt",
+        "--author",
+        "mehmet",
+    ]);
+    let approved = s.json(&["review", "approve", &id, "--author", "mehmet"]);
+    assert_eq!(approved["ready"], true);
+    let shown = s.ok(&["review", "show", &id]);
+    assert!(shown.contains("mehmet commented on a.txt"), "{shown}");
+    assert!(shown.contains("M a.txt"), "{shown}");
+    s.ok(&merge);
+    assert!(s.ok(&["review", "list"]).contains("No open reviews"));
+    let ops = s.ok(&["oplog"]);
+    assert!(
+        ops.lines().next().unwrap().contains("merge-review"),
+        "{ops}"
+    );
+}
+
 /// The GDPR shows the same facts as ISO/IEC 27001, under its articles
 /// (REPORTS.md §3.1).
 #[test]

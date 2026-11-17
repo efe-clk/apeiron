@@ -649,3 +649,103 @@ fn a_compliance_report_shows_what_is_kept_and_what_needs_attention() {
     assert!(report.remotes[1].error.is_some());
     assert!(report.has_problems());
 }
+
+/// A review is opened, commented on, approved by someone else and merged;
+/// a new snapshot on the branch asks for a new approval (REVIEW.md §2).
+#[test]
+fn a_review_is_approved_and_merged() {
+    use apeiron::{
+        MergeReviewRequest, OpenReviewRequest, ReviewAction, ReviewNoteRequest, ReviewState,
+        ReviewsRequest,
+    };
+    let s = setup();
+    backup(&s, "first");
+    s.repo
+        .create_ref(&apeiron::CreateRefRequest {
+            name: "draft".to_owned(),
+            snapshot: "main".to_owned(),
+        })
+        .unwrap();
+    fs::write(s.root.join("src/a.txt"), b"changed").unwrap();
+    let mut request = BackupRequest::new(s.root.join("src"), "draft");
+    request.message = Some("change a".to_owned());
+    s.repo.backup(request.clone()).unwrap().wait().unwrap();
+
+    let opened = s
+        .repo
+        .open_review(&OpenReviewRequest {
+            from: "draft".to_owned(),
+            into: "main".to_owned(),
+            title: "Change a".to_owned(),
+            text: Some("Please look".to_owned()),
+            author: Some("ayse".to_owned()),
+        })
+        .unwrap();
+    assert_eq!(opened.state, ReviewState::Open);
+    assert!(!opened.ready);
+    let note = |action, author: &str, text: Option<&str>| ReviewNoteRequest {
+        id: opened.id[..4].to_owned(),
+        action,
+        text: text.map(str::to_owned),
+        path: None,
+        author: Some(author.to_owned()),
+    };
+    let own = s
+        .repo
+        .note_review(&note(ReviewAction::Approve, "ayse", None));
+    assert_eq!(own.unwrap_err().kind, ErrorKind::InvalidInput);
+    let merge = MergeReviewRequest {
+        id: opened.id.clone(),
+        message: None,
+        author: Some("ayse".to_owned()),
+    };
+    assert_eq!(
+        s.repo.merge_review(&merge).unwrap_err().kind,
+        ErrorKind::Conflict
+    );
+
+    s.repo
+        .note_review(&note(ReviewAction::RequestChanges, "mehmet", Some("b too")))
+        .unwrap();
+    fs::write(s.root.join("src/sub/b.txt"), b"changed too").unwrap();
+    s.repo.backup(request).unwrap().wait().unwrap();
+    let review = s
+        .repo
+        .note_review(&note(ReviewAction::Approve, "mehmet", None))
+        .unwrap();
+    assert_eq!(review.approvals, ["mehmet"]);
+    assert!(review.ready);
+
+    // A new snapshot on the branch needs a new approval.
+    fs::write(s.root.join("src/c.txt"), b"late").unwrap();
+    let mut late = BackupRequest::new(s.root.join("src"), "draft");
+    late.message = Some("late".to_owned());
+    s.repo.backup(late).unwrap().wait().unwrap();
+    assert!(!s.repo.review(&opened.id).unwrap().ready);
+    s.repo
+        .note_review(&note(ReviewAction::Approve, "mehmet", None))
+        .unwrap();
+
+    let merged = s.repo.merge_review(&merge).unwrap();
+    assert_eq!(merged.review.state, ReviewState::Merged);
+    assert_eq!(
+        s.repo.resolve("main").unwrap(),
+        s.repo.resolve("draft").unwrap()
+    );
+    assert!(
+        s.repo
+            .reviews(&ReviewsRequest::default())
+            .unwrap()
+            .is_empty()
+    );
+    let all = s.repo.reviews(&ReviewsRequest { all: true }).unwrap();
+    assert_eq!(all.len(), 1);
+    assert_eq!(all[0].events.len(), 5);
+    let again = s
+        .repo
+        .note_review(&note(ReviewAction::Close, "mehmet", None));
+    assert_eq!(again.unwrap_err().kind, ErrorKind::Conflict);
+    s.repo
+        .note_review(&note(ReviewAction::Comment, "mehmet", Some("thanks")))
+        .unwrap();
+}

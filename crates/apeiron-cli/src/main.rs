@@ -295,6 +295,11 @@ enum Command {
         #[command(subcommand)]
         command: HoldCommand,
     },
+    /// Ask for a branch to be merged, comment, approve and merge it
+    Review {
+        #[command(subcommand)]
+        command: ReviewCommand,
+    },
     /// Find files by name, size, time and text in a snapshot or its history
     Search {
         /// A name with `*` and `?`; with `/`, a whole path
@@ -653,6 +658,76 @@ enum HoldCommand {
         id: String,
         #[arg(long)]
         reason: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum ReviewCommand {
+    /// Ask for the changes of a ref to be merged into another
+    Open {
+        /// The ref with the changes, usually a branch
+        from: String,
+        /// The ref to merge them into
+        #[arg(long, default_value = "main")]
+        into: String,
+        /// One line saying what the changes are
+        #[arg(long)]
+        title: String,
+        #[arg(long)]
+        text: Option<String>,
+        /// Who asks; the user of the operating system by default
+        #[arg(long)]
+        author: Option<String>,
+    },
+    /// List the open reviews, newest first
+    List {
+        /// Merged and closed ones too
+        #[arg(long)]
+        all: bool,
+    },
+    /// Show a review with every step and the files it changes
+    Show { id: String },
+    /// Comment on a review, or on one file of it
+    Comment {
+        id: String,
+        text: String,
+        /// The file the comment is about
+        #[arg(long)]
+        path: Option<String>,
+        #[arg(long)]
+        author: Option<String>,
+    },
+    /// Approve what the branch holds now; its author cannot
+    Approve {
+        id: String,
+        #[arg(long)]
+        text: Option<String>,
+        #[arg(long)]
+        author: Option<String>,
+    },
+    /// Ask for changes; the review cannot be merged until you approve
+    RequestChanges {
+        id: String,
+        #[arg(long)]
+        text: String,
+        #[arg(long)]
+        author: Option<String>,
+    },
+    /// Close a review without merging it
+    Close {
+        id: String,
+        #[arg(long)]
+        text: Option<String>,
+        #[arg(long)]
+        author: Option<String>,
+    },
+    /// Merge an approved review
+    Merge {
+        id: String,
+        #[arg(long)]
+        message: Option<String>,
+        #[arg(long)]
+        author: Option<String>,
     },
 }
 
@@ -2859,6 +2934,11 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             }
             Ok(0)
         }
+        Command::Review { command } => {
+            let repo = open(cli.repo, password_file)?;
+            run_review(&repo, out, command)?;
+            Ok(0)
+        }
         Command::Ref { command } => {
             let repo = open(cli.repo, password_file)?;
             match command {
@@ -4088,4 +4168,181 @@ impl Output {
             Err(e) => eprintln!("error: cannot write JSON: {e}"),
         }
     }
+}
+
+/// `apeiron review` (REVIEW.md §3).
+fn run_review(repo: &Repository, out: &Output, command: ReviewCommand) -> Result<(), Failure> {
+    use apeiron::{
+        MergeReviewRequest, OpenReviewRequest, Review, ReviewAction, ReviewNoteRequest,
+        ReviewState, ReviewsRequest,
+    };
+    let when = |seconds: u64| {
+        format::time(&apeiron::Time {
+            seconds: i64::try_from(seconds).unwrap_or(i64::MAX),
+            nanos: 0,
+        })
+    };
+    let state = |r: &Review| match r.state {
+        ReviewState::Open if r.ready => "ready to merge",
+        ReviewState::Open => "open",
+        ReviewState::Merged => "merged",
+        ReviewState::Closed => "closed",
+    };
+    let note = |id, action, text, path, author| -> Result<(), Failure> {
+        let review = repo.note_review(&ReviewNoteRequest {
+            id,
+            action,
+            text,
+            path,
+            author,
+        })?;
+        out.result(&review, |r| {
+            say!("{}  {}  {}", r.id, state(r), r.title);
+        });
+        Ok(())
+    };
+    match command {
+        ReviewCommand::Open {
+            from,
+            into,
+            title,
+            text,
+            author,
+        } => {
+            let review = repo.open_review(&OpenReviewRequest {
+                from,
+                into,
+                title,
+                text,
+                author,
+            })?;
+            out.result(&review, |r| {
+                say!("Opened review {}: merge {} into {}", r.id, r.from, r.into);
+            });
+        }
+        ReviewCommand::List { all } => {
+            let reviews = repo.reviews(&ReviewsRequest { all })?;
+            out.result(&reviews, |reviews| {
+                for r in reviews {
+                    say!(
+                        "{}  {:<14}  {} -> {}  {}  ({})",
+                        r.id,
+                        state(r),
+                        r.from,
+                        r.into,
+                        r.title,
+                        r.author
+                    );
+                }
+                if reviews.is_empty() {
+                    say!("No open reviews");
+                }
+            });
+        }
+        ReviewCommand::Show { id } => {
+            let review = repo.review(&id)?;
+            let changes = match (review.state, review.snapshot) {
+                (ReviewState::Open, Some(s)) => {
+                    repo.merge(&apeiron::MergeRequest {
+                        from: s.to_string(),
+                        into: review.into.clone(),
+                        message: None,
+                        author: None,
+                        dry_run: true,
+                    })?
+                    .changes
+                }
+                _ => Vec::new(),
+            };
+            #[derive(Serialize)]
+            struct Shown<'a> {
+                review: &'a Review,
+                changes: &'a [apeiron::Change],
+            }
+            let shown = Shown {
+                review: &review,
+                changes: &changes,
+            };
+            out.result(&shown, |s| {
+                let r = s.review;
+                say!("{}  {}", r.id, r.title);
+                say!(
+                    "{} -> {}, {}, approved by: {}",
+                    r.from,
+                    r.into,
+                    state(r),
+                    if r.approvals.is_empty() {
+                        "no one".to_owned()
+                    } else {
+                        r.approvals.join(", ")
+                    }
+                );
+                if !r.changes_requested.is_empty() {
+                    say!("changes asked by: {}", r.changes_requested.join(", "));
+                }
+                say!("");
+                for e in &r.events {
+                    let action = match e.action {
+                        ReviewAction::Open => "opened",
+                        ReviewAction::Comment => "commented",
+                        ReviewAction::Approve => "approved",
+                        ReviewAction::RequestChanges => "asked for changes",
+                        ReviewAction::Merge => "merged",
+                        ReviewAction::Close => "closed",
+                    };
+                    let on = e
+                        .path
+                        .as_deref()
+                        .map(|p| format!(" on {p}"))
+                        .unwrap_or_default();
+                    say!("{}  {} {action}{on}", when(e.time), e.author);
+                    for line in e.text.as_deref().unwrap_or("").lines() {
+                        say!("    {line}");
+                    }
+                }
+                if !s.changes.is_empty() {
+                    say!("");
+                    say!("Merging changes in {}:", r.into);
+                    for c in s.changes {
+                        say!("{} {}", format::change(c.kind), c.path);
+                    }
+                }
+            });
+        }
+        ReviewCommand::Comment {
+            id,
+            text,
+            path,
+            author,
+        } => note(id, ReviewAction::Comment, Some(text), path, author)?,
+        ReviewCommand::Approve { id, text, author } => {
+            note(id, ReviewAction::Approve, text, None, author)?;
+        }
+        ReviewCommand::RequestChanges { id, text, author } => {
+            note(id, ReviewAction::RequestChanges, Some(text), None, author)?;
+        }
+        ReviewCommand::Close { id, text, author } => {
+            note(id, ReviewAction::Close, text, None, author)?;
+        }
+        ReviewCommand::Merge {
+            id,
+            message,
+            author,
+        } => {
+            let merged = repo.merge_review(&MergeReviewRequest {
+                id,
+                message,
+                author,
+            })?;
+            out.result(&merged, |m| {
+                say!(
+                    "Merged review {} into {}: {}",
+                    m.review.id,
+                    m.review.into,
+                    format::short_id(&m.merge.snapshot)
+                );
+            });
+        }
+    }
+    Ok(())
 }

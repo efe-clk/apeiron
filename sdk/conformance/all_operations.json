@@ -15,6 +15,8 @@
     {"call": "diff_text", "request": {"from": "main~1", "to": "main"}},
     {"call": "duplicates", "request": {"snapshot": "main~1"}},
     {"call": "create_ref", "request": {"name": "side", "snapshot": "main~1"}},
+    {"call": "open_review", "request": {"from": "main", "into": "side", "title": "Bring side up", "author": "ayse"}, "expect": {"state": "open", "ready": false}},
+    {"call": "reviews", "request": {}, "expect": [{"title": "Bring side up", "author": "ayse"}]},
     {"call": "merge", "request": {"from": "main", "into": "side"}},
     {"call": "cherry_pick", "request": {"from": "main", "into": "side"}},
     {"call": "rebase", "request": {"from": "main", "into": "side"}},

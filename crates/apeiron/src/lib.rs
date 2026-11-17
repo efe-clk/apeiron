@@ -14,6 +14,7 @@ pub mod json;
 mod plugins;
 mod repo;
 mod report;
+mod review;
 mod saved;
 mod spec;
 mod types;
@@ -66,6 +67,10 @@ pub use repo::Repository;
 pub use report::{
     ComplianceReport, CopyKind, CopyState, Finding, FindingKind, Level, RefFacts, RemoteFacts,
     ReportRequest, RepositoryFacts,
+};
+pub use review::{
+    MergeReviewRequest, OpenReviewRequest, REVIEWS_REF, Review, ReviewAction, ReviewEvent,
+    ReviewMerged, ReviewNoteRequest, ReviewState, ReviewsRequest,
 };
 pub use saved::{
     SavedSearch, forget_search, save_search, saved_search, saved_searches, searches_file,

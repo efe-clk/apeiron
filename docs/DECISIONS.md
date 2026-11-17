@@ -1007,3 +1007,23 @@ ADR 001â€“008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009â€
 | A compiled C++ library | Adds a build and a binary interface that differ by compiler, for no gain over the C ABI |
 
 **Consequences.** A C++ program reads results itself, so a wrong field name shows up when it runs, not when it compiles. Typed classes can come later on top of this header without changing it.
+
+## ADR-047: Reviews are steps kept as files in a ref of their own
+
+**Status:** Accepted (2026-11-17)
+
+**Context.** The vision asks for review, approval and comments for every kind of data. Reviews must survive copies of the repository, stay private in an encrypted one, and two people commenting at once must not lose a comment.
+
+**Decision.** Every step of a review is a new JSON file in the ref `apeiron/reviews`; the state is computed from the steps. An approval names the snapshot it approves, and merging merges exactly that snapshot, refusing a merge that would make conflict copies ([REVIEW.md](REVIEW.md)).
+
+**Rationale.** A ref is already encrypted, copied and protected by retention rules, so reviews need no new storage. Adding files and never changing one turns two writers into two steps, not a lost update. Tying an approval to a snapshot means no one merges something no one has seen.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| One file per review, rewritten at each step | Two steps at once would replace each other |
+| A database of the web server, as for shares | The command line and copies of the repository would not see reviews |
+| Approvals that follow the branch | A change after the approval would be merged unseen |
+
+**Consequences.** Names are not checked on one computer: a review is a record of agreement, not access control. A review needs an approval again after every new snapshot on its branch.
