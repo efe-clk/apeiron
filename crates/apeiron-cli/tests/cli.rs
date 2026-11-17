@@ -902,6 +902,44 @@ fn a_report_maps_to_soc2_with_the_same_facts() {
     );
 }
 
+/// The GDPR shows the same facts as ISO/IEC 27001, under its articles
+/// (REPORTS.md §3.1).
+#[test]
+fn a_report_maps_to_the_gdpr_with_the_same_facts() {
+    let s = Setup::new();
+    s.ok(&["backup", &s.path("src")]);
+    let iso = s.json(&["report", "--standard", "iso27001"]);
+    let gdpr = s.json(&["report", "--standard", "gdpr"]);
+    let of = |report: &serde_json::Value, id: &str| {
+        report["standard"]["controls"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["id"] == id)
+            .cloned()
+            .unwrap_or_else(|| panic!("no {id}"))
+    };
+    assert_eq!(gdpr["standard"]["controls"].as_array().unwrap().len(), 6);
+    for (from, to) in [
+        ("A.8.24", "Art. 32(1)(a)"),
+        ("A.5.30", "Art. 32(1)(b)"),
+        ("A.8.13", "Art. 32(1)(c)"),
+        ("A.5.15", "Art. 32(4)"),
+        ("A.5.33", "Art. 5(1)(f)"),
+        ("A.8.15", "Art. 5(2)"),
+    ] {
+        let (a, b) = (of(&iso, from), of(&gdpr, to));
+        assert_eq!(a["status"], b["status"], "{to}");
+        assert_eq!(a["facts"], b["facts"], "{to}");
+    }
+    let text = s.ok(&["report", "--standard", "gdpr"]);
+    assert!(text.contains("## GDPR Articles 5 and 32"), "{text}");
+    assert!(
+        text.contains("| Art. 32(1)(a) Encryption of personal data | gap |"),
+        "{text}"
+    );
+}
+
 /// A report written to a file can be signed and checked (REPORTS.md §5.1).
 #[test]
 fn a_signed_report_is_checked() {

@@ -33,7 +33,7 @@ apeiron --json report --verify --remotes --web > report-2026-10.json
 | `--tenant <name>` | With `--web`: the tenant whose files to report on ([TENANTS.md](TENANTS.md)) | None |
 | `--all-tenants` | One report for each tenant, each on the tenant's own repository (opened with its password file) and, with `--web`, its own files; the reports follow one another, separated by `---`, or form a JSON array with a `tenant` field each. The exit code is the worst of them | Off |
 | `--since <YYYY-MM-DD>` | With `--web`: count audit events from that day | 30 days ago |
-| `--standard iso27001`, `--standard soc2` | Add the facts mapped to the controls of a standard (§3.1) | None |
+| `--standard iso27001`, `--standard soc2`, `--standard gdpr` | Add the facts mapped to the controls of a standard (§3.1) | None |
 
 The report reads only; it changes nothing. Its text form is Markdown, ready to keep or turn into a PDF; `--json` gives the same content for other programs. A scheduled job can make one every month ([DAEMON.md](DAEMON.md) runs commands only through its own jobs, so use the system's scheduler for this).
 
@@ -80,6 +80,17 @@ With `--standard soc2` the same facts appear under the 2017 Trust Services Crite
 | A1.2 Data backup and recovery | A.8.13 |
 | C1.1 Keeping confidential information | A.5.33 |
 
+With `--standard gdpr` the same facts appear under the articles of the GDPR (Regulation (EU) 2016/679) on the security of processing. The GDPR names no controls, so the table points to the parts of Articles 5 and 32 the facts bear on; it was made from the regulation's text as summarised in common sources, and a data protection officer should confirm it. Retention rules and legal holds keep data, which can work against erasure (Article 17) and storage limitation (Article 5(1)(e)); the report does not judge that balance.
+
+| Article | Same facts as |
+| --- | --- |
+| Art. 32(1)(a) Encryption of personal data | A.8.24 |
+| Art. 32(1)(b) Availability and resilience | A.5.30 |
+| Art. 32(1)(c) Restoring availability after an incident | A.8.13 |
+| Art. 32(4) Access only on instructions | A.5.15 |
+| Art. 5(1)(f) Protection against accidental loss | A.5.33 |
+| Art. 5(2) Accountability | A.8.15 |
+
 ## 4. Findings
 
 | Level | When |
@@ -119,7 +130,7 @@ The signature covers the report's bytes exactly, so even a changed space breaks 
 
 | Item | Where |
 | --- | --- |
-| Mappings to other standards, such as the GDPR | Later, with a pilot that names its standard; §3.1 shows the form |
+| Mappings to other standards, such as NIS2 | Later, with a pilot that names its standard; §3.1 shows the form |
 
 ## 7. Crates
 

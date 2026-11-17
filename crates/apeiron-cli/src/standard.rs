@@ -13,6 +13,8 @@ pub(crate) enum Standard {
     Iso27001,
     /// SOC 2, the 2017 Trust Services Criteria
     Soc2,
+    /// The GDPR, Articles 5 and 32
+    Gdpr,
 }
 
 /// What the report shows for a control.
@@ -46,7 +48,8 @@ pub(crate) struct Mapping {
 pub(crate) fn map(standard: Standard, full: &FullReport) -> Mapping {
     match standard {
         Standard::Iso27001 => iso27001(full),
-        Standard::Soc2 => soc2(full),
+        Standard::Soc2 => same_facts(full, "SOC 2 Trust Services Criteria", &SOC2),
+        Standard::Gdpr => same_facts(full, "GDPR Articles 5 and 32", &GDPR),
     }
 }
 
@@ -279,20 +282,41 @@ const SOC2: [(&str, &str, &str); 7] = [
     ("A.5.33", "C1.1", "Keeping confidential information"),
 ];
 
-/// The same facts as `iso27001`, so that the two reports cannot disagree.
-fn soc2(full: &FullReport) -> Mapping {
+/// The articles of the GDPR that the facts behind an ISO/IEC 27001 control
+/// bear on, in the same form as `SOC2`.
+const GDPR: [(&str, &str, &str); 6] = [
+    ("A.8.24", "Art. 32(1)(a)", "Encryption of personal data"),
+    ("A.5.30", "Art. 32(1)(b)", "Availability and resilience"),
+    (
+        "A.8.13",
+        "Art. 32(1)(c)",
+        "Restoring availability after an incident",
+    ),
+    ("A.5.15", "Art. 32(4)", "Access only on instructions"),
+    (
+        "A.5.33",
+        "Art. 5(1)(f)",
+        "Protection against accidental loss",
+    ),
+    ("A.8.15", "Art. 5(2)", "Accountability"),
+];
+
+/// The same facts as `iso27001` under other names, so that the reports
+/// cannot disagree.
+fn same_facts(
+    full: &FullReport,
+    standard: &'static str,
+    table: &[(&str, &'static str, &'static str)],
+) -> Mapping {
     let iso = iso27001(full).controls;
-    let controls = SOC2
+    let controls = table
         .iter()
         .filter_map(|(from, id, title)| {
             let c = iso.iter().find(|c| c.id == *from)?;
             Some(control(id, title, c.status, c.facts.clone()))
         })
         .collect();
-    Mapping {
-        standard: "SOC 2 Trust Services Criteria",
-        controls,
-    }
+    Mapping { standard, controls }
 }
 
 /// The Markdown section of a mapping.

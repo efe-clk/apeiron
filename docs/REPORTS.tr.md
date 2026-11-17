@@ -33,7 +33,7 @@ apeiron --json report --verify --remotes --web > rapor-2026-10.json
 | `--tenant <ad>` | `--web` ile: dosyaları raporlanacak kiracı ([TENANTS.tr.md](TENANTS.tr.md)) | Yok |
 | `--all-tenants` | Her kiracı için bir rapor; her biri kiracının kendi deposunda (parola dosyasıyla açılır) ve `--web` ile kendi dosyalarında. Raporlar `---` ile ayrılarak art arda gelir ya da her birinde `tenant` alanı olan bir JSON dizisi oluşturur. Çıkış kodu, içlerindeki en kötüsüdür | Kapalı |
 | `--since <YYYY-AA-GG>` | `--web` ile: denetim olaylarını o günden itibaren sayar | 30 gün önce |
-| `--standard iso27001`, `--standard soc2` | Bir standardın maddelerine eşlenmiş gerçekleri ekler (§3.1) | Yok |
+| `--standard iso27001`, `--standard soc2`, `--standard gdpr` | Bir standardın maddelerine eşlenmiş gerçekleri ekler (§3.1) | Yok |
 
 Rapor yalnızca okur; hiçbir şeyi değiştirmez. Metin biçimi, saklanmaya ya da PDF'e dönüştürülmeye hazır Markdown'dır; `--json` aynı içeriği başka programlar için verir. Zamanlanmış bir iş her ay bir tane oluşturabilir ([DAEMON.tr.md](DAEMON.tr.md) komutları yalnızca kendi işleriyle çalıştırır; bunun için sistemin zamanlayıcısını kullanın).
 
@@ -80,6 +80,17 @@ Kanıt snapshot kimlikleridir: bir kimlik, altındaki her baytı ve ondan öncek
 | A1.2 Data backup and recovery | A.8.13 |
 | C1.1 Keeping confidential information | A.5.33 |
 
+`--standard gdpr` ile aynı gerçekler GDPR'ın (Tüzük (AB) 2016/679) işleme güvenliğiyle ilgili maddeleri altında görünür. GDPR madde listesi vermez; tablo, gerçeklerin ilgili olduğu 5. ve 32. madde bölümlerini gösterir. Tablo tüzüğün yaygın kaynaklardaki özetlerinden yapıldı, bir veri koruma görevlisi doğrulamalıdır. Saklama kuralları ve yasal saklama kilitleri veriyi tutar; bu, silme hakkına (17. madde) ve saklamanın sınırlandırılmasına (5(1)(e)) ters düşebilir; rapor bu dengeyi yargılamaz.
+
+| Madde | Aynı gerçekler |
+| --- | --- |
+| Art. 32(1)(a) Encryption of personal data | A.8.24 |
+| Art. 32(1)(b) Availability and resilience | A.5.30 |
+| Art. 32(1)(c) Restoring availability after an incident | A.8.13 |
+| Art. 32(4) Access only on instructions | A.5.15 |
+| Art. 5(1)(f) Protection against accidental loss | A.5.33 |
+| Art. 5(2) Accountability | A.8.15 |
+
 ## 4. Bulgular
 
 | Düzey | Ne zaman |
@@ -119,7 +130,7 @@ apeiron report check report-2026-10.md --public-key 3b6a…
 
 | Konu | Nerede |
 | --- | --- |
-| KVKK/GDPR gibi başka standartlara eşlemeler | Sonra, standardını adlandıran bir pilotla; §3.1 biçimi gösterir |
+| KVKK ya da NIS2 gibi başka standartlara eşlemeler | Sonra, standardını adlandıran bir pilotla; §3.1 biçimi gösterir |
 
 ## 7. Crate'ler
 
