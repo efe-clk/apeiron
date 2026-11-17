@@ -102,6 +102,12 @@ fn beside(store: &str, file: &str) -> Result<String> {
             "the store names a file outside it: {file}"
         )));
     }
+    if !is_web(store) {
+        // A file on disk: its folder, with the separators of the system.
+        let index = Path::new(store.strip_prefix("file://").unwrap_or(store));
+        let folder = index.parent().unwrap_or(Path::new(""));
+        return Ok(folder.join(file).to_string_lossy().into_owned());
+    }
     match store.rfind('/') {
         Some(end) => Ok(format!("{}/{file}", &store[..end])),
         None => Ok(file.to_owned()),
@@ -168,9 +174,10 @@ mod tests {
             .unwrap(),
             "https://x.example/releases/latest/download/a.wasm"
         );
+        let local = std::path::Path::new("srv").join("store");
         assert_eq!(
-            beside("/srv/store/plugins.json", "a.wasm").unwrap(),
-            "/srv/store/a.wasm"
+            beside(&local.join("plugins.json").to_string_lossy(), "a.wasm").unwrap(),
+            local.join("a.wasm").to_string_lossy()
         );
         assert_eq!(
             beside("https://a/i.json", "https://b/c.wasm").unwrap(),
