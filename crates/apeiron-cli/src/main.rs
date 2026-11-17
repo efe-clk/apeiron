@@ -174,6 +174,30 @@ enum Command {
     },
     /// List all refs and the snapshots they point to
     Refs,
+    /// Run any operation of the API with a JSON request, here or on a
+    /// web server with --server (docs/API.md)
+    Call {
+        /// The operation, such as log, backup or merge_review
+        operation: String,
+        /// Its request as JSON, or - to read it from standard input
+        #[arg(default_value = "{}")]
+        request: String,
+        /// A web server to run it on, such as https://nas:8443
+        #[arg(long, env = "APEIRON_SERVER", value_name = "URL")]
+        server: Option<String>,
+        /// File holding the access token, from `apeiron web token add`
+        #[arg(
+            long,
+            env = "APEIRON_TOKEN_FILE",
+            value_name = "PATH",
+            requires = "server"
+        )]
+        token_file: Option<PathBuf>,
+        /// Certificates, PEM, to trust besides the system's, such as the
+        /// server's self-signed one
+        #[arg(long, env = "APEIRON_CA", value_name = "PATH", requires = "server")]
+        ca: Option<PathBuf>,
+    },
     /// List the operations that changed the repository, newest first
     Oplog {
         /// Show at most this many operations
@@ -764,6 +788,11 @@ enum WebCommand {
         #[command(subcommand)]
         command: ShareCommand,
     },
+    /// Access tokens that let a program use the API as a user (docs/API.md)
+    Token {
+        #[command(subcommand)]
+        command: TokenCommand,
+    },
     /// Sign in through an identity provider with OpenID Connect (docs/IDENTITY.md)
     Oidc {
         #[command(subcommand)]
@@ -1205,6 +1234,80 @@ fn web_oidc(files: &WebFiles, command: OidcCommand, out: &Output) -> Result<(), 
                 "ok",
             )?;
             say!("Signing in through the identity provider is off.");
+        }
+    }
+    Ok(())
+}
+
+#[derive(Subcommand)]
+enum TokenCommand {
+    /// Make a token for a user; it is shown once
+    Add {
+        user: String,
+        /// A name for it, such as the program or computer that uses it
+        #[arg(long)]
+        name: String,
+    },
+    /// List the tokens, of one user or of all
+    List { user: Option<String> },
+    /// Remove a token, so it stops working at once
+    Remove { user: String, name: String },
+}
+
+fn web_token(files: &WebFiles, command: TokenCommand, out: &Output) -> Result<(), Failure> {
+    let tokens = apeiron_server::Tokens::beside(&files.users);
+    match command {
+        TokenCommand::Add { user, name } => {
+            let users = apeiron_server::Users::load(&files.users)?;
+            if users.get(&user).is_none() {
+                return Err(Failure::Api(Error::new(
+                    ErrorKind::NotFound,
+                    format!("no user named {user}"),
+                )));
+            }
+            let (token, secret) = tokens.add(&user, &name)?;
+            files.audit.record(
+                &apeiron_server::Actor::default(),
+                "token_add",
+                serde_json::json!({ "user": token.user, "name": token.name }),
+                "ok",
+            )?;
+            #[derive(Serialize)]
+            struct Made {
+                token: apeiron_server::Token,
+                secret: String,
+            }
+            out.result(&Made { token, secret }, |m| {
+                say!("{}", m.secret);
+                say!(
+                    "This is the token {} of {}; it is shown only now. Keep it in a file only its program can read.",
+                    m.token.name,
+                    m.token.user
+                );
+            });
+        }
+        TokenCommand::List { user } => {
+            let list = tokens.list(user.as_deref())?;
+            out.result(&list, |list| {
+                for t in list {
+                    say!("{}  {}  made {}", t.user, t.name, t.made);
+                }
+                if list.is_empty() {
+                    say!("No tokens.");
+                }
+            });
+        }
+        TokenCommand::Remove { user, name } => {
+            tokens.remove(&user, &name)?;
+            files.audit.record(
+                &apeiron_server::Actor::default(),
+                "token_remove",
+                serde_json::json!({ "user": user, "name": name }),
+                "ok",
+            )?;
+            out.result(&serde_json::json!({}), |_| {
+                say!("Removed the token {name} of {user}");
+            });
         }
     }
     Ok(())
@@ -2562,6 +2665,61 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             });
             Ok(0)
         }
+        Command::Call {
+            operation,
+            request,
+            server,
+            token_file,
+            ca,
+        } => {
+            let text = if request == "-" {
+                let mut text = String::new();
+                std::io::Read::read_to_string(&mut std::io::stdin(), &mut text)
+                    .map_err(|e| Failure::Usage(format!("standard input: {e}")))?;
+                text
+            } else {
+                request
+            };
+            let request: serde_json::Value = serde_json::from_str(&text)
+                .map_err(|e| Failure::Usage(format!("the request is not JSON: {e}")))?;
+            let schema = apeiron::json::schema();
+            let long = schema["operations"][&operation]["long"] == true;
+            let result = match server {
+                Some(server) => {
+                    let token_file = token_file.ok_or_else(|| {
+                        Failure::Usage("give the access token with --token-file".to_owned())
+                    })?;
+                    let read = |p: &Path| {
+                        std::fs::read(p)
+                            .map_err(|e| Failure::Usage(format!("{}: {e}", p.display())))
+                    };
+                    let token = String::from_utf8_lossy(&read(&token_file)?).into_owned();
+                    let ca = ca.as_deref().map(read).transpose()?;
+                    let client = apeiron_server::Client::new(&server, &token, ca.as_deref())?;
+                    if long {
+                        client.start(&operation, &request)?.wait(|_| {})?
+                    } else {
+                        client.call(&operation, &request)?
+                    }
+                }
+                None if long => {
+                    let repo = open(cli.repo, password_file)?;
+                    let mut job = apeiron::json::start(&repo, &operation, request)?;
+                    job.wait(None).ok_or_else(|| {
+                        Failure::Api(Error::new(ErrorKind::Internal, "the job gave no result"))
+                    })??
+                }
+                None => match cli.repo {
+                    Some(_) => {
+                        let repo = open(cli.repo, password_file)?;
+                        apeiron::json::call(&repo, &operation, request)?
+                    }
+                    None => apeiron::json::call_global(&operation, request)?,
+                },
+            };
+            out.json_value(&result);
+            Ok(0)
+        }
         Command::Oplog { limit } => {
             let repo = open(cli.repo, password_file)?;
             let ops = repo.operations(Some(limit))?;
@@ -3196,6 +3354,10 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                 }
                 Some(WebCommand::Share { command }) => {
                     web_share(&files()?, command, out)?;
+                    return Ok(0);
+                }
+                Some(WebCommand::Token { command }) => {
+                    web_token(&files()?, command, out)?;
                     return Ok(0);
                 }
                 Some(WebCommand::Tenant { command }) => {

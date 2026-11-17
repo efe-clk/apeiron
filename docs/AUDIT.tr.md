@@ -19,6 +19,7 @@ Birkaç kişi bir yedek sunucusunu paylaştığında admin, "bu klasörü kim, n
 | `done:<operation>` | Uzun bir işlemin sonucu alındığında | İş numarası |
 | `"via": "cli"` ile `start:backup`, `done:backup`, `start:restore`, `done:restore` | Bu bilgisayardaki web sunucusunun bir denetim kaydı varsa `apeiron backup` ve `apeiron restore`: deposu bu olan kiracınınki, yoksa sunucunun kendisininki | Depo, klasör ya da sürüm ve hedef; sonunda yeni sürüm ya da geri yüklenen dosyalar ve baytlar; başarısız olduysa sonuç hata türüdür. Başlangıcı kaydedilemeyen komut çalışmaz |
 | `cancel` | Bir işi durdurma isteği | İş numarası |
+| `token_add`, `token_remove` | `apeiron web token` ile bir erişim belirteci oluşturmak ya da kaldırmak ([API.tr.md](API.tr.md) §2.1) | Kullanıcı ve belirtecin adı; bir belirteçle yapılan isteklerin adresinin yanında `token <ad>` bulunur |
 | `share_add`, `share_remove` | Bir paylaşım bağlantısı oluşturmak ya da kaldırmak | Bağlantının kimliği, sürümü, yolu ve bitişi ([SHARE.tr.md](SHARE.tr.md) §6) |
 | `shared:list`, `shared:read`, `shared:upload` | Bir paylaşım bağlantısının oturum açmadan her kullanımı; `shared:upload` gönderilen dosyayı adlandırır ([SHARE.tr.md](SHARE.tr.md) §7) | Bağlantının kimliği ve yol; bağlantının gizli kısmı asla |
 | `shared:unlock` | Bir paylaşım bağlantısı için girilen her parola | Bağlantının kimliği; parola ya da gizli kısım asla |

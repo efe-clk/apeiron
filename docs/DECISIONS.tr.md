@@ -1027,3 +1027,23 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Dalı izleyen onaylar | Onaydan sonraki bir değişiklik görülmeden birleştirilirdi |
 
 **Sonuçlar.** Bir bilgisayarda adlar denetlenmez: inceleme bir uzlaşma kaydıdır, erişim denetimi değildir. Dalındaki her yeni snapshot'tan sonra inceleme yeniden onay ister.
+
+## ADR-048: Uzak kullanım, web sunucusunun API'sinin erişim belirteçleriyle kullanılmasıdır
+
+**Durum:** Kabul edildi (2026-11-18)
+
+**Bağlam.** API gömülü ve uzak kullanımda aynı çalışmalı, arka plan hizmeti başka bir cihazdan yönetilmelidir. Bir web sunucusu bir kullanıcının kullanabileceği her işlemi rollerle, denetimlerle ve bir denetim kaydıyla zaten sunar, ama yalnızca oturum açmış bir tarayıcıya.
+
+**Karar.** Bir program oturum yerine bir web kullanıcısının erişim belirtecini gösterir (API.tr.md §2.1). `apeiron_server::Client` ve `apeiron call --server` aynı işlemleri aynı JSON ile çağırır. Bir web sunucusunun işleri `--schedule` ile onun içinde çalışır ve Zamanlama sayfasında düzenlenir (DAEMON.tr.md §3.2).
+
+**Gerekçe.** Sayfalar ve programlar için tek sunucu, tek izin denetimi ve tek denetim kaydı, bir programın kullanıcısından fazlasını asla yapamaması demektir. Bir belirteç parola değiştirmeden kaldırılır ve kayıtta ayırt edilir. Sunucunun içindeki işler kiracıların kapsam kurallarını kullanır; uzaktaki bir admin `--folder`'ın ötesine ulaşamaz.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Arka plan hizmetinde kendi protokolüyle ikinci bir sunucu | Eşit tutulacak ikinci bir izin denetimi ve ikinci bir kayıt |
+| Programlardan parolayla oturum açmak | Programlar parolayı tutardı ve ikinci adım onları durdururdu |
+| Sunucunun diskinde her yerde işler | Uzaktaki bir admin sunucuyu çalıştıran kullanıcının her klasörüne ulaşırdı |
+
+**Sonuçlar.** Uzak kullanım bir web sunucusu ister; sunucusu olmayan bir bilgisayar eskisi gibi SSH ve CLI ile kullanılır. Belirteç ikinci adımı atlar; bu yüzden bir kez gösterilir ve yalnızca özeti tutulur.

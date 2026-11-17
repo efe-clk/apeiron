@@ -1027,3 +1027,23 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Approvals that follow the branch | A change after the approval would be merged unseen |
 
 **Consequences.** Names are not checked on one computer: a review is a record of agreement, not access control. A review needs an approval again after every new snapshot on its branch.
+
+## ADR-048: The remote mode is the web server's API with access tokens
+
+**Status:** Accepted (2026-11-18)
+
+**Context.** The API is to work the same embedded and remote, and the background service is to be run from another device. A web server already serves every operation a user may use, with roles, checks and an audit log, but only to a browser that signed in.
+
+**Decision.** A program shows an access token of a web user instead of a session (API.md §2.1). `apeiron_server::Client` and `apeiron call --server` call the same operations with the same JSON. The jobs of a web server run inside it with `--schedule` and are edited on its Schedule page (DAEMON.md §3.2).
+
+**Rationale.** One server, one set of permission checks and one audit log for pages and programs means a program can never do more than its user. A token is removed without changing a password and is told apart in the log. Jobs inside the server reuse the scope rules of tenants, so a remote admin cannot reach beyond `--folder`.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| A second server in the background service with its own protocol | A second set of permission checks and a second log to keep in step |
+| Signing in with the password from programs | Programs would keep the password, and the second factor would stop them |
+| Jobs anywhere on the server's disk | A remote admin would reach every folder of the user that runs the server |
+
+**Consequences.** Remote use needs a web server; a computer without one is used through SSH and the CLI as before. A token skips the second factor, so it is shown once and kept only as a hash.

@@ -9,12 +9,14 @@
 
 mod accounts;
 mod audit;
+mod client;
 mod git;
 mod oidc;
 mod operator;
 mod replicate;
 mod shares;
 mod tenants;
+mod tokens;
 mod totp;
 mod users;
 mod web;
@@ -30,10 +32,12 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 pub use audit::{Actor, Audit, Event, Syslog, Verified};
+pub use client::{Client, RemoteJob};
 pub use oidc::{GroupRule, OidcConfig, Provider, check_provider};
 pub use operator::Manage;
 pub use shares::{DEFAULT_DAYS, LinkOptions, MAX_DAYS, MAX_DOWNLOADS, Share, Shares};
 pub use tenants::{Tenant, Tenants};
+pub use tokens::{Token, Tokens};
 pub use totp::{code as totp_code, new_secret as new_totp_secret, uri as totp_uri};
 pub use users::{MIN_PASSWORD, Role, User, Users, hash_password};
 pub use web::{Acme, LETS_ENCRYPT, Limits, TenantOptions, Tls, Web, WebOptions};
@@ -242,9 +246,24 @@ async fn guard(State(app): State<Arc<App>>, mut request: Request, next: Next) ->
                     | "/api/oidc/callback"
                     | "/api/health"
             ) || request.uri().path().starts_with("/api/shared/");
-            match web.current(headers) {
-                Some(user) => {
-                    let from = peer(&request);
+            // A program shows a token instead of a session (API.md §2.1).
+            let bearer = header(header::AUTHORIZATION).and_then(|v| v.strip_prefix("Bearer "));
+            let found = match bearer {
+                Some(secret) => match web.token_user(secret) {
+                    Some((user, name)) => Some((user, Some(name))),
+                    None => {
+                        return refused(StatusCode::UNAUTHORIZED, "unknown or removed token");
+                    }
+                },
+                None => web.current(headers).map(|user| (user, None)),
+            };
+            match found {
+                Some((user, token)) => {
+                    let from = match (peer(&request), token) {
+                        (Some(peer), Some(token)) => Some(format!("{peer} token {token}")),
+                        (None, Some(token)) => Some(format!("token {token}")),
+                        (peer, None) => peer,
+                    };
                     request.extensions_mut().insert(Who {
                         user: Arc::new(user),
                         from,

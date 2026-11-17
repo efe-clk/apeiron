@@ -98,6 +98,7 @@ Geçerli bir oturumu olmayan istek, `invalid_input` türü ve `"sign_in": true` 
 | Bir oturum 12 saat istek gelmezse, her durumda 7 gün sonra, oturum kapatılınca ve sunucu durunca biter | Unutulan bir tarayıcı açık kalmaz |
 | Art arda 5 yanlış paroladan sonra her oturum açma 60 saniye reddedilir (429 durumu, `locked` türü) | Parolayı tahmin etmek çok uzun sürer; bedeli, tahmin eden birinin sahibini bir süre dışarıda tutabilmesidir |
 | `Origin` başlığı olan bir istekte o başlığın sunucusu `Host` başlığıyla aynı olmalıdır | Başka bir site API'yi çağıramaz |
+| Bir program oturum yerine bir erişim belirteci (`Authorization: Bearer`) gösterebilir; yalnızca SHA-256'sı tutulur ve kullanıcısı olarak çalışır ([API.tr.md](API.tr.md) §2.1) | Betikler ve başka bilgisayarlar API'yi tarayıcısız kullanır; bir belirteç parolayı değiştirmeden kaldırılır |
 | Yollar bağlantılar ve `..` çözüldükten sonra karşılaştırılır; henüz olmayan bir geri yükleme hedefi en yakın var olan üst klasörüyle denetlenir | Kimse dolambaçlı bir yolla `--folder` dışındaki bir klasöre ulaşamaz |
 | Yalnızca §4'teki işlemler; uzak depolar, senkron, anahtarlar ve eklentiler yalnızca bir `admin` için | Bunlar bütün depoya, parolalarına, sunucunun diskine ve başka bilgisayarlara uzanır; dışa aktarma, çöp toplama ve iş dosyası CLI'da kalır. Yeni bir parola denetim kaydına asla yazılmaz |
 | DESKTOP.tr.md §4'teki başlıklar (CSP, `no-store`, `nosniff`) | Aynı sayfalar, aynı kurallar |

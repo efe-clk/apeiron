@@ -31,12 +31,33 @@ SDKs never re-implement logic; they only wrap the C ABI. That is how the same op
 
 | Principle | Description | Status |
 | --- | --- | --- |
-| One model, two modes | The same operations and types work in embedded use (library in the same process) and remote use (through the background service) | In progress (embedded done; remote not scheduled, [ROADMAP.md](ROADMAP.md) §8) |
+| One model, two modes | The same operations and types work in embedded use (library in the same process) and remote use (through the background service) | Done (remote through a web server, section 2.1) |
 | Complete coverage | Every versioning, archive, backup, sync and administration operation is available; if the CLI can do it, the API can do it | In progress (section 8.3; the `web` commands manage the server's own files and are not in the API) |
 | Explicit results | Every critical operation ends in an explicit success or a typed error; there is no "probably done" state | Done |
 | Plain-data inputs and outputs | Requests and results are plain data types that can be serialised (for the remote mode and the C ABI) | Done |
 
 Long operations (backup, restore, sync, verification) are started as **jobs**. A job can be observed, cancelled and queried for its result (section 8.5).
+
+### 2.1 Remote mode
+
+A program on another computer uses the operations of a web server ([WEB.md](WEB.md)) through its JSON API, as one of its users, with an **access token** instead of a browser's sign-in:
+
+| Part | Detail |
+| --- | --- |
+| Token | `apeiron web token add <user> --name <name>` makes one and shows it once: `apt_` and 64 hex characters, 256 random bits. The server keeps only its SHA-256, in `web-tokens.json` beside the users file. `web token list` and `web token remove <user> <name>` manage them; a removed token, or one whose user was removed, stops at once |
+| Request | `Authorization: Bearer <token>` on the requests of WEB.md §4; the token acts as its user, with the user's role, backups and folders ([USERS.md](USERS.md) §4). A wrong token is refused with status 401 |
+| Record | Each request is in the audit log under the user's name, with `token <name>` beside the address it came from ([AUDIT.md](AUDIT.md)) |
+| Second factor | A token does not ask for the authenticator code; it is a second secret of its own, so keep it in a file only its program can read |
+| Rust | `apeiron_server::Client::new(server, token, ca)` with `call`, `call_typed` and `start`, whose job reports progress and is waited for or cancelled: the same operations, requests and results as the JSON API of section 8.3 |
+| Command line | `apeiron call <operation> [<request>]` runs any operation with a JSON request and prints its result; with `--server <url> --token-file <file> [--ca <pem>]` (or `APEIRON_SERVER`, `APEIRON_TOKEN_FILE`, `APEIRON_CA`) on the server, otherwise on `--repo` |
+
+```text
+$ apeiron web token add ayse --name laptop
+$ apeiron call --server https://nas:8443 --token-file ~/.config/apeiron/nas-token \
+    log '{"start": "backup/ayse-docs", "limit": 5}'
+```
+
+The jobs of a web server's background service are edited on its Schedule page from any computer ([DAEMON.md](DAEMON.md) §3.2).
 
 ## 3. Progress and cancellation
 

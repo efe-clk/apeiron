@@ -627,6 +627,12 @@ impl WebState {
     }
 
     /// The user of the request's live session; using it keeps it alive.
+    /// The user a program's token acts as, with the token's name.
+    pub(crate) fn token_user(&self, secret: &str) -> Option<(User, String)> {
+        let token = crate::Tokens::beside(&self.users_file).find(secret)?;
+        Some((self.user(&token.user)?, token.name))
+    }
+
     pub(crate) fn current(&self, headers: &HeaderMap) -> Option<User> {
         let id = cookie_value(headers)?;
         let (name, kept) = {

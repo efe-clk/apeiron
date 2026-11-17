@@ -1775,3 +1775,65 @@ fn the_server_runs_its_scheduled_jobs() {
     let saved = root.post("/api/schedule", job(&home.join("src"))).json();
     assert_eq!(saved["jobs"][0]["name"], "other", "{saved}");
 }
+
+/// A program uses the API with a token, as the token's user, until the
+/// token is removed (API.md §2.1).
+#[test]
+fn a_program_uses_the_api_with_a_token() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_server, mut root, home) = start(dir.path());
+    let file = dir.path().join("config/web.json");
+    let mut users = Users::load(&file).unwrap();
+    users
+        .add(User {
+            name: "ayse".to_owned(),
+            password: hash(),
+            role: Role::Member,
+            backups: vec!["backup/ayse-*".to_owned()],
+            folders: vec![home.clone()],
+            oidc: None,
+            totp: None,
+            from_groups: false,
+        })
+        .unwrap();
+    users.save(&file).unwrap();
+    root.sign_in();
+    let done = root.run(
+        "backup",
+        json!({"source": home.join("src"), "ref": "backup/root"}),
+    );
+    assert!(done["result"]["snapshot"].is_string(), "{done}");
+
+    let tokens = apeiron_server::Tokens::beside(&file);
+    let (_, secret) = tokens.add("ayse", "laptop").unwrap();
+    assert!(secret.starts_with("apt_"));
+    let server = format!("http://{}", root.address);
+    let client = apeiron_server::Client::new(&server, &secret, None).unwrap();
+    let backup = client
+        .start(
+            "backup",
+            &json!({"source": home.join("src"), "ref": "backup/ayse-docs"}),
+        )
+        .unwrap()
+        .wait(|_| {})
+        .unwrap();
+    assert!(backup["snapshot"].is_string(), "{backup}");
+    let refs: Vec<apeiron::RefInfo> = client.call_typed("refs", &json!({})).unwrap();
+    assert_eq!(refs.len(), 1);
+    assert_eq!(refs[0].name, "backup/ayse-docs");
+    let refused = client
+        .start(
+            "backup",
+            &json!({"source": home.join("src"), "ref": "backup/root"}),
+        )
+        .err()
+        .unwrap();
+    assert_eq!(refused.kind, ErrorKind::InvalidInput);
+
+    let log = fs::read_to_string(dir.path().join("audit.log")).unwrap();
+    assert!(log.contains("token laptop"), "{log}");
+    let wrong = apeiron_server::Client::new(&server, "apt_00", None).unwrap();
+    assert!(wrong.call("refs", &json!({})).is_err());
+    tokens.remove("ayse", "laptop").unwrap();
+    assert!(client.call("refs", &json!({})).is_err());
+}

@@ -19,6 +19,7 @@ When several people share a backup server, the admin must be able to answer "who
 | `done:<operation>` | When the result of a long operation is collected | The job number |
 | `start:backup`, `done:backup`, `start:restore`, `done:restore` with `"via": "cli"` | `apeiron backup` and `apeiron restore`, when the web server of this computer has an audit log: that of the tenant whose repository it is, or else the server's own | The repository, the folder or snapshot and target, and at the end the new snapshot or the files and bytes restored; the outcome is the error kind if it failed. A start that cannot be recorded stops the command |
 | `cancel` | A request to stop a job | The job number |
+| `token_add`, `token_remove` | Making or removing an access token with `apeiron web token` ([API.md](API.md) §2.1) | The user and the token's name; requests made with a token have `token <name>` with their address |
 | `share_add`, `share_remove` | Making or removing a share link | The link's id, version, path and end ([SHARE.md](SHARE.md) §6) |
 | `shared:list`, `shared:read`, `shared:upload` | Every use of a share link, without signing in; `shared:upload` names the file sent ([SHARE.md](SHARE.md) §7) | The link's id and the path; never the link's secret |
 | `shared:unlock` | Every password given for a share link | The link's id; never the password or the secret |

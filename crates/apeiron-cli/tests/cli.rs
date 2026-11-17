@@ -988,6 +988,21 @@ fn a_review_is_opened_approved_and_merged() {
     );
 }
 
+/// `apeiron call` runs any operation with a JSON request, short or long
+/// (API.md §2.1).
+#[test]
+fn any_operation_runs_with_a_json_request() {
+    let s = Setup::new();
+    s.ok(&["backup", &s.path("src")]);
+    let page: serde_json::Value =
+        serde_json::from_str(&s.ok(&["call", "log", r#"{"start": "main", "limit": 1}"#])).unwrap();
+    assert_eq!(page["snapshots"].as_array().unwrap().len(), 1);
+    let verified: serde_json::Value = serde_json::from_str(&s.ok(&["call", "verify"])).unwrap();
+    assert!(verified["objects_checked"].as_u64().unwrap() > 0, "{verified}");
+    assert_ne!(code(&s.run(&["call", "nonsense"])), Some(0));
+    assert_eq!(code(&s.run(&["call", "log", "not json"])), Some(2));
+}
+
 /// The GDPR shows the same facts as ISO/IEC 27001, under its articles
 /// (REPORTS.md §3.1).
 #[test]

@@ -31,12 +31,33 @@ SDK'lar mantığı yeniden yazmaz, yalnızca C ABI'yi sarar. Aynı işlemin her 
 
 | İlke | Açıklama | Durum |
 | --- | --- | --- |
-| Tek model, iki kullanım | Aynı işlemler ve türler gömülü kullanımda (aynı süreçte kütüphane) ve uzak kullanımda (arka plan hizmeti üzerinden) çalışır | Devam ediyor (gömülü tamamlandı; uzak zamanlanmadı, [ROADMAP.tr.md](ROADMAP.tr.md) §8) |
+| Tek model, iki kullanım | Aynı işlemler ve türler gömülü kullanımda (aynı süreçte kütüphane) ve uzak kullanımda (arka plan hizmeti üzerinden) çalışır | Tamamlandı (uzak kullanım bir web sunucusu üzerinden, bölüm 2.1) |
 | Eksiksiz kapsam | Sürümleme, arşiv, yedek, senkron ve yönetim işlemlerinin hepsi erişilebilir; CLI'ın yapabildiği her şeyi API de yapabilir | Devam ediyor (bölüm 8.3; `web` komutları sunucunun kendi dosyalarını yönetir, API'de değildir) |
 | Açık sonuç | Her kritik işlem açık bir başarıyla ya da tipli bir hatayla biter; "muhtemelen oldu" durumu yoktur | Tamamlandı |
 | Düz veri giriş ve çıkışları | İstekler ve sonuçlar, serileştirilebilen düz veri türleridir (uzak kullanım ve C ABI için) | Tamamlandı |
 
 Uzun işlemler (yedek, geri yükleme, senkron, doğrulama) **iş** (job) olarak başlatılır. Bir iş izlenebilir, iptal edilebilir ve sonucu sorgulanabilir (bölüm 8.5).
+
+### 2.1 Uzak kullanım
+
+Başka bir bilgisayardaki bir program, bir web sunucusunun ([WEB.tr.md](WEB.tr.md)) işlemlerini JSON API'si üzerinden, kullanıcılarından biri olarak, bir tarayıcının oturum açması yerine bir **erişim belirteciyle** kullanır:
+
+| Parça | Ayrıntı |
+| --- | --- |
+| Belirteç | `apeiron web token add <user> --name <name>` bir belirteç oluşturur ve bir kez gösterir: `apt_` ve 64 hex karakter, 256 rastgele bit. Sunucu yalnızca SHA-256'sını, kullanıcılar dosyasının yanındaki `web-tokens.json` içinde tutar. `web token list` ve `web token remove <user> <name>` onları yönetir; kaldırılan bir belirteç ya da kullanıcısı kaldırılmış biri hemen durur |
+| İstek | WEB.tr.md §4'teki isteklerde `Authorization: Bearer <belirteç>`; belirteç kullanıcısı olarak, kullanıcının rolü, yedekleri ve klasörleriyle çalışır ([USERS.tr.md](USERS.tr.md) §4). Yanlış bir belirteç 401 durumuyla reddedilir |
+| Kayıt | Her istek denetim kaydında kullanıcının adıyla, geldiği adresin yanında `token <ad>` ile yer alır ([AUDIT.tr.md](AUDIT.tr.md)) |
+| İkinci adım | Belirteç doğrulama kodu istemez; kendi başına ikinci bir sırdır, bu yüzden onu yalnızca programının okuyabildiği bir dosyada tutun |
+| Rust | `call`, `call_typed` ve `start` ile `apeiron_server::Client::new(server, token, ca)`; `start`'ın işi ilerleme bildirir, beklenir ya da iptal edilir: bölüm 8.3'teki JSON API'nin aynı işlemleri, istekleri ve sonuçları |
+| Komut satırı | `apeiron call <operation> [<request>]` herhangi bir işlemi bir JSON isteğiyle çalıştırır ve sonucunu yazdırır; `--server <url> --token-file <file> [--ca <pem>]` (ya da `APEIRON_SERVER`, `APEIRON_TOKEN_FILE`, `APEIRON_CA`) ile sunucuda, yoksa `--repo` üzerinde |
+
+```text
+$ apeiron web token add ayse --name laptop
+$ apeiron call --server https://nas:8443 --token-file ~/.config/apeiron/nas-token \
+    log '{"start": "backup/ayse-docs", "limit": 5}'
+```
+
+Bir web sunucusunun arka plan hizmetinin işleri, herhangi bir bilgisayardan Zamanlama sayfasında düzenlenir ([DAEMON.tr.md](DAEMON.tr.md) §3.2).
 
 ## 3. İlerleme ve iptal
 

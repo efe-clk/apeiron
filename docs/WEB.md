@@ -98,6 +98,7 @@ A request without a valid session has status 401 with the kind `invalid_input` a
 | A session ends after 12 hours without a request, after 7 days in any case, at sign-out and when the server stops | A forgotten browser does not stay signed in |
 | After 5 wrong passwords in a row, every sign-in is refused for 60 seconds (status 429, kind `locked`) | Guessing the password takes too long; the cost is that someone who guesses can keep the owner out for a while |
 | A request with an `Origin` header must have the same host as its `Host` header | Another site cannot call the API |
+| A program may show an access token (`Authorization: Bearer`) instead of a session; only its SHA-256 is kept, and it acts as its user ([API.md](API.md) §2.1) | Scripts and other computers use the API without a browser, and a token is removed without changing the password |
 | Paths are compared after resolving links and `..`; a restore target that does not exist yet is checked through its nearest existing parent | Nobody reaches a folder outside `--folder` by a detour |
 | Only the operations of §4; remotes, sync, keys and plugins only for an `admin` | They reach the whole repository, its passwords, the server's disk and other computers; export, garbage collection and the jobs file stay with the CLI. A new password is never written to the audit log |
 | The headers of DESKTOP.md §4 (CSP, `no-store`, `nosniff`) | The same pages, the same rules |
