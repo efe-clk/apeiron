@@ -58,6 +58,7 @@ Uygulama durumu (`apeiron-core`):
 ├── locks/                 # Depo kilidi, bölüm 12
 ├── keys/                  # Şifreli bir deponun anahtar dosyaları, bölüm 14
 ├── remotes                # Bu kopyanın uzak depoları (TOML), bölüm 15.1
+├── oplog                  # İşlem günlüğü, bölüm 9.5
 ├── retention/             # Saklama kuralları, bölüm 16
 ├── holds/                 # Yasal saklama kilitleri, bölüm 17
 └── tmp/                   # Yazılmakta olan geçici dosyalar
@@ -370,6 +371,20 @@ Alanlar tek boşlukla ayrılır, satır `\n` ile biter. `check`, satırın `chec
 - Son satır dışındaki bir satır geçersizse bu bozulmadır ve hata olarak raporlanır.
 - Ref değeri reflog'daki son `yeni` değerden farklıysa (ref güncellendi ama satır yazılamadı), o ref bir sonraki kez güncellenmeden hemen önce (veya açık bir onarım komutuyla) `repair` satırı eklenir. Eski değer zaten önceki satırda kayıtlı olduğu için bilgi kaybolmaz.
 - Reflog, çöp toplamanın hangi snapshot'ları canlı sayacağını belirlemek için de kullanılır (bölüm 13.1).
+
+### 9.5 İşlem günlüğü (`oplog`)
+
+Depoyu değiştirebilen her işlem, bittiğinde, başarılı olsun olmasın bir satır ekler: depoyu oluşturmak, yedekler, içe aktarmalar, senkron ve geçiş turları, Git içe aktarma ve push'ları, yüklemeler, ref değişiklikleri, birleştirmeler, anahtarlar, saklama kuralları, yasal saklama kilitleri, uzak depolar, push ve pull, onarım, budama ve çöp toplama. Okuma, geri yükleme, dışa aktarma ve deneme çalıştırmaları bir şey eklemez. Clone ile yapılan bir kopya kendi günlüğüne bir `clone` satırıyla başlar; push ve pull günlüğü kopyalamaz.
+
+```text
+<unix saniye> <işlem> <sonuç: ok|failed|cancelled> <kullanıcı | -> <ayrıntı | -> <check>
+```
+
+- `işlem`, `backup`, `delete-ref` ya da `gc` gibi bir addır; `kullanıcı` onu çalıştıran işletim sistemi kullanıcısıdır; `ayrıntı` neyin üzerinde çalıştığını adlandırır: ref'ler, bir uzak depo, bir anahtar kimliği ya da bir kilit kimliği. Bir metin alanında `%`, baştaki `-`, boşluk ve yazdırılabilir ASCII dışındaki her bayt `%XX` olarak yazılır; tek başına `-` "yok" demektir.
+- `check` ile yarım kalmış son satırın ve geçersiz bir ara satırın ele alınışı reflog'daki gibidir (bölüm 9.4).
+- Yazıcı, yarım satırı keserken ve ekleme yaparken dosyaya özel bir kilit (`flock`) alır; böylece aynı anda çalışan programların satırları karışmaz.
+- Günlük, anahtarı olmayan bir okuyucunun zaten göremediği hiçbir şeyi tutmaz (bölüm 14.5): ref, uzak depo ve anahtar adları; asla yollar ya da gerekçeler. Şifreli bir depoda da düz kalır.
+- Satır işlemden sonra yazılır. Yazılamazsa, örneğin disk doluysa, işlemin sonucu geçerli kalır ve satır eksik olur; günlük insanlar içindir, kurtarma ona dayanmaz. Çöp toplama onu okumaz.
 
 ## 10. Kesinti ve bozulma durumları
 

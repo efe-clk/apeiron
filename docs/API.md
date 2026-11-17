@@ -154,6 +154,7 @@ Every operation takes one plain request value and returns one plain result value
 | `diff_text` | two snapshots | `Vec<TextDiff>`: path, kind, and the changed lines a plugin shows or why it could not ([TEXT.md](TEXT.md)) | No |
 | `refs` | — | `Vec<RefInfo>`: name and snapshot id | No |
 | `reflog` | ref name | `Vec<ReflogEntry>` | No |
+| `operations` | optional maximum count | `Vec<Operation>`: the operations that changed the repository, newest first, with time, name, outcome (`ok`, `failed` or `cancelled`), user and what they worked on ([FORMAT.md](FORMAT.md) §9.5) | No |
 | `resolve` | snapshot spec (section 8.4) | snapshot id | No |
 | `delete_ref` | ref name, expected snapshot | — | No |
 | `repair` | — | `RepairReport`: removed locks, repaired reflogs, packs indexed anew, damaged indexes removed | No |
@@ -270,4 +271,5 @@ These functions of `apeiron-core` are the building blocks of section 8. Applicat
 | Writing | `writer`, `put_file`, `put_tree`, `put_snapshot`, `finish` | Done |
 | Reading | `read_file`, `read_tree`, `read_snapshot`, `history` | Done |
 | Refs | `read_ref`, `update_ref`, `reflog`, `list_refs` | Done |
+| Operation log | `oplog::append`, `oplog::read` | Done |
 | Types | `ObjectId`, `Blob`, `Tree`, `TreeEntry`, `EntryKind`, `Snapshot`, `Time`, `ReflogEntry`, `VerifyReport`, `Error` | Done |

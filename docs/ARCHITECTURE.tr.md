@@ -66,7 +66,7 @@ Her crate için geçerli kurallar:
 | `crypto`, `keyfile` | Şifreleme: mühürlü kutular ve anahtar dosyaları (FORMAT.tr.md §14) | Tamamlandı |
 | `remote`, `repo::transfer` | `remotes` dosyası, `Store` arayüzü, klasör uzak depoları, push ve pull (FORMAT.tr.md §15); SFTP ve S3 depoları `apeiron-remote` içinde | Tamamlandı |
 | `retention` | Saklama kuralları ve her ref değişikliğinin denetimleri (FORMAT.tr.md §16) | Tamamlandı |
-| İşlem günlüğü | — | Planlandı, zamanlanmadı ([ROADMAP.tr.md](ROADMAP.tr.md) §8) |
+| `oplog` | İşlem günlüğü (FORMAT.tr.md §9.5) | Tamamlandı |
 
 ## 3. Nesne modeli
 

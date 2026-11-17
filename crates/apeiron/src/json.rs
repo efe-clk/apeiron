@@ -155,6 +155,12 @@ struct NewHold {
 }
 
 #[derive(Deserialize, schemars::JsonSchema)]
+struct Limit {
+    #[serde(default)]
+    limit: Option<usize>,
+}
+
+#[derive(Deserialize, schemars::JsonSchema)]
 struct LiftHold {
     id: String,
     reason: String,
@@ -179,6 +185,7 @@ pub fn call(repo: &Repository, operation: &str, request: Value) -> Result<Value>
         "duplicates" => json(&repo.duplicates(&parse(request)?)?),
         "refs" => json(&repo.refs()?),
         "reflog" => json(&repo.reflog(&parse::<Named>(request)?.name)?),
+        "operations" => json(&repo.operations(parse::<Limit>(request)?.limit)?),
         "create_ref" => json(&repo.create_ref(&parse(request)?)?),
         "delete_ref" => json(&repo.delete_ref(&parse(request)?)?),
         "merge" => json(&repo.merge(&parse(request)?)?),
@@ -313,6 +320,7 @@ pub fn schema() -> Value {
         "duplicates" DuplicatesRequest => Vec<Duplicate>,
         "refs" NoRequest => Vec<RefInfo>,
         "reflog" Named => Vec<ReflogEntry>,
+        "operations" Limit => Vec<Operation>,
         "create_ref" CreateRefRequest => ObjectId,
         "delete_ref" DeleteRefRequest => (),
         "merge" MergeRequest => MergeReport,

@@ -11,6 +11,7 @@
     {"start": "backup", "request": {"source": "$TMP/src", "ref": "main"}},
     {"call": "resolve", "request": {"spec": "main"}},
     {"call": "reflog", "request": {"name": "main"}},
+    {"call": "operations", "request": {"limit": 2}},
     {"call": "diff_text", "request": {"from": "main~1", "to": "main"}},
     {"call": "duplicates", "request": {"snapshot": "main~1"}},
     {"call": "create_ref", "request": {"name": "side", "snapshot": "main~1"}},

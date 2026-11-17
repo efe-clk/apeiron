@@ -18,6 +18,7 @@ mod index;
 mod keyfile;
 mod lock;
 mod object;
+pub mod oplog;
 mod pack;
 mod refs;
 mod remote;

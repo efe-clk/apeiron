@@ -58,6 +58,7 @@ Implementation status (`apeiron-core`):
 ├── locks/                 # Repository lock, section 12
 ├── keys/                  # Key files of an encrypted repository, section 14
 ├── remotes                # Remote repositories of this copy (TOML), section 15.1
+├── oplog                  # Operation log, section 9.5
 ├── retention/             # Retention rules, section 16
 ├── holds/                 # Legal holds, section 17
 └── tmp/                   # Temporary files being written
@@ -370,6 +371,20 @@ Fields are separated by a single space and the line ends with `\n`. `check` is t
 - An invalid line other than the last one is corruption and is reported as an error.
 - If the ref value differs from the last `new` value in the reflog (the ref was updated but the line could not be written), a `repair` line is appended right before the next update of that ref (or by an explicit repair command). No information is lost, because the old value is already recorded in the previous line.
 - The reflog is also used to decide which snapshots garbage collection treats as live (section 13.1).
+
+### 9.5 Operation log (`oplog`)
+
+Every operation that can change the repository appends a line when it ends, whether it succeeded or not: creating the repository, backups, imports, sync and switch rounds, Git imports and pushes, uploads, ref changes, merges, keys, retention rules, legal holds, remotes, push and pull, repair, prune and garbage collection. Reading, restoring, exporting and dry runs add nothing. A copy made by clone starts its own log with a `clone` line; push and pull do not copy the log.
+
+```text
+<unix seconds> <op> <outcome: ok|failed|cancelled> <user | -> <detail | -> <check>
+```
+
+- `op` is a name such as `backup`, `delete-ref` or `gc`; `user` is the operating system user who ran it; `detail` names what it worked on: refs, a remote, a key id or a hold id. In a text field `%`, a `-` at the start, a space and every byte outside printable ASCII are written as `%XX`; `-` alone means none.
+- `check` and the handling of a torn last line or an invalid middle line are as in the reflog (section 9.4).
+- A writer takes an exclusive lock on the file (`flock`) while it cuts a torn line and appends, so the lines of programs running at once do not mix.
+- The log holds nothing a reader without a key cannot see already (section 14.5): ref, remote and key names, never paths or reasons. It stays plain in an encrypted repository.
+- The line is written after the operation. If it cannot be written, as on a full disk, the operation's result stands and the line is missing; the log is a record for people, not something recovery depends on. Garbage collection does not read it.
 
 ## 10. Interruption and corruption cases
 

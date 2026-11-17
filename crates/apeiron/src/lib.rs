@@ -21,6 +21,7 @@ mod types;
 /// Version of the API contract in `docs/API.md` §8.
 pub const API_VERSION: &str = "0.1";
 
+pub use apeiron_core::oplog::{Operation, Outcome};
 pub use apeiron_core::{
     CopyRepairReport, GcOptions as GcRequest, GcReport, Hold, KeyInfo, KeyKind, LegalHold, Lift,
     MAX_RETENTION_DAYS, ObjectId, RefOp, ReflogEntry, Remote, RepairReport, RetentionRule, Time,

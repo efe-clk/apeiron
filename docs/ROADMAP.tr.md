@@ -122,7 +122,6 @@ Her iş tamamlandı (2026-10-30); aşama, çıkış kriteri olan ilk kurumsal pi
 | İhtiyaç | İsteyen belge | Bugün ne oluyor |
 | --- | --- | --- |
 | Performans hedeflerini Raspberry Pi 4'te ölçmek | [VISION.tr.md](VISION.tr.md), [API.tr.md](API.tr.md) §4 | Daha güçlü bir bilgisayarda ölçüldü ([PERFORMANCE.tr.md](PERFORMANCE.tr.md)); cihaz gerekir |
-| İşlem günlüğü | [ARCHITECTURE.tr.md](ARCHITECTURE.tr.md) §2 | Reflog'lar ref değişikliklerini kaydeder; web arayüzü dışındaki diğer işlemleri hiçbir şey kaydetmez |
 | API'nin uzak kullanımı ve daemon'u başka bir cihazdan yönetmek | [API.tr.md](API.tr.md) §2, [DAEMON.tr.md](DAEMON.tr.md) §7 | Yalnızca sayfaların JSON API'si; bir kiracının işleri Zamanlama sayfasında |
 | Git'in eklenti arayüzünün arkasına geçmesi; diğer eklenti türleri ve eklenti mağazası | [DECISIONS.tr.md](DECISIONS.tr.md) ADR-021, [PLUGIN.tr.md](PLUGIN.tr.md) §6 | `apeiron-git` kendi crate'idir; eklentiler yalnızca tür sürücüsüdür |
 | Raporlarda başka standartlar | [REPORTS.tr.md](REPORTS.tr.md) §6 | ISO/IEC 27001, SOC 2 ve GDPR |

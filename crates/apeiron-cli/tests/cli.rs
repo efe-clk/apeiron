@@ -902,6 +902,48 @@ fn a_report_maps_to_soc2_with_the_same_facts() {
     );
 }
 
+/// Operations that change the repository are recorded, newest first, with
+/// how they ended; dry runs are not (FORMAT.md §9.5).
+#[test]
+fn the_operation_log_records_changes() {
+    let s = Setup::new();
+    s.ok(&["backup", &s.path("src")]);
+    s.ok(&["gc", "--dry-run"]);
+    assert_ne!(code(&s.run(&["ref", "create", "main", "main"])), Some(0));
+    s.ok(&["ref", "delete", "main"]);
+    let ops = s.json(&["oplog"]);
+    let seen: Vec<(String, String, String)> = ops
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|o| {
+            (
+                o["op"].as_str().unwrap().to_owned(),
+                o["outcome"].as_str().unwrap().to_owned(),
+                o["detail"].as_str().unwrap_or("").to_owned(),
+            )
+        })
+        .collect();
+    let want = |op: &str, outcome: &str, detail: &str| {
+        (op.to_owned(), outcome.to_owned(), detail.to_owned())
+    };
+    assert_eq!(
+        seen,
+        [
+            want("delete-ref", "ok", "main"),
+            want("create-ref", "failed", "main"),
+            want("backup", "ok", "main"),
+            want("init", "ok", ""),
+        ]
+    );
+    assert_eq!(s.json(&["oplog", "-n", "1"]).as_array().unwrap().len(), 1);
+    let text = s.ok(&["oplog"]);
+    assert!(
+        text.lines().next().unwrap().ends_with("delete-ref  main"),
+        "{text}"
+    );
+}
+
 /// The GDPR shows the same facts as ISO/IEC 27001, under its articles
 /// (REPORTS.md §3.1).
 #[test]

@@ -154,6 +154,7 @@ Her işlem tek bir düz istek değeri alır ve tek bir düz sonuç değeri dönd
 | `diff_text` | iki snapshot | `Vec<TextDiff>`: yol, tür ve bir eklentinin gösterdiği değişen satırlar ya da neden gösteremediği ([TEXT.tr.md](TEXT.tr.md)) | Hayır |
 | `refs` | — | `Vec<RefInfo>`: ad ve snapshot kimliği | Hayır |
 | `reflog` | ref adı | `Vec<ReflogEntry>` | Hayır |
+| `operations` | isteğe bağlı en fazla sayı | `Vec<Operation>`: depoyu değiştiren işlemler, en yenisi önce; zaman, ad, sonuç (`ok`, `failed` ya da `cancelled`), kullanıcı ve üzerinde çalıştıkları ([FORMAT.tr.md](FORMAT.tr.md) §9.5) | Hayır |
 | `resolve` | snapshot belirteci (bölüm 8.4) | snapshot kimliği | Hayır |
 | `delete_ref` | ref adı, beklenen snapshot | — | Hayır |
 | `repair` | — | `RepairReport`: kaldırılan kilitler, onarılan reflog'lar, yeniden indekslenen paketler, silinen bozuk indeksler | Hayır |
@@ -270,4 +271,5 @@ Bir işlemi durdurmayan sorunlar (yedek sırasında okunamayan bir dosya, okunur
 | Yazma | `writer`, `put_file`, `put_tree`, `put_snapshot`, `finish` | Tamamlandı |
 | Okuma | `read_file`, `read_tree`, `read_snapshot`, `history` | Tamamlandı |
 | Ref'ler | `read_ref`, `update_ref`, `reflog`, `list_refs` | Tamamlandı |
+| İşlem günlüğü | `oplog::append`, `oplog::read` | Tamamlandı |
 | Türler | `ObjectId`, `Blob`, `Tree`, `TreeEntry`, `EntryKind`, `Snapshot`, `Time`, `ReflogEntry`, `VerifyReport`, `Error` | Tamamlandı |

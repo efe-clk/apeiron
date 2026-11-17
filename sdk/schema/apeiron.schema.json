@@ -1545,6 +1545,20 @@
       ],
       "type": "object"
     },
+    "Limit": {
+      "properties": {
+        "limit": {
+          "default": null,
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
     "ListRequest": {
       "properties": {
         "path": {
@@ -1879,6 +1893,53 @@
     "ObjectId": {
       "description": "An object id: 64 lowercase hexadecimal characters.",
       "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "Operation": {
+      "description": "One line of the operation log.",
+      "properties": {
+        "detail": {
+          "description": "What it worked on: ref, remote, key or hold names, separated by\nspaces.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "op": {
+          "description": "The name of the operation, such as `backup` or `gc`.",
+          "type": "string"
+        },
+        "outcome": {
+          "$ref": "#/$defs/Outcome"
+        },
+        "time": {
+          "description": "Unix time in seconds when the operation ended.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "user": {
+          "description": "The user of the operating system that ran it, when known.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "time",
+        "op",
+        "outcome"
+      ],
+      "type": "object"
+    },
+    "Outcome": {
+      "description": "How an operation ended.",
+      "enum": [
+        "ok",
+        "failed",
+        "cancelled"
+      ],
       "type": "string"
     },
     "Password": {
@@ -4031,6 +4092,18 @@
       },
       "result": {
         "$ref": "#/$defs/MergeOutcome"
+      }
+    },
+    "operations": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/Limit"
+      },
+      "result": {
+        "items": {
+          "$ref": "#/$defs/Operation"
+        },
+        "type": "array"
       }
     },
     "plugin_add": {

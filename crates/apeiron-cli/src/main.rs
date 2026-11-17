@@ -174,6 +174,12 @@ enum Command {
     },
     /// List all refs and the snapshots they point to
     Refs,
+    /// List the operations that changed the repository, newest first
+    Oplog {
+        /// Show at most this many operations
+        #[arg(short = 'n', long, default_value_t = 50)]
+        limit: usize,
+    },
     /// Read and check every pack, index and object
     Verify,
     /// Remove stale ref locks, add lost reflog lines and replace damaged index files
@@ -2473,6 +2479,32 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             out.result(&refs, |refs| {
                 for r in refs {
                     say!("{}  {}", format::short_id(&r.snapshot), r.name);
+                }
+            });
+            Ok(0)
+        }
+        Command::Oplog { limit } => {
+            let repo = open(cli.repo, password_file)?;
+            let ops = repo.operations(Some(limit))?;
+            out.result(&ops, |ops| {
+                for o in ops {
+                    let time = apeiron::Time {
+                        seconds: i64::try_from(o.time).unwrap_or(i64::MAX),
+                        nanos: 0,
+                    };
+                    let outcome = match o.outcome {
+                        apeiron::Outcome::Ok => "ok",
+                        apeiron::Outcome::Failed => "failed",
+                        apeiron::Outcome::Cancelled => "cancelled",
+                    };
+                    let line = format!(
+                        "{}  {outcome:<9}  {}  {}  {}",
+                        format::time(&time),
+                        o.user.as_deref().unwrap_or("-"),
+                        o.op,
+                        o.detail.as_deref().unwrap_or("")
+                    );
+                    say!("{}", line.trim_end());
                 }
             });
             Ok(0)

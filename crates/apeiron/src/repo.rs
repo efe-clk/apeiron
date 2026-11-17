@@ -24,10 +24,10 @@ use crate::types::{
 use crate::{
     AddFileReport, AddFileRequest, ArchiveFormat, BackupReport, BackupRequest, Change, EntryInfo,
     ExportReport, GcReport, GcRequest, GitExportReport, GitImportReport, GitPushResult,
-    GitPushedRef, GitServedRef, ImportReport, ImportRequest, KeyInfo, LegalHold, ObjectId, Phase,
-    PluginAdded, PluginInfo, PruneReport, PruneRequest, ReflogEntry, Remote, RepairReport,
-    RestoreReport, RestoreTestReport, RetentionRule, SearchReport, SwitchReport, SyncReport,
-    TransferReport, VerifyReport,
+    GitPushedRef, GitServedRef, ImportReport, ImportRequest, KeyInfo, LegalHold, ObjectId,
+    Operation, Phase, PluginAdded, PluginInfo, PruneReport, PruneRequest, ReflogEntry, Remote,
+    RepairReport, RestoreReport, RestoreTestReport, RetentionRule, SearchReport, SwitchReport,
+    SyncReport, TransferReport, VerifyReport,
 };
 
 /// The ref the plugins a repository carries are kept in (PLUGIN.md §5).
@@ -65,7 +65,9 @@ impl Repository {
     /// Creates an empty repository in a new or empty folder and opens it.
     pub fn init(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
-        Ok(Repository::wrap(path, core::Repository::init(path)?))
+        let repo = Repository::wrap(path, core::Repository::init(path)?);
+        repo.recorded("init", None, None, Ok(()))?;
+        Ok(repo)
     }
 
     /// Creates an encrypted repository in a new or empty folder and opens
@@ -81,7 +83,9 @@ impl Repository {
         let path = path.as_ref();
         let (core, recovery) =
             core::Repository::init_encrypted(path, core::ChunkerParams::default(), password)?;
-        Ok((Repository::wrap(path, core), recovery))
+        let repo = Repository::wrap(path, core);
+        repo.recorded("init", None, None, Ok(()))?;
+        Ok((repo, recovery))
     }
 
     /// Opens a repository. An encrypted one fails with [`ErrorKind::Key`];
@@ -122,6 +126,12 @@ impl Repository {
                 &mut |r| copied(ctl, r),
             )?;
             core.add_remote(&remote.name, &remote.url)?;
+            record(
+                &request.path,
+                "clone",
+                Some(ORIGIN.to_owned()),
+                &Ok::<(), Error>(()),
+            );
             ctl.update(|p| p.phase = Phase::Done);
             Ok(CloneReport {
                 refs: reports
@@ -130,6 +140,30 @@ impl Repository {
                     .collect(),
             })
         })
+    }
+
+    /// Every operation that changed the repository, newest first, at most
+    /// `limit` of them ([FORMAT.md](FORMAT.md) §9.5).
+    pub fn operations(&self, limit: Option<usize>) -> Result<Vec<Operation>> {
+        let mut ops = core::oplog::read(self.path())?;
+        ops.reverse();
+        ops.truncate(limit.unwrap_or(usize::MAX));
+        Ok(ops)
+    }
+
+    /// Records an operation that may have changed the repository and
+    /// returns its result; a dry run is not recorded.
+    fn recorded<T>(
+        &self,
+        op: &str,
+        dry_run: Option<bool>,
+        detail: Option<String>,
+        result: Result<T>,
+    ) -> Result<T> {
+        if dry_run != Some(true) {
+            record(self.path(), op, detail, &result);
+        }
+        result
     }
 
     fn wrap(path: &Path, core: core::Repository) -> Self {
@@ -233,13 +267,17 @@ impl Repository {
     pub fn backup(&self, request: BackupRequest) -> Result<Job<BackupReport>> {
         let repo = self.clone();
         Job::spawn("backup", move |ctl| {
-            let _writer = repo.lock_writer();
-            // The index is loaded after the lock is taken (FORMAT.md §12).
-            let _lock = core::RepoLock::shared(repo.path())?;
-            let mut core = repo.read().reopen()?;
-            let report = services::backup(&mut core, &request, ctl)?;
-            *repo.write() = core;
-            Ok(report)
+            let detail = Some(request.ref_name.clone());
+            let result = (|| {
+                let _writer = repo.lock_writer();
+                // The index is loaded after the lock is taken (FORMAT.md §12).
+                let _lock = core::RepoLock::shared(repo.path())?;
+                let mut core = repo.read().reopen()?;
+                let report = services::backup(&mut core, &request, ctl)?;
+                *repo.write() = core;
+                Ok(report)
+            })();
+            repo.recorded("backup", None, detail, result)
         })
     }
 
@@ -248,12 +286,16 @@ impl Repository {
     pub fn import_archive(&self, request: ImportRequest) -> Result<Job<ImportReport>> {
         let repo = self.clone();
         Job::spawn("import", move |ctl| {
-            let _writer = repo.lock_writer();
-            let _lock = core::RepoLock::shared(repo.path())?;
-            let mut core = repo.read().reopen()?;
-            let report = services::import(&mut core, &request, ctl)?;
-            *repo.write() = core;
-            Ok(report)
+            let detail = Some(request.ref_name.clone());
+            let result = (|| {
+                let _writer = repo.lock_writer();
+                let _lock = core::RepoLock::shared(repo.path())?;
+                let mut core = repo.read().reopen()?;
+                let report = services::import(&mut core, &request, ctl)?;
+                *repo.write() = core;
+                Ok(report)
+            })();
+            repo.recorded("import", None, detail, result)
         })
     }
 
@@ -277,18 +319,22 @@ impl Repository {
         };
         let repo = self.clone();
         Job::spawn("sync", move |ctl| {
-            let store = open_store(&remote, repo.info().encrypted, request.rate)?;
-            let _writer = repo.lock_writer();
-            let _lock = core::RepoLock::shared(repo.path())?;
-            let plugins = repo.plugins()?;
-            let mut core = repo.read().reopen()?;
-            let merger = plugins
-                .as_deref()
-                .map(|p| p as &dyn services::ContentMerger);
-            let report = services::sync(&mut core, &*store, &options, merger, ctl);
-            // Refs may have moved even when a later step failed.
-            *repo.write() = core;
-            Ok(report?)
+            let detail = Some(options.ref_name.clone());
+            let result = (|| {
+                let store = open_store(&remote, repo.info().encrypted, request.rate)?;
+                let _writer = repo.lock_writer();
+                let _lock = core::RepoLock::shared(repo.path())?;
+                let plugins = repo.plugins()?;
+                let mut core = repo.read().reopen()?;
+                let merger = plugins
+                    .as_deref()
+                    .map(|p| p as &dyn services::ContentMerger);
+                let report = services::sync(&mut core, &*store, &options, merger, ctl);
+                // Refs may have moved even when a later step failed.
+                *repo.write() = core;
+                Ok(report?)
+            })();
+            repo.recorded("sync", Some(options.dry_run), detail, result)
         })
     }
 
@@ -306,12 +352,16 @@ impl Repository {
         };
         let repo = self.clone();
         Job::spawn("switch", move |ctl| {
-            let _writer = repo.lock_writer();
-            let _lock = core::RepoLock::shared(repo.path())?;
-            let mut core = repo.read().reopen()?;
-            let report = services::switch(&mut core, &options, ctl);
-            *repo.write() = core;
-            Ok(report?)
+            let detail = Some(options.name.clone());
+            let result = (|| {
+                let _writer = repo.lock_writer();
+                let _lock = core::RepoLock::shared(repo.path())?;
+                let mut core = repo.read().reopen()?;
+                let report = services::switch(&mut core, &options, ctl);
+                *repo.write() = core;
+                Ok(report?)
+            })();
+            repo.recorded("switch", Some(options.dry_run), detail, result)
         })
     }
 
@@ -320,16 +370,21 @@ impl Repository {
     pub fn git_import(&self, request: GitRequest) -> Result<Job<GitImportReport>> {
         let repo = self.clone();
         Job::spawn("git-import", move |ctl| {
-            ctl.update(|p| p.phase = Phase::Storing);
-            let _writer = repo.lock_writer();
-            let _lock = core::RepoLock::shared(repo.path())?;
-            let mut core = repo.read().reopen()?;
-            let report = apeiron_git::import(&mut core, &request.path, &request.prefix, &mut |n| {
-                git_progress(ctl, n)
-            });
-            *repo.write() = core;
-            ctl.update(|p| p.phase = Phase::Done);
-            Ok(report?)
+            let detail = Some(request.prefix.clone());
+            let result = (|| {
+                ctl.update(|p| p.phase = Phase::Storing);
+                let _writer = repo.lock_writer();
+                let _lock = core::RepoLock::shared(repo.path())?;
+                let mut core = repo.read().reopen()?;
+                let report =
+                    apeiron_git::import(&mut core, &request.path, &request.prefix, &mut |n| {
+                        git_progress(ctl, n)
+                    });
+                *repo.write() = core;
+                ctl.update(|p| p.phase = Phase::Done);
+                Ok(report?)
+            })();
+            repo.recorded("git-import", None, detail, result)
         })
     }
 
@@ -368,77 +423,89 @@ impl Repository {
         request: &AddFileRequest,
         reader: &mut dyn std::io::Read,
     ) -> Result<AddFileReport> {
-        let _writer = self.lock_writer();
-        let _lock = core::RepoLock::shared(self.path())?;
-        let mut core = self.read().reopen()?;
-        let mut request = request.clone();
-        if request.host.is_none() {
-            request.host = gethostname::gethostname().into_string().ok();
-        }
-        let report = services::add_file(&mut core, &request, reader);
-        *self.write() = core;
-        Ok(report?)
+        let detail = Some(request.ref_name.clone());
+        let result = (|| {
+            let _writer = self.lock_writer();
+            let _lock = core::RepoLock::shared(self.path())?;
+            let mut core = self.read().reopen()?;
+            let mut request = request.clone();
+            if request.host.is_none() {
+                request.host = gethostname::gethostname().into_string().ok();
+            }
+            let report = services::add_file(&mut core, &request, reader);
+            *self.write() = core;
+            Ok(report?)
+        })();
+        self.recorded("add-file", None, detail, result)
     }
 
     /// Puts the installed plugin `name` from the plugin folder `dir` (the
     /// user's by default) into the repository's ref `apeiron/plugins`, so
     /// copies of the repository carry it (PLUGIN.md §5).
     pub fn share_plugin(&self, name: &str, dir: Option<&Path>) -> Result<PluginInfo> {
-        let info = crate::plugins(dir)?
-            .into_iter()
-            .find(|i| i.name == name)
-            .ok_or_else(|| {
-                Error::new(
-                    ErrorKind::NotFound,
-                    format!("no plugin {name} is installed"),
-                )
-            })?;
-        let dir = match dir {
-            Some(d) => d.to_path_buf(),
-            None => crate::plugin_dir()?,
-        };
-        let mut put = Vec::new();
-        for ext in ["wasm", "json"] {
-            let path = dir.join(format!("{name}.{ext}"));
-            let data = std::fs::read(&path).map_err(|e| Error::io(path.clone(), &e))?;
-            put.push((format!("{name}.{ext}").into_bytes(), data));
-        }
-        let _writer = self.lock_writer();
-        let _lock = core::RepoLock::shared(self.path())?;
-        let mut core = self.read().reopen()?;
-        let message = format!("share the plugin {name} {}", info.version);
-        let stored = services::put_files(&mut core, PLUGINS_REF, &put, &[], &message);
-        *self.write() = core;
-        stored?;
-        Ok(info)
+        let detail = Some(PLUGINS_REF.to_owned());
+        let result = (|| {
+            let info = crate::plugins(dir)?
+                .into_iter()
+                .find(|i| i.name == name)
+                .ok_or_else(|| {
+                    Error::new(
+                        ErrorKind::NotFound,
+                        format!("no plugin {name} is installed"),
+                    )
+                })?;
+            let dir = match dir {
+                Some(d) => d.to_path_buf(),
+                None => crate::plugin_dir()?,
+            };
+            let mut put = Vec::new();
+            for ext in ["wasm", "json"] {
+                let path = dir.join(format!("{name}.{ext}"));
+                let data = std::fs::read(&path).map_err(|e| Error::io(path.clone(), &e))?;
+                put.push((format!("{name}.{ext}").into_bytes(), data));
+            }
+            let _writer = self.lock_writer();
+            let _lock = core::RepoLock::shared(self.path())?;
+            let mut core = self.read().reopen()?;
+            let message = format!("share the plugin {name} {}", info.version);
+            let stored = services::put_files(&mut core, PLUGINS_REF, &put, &[], &message);
+            *self.write() = core;
+            stored?;
+            Ok(info)
+        })();
+        self.recorded("share-plugin", None, detail, result)
     }
 
     /// Takes the plugin `name` out of `apeiron/plugins`; installed copies
     /// stay.
     pub fn unshare_plugin(&self, name: &str) -> Result<()> {
-        if !self.shared_plugins()?.iter().any(|i| i.name == name) {
-            return Err(Error::new(
-                ErrorKind::NotFound,
-                format!("the repository holds no plugin {name}"),
-            ));
-        }
-        let remove = [
-            format!("{name}.wasm").into_bytes(),
-            format!("{name}.json").into_bytes(),
-        ];
-        let _writer = self.lock_writer();
-        let _lock = core::RepoLock::shared(self.path())?;
-        let mut core = self.read().reopen()?;
-        let stored = services::put_files(
-            &mut core,
-            PLUGINS_REF,
-            &[],
-            &remove,
-            &format!("unshare the plugin {name}"),
-        );
-        *self.write() = core;
-        stored?;
-        Ok(())
+        let detail = Some(PLUGINS_REF.to_owned());
+        let result = (|| {
+            if !self.shared_plugins()?.iter().any(|i| i.name == name) {
+                return Err(Error::new(
+                    ErrorKind::NotFound,
+                    format!("the repository holds no plugin {name}"),
+                ));
+            }
+            let remove = [
+                format!("{name}.wasm").into_bytes(),
+                format!("{name}.json").into_bytes(),
+            ];
+            let _writer = self.lock_writer();
+            let _lock = core::RepoLock::shared(self.path())?;
+            let mut core = self.read().reopen()?;
+            let stored = services::put_files(
+                &mut core,
+                PLUGINS_REF,
+                &[],
+                &remove,
+                &format!("unshare the plugin {name}"),
+            );
+            *self.write() = core;
+            stored?;
+            Ok(())
+        })();
+        self.recorded("unshare-plugin", None, detail, result)
     }
 
     /// The plugins the repository carries in `apeiron/plugins`.
@@ -508,20 +575,24 @@ impl Repository {
         pack: &[u8],
         may: &dyn Fn(&str) -> bool,
     ) -> Result<Vec<GitPushResult>> {
-        let _writer = self.lock_writer();
-        let _lock = core::RepoLock::shared(self.path())?;
-        let mut core = self.read().reopen()?;
-        let results = apeiron_git::receive(
-            &mut core,
-            &request.path,
-            &request.prefix,
-            updates,
-            pack,
-            may,
-        );
-        // Refs may have moved even when a later step failed.
-        *self.write() = core;
-        Ok(results?)
+        let detail = Some(request.prefix.clone());
+        let result = (|| {
+            let _writer = self.lock_writer();
+            let _lock = core::RepoLock::shared(self.path())?;
+            let mut core = self.read().reopen()?;
+            let results = apeiron_git::receive(
+                &mut core,
+                &request.path,
+                &request.prefix,
+                updates,
+                pack,
+                may,
+            );
+            // Refs may have moved even when a later step failed.
+            *self.write() = core;
+            Ok(results?)
+        })();
+        self.recorded("git-receive", None, detail, result)
     }
 
     /// The Git ids of `haves` that `wants` reach in the Git copy at `path`:
@@ -558,15 +629,19 @@ impl Repository {
         let remote = self.read().remote(&request.remote)?;
         let repo = self.clone();
         Job::spawn("gc-remote", move |ctl| {
-            let _writer = repo.lock_writer();
-            ctl.update(|p| p.phase = crate::Phase::Finishing);
-            let store = open_store(&remote, repo.info().encrypted, None)?;
-            let host = gethostname::gethostname().into_string().ok();
-            let report = repo
-                .read()
-                .gc_remote(&*store, request.dry_run, host.as_deref())?;
-            ctl.update(|p| p.phase = crate::Phase::Done);
-            Ok(report)
+            let detail = Some(request.remote.clone());
+            let result = (|| {
+                let _writer = repo.lock_writer();
+                ctl.update(|p| p.phase = crate::Phase::Finishing);
+                let store = open_store(&remote, repo.info().encrypted, None)?;
+                let host = gethostname::gethostname().into_string().ok();
+                let report = repo
+                    .read()
+                    .gc_remote(&*store, request.dry_run, host.as_deref())?;
+                ctl.update(|p| p.phase = crate::Phase::Done);
+                Ok(report)
+            })();
+            repo.recorded("gc-remote", Some(request.dry_run), detail, result)
         })
     }
 
@@ -575,13 +650,17 @@ impl Repository {
     pub fn gc(&self, request: GcRequest) -> Result<Job<GcReport>> {
         let repo = self.clone();
         Job::spawn("gc", move |ctl| {
-            let _writer = repo.lock_writer();
-            ctl.update(|p| p.phase = crate::Phase::Finishing);
-            let mut core = repo.read().reopen()?;
-            let report = core.gc(&request)?;
-            *repo.write() = core;
-            ctl.update(|p| p.phase = crate::Phase::Done);
-            Ok(report)
+            let detail = None;
+            let result = (|| {
+                let _writer = repo.lock_writer();
+                ctl.update(|p| p.phase = crate::Phase::Finishing);
+                let mut core = repo.read().reopen()?;
+                let report = core.gc(&request)?;
+                *repo.write() = core;
+                ctl.update(|p| p.phase = crate::Phase::Done);
+                Ok(report)
+            })();
+            repo.recorded("gc", Some(request.dry_run), detail, result)
         })
     }
 
@@ -847,50 +926,59 @@ impl Repository {
     /// Deletes a ref if it still points to the expected snapshot. The
     /// snapshots stay until garbage collection removes them.
     pub fn delete_ref(&self, request: &DeleteRefRequest) -> Result<()> {
-        let _writer = self.lock_writer();
-        Ok(self
-            .view()?
-            .update_ref(&request.name, Some(request.expected), None)?)
+        let detail = Some(request.name.clone());
+        let result = (|| {
+            let _writer = self.lock_writer();
+            Ok(self
+                .view()?
+                .update_ref(&request.name, Some(request.expected), None)?)
+        })();
+        self.recorded("delete-ref", None, detail, result)
     }
 
     /// Creates the ref `name` pointing to a snapshot; fails with
     /// [`ErrorKind::AlreadyExists`] if the ref exists (BRANCH.md §1).
     pub fn create_ref(&self, request: &CreateRefRequest) -> Result<ObjectId> {
-        let _writer = self.lock_writer();
-        let view = self.view()?;
-        let snapshot = spec::resolve(&view, &request.snapshot)?;
-        if view.read_ref(&request.name)?.is_some() {
-            return Err(Error::new(
-                ErrorKind::AlreadyExists,
-                format!("ref {} already exists", request.name),
-            ));
-        }
-        view.update_ref(&request.name, None, Some(snapshot))?;
-        Ok(snapshot)
+        let detail = Some(request.name.clone());
+        let result = (|| {
+            let _writer = self.lock_writer();
+            let view = self.view()?;
+            let snapshot = spec::resolve(&view, &request.snapshot)?;
+            if view.read_ref(&request.name)?.is_some() {
+                return Err(Error::new(
+                    ErrorKind::AlreadyExists,
+                    format!("ref {} already exists", request.name),
+                ));
+            }
+            view.update_ref(&request.name, None, Some(snapshot))?;
+            Ok(snapshot)
+        })();
+        self.recorded("create-ref", None, detail, result)
     }
 
     /// Merges a snapshot into a ref (BRANCH.md §2): nothing to do, a
     /// fast-forward, or a new snapshot with both as parents.
     pub fn merge(&self, request: &MergeRequest) -> Result<MergeReport> {
-        self.merge_with(request, services::merge)
+        self.merge_with("merge", request, services::merge)
     }
 
     /// Applies the changes the snapshot `request.from` made to its parent
     /// onto the ref `request.into`, as one new snapshot there
     /// ([BRANCH.md](BRANCH.md) §4).
     pub fn cherry_pick(&self, request: &MergeRequest) -> Result<MergeReport> {
-        self.merge_with(request, services::cherry_pick)
+        self.merge_with("cherry-pick", request, services::cherry_pick)
     }
 
     /// Copies the snapshots of the ref `request.into` that `request.from`
     /// lacks on top of it, one by one, and moves the ref to the last copy
     /// ([BRANCH.md](BRANCH.md) §5); `request.message` is not used.
     pub fn rebase(&self, request: &MergeRequest) -> Result<MergeReport> {
-        self.merge_with(request, services::rebase)
+        self.merge_with("rebase", request, services::rebase)
     }
 
     fn merge_with(
         &self,
+        op: &str,
         request: &MergeRequest,
         run: fn(
             &mut core::Repository,
@@ -898,25 +986,29 @@ impl Repository {
             Option<&dyn services::ContentMerger>,
         ) -> services::Result<MergeReport>,
     ) -> Result<MergeReport> {
-        let _writer = self.lock_writer();
-        let _lock = core::RepoLock::shared(self.path())?;
-        let mut core = self.read().reopen()?;
-        let options = services::MergeOptions {
-            from: spec::resolve(&core, &request.from)?,
-            from_name: request.from.clone(),
-            into: request.into.clone(),
-            message: request.message.clone(),
-            author: request.author.clone(),
-            host: gethostname::gethostname().into_string().ok(),
-            dry_run: request.dry_run,
-        };
-        let plugins = self.plugins()?;
-        let merger = plugins
-            .as_deref()
-            .map(|p| p as &dyn services::ContentMerger);
-        let report = run(&mut core, &options, merger);
-        *self.write() = core;
-        Ok(report?)
+        let detail = Some(request.into.clone());
+        let result = (|| {
+            let _writer = self.lock_writer();
+            let _lock = core::RepoLock::shared(self.path())?;
+            let mut core = self.read().reopen()?;
+            let options = services::MergeOptions {
+                from: spec::resolve(&core, &request.from)?,
+                from_name: request.from.clone(),
+                into: request.into.clone(),
+                message: request.message.clone(),
+                author: request.author.clone(),
+                host: gethostname::gethostname().into_string().ok(),
+                dry_run: request.dry_run,
+            };
+            let plugins = self.plugins()?;
+            let merger = plugins
+                .as_deref()
+                .map(|p| p as &dyn services::ContentMerger);
+            let report = run(&mut core, &options, merger);
+            *self.write() = core;
+            Ok(report?)
+        })();
+        self.recorded(op, Some(request.dry_run), detail, result)
     }
 
     /// The passwords and recovery keys of an encrypted repository, oldest
@@ -927,52 +1019,64 @@ impl Repository {
 
     /// Adds a password to an encrypted repository.
     pub fn add_password(&self, password: &str) -> Result<AddedKey> {
-        if password.is_empty() {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "the password must not be empty",
-            ));
-        }
-        Ok(AddedKey {
-            id: self.read().add_password(password)?,
-            recovery_key: None,
-        })
+        let detail = None;
+        let result = (|| {
+            if password.is_empty() {
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    "the password must not be empty",
+                ));
+            }
+            Ok(AddedKey {
+                id: self.read().add_password(password)?,
+                recovery_key: None,
+            })
+        })();
+        self.recorded("add-password", None, detail, result)
     }
 
     /// Adds a new recovery key to an encrypted repository. The key is in the
     /// result only; it is shown to the user once.
     pub fn add_recovery_key(&self) -> Result<AddedKey> {
-        let (id, recovery_key) = self.read().add_recovery_key()?;
-        Ok(AddedKey {
-            id,
-            recovery_key: Some(recovery_key),
-        })
+        let detail = None;
+        let result = (|| {
+            let (id, recovery_key) = self.read().add_recovery_key()?;
+            Ok(AddedKey {
+                id,
+                recovery_key: Some(recovery_key),
+            })
+        })();
+        self.recorded("add-recovery-key", None, detail, result)
     }
 
     /// Removes a password or recovery key by its id or the start of it and
     /// returns the whole id. The last key cannot be removed. Fails with
     /// [`ErrorKind::Locked`] while any other operation uses the repository.
     pub fn remove_key(&self, id: &str) -> Result<String> {
-        let core = self.read();
-        let matches: Vec<KeyInfo> = core
-            .list_keys()?
-            .into_iter()
-            .filter(|k| !id.is_empty() && k.id.starts_with(id))
-            .collect();
-        match matches.as_slice() {
-            [key] => {
-                core.remove_key(&key.id)?;
-                Ok(key.id.clone())
+        let detail = Some(id.to_owned());
+        let result = (|| {
+            let core = self.read();
+            let matches: Vec<KeyInfo> = core
+                .list_keys()?
+                .into_iter()
+                .filter(|k| !id.is_empty() && k.id.starts_with(id))
+                .collect();
+            match matches.as_slice() {
+                [key] => {
+                    core.remove_key(&key.id)?;
+                    Ok(key.id.clone())
+                }
+                [] => Err(Error::new(
+                    ErrorKind::NotFound,
+                    format!("no key with id {id:?}"),
+                )),
+                _ => Err(Error::new(
+                    ErrorKind::Ambiguous,
+                    format!("{id:?} is the start of more than one key id"),
+                )),
             }
-            [] => Err(Error::new(
-                ErrorKind::NotFound,
-                format!("no key with id {id:?}"),
-            )),
-            _ => Err(Error::new(
-                ErrorKind::Ambiguous,
-                format!("{id:?} is the start of more than one key id"),
-            )),
-        }
+        })();
+        self.recorded("remove-key", None, detail, result)
     }
 
     /// The retention rules, oldest first ([ARCHIVE.md](ARCHIVE.md) §2).
@@ -985,8 +1089,12 @@ impl Repository {
     /// `days` after their last change. A rule can never be removed or
     /// shortened ([FORMAT.md](FORMAT.md) §16).
     pub fn add_retention(&self, refs: &str, days: u32) -> Result<RetentionRule> {
-        let _writer = self.lock_writer();
-        Ok(self.read().add_retention_rule(refs, days)?)
+        let detail = Some(refs.to_owned());
+        let result = (|| {
+            let _writer = self.lock_writer();
+            Ok(self.read().add_retention_rule(refs, days)?)
+        })();
+        self.recorded("add-retention", None, detail, result)
     }
 
     /// Every legal hold, lifted ones too, oldest first ([ARCHIVE.md](ARCHIVE.md)
@@ -1000,14 +1108,22 @@ impl Repository {
     /// deleted, and keep every version their reflog names
     /// ([FORMAT.md](FORMAT.md) §17).
     pub fn add_legal_hold(&self, refs: &str, reason: &str) -> Result<LegalHold> {
-        let _writer = self.lock_writer();
-        Ok(self.read().add_legal_hold(refs, reason)?)
+        let detail = Some(refs.to_owned());
+        let result = (|| {
+            let _writer = self.lock_writer();
+            Ok(self.read().add_legal_hold(refs, reason)?)
+        })();
+        self.recorded("add-hold", None, detail, result)
     }
 
     /// Lifts the legal hold `id`, for `reason`; this cannot be undone.
     pub fn lift_legal_hold(&self, id: &str, reason: &str) -> Result<LegalHold> {
-        let _writer = self.lock_writer();
-        Ok(self.read().lift_legal_hold(id, reason)?)
+        let detail = Some(id.to_owned());
+        let result = (|| {
+            let _writer = self.lock_writer();
+            Ok(self.read().lift_legal_hold(id, reason)?)
+        })();
+        self.recorded("lift-hold", None, detail, result)
     }
 
     /// The remotes of this copy, sorted by name.
@@ -1018,17 +1134,23 @@ impl Repository {
     /// Adds a remote. A folder may be given relative to the current folder;
     /// it is stored as an absolute path.
     pub fn add_remote(&self, name: &str, url: &str) -> Result<Remote> {
-        let url = absolute_url(url)?;
-        self.read().add_remote(name, &url)?;
-        Ok(Remote {
-            name: name.to_owned(),
-            url,
-        })
+        let detail = Some(name.to_owned());
+        let result = (|| {
+            let url = absolute_url(url)?;
+            self.read().add_remote(name, &url)?;
+            Ok(Remote {
+                name: name.to_owned(),
+                url,
+            })
+        })();
+        self.recorded("add-remote", None, detail, result)
     }
 
     /// Forgets a remote; the copy it names is not touched.
     pub fn remove_remote(&self, name: &str) -> Result<()> {
-        Ok(self.read().remove_remote(name)?)
+        let detail = Some(name.to_owned());
+        let result = (|| Ok(self.read().remove_remote(name)?))();
+        self.recorded("remove-remote", None, detail, result)
     }
 
     /// Copies the snapshots of a ref to a remote and moves the ref there.
@@ -1038,16 +1160,20 @@ impl Repository {
         let remote = self.read().remote(&request.remote)?;
         let repo = self.clone();
         Job::spawn("push", move |ctl| {
-            ctl.update(|p| p.phase = Phase::Copying);
-            let store = open_store(&remote, repo.info().encrypted, request.rate)?;
-            let view = repo.view()?;
-            let report = if request.replace {
-                view.push_replacing(&*store, &request.ref_name, &mut |r| copied(ctl, r))?
-            } else {
-                view.push(&*store, &request.ref_name, &mut |r| copied(ctl, r))?
-            };
-            ctl.update(|p| p.phase = Phase::Done);
-            Ok(report)
+            let detail = Some(format!("{} {}", request.remote, request.ref_name));
+            let result = (|| {
+                ctl.update(|p| p.phase = Phase::Copying);
+                let store = open_store(&remote, repo.info().encrypted, request.rate)?;
+                let view = repo.view()?;
+                let report = if request.replace {
+                    view.push_replacing(&*store, &request.ref_name, &mut |r| copied(ctl, r))?
+                } else {
+                    view.push(&*store, &request.ref_name, &mut |r| copied(ctl, r))?
+                };
+                ctl.update(|p| p.phase = Phase::Done);
+                Ok(report)
+            })();
+            repo.recorded("push", None, detail, result)
         })
     }
 
@@ -1058,15 +1184,19 @@ impl Repository {
         let remote = self.read().remote(&request.remote)?;
         let repo = self.clone();
         Job::spawn("pull", move |ctl| {
-            ctl.update(|p| p.phase = Phase::Copying);
-            let store = open_store(&remote, repo.info().encrypted, request.rate)?;
-            let _writer = repo.lock_writer();
-            let _lock = core::RepoLock::shared(repo.path())?;
-            let mut core = repo.read().reopen()?;
-            let report = core.pull(&*store, &request.ref_name, &mut |r| copied(ctl, r))?;
-            *repo.write() = core;
-            ctl.update(|p| p.phase = Phase::Done);
-            Ok(report)
+            let detail = Some(format!("{} {}", request.remote, request.ref_name));
+            let result = (|| {
+                ctl.update(|p| p.phase = Phase::Copying);
+                let store = open_store(&remote, repo.info().encrypted, request.rate)?;
+                let _writer = repo.lock_writer();
+                let _lock = core::RepoLock::shared(repo.path())?;
+                let mut core = repo.read().reopen()?;
+                let report = core.pull(&*store, &request.ref_name, &mut |r| copied(ctl, r))?;
+                *repo.write() = core;
+                ctl.update(|p| p.phase = Phase::Done);
+                Ok(report)
+            })();
+            repo.recorded("pull", None, detail, result)
         })
     }
 
@@ -1078,11 +1208,15 @@ impl Repository {
         let remote = self.read().remote(&request.remote)?;
         let repo = self.clone();
         Job::spawn("push", move |ctl| {
-            ctl.update(|p| p.phase = Phase::Copying);
-            let store = open_store(&remote, repo.info().encrypted, request.rate)?;
-            let outcomes = repo.view()?.push_all(&*store, &mut |r| copied(ctl, r))?;
-            ctl.update(|p| p.phase = Phase::Done);
-            Ok(mirrored(outcomes))
+            let detail = Some(request.remote.clone());
+            let result = (|| {
+                ctl.update(|p| p.phase = Phase::Copying);
+                let store = open_store(&remote, repo.info().encrypted, request.rate)?;
+                let outcomes = repo.view()?.push_all(&*store, &mut |r| copied(ctl, r))?;
+                ctl.update(|p| p.phase = Phase::Done);
+                Ok(mirrored(outcomes))
+            })();
+            repo.recorded("push-all", None, detail, result)
         })
     }
 
@@ -1094,26 +1228,34 @@ impl Repository {
         let remote = self.read().remote(&request.remote)?;
         let repo = self.clone();
         Job::spawn("pull", move |ctl| {
-            ctl.update(|p| p.phase = Phase::Copying);
-            let store = open_store(&remote, repo.info().encrypted, request.rate)?;
-            let _writer = repo.lock_writer();
-            let _lock = core::RepoLock::shared(repo.path())?;
-            let mut core = repo.read().reopen()?;
-            let outcomes = core.pull_all(&*store, &mut |r| copied(ctl, r))?;
-            *repo.write() = core;
-            ctl.update(|p| p.phase = Phase::Done);
-            Ok(mirrored(outcomes))
+            let detail = Some(request.remote.clone());
+            let result = (|| {
+                ctl.update(|p| p.phase = Phase::Copying);
+                let store = open_store(&remote, repo.info().encrypted, request.rate)?;
+                let _writer = repo.lock_writer();
+                let _lock = core::RepoLock::shared(repo.path())?;
+                let mut core = repo.read().reopen()?;
+                let outcomes = core.pull_all(&*store, &mut |r| copied(ctl, r))?;
+                *repo.write() = core;
+                ctl.update(|p| p.phase = Phase::Done);
+                Ok(mirrored(outcomes))
+            })();
+            repo.recorded("pull-all", None, detail, result)
         })
     }
 
     /// Removes stale ref locks, adds reflog lines lost in a crash and
     /// replaces damaged index files.
     pub fn repair(&self) -> Result<RepairReport> {
-        let _writer = self.lock_writer();
-        let _lock = core::RepoLock::shared(self.path())?;
-        let mut core = self.write();
-        core.refresh_index()?;
-        Ok(core.repair()?)
+        let detail = None;
+        let result = (|| {
+            let _writer = self.lock_writer();
+            let _lock = core::RepoLock::shared(self.path())?;
+            let mut core = self.write();
+            core.refresh_index()?;
+            Ok(core.repair()?)
+        })();
+        self.recorded("repair", None, detail, result)
     }
 
     /// Keeps the snapshots of a ref the rules name and moves the ref to the
@@ -1121,11 +1263,15 @@ impl Repository {
     /// [`Repository::gc`], and following on a remote to `push` with
     /// `replace`.
     pub fn prune(&self, request: &PruneRequest) -> Result<PruneReport> {
-        let _writer = self.lock_writer();
-        let _lock = core::RepoLock::shared(self.path())?;
-        let mut core = self.write();
-        core.refresh_index()?;
-        Ok(services::prune(&mut core, request)?)
+        let detail = Some(request.ref_name.clone());
+        let result = (|| {
+            let _writer = self.lock_writer();
+            let _lock = core::RepoLock::shared(self.path())?;
+            let mut core = self.write();
+            core.refresh_index()?;
+            Ok(services::prune(&mut core, request)?)
+        })();
+        self.recorded("prune", Some(request.dry_run), detail, result)
     }
 
     /// Replaces damaged or missing objects from a whole copy on a remote and
@@ -1135,22 +1281,51 @@ impl Repository {
         let remote = self.read().remote(&request.remote)?;
         let repo = self.clone();
         Job::spawn("repair", move |ctl| {
-            let _writer = repo.lock_writer();
-            ctl.update(|p| p.phase = Phase::Copying);
-            let store = open_store(&remote, repo.info().encrypted, request.rate)?;
-            let mut core = repo.read().reopen()?;
-            let report = core.repair_from(&*store, &mut |objects| {
-                ctl.update(|p| p.items_done = objects);
-                if ctl.is_cancelled() {
-                    return Err(core::Error::Cancelled);
-                }
-                Ok(())
-            })?;
-            *repo.write() = core;
-            ctl.update(|p| p.phase = Phase::Done);
-            Ok(report)
+            let detail = Some(request.remote.clone());
+            let result = (|| {
+                let _writer = repo.lock_writer();
+                ctl.update(|p| p.phase = Phase::Copying);
+                let store = open_store(&remote, repo.info().encrypted, request.rate)?;
+                let mut core = repo.read().reopen()?;
+                let report = core.repair_from(&*store, &mut |objects| {
+                    ctl.update(|p| p.items_done = objects);
+                    if ctl.is_cancelled() {
+                        return Err(core::Error::Cancelled);
+                    }
+                    Ok(())
+                })?;
+                *repo.write() = core;
+                ctl.update(|p| p.phase = Phase::Done);
+                Ok(report)
+            })();
+            repo.recorded("repair-from", None, detail, result)
         })
     }
+}
+
+/// Appends an operation to the log of the repository at `path`. Its
+/// result stands even when the line cannot be written, as on a full disk.
+fn record<T>(path: &Path, op: &str, detail: Option<String>, result: &Result<T>) {
+    let outcome = match result {
+        Ok(_) => core::oplog::Outcome::Ok,
+        Err(e) if e.kind == ErrorKind::Cancelled => core::oplog::Outcome::Cancelled,
+        Err(_) => core::oplog::Outcome::Failed,
+    };
+    let user = ["USER", "USERNAME"]
+        .iter()
+        .find_map(|v| std::env::var(v).ok().filter(|u| !u.is_empty()));
+    let _ = core::oplog::append(
+        path,
+        &Operation {
+            time: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_secs()),
+            op: op.to_owned(),
+            outcome,
+            user,
+            detail,
+        },
+    );
 }
 
 /// The last part of a folder's path, lowercased, with other characters

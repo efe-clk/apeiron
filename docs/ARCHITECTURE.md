@@ -66,7 +66,7 @@ What `apeiron-core` contains today:
 | `crypto`, `keyfile` | Encryption: sealed boxes and key files (FORMAT.md §14) | Done |
 | `remote`, `repo::transfer` | The `remotes` file, the `Store` interface, folder remotes, push and pull (FORMAT.md §15); SFTP and S3 stores are in `apeiron-remote` | Done |
 | `retention` | Retention rules and the checks of every ref change (FORMAT.md §16) | Done |
-| Operation log | — | Planned, not scheduled ([ROADMAP.md](ROADMAP.md) §8) |
+| `oplog` | The operation log (FORMAT.md §9.5) | Done |
 
 ## 3. Object model
 

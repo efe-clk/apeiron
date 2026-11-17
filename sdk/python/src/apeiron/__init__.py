@@ -590,6 +590,10 @@ class Repository:
     def reflog(self, name: str) -> list:
         return self.call("reflog", name=name)
 
+    def operations(self, limit: Optional[int] = None) -> list:
+        """The operations that changed the repository, newest first."""
+        return self.call("operations", limit=limit)
+
     def create_ref(self, name: str, snapshot: str = "main") -> str:
         return self.call("create_ref", name=name, snapshot=snapshot)
 
