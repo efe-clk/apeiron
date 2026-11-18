@@ -1106,3 +1106,23 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | A new protocol of snapshots instead of files | Push and pull would have to be written again for it |
 
 **Consequences.** Only encrypted repositories sync this way. During pairing, anyone on the network can read the encrypted data and try to guess the password offline, so pairing is short and explicit. Finding devices without an address is left for later.
+
+## ADR-052: Plugins reach the network only to hosts the user grants at install
+
+**Status:** Accepted (2026-11-18)
+
+**Context.** Storage backends and integrations must reach other services, while every plugin so far saw only the bytes it was given (PLUGIN.md §3).
+
+**Decision.** The only permission is `net:<host>[:<port>]`. A hook or a storage backend names its hosts; `plugin add --allow` must grant each one, and the grant is kept with the plugin. At run time WASI HTTP is linked for every plugin, but every request passes a gate that allows only granted hosts, over HTTPS except to this computer. Integrations are hooks of the new `backup-done` event with settings of the user's; storage backends are a new plugin kind used as `plugin://` remotes.
+
+**Rationale.** A list of hosts is something a person can judge when installing, and a gate in the host enforces it whatever the plugin's code does. HTTP alone covers webhooks and cloud storage interfaces without opening raw sockets. Reusing the hook for integrations and the store operations for storage keeps the interface small.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| Raw sockets (WASI sockets) | Harder to judge and to limit than named HTTPS hosts |
+| Granting at first use, with a prompt | Background jobs have no one to ask |
+| A separate integration kind | It would be a hook that runs later; the event says that |
+
+**Consequences.** A storage backend must keep its promise that ref swaps are atomic; Apeiron cannot check it. A plugin with a granted host can send what it is shown there, so granting is the user's decision of trust.

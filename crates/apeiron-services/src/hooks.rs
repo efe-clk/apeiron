@@ -95,8 +95,11 @@ pub(crate) fn run_hooks(
                 message: format!("{plugin}: {message}"),
             })
             .collect()),
-        Verdict::Refuse(plugin, message) => Err(Error::Refused(format!(
+        Verdict::Refuse(plugin, message) if event == "backup" => Err(Error::Refused(format!(
             "the plugin {plugin} stopped the backup: {message}"
+        ))),
+        Verdict::Refuse(plugin, message) => Err(Error::Refused(format!(
+            "the plugin {plugin} failed after the backup: {message}"
         ))),
     }
 }

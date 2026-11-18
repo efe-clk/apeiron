@@ -67,7 +67,8 @@ interface hook {
     name: string,
     version: string,
     description: string,
-    // The events it is called for; `backup` is the only one so far.
+    // The events it is called for: `backup`, before a backup's ref moves,
+    // and `backup-done`, after it moved.
     events: list<string>,
     permissions: list<string>,
   }
@@ -88,8 +89,47 @@ interface hook {
 
   describe: func() -> info;
 
-  // Warnings to show and go on, or why to stop.
-  check: func(event: string, ref-name: string, changes: list<change>) -> result<list<string>, string>;
+  // Warnings to show and go on, or why to stop. `settings` is the text the
+  // user gave with `apeiron plugin settings`, empty when none.
+  check: func(settings: string, event: string, ref-name: string, changes: list<change>) -> result<list<string>, string>;
+}
+
+// A storage backend keeps repository copies where Apeiron cannot reach by
+// itself, as the remote `plugin://<name>/<config>` (docs/PLUGIN.md §2.3).
+// Each call gets the remote's `config` text; paths and refs are those of a
+// folder copy (docs/FORMAT.md §15.2).
+interface storage {
+  record info {
+    name: string,
+    version: string,
+    description: string,
+    // `net:<host>` for each host it reaches, granted when it is installed.
+    permissions: list<string>,
+  }
+
+  variant swap-failure {
+    // The ref points elsewhere: its id in hex, or none when it is missing.
+    conflict(option<string>),
+    failed(string),
+  }
+
+  describe: func() -> info;
+  read: func(config: string, path: string) -> result<option<list<u8>>, string>;
+  read-range: func(config: string, path: string, offset: u64, len: u64) -> result<list<u8>, string>;
+  list-dir: func(config: string, dir: string) -> result<list<string>, string>;
+  // Writes a new file; one already there is left as it is.
+  write-new: func(config: string, path: string, data: list<u8>) -> result<_, string>;
+  create-dirs: func(config: string, dirs: list<string>) -> result<_, string>;
+  delete: func(config: string, path: string) -> result<_, string>;
+  // The ref's snapshot id in hex, or none.
+  read-ref: func(config: string, name: string) -> result<option<string>, string>;
+  list-refs: func(config: string) -> result<list<string>, string>;
+  // Points the ref at `new` only if it points at `expected`, atomically.
+  swap-ref: func(config: string, name: string, expected: option<string>, new: string) -> result<_, swap-failure>;
+}
+
+world storage-plugin {
+  export storage;
 }
 
 world importer-plugin {

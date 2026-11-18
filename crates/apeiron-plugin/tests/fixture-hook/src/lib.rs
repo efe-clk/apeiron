@@ -18,7 +18,12 @@ impl Guest for Hook {
         }
     }
 
-    fn check(event: String, ref_name: String, changes: Vec<Change>) -> Result<Vec<String>, String> {
+    fn check(
+        _settings: String,
+        event: String,
+        ref_name: String,
+        changes: Vec<Change>,
+    ) -> Result<Vec<String>, String> {
         if ref_name == "backup/loop" {
             loop {
                 std::hint::black_box(());

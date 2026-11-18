@@ -1480,7 +1480,12 @@
         },
         {
           "const": "hook",
-          "description": "Looks at operations before they take effect and may stop them.",
+          "description": "Looks at operations before they take effect and may stop them, or\ntells another service after them.",
+          "type": "string"
+        },
+        {
+          "const": "storage",
+          "description": "Keeps repository copies as the remote `plugin://<name>/<config>`.",
           "type": "string"
         }
       ]
@@ -2086,6 +2091,14 @@
     },
     "PluginFile": {
       "properties": {
+        "allow": {
+          "default": [],
+          "description": "Permissions granted to it, such as `net:hooks.example.com`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "dir": {
           "default": null,
           "type": [
@@ -2110,6 +2123,13 @@
         },
         "events": {
           "description": "For a hook, the events it is called for, such as `backup`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "granted": {
+          "description": "The permissions the user granted when installing it (PLUGIN.md §3.1).",
           "items": {
             "type": "string"
           },
@@ -2183,6 +2203,32 @@
         },
         "name": {
           "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "PluginSettings": {
+      "properties": {
+        "dir": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "text": {
+          "default": null,
+          "description": "New settings; empty removes them, absent only reads them.",
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "required": [
@@ -3710,6 +3756,13 @@
     },
     "StoreInstall": {
       "properties": {
+        "allow": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "dir": {
           "default": null,
           "type": [
@@ -4569,6 +4622,15 @@
       },
       "result": {
         "$ref": "#/$defs/PluginInfo"
+      }
+    },
+    "plugin_settings": {
+      "long": false,
+      "request": {
+        "$ref": "#/$defs/PluginSettings"
+      },
+      "result": {
+        "type": "string"
       }
     },
     "plugins": {

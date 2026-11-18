@@ -250,6 +250,7 @@ fn conformance_scenarios() {
         "note_review",
         "plugin_add",
         "plugin_remove",
+        "plugin_settings",
         "remove_key",
         "review",
         "store_plugins",

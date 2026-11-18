@@ -38,7 +38,8 @@ Bir eklenti, dışa verdiği arayüze göre üç türden biridir; `plugin add` o
 | --- | --- | --- |
 | Tür sürücüsü | `type-driver` | Bildiği dosyaları birleştirmek, farklarını göstermek ve metinlerini okumak (§4) |
 | İçe aktarıcı | `importer` | Apeiron'un bilmediği arşiv biçimlerini `apeiron import` için okumak (§2.1) |
-| Kanca | `hook` | Bir yedeğe, ref'i ilerlemeden önce bakmak ve onu durdurmak (§2.2) |
+| Kanca | `hook` | Bir yedeğe, ref'i ilerlemeden önce bakmak ve onu durdurmak ya da ondan sonra başka bir hizmete haber vermek (§2.2) |
+| Depolama arka ucu | `storage` | Depo kopyalarını Apeiron'un kendi başına ulaşamadığı yerlerde tutmak (§2.3) |
 
 ### 2.1 İçe aktarıcılar
 
@@ -48,7 +49,12 @@ Bir eklenti, dışa verdiği arayüze göre üç türden biridir; `plugin add` o
 
 ### 2.2 Kancalar
 
-`describe()` adı, sürümü, açıklamayı, çağrıldığı olayları ve izinlerini verir; şimdilik tek olay `backup`'tır. `check(event, ref-name, changes)` uyarılar ya da durdurmak için bir gerekçe döndürür.
+`describe()` adı, sürümü, açıklamayı, çağrıldığı olayları ve izinlerini verir. `check(settings, event, ref-name, changes)` uyarılar ya da durdurmak için bir gerekçe döndürür; `settings`, kullanıcının `apeiron plugin settings <name> <text>` ile verdiği metindir, örneğin haber verilecek bir adres; yoksa boştur. İki olay vardır:
+
+| Olay | Ne zaman | Durdurma gerekçesi |
+| --- | --- | --- |
+| `backup` | Snapshot kaydedildikten sonra, ref ilerlemeden önce | Yedeği durdurur (aşağıda) |
+| `backup-done` | Ref ilerledikten sonra | Bir uyarı olur: "the plugin … failed after the backup"; yedek geçerli kalır |
 
 1. Bir yedek snapshot'ını kaydeder, sonra `backup`'ın her kancasına, ad sırasıyla, eklediği, değiştirdiği ya da sildiği her yolu; eklenen ya da değişen, en fazla 1 MiB'lık her dosyanın yeni içeriğiyle, toplamda 64 MiB'a kadar gösterir.
 2. Uyarılar, eklentinin adıyla `plugin` uyarıları olarak yedeğin uyarılarına eklenir; CLI çıkış kodu 3 ile biter.
@@ -57,7 +63,13 @@ Bir eklenti, dışa verdiği arayüze göre üç türden biridir; `plugin add` o
 
 CLI'ın, arka plan hizmetinin ve web arayüzünün yedeklerinin hepsi kancaları çalıştırır. Senkron turları, birleştirmeler, içe aktarmalar ve push'lar çalıştırmaz.
 
-Bir kanca, örneğin parola içeren dosyaları yedeklerin dışında tutabilir ya da büyük kayıt dosyaları için uyarabilir. Her eklenti gibi yalnızca kendisine verileni görür (§3).
+`backup` kancası, örneğin parola içeren dosyaları yedeklerin dışında tutabilir ya da büyük kayıt dosyaları için uyarabilir. Bir ana makineye ulaşma izni olan (§3.1) bir `backup-done` kancası bir entegrasyondur: her yedekten bir sohbet hizmetine ya da bir izleme aracına haber verebilir. Bunun dışında her eklenti gibi yalnızca kendisine verileni görür (§3).
+
+### 2.3 Depolama arka uçları
+
+Bir depolama arka ucu, depo kopyalarını Apeiron'un kendi başına ulaşamadığı yerlerde, örneğin kendi arayüzü olan bir bulut hizmetinde tutar. `describe()` adı, sürümü, açıklamayı ve ulaşması gereken ana makineleri (§3.1) verir; diğer işlevleri bir uzak deponun depolama işlemleridir (FORMAT.tr.md §15.2): bir dosyayı ya da bir parçasını okumak, bir klasörü listelemek, yeni bir dosya yazmak, bir dosyayı silmek ve ref'leri okumak, listelemek ve değiştirmek. Bir ref'i değiştirmek atomik olmalı ve ref başka yeri gösteriyorsa ref'in kimliğiyle `conflict` yanıtı vermelidir; böylece iki cihazın push'ları birbirini geri almaz. Bu, Apeiron'un denetleyemediği, arka ucun verdiği bir sözdür.
+
+`plugin://<name>/<settings>` uzak deposu olarak kullanılır, örneğin `apeiron remote add cloud 'plugin://example-cloud/bucket=photos'`: her çağrı adın ardından gelen metni alır. Bilgisayardan çıkan her uzak depo gibi yalnızca şifreli bir depo onu kullanabilir. Bir çağrı on dakika sürebilir; bu, yavaş bir hatta bir paket için yeterlidir; diğer sınırlar §3'tekilerdir.
 
 ## 3. Sandbox
 
@@ -72,12 +84,20 @@ flowchart LR
 | Kural | Nasıl |
 | --- | --- |
 | Hiçbir şeye erişim yok | Eklenti dosya, ağ, ortam değişkeni ve argüman almaz; standart çıktıya ve hataya yazdıkları atılır. Yalnızca kendisine verilen baytları görür |
-| Henüz izin yok | Eklenti API'sinin 0.2 sürümü hiç izin vermez; izin isteyen bir eklenti reddedilir. İzinler, depolama arka uçları gibi onlara ihtiyaç duyan eklenti türleriyle gelir ve yalnızca kullanıcının onayıyla verilir |
+| Yalnızca izin verilen ana makineler | Bir kanca ya da depolama arka ucu ağdaki ana makinelere ulaşmayı isteyebilir; onları ancak kullanıcı kurarken izin verirse alır (§3.1). Diğer her eklenti ve diğer her ana makine reddedilir |
 | Süre sınırı | 30 saniyeden uzun süren bir çağrı durdurulur |
 | Bellek sınırı | Bir eklenti en çok 512 MiB bellek kullanabilir |
 | Boyut sınırı | 64 MiB'tan büyük dosyalar eklentiye verilmez |
 | Taze durum | Her çağrı yeni bir örnekte çalışır; böylece bir çağrı bir sonrakini etkileyemez |
 | Hata sınırlanır | Çöken, süresi ya da belleği biten veya hata döndüren bir eklenti, dosyayı eklenti yokmuş gibi çatışma kopyası olarak bırakır ve sonuç bir uyarı bildirir |
+
+### 3.1 Ağ izinleri
+
+Tek izin `net:<host>` ya da `net:<host>:<port>`'tur, örneğin `net:hooks.example.com`.
+
+1. Bir eklenti ulaşması gereken ana makineleri `describe()` içinde adlandırır. `apeiron plugin add <file> --allow net:<host>` (ve `plugin install`) onu ancak hepsine komut satırında izin verilmişse kurar ve onları açıklamasında `granted` olarak tutar; yoksa hangi `--allow`'a ihtiyaç duyduğunu söyler ve hiçbir şey kurmaz. Tür sürücüleri ve içe aktarıcılar hiç isteyemez.
+2. Eklenti ağa WASI HTTP üzerinden ulaşır. Her istek denetlenir: ana makinesine izin verilmiş olmalı ve bu bilgisayar (`localhost`, `127.0.0.1`, `[::1]`) dışında HTTPS kullanmalıdır. Diğer her şey eklentinin bir hata olarak gördüğü `HTTP request denied` ile reddedilir.
+3. Eskisi gibi soket, dosya, değişken ya da argüman almaz. `plugin list` ve `plugin add` bir eklentinin nereye ulaşabileceğini gösterir.
 
 ## 4. Tür sürücüsüyle birleştirme
 
@@ -110,7 +130,6 @@ SHA-256, dosyanın indekstekiyle aynı olduğunu güvenceye alır, indeksin dür
 | Konu | Nerede |
 | --- | --- |
 | Satır satır metin birleştirme ve bir farkı göstermek | Metin eklentisi ([TEXT.tr.md](TEXT.tr.md)) |
-| Eklenti olarak depolama arka uçları ve entegrasyonlar | Daha sonra; ağa ulaşmaları gerekir, bu yüzden kullanıcının verdiği izinlerle gelirler ([ROADMAP.tr.md](ROADMAP.tr.md) §8) |
 | `backup` dışındaki olayların kancaları | Daha sonra, kullanımları ortaya çıktıkça |
 | Eklenti olarak Git | Planlanmadı; ADR-049 ([DECISIONS.tr.md](DECISIONS.tr.md)) |
 

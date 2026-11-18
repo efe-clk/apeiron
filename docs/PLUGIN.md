@@ -38,7 +38,8 @@ A plugin is one of three kinds, by the interface it exports; `plugin add` tries 
 | --- | --- | --- |
 | Type driver | `type-driver` | Merging, showing differences and reading the text of the files it knows (§4) |
 | Importer | `importer` | Reading archive formats Apeiron does not know for `apeiron import` (§2.1) |
-| Hook | `hook` | Looking at a backup before its ref moves, and stopping it (§2.2) |
+| Hook | `hook` | Looking at a backup before its ref moves, and stopping it, or telling another service after it (§2.2) |
+| Storage backend | `storage` | Keeping repository copies where Apeiron cannot reach by itself (§2.3) |
 
 ### 2.1 Importers
 
@@ -48,7 +49,12 @@ A plugin is one of three kinds, by the interface it exports; `plugin add` tries 
 
 ### 2.2 Hooks
 
-`describe()` gives the name, version, description, the events it is called for and its permissions; `backup` is the only event so far. `check(event, ref-name, changes)` returns warnings, or a reason to stop.
+`describe()` gives the name, version, description, the events it is called for and its permissions. `check(settings, event, ref-name, changes)` returns warnings, or a reason to stop; `settings` is the text the user gave with `apeiron plugin settings <name> <text>`, such as an address to tell, empty when none. There are two events:
+
+| Event | When | A reason to stop |
+| --- | --- | --- |
+| `backup` | After the snapshot is stored, before the ref moves | Stops the backup (below) |
+| `backup-done` | After the ref moved | Becomes a warning: "the plugin … failed after the backup"; the backup stands |
 
 1. A backup stores its snapshot, then shows every hook of `backup`, in name order, each path it adds, changes or removes, with the new content of each added or changed file of at most 1 MiB, up to 64 MiB in all.
 2. Warnings are added to the backup's warnings as `plugin` warnings, with the plugin's name, so the CLI ends with exit code 3.
@@ -57,7 +63,13 @@ A plugin is one of three kinds, by the interface it exports; `plugin add` tries 
 
 Backups of the CLI, the background service and the web interface all run hooks. Sync rounds, merges, imports and pushes do not.
 
-A hook can, for example, keep files with passwords out of backups, or warn about large logs. It sees only what it is given, like every plugin (§3).
+A hook of `backup` can, for example, keep files with passwords out of backups, or warn about large logs. A hook of `backup-done` with the permission to reach a host (§3.1) is an integration: it can tell a chat service or a monitor about each backup. Otherwise it sees only what it is given, like every plugin (§3).
+
+### 2.3 Storage backends
+
+A storage backend keeps repository copies where Apeiron cannot reach by itself, such as a cloud service with its own interface. `describe()` gives the name, version, description and the hosts it must reach (§3.1); its other functions are the store operations of a remote (FORMAT.md §15.2): reading a file or part of it, listing a folder, writing a new file, deleting one, and reading, listing and swapping refs. Swapping a ref must be atomic and answer `conflict` with the ref's id when it points elsewhere, so pushes from two devices cannot undo each other; that is the backend's promise, which Apeiron cannot check.
+
+It is used as the remote `plugin://<name>/<settings>`, such as `apeiron remote add cloud 'plugin://example-cloud/bucket=photos'`: every call gets the text after the name. Only an encrypted repository can use it, as for every remote that leaves the computer. A call may take ten minutes, enough for a pack on a slow line; the other limits are those of §3.
 
 ## 3. The sandbox
 
@@ -72,12 +84,20 @@ flowchart LR
 | Rule | How |
 | --- | --- |
 | No access to anything | The plugin gets no files, no network, no environment variables and no arguments; what it writes to standard output and error is dropped. It sees only the bytes it is given |
-| No permissions yet | Version 0.2 of the plugin API grants no permissions; a plugin that asks for any is refused. Permissions come with the plugin types that need them, such as storage backends, and are granted only with the user's approval |
+| Only granted hosts | A hook or a storage backend may ask to reach hosts on the network; it gets them only if the user grants them when installing it (§3.1). Every other plugin, and every other host, is refused |
 | Time limit | A call that runs longer than 30 seconds is stopped |
 | Memory limit | A plugin can use at most 512 MiB of memory |
 | Size limit | Files larger than 64 MiB are not given to a plugin |
 | Fresh state | Every call runs in a new instance, so one call cannot affect the next |
 | Failure is contained | A plugin that crashes, runs out of time or memory, or returns an error leaves the file as a conflict copy, as if there were no plugin, and the result reports a warning |
+
+### 3.1 Network permissions
+
+The only permission is `net:<host>` or `net:<host>:<port>`, such as `net:hooks.example.com`.
+
+1. A plugin names the hosts it must reach in `describe()`. `apeiron plugin add <file> --allow net:<host>` (and `plugin install`) installs it only if every one of them is allowed on the command line, and keeps them in its description as `granted`; otherwise it says which `--allow` it needs and installs nothing. Type drivers and importers may not ask at all.
+2. The plugin reaches the network through WASI HTTP. Every request is checked: its host must be granted, and it must use HTTPS, except to this computer (`localhost`, `127.0.0.1`, `[::1]`). Anything else is refused as `HTTP request denied`, which the plugin sees as an error.
+3. It gets no sockets, files, variables or arguments, as before. `plugin list` and `plugin add` show what a plugin may reach.
 
 ## 4. Merging with a type driver
 
@@ -110,7 +130,6 @@ The SHA-256 makes sure the file is the one the index lists, not that the index i
 | Item | Where |
 | --- | --- |
 | Line-by-line text merge and showing a difference | The text plugin ([TEXT.md](TEXT.md)) |
-| Storage backends and integrations as plugins | Later; they need to reach the network, so they come with permissions the user grants ([ROADMAP.md](ROADMAP.md) §8) |
 | Hooks of other events than `backup` | Later, as uses for them appear |
 | Git as a plugin | Not planned; ADR-049 ([DECISIONS.md](DECISIONS.md)) |
 

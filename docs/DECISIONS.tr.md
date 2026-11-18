@@ -1106,3 +1106,23 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Dosyalar yerine snapshot'lardan yeni bir protokol | Push ve pull onun için yeniden yazılmak zorunda kalırdı |
 
 **Sonuçlar.** Bu yolla yalnızca şifreli depolar eşitlenir. Eşleştirme sırasında ağdaki herkes şifreli veriyi okuyup parolayı çevrimdışı tahmin etmeyi deneyebilir; bu yüzden eşleştirme kısa ve açıktır. Adres olmadan cihaz bulmak sonraya kaldı.
+
+## ADR-052: Eklentiler ağa yalnızca kullanıcının kurarken izin verdiği ana makineler için ulaşır
+
+**Durum:** Kabul edildi (2026-11-18)
+
+**Bağlam.** Depolama arka uçları ve entegrasyonlar başka hizmetlere ulaşmalıdır; oysa şimdiye kadar her eklenti yalnızca kendisine verilen baytları gördü (PLUGIN.tr.md §3).
+
+**Karar.** Tek izin `net:<host>[:<port>]`'tur. Bir kanca ya da depolama arka ucu ana makinelerini adlandırır; `plugin add --allow` her birine izin vermelidir ve izin eklentiyle birlikte tutulur. Çalışırken WASI HTTP her eklentiye bağlanır, ama her istek yalnızca izin verilen ana makinelere, bu bilgisayar dışında HTTPS üzerinden izin veren bir kapıdan geçer. Entegrasyonlar, kullanıcının ayarlarıyla yeni `backup-done` olayının kancalarıdır; depolama arka uçları `plugin://` uzak depoları olarak kullanılan yeni bir eklenti türüdür.
+
+**Gerekçe.** Ana makinelerin bir listesi, bir kişinin kurarken değerlendirebileceği bir şeydir ve ortamdaki bir kapı, eklentinin kodu ne yaparsa yapsın onu uygular. Tek başına HTTP, ham soketler açmadan web kancalarını ve bulut depolama arayüzlerini karşılar. Entegrasyonlar için kancayı, depolama için depolama işlemlerini yeniden kullanmak arayüzü küçük tutar.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Ham soketler (WASI sockets) | Adlandırılmış HTTPS ana makinelerinden değerlendirmesi ve sınırlaması daha zor |
+| İlk kullanımda sorarak izin vermek | Arka plan işlerinde sorulacak kimse yoktur |
+| Ayrı bir entegrasyon türü | Daha sonra çalışan bir kanca olurdu; bunu olay söyler |
+
+**Sonuçlar.** Bir depolama arka ucu ref değişikliklerinin atomik olduğu sözünü tutmalıdır; Apeiron bunu denetleyemez. İzin verilmiş bir ana makinesi olan eklenti kendisine gösterileni oraya gönderebilir; bu yüzden izin vermek kullanıcının güven kararıdır.

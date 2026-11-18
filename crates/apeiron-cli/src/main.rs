@@ -2250,6 +2250,9 @@ enum PluginCommand {
         /// Install the plugin of this name that the repository carries
         #[arg(long, value_name = "NAME", conflicts_with = "file")]
         from_repo: Option<String>,
+        /// Grant a permission it asks for, such as net:hooks.example.com
+        #[arg(long = "allow", value_name = "PERMISSION")]
+        allow: Vec<String>,
     },
     /// List the installed plugins
     List {
@@ -2278,7 +2281,13 @@ enum PluginCommand {
         name: String,
         #[arg(long, env = "APEIRON_PLUGIN_STORE", value_name = "URL")]
         store: Option<String>,
+        /// Grant a permission it asks for, such as net:hooks.example.com
+        #[arg(long = "allow", value_name = "PERMISSION")]
+        allow: Vec<String>,
     },
+    /// Show or set the settings of a plugin, such as the address a hook
+    /// tells; an empty text removes them
+    Settings { name: String, text: Option<String> },
     /// Print a store's index of plugin files, as plugins.json
     Index {
         #[arg(required = true)]
@@ -2300,12 +2309,18 @@ fn print_added(out: &Output, added: &apeiron::PluginAdded) {
                 say!("apeiron import reads {} with it", i.patterns.join(", "));
             }
             apeiron::PluginKind::Hook => {
+                say!("It is called for: {}", i.events.join(", "));
+            }
+            apeiron::PluginKind::Storage => {
                 say!(
-                    "It checks every {} before its ref moves, and may stop it",
-                    i.events.join(", ")
+                    "It keeps repository copies: apeiron remote add <name> 'plugin://{}/<settings>'",
+                    i.name
                 );
             }
             _ => {}
+        }
+        if !i.granted.is_empty() {
+            say!("It may reach: {}", i.granted.join(", "));
         }
         if !i.text_patterns.is_empty() {
             say!("Search finds the text in {}", i.text_patterns.join(", "));
@@ -3833,22 +3848,26 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
         }
         Command::Plugin { command } => {
             match command {
-                PluginCommand::Add { file, from_repo } => {
+                PluginCommand::Add {
+                    file,
+                    from_repo,
+                    allow,
+                } => {
                     let added = match (file, from_repo) {
                         (_, Some(name)) => {
                             open(cli.repo, password_file)?.install_shared_plugin(&name, None)?
                         }
-                        (Some(file), None) => apeiron::add_plugin(&file, None)?,
+                        (Some(file), None) => apeiron::add_plugin_allowing(&file, &allow, None)?,
                         (None, None) => {
                             return Err(Failure::Usage("give a file or --from-repo".to_owned()));
                         }
                     };
                     print_added(out, &added);
                 }
-                PluginCommand::Install { name, store } => {
+                PluginCommand::Install { name, store, allow } => {
                     print_added(
                         out,
-                        &apeiron::install_plugin(&name, store.as_deref(), None)?,
+                        &apeiron::install_plugin(&name, store.as_deref(), &allow, None)?,
                     );
                 }
                 PluginCommand::Search { text, store } => {
@@ -3866,6 +3885,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                                 apeiron::PluginKind::TypeDriver => "type driver",
                                 apeiron::PluginKind::Importer => "importer",
                                 apeiron::PluginKind::Hook => "hook",
+                                apeiron::PluginKind::Storage => "storage",
                             };
                             say!(
                                 "{} {}  {kind}  {}  {}",
@@ -3877,6 +3897,16 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                         }
                         if found.is_empty() {
                             say!("The store offers no such plugin");
+                        }
+                    });
+                }
+                PluginCommand::Settings { name, text } => {
+                    let settings = apeiron::plugin_settings(&name, text.as_deref(), None)?;
+                    out.result(&settings, |s| {
+                        if s.is_empty() {
+                            say!("{name} has no settings");
+                        } else {
+                            say!("{s}");
                         }
                     });
                 }
@@ -3896,6 +3926,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                                 apeiron::PluginKind::TypeDriver => "type driver",
                                 apeiron::PluginKind::Importer => "importer",
                                 apeiron::PluginKind::Hook => "hook",
+                                apeiron::PluginKind::Storage => "storage",
                             };
                             say!(
                                 "{} {}  {kind}  {}  {}",

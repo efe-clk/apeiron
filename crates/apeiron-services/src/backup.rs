@@ -151,6 +151,26 @@ pub fn backup_with(
         None => Vec::new(),
     };
     repo.update_ref(&options.ref_name, parent, Some(id))?;
+    // Telling other services comes after the ref moved; a hook that fails
+    // then is only a warning (PLUGIN.md §2.2).
+    let told = match hooks {
+        Some(hooks) => match crate::hooks::run_hooks(
+            repo,
+            hooks,
+            "backup-done",
+            &options.ref_name,
+            parent.as_ref(),
+            &id,
+        ) {
+            Ok(warnings) => warnings,
+            Err(e) => vec![crate::control::Warning {
+                path: crate::name::Name::default(),
+                kind: crate::control::WarningKind::Plugin,
+                message: e.to_string(),
+            }],
+        },
+        None => Vec::new(),
+    };
     ctl.set_phase(Phase::Done);
     Ok(BackupOutcome {
         snapshot: id,
@@ -162,7 +182,12 @@ pub fn backup_with(
         new_bytes,
         excluded: stored.excluded,
         unchanged: stored.unchanged,
-        warnings: stored.warnings.into_iter().chain(hooked).collect(),
+        warnings: stored
+            .warnings
+            .into_iter()
+            .chain(hooked)
+            .chain(told)
+            .collect(),
     })
 }
 

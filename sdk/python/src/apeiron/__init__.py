@@ -23,6 +23,7 @@ __all__ = [
     "add_plugin",
     "remove_plugin",
     "store_plugins",
+    "plugin_settings",
     "install_plugin",
     "saved_searches",
     "save_search",
@@ -338,14 +339,20 @@ def plugins(dir: Any = None) -> list:
     return _call_global("plugins", _drop_none({"dir": dir}))
 
 
-def add_plugin(file: Any, dir: Any = None) -> Record:
-    """Checks a plugin (a WebAssembly component) and installs it."""
-    return _call_global("plugin_add", _drop_none({"file": file, "dir": dir}))
+def add_plugin(file: Any, dir: Any = None, allow: Optional[list] = None) -> Record:
+    """Checks a plugin (a WebAssembly component) and installs it, granting
+    the permissions in ``allow``, such as ``net:hooks.example.com``."""
+    return _call_global("plugin_add", _drop_none({"file": file, "dir": dir, "allow": allow}))
 
 
 def remove_plugin(name: str, dir: Any = None) -> Record:
     """Removes an installed plugin."""
     return _call_global("plugin_remove", _drop_none({"name": name, "dir": dir}))
+
+
+def plugin_settings(name: str, text: Optional[str] = None, dir: Any = None) -> str:
+    """The settings of a plugin, after setting them to ``text`` if given."""
+    return _call_global("plugin_settings", _drop_none({"name": name, "text": text, "dir": dir}))
 
 
 def store_plugins(store: Optional[str] = None) -> list:
@@ -354,11 +361,14 @@ def store_plugins(store: Optional[str] = None) -> list:
     return _call_global("store_plugins", _drop_none({"store": store}))
 
 
-def install_plugin(name: str, store: Optional[str] = None, dir: Any = None) -> Record:
+def install_plugin(
+    name: str, store: Optional[str] = None, dir: Any = None, allow: Optional[list] = None
+) -> Record:
     """Downloads a plugin from a store, checks it against the store's index
     and installs it."""
     return _call_global(
-        "install_plugin", _drop_none({"name": name, "store": store, "dir": dir})
+        "install_plugin",
+        _drop_none({"name": name, "store": store, "dir": dir, "allow": allow}),
     )
 
 

@@ -28,6 +28,27 @@ pub fn add_plugin(file: &Path, dir: Option<&Path>) -> Result<PluginAdded> {
     Ok(open(dir)?.add(file)?)
 }
 
+/// [`add_plugin`], granting the permissions in `allow`, such as
+/// `net:hooks.example.com` (PLUGIN.md §3.1); a plugin that asks for others
+/// is refused.
+pub fn add_plugin_allowing(
+    file: &Path,
+    allow: &[String],
+    dir: Option<&Path>,
+) -> Result<PluginAdded> {
+    Ok(open(dir)?.add_allowing(file, allow)?)
+}
+
+/// The settings of the installed plugin `name`, after setting them to
+/// `text` when given; empty text removes them (PLUGIN.md §2.2).
+pub fn plugin_settings(name: &str, text: Option<&str>, dir: Option<&Path>) -> Result<String> {
+    let plugins = open(dir)?;
+    if let Some(text) = text {
+        plugins.set_settings(name, text)?;
+    }
+    Ok(plugins.settings(name))
+}
+
 /// Removes an installed plugin.
 pub fn remove_plugin(name: &str, dir: Option<&Path>) -> Result<PluginInfo> {
     Ok(open(dir)?.remove(name)?)
@@ -48,7 +69,12 @@ pub fn store_plugins(store: Option<&str>) -> Result<Vec<crate::StoreEntry>> {
 
 /// Downloads the plugin `name` from a store, checks its SHA-256 against the
 /// store's index, and installs it after the checks of [`add_plugin`].
-pub fn install_plugin(name: &str, store: Option<&str>, dir: Option<&Path>) -> Result<PluginAdded> {
+pub fn install_plugin(
+    name: &str,
+    store: Option<&str>,
+    allow: &[String],
+    dir: Option<&Path>,
+) -> Result<PluginAdded> {
     use crate::error::{Error, ErrorKind};
     let store = store.map_or_else(apeiron_plugin::default_store, str::to_owned);
     let entry = apeiron_plugin::index(&store)?
@@ -66,7 +92,7 @@ pub fn install_plugin(name: &str, store: Option<&str>, dir: Option<&Path>) -> Re
     let file = folder.join(format!(".download-{}-{name}.wasm", std::process::id()));
     let added = apeiron_plugin::download(&store, &entry, &file)
         .map_err(Error::from)
-        .and_then(|()| Ok(plugins.add(&file)?));
+        .and_then(|()| Ok(plugins.add_allowing(&file, allow)?));
     let _ = std::fs::remove_file(&file);
     let added = added?;
     if added.info.name != name {

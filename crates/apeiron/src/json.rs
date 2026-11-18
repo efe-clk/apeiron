@@ -125,6 +125,9 @@ struct PluginDir {
 #[derive(Deserialize, schemars::JsonSchema)]
 struct PluginFile {
     file: PathBuf,
+    /// Permissions granted to it, such as `net:hooks.example.com`.
+    #[serde(default)]
+    allow: Vec<String>,
     #[serde(default)]
     dir: Option<PathBuf>,
 }
@@ -132,6 +135,16 @@ struct PluginFile {
 #[derive(Deserialize, schemars::JsonSchema)]
 struct PluginName {
     name: String,
+    #[serde(default)]
+    dir: Option<PathBuf>,
+}
+
+#[derive(Deserialize, schemars::JsonSchema)]
+struct PluginSettings {
+    name: String,
+    /// New settings; empty removes them, absent only reads them.
+    #[serde(default)]
+    text: Option<String>,
     #[serde(default)]
     dir: Option<PathBuf>,
 }
@@ -147,6 +160,8 @@ struct StoreInstall {
     name: String,
     #[serde(default)]
     store: Option<String>,
+    #[serde(default)]
+    allow: Vec<String>,
     #[serde(default)]
     dir: Option<PathBuf>,
 }
@@ -252,11 +267,23 @@ pub fn call_global(operation: &str, request: Value) -> Result<Value> {
         )?),
         "plugin_add" => {
             let r: PluginFile = parse(request)?;
-            json(&crate::add_plugin(&r.file, r.dir.as_deref())?)
+            json(&crate::add_plugin_allowing(
+                &r.file,
+                &r.allow,
+                r.dir.as_deref(),
+            )?)
         }
         "plugin_remove" => {
             let r: PluginName = parse(request)?;
             json(&crate::remove_plugin(&r.name, r.dir.as_deref())?)
+        }
+        "plugin_settings" => {
+            let r: PluginSettings = parse(request)?;
+            json(&crate::plugin_settings(
+                &r.name,
+                r.text.as_deref(),
+                r.dir.as_deref(),
+            )?)
         }
         "store_plugins" => json(&crate::store_plugins(
             parse::<Store>(request)?.store.as_deref(),
@@ -266,6 +293,7 @@ pub fn call_global(operation: &str, request: Value) -> Result<Value> {
             json(&crate::install_plugin(
                 &r.name,
                 r.store.as_deref(),
+                &r.allow,
                 r.dir.as_deref(),
             )?)
         }
@@ -379,6 +407,7 @@ pub fn schema() -> Value {
         "plugins" PluginDir => Vec<PluginInfo>,
         "plugin_add" PluginFile => PluginAdded,
         "plugin_remove" PluginName => PluginInfo,
+        "plugin_settings" PluginSettings => String,
         "store_plugins" Store => Vec<StoreEntry>,
         "install_plugin" StoreInstall => PluginAdded,
         "saved_searches" SearchesFile => Vec<SavedSearch>,

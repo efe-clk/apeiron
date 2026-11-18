@@ -65,7 +65,8 @@ pub use conflicts::{conflicts, resolve_conflict};
 pub use error::{Error, ErrorKind, Result};
 pub use job::Job;
 pub use plugins::{
-    add_plugin, install_plugin, plugin_dir, plugin_index, plugins, remove_plugin, store_plugins,
+    add_plugin, add_plugin_allowing, install_plugin, plugin_dir, plugin_index, plugin_settings,
+    plugins, remove_plugin, store_plugins,
 };
 pub use repo::Repository;
 pub use report::{

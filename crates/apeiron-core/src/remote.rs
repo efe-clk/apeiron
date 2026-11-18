@@ -53,6 +53,12 @@ pub enum RemoteUrl {
     S3(S3Url),
     /// Another device running `apeiron peer serve` (SYNC.md §7).
     Peer(PeerUrl),
+    /// `plugin://<name>/<config>`: a storage backend plugin (PLUGIN.md
+    /// §2.3), given the text after the name.
+    Plugin {
+        name: String,
+        config: String,
+    },
 }
 
 /// `peer://host[:port]#<SHA-256 of the device's certificate, hex>`
@@ -126,6 +132,23 @@ impl RemoteUrl {
                 port,
                 path: path.to_owned(),
             }));
+        }
+        if let Some(rest) = url.strip_prefix("plugin://") {
+            let (name, config) = rest.split_once('/').unwrap_or((rest, ""));
+            let valid = !name.is_empty()
+                && name.len() <= 64
+                && name
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
+            if !valid {
+                return Err(invalid(
+                    "the plugin name is not lowercase letters, digits and -",
+                ));
+            }
+            return Ok(RemoteUrl::Plugin {
+                name: name.to_owned(),
+                config: config.to_owned(),
+            });
         }
         if let Some(rest) = url.strip_prefix("peer://") {
             let (authority, fingerprint) = rest

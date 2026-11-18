@@ -565,11 +565,14 @@ url = "s3://bucket/apeiron?endpoint=https://s3.example.com&region=eu-1"   # S3-c
 
 [remote.laptop]
 url = "peer://laptop.local:7865#3f9a…e1"            # another device, section 15.9
+
+[remote.photos]
+url = "plugin://example-cloud/bucket=photos"          # a storage backend plugin (PLUGIN.md §2.3)
 ```
 
 - The file is local to one copy; it is never pushed. Names follow the ref name rules of section 9.3, without `/`.
 - It holds no secrets. SFTP uses the user's SSH keys and agent and checks the server against `~/.ssh/known_hosts`; an unknown server is refused. S3 reads `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
-- Only an encrypted repository (section 14) can be pushed to an SFTP, S3 or peer remote. A folder remote, such as an external disk, may hold a repository that is not encrypted.
+- Only an encrypted repository (section 14) can be pushed to an SFTP, S3, peer or plugin remote. A folder remote, such as an external disk, may hold a repository that is not encrypted.
 
 ### 15.2 Store operations
 

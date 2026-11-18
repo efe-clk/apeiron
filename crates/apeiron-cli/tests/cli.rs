@@ -742,7 +742,7 @@ fn importer_and_hook_plugins_work_in_import_and_backup() {
 
     let hook = fixture("fixture-hook", "test_hook");
     let out = ok(&["plugin", "add", hook.to_str().unwrap()]);
-    assert!(out.contains("checks every backup"), "{out}");
+    assert!(out.contains("It is called for: backup"), "{out}");
     assert!(ok(&["plugin", "list"]).contains("test-hook 1.0  hook  backup"));
     let src = s.path("src");
     ok(&["backup", &src]);

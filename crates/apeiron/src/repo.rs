@@ -1410,7 +1410,7 @@ pub(crate) fn open_store(
         }
         Err(Error::new(
             ErrorKind::InvalidInput,
-            "only an encrypted repository can use an SFTP, S3 or peer remote; \
+            "only an encrypted repository can use an SFTP, S3, peer or plugin remote; \
              create one with `init --encrypt`",
         ))
     };
@@ -1434,6 +1434,14 @@ pub(crate) fn open_store(
                 None => None,
             };
             Box::new(apeiron_remote::PeerStore::connect(&url, token)?)
+        }
+        core::RemoteUrl::Plugin { name, config } => {
+            network_needs_encryption()?;
+            let dir = match repo.map(Repository::plugins).transpose()?.flatten() {
+                Some(plugins) => plugins.dir().to_path_buf(),
+                None => apeiron_plugin::default_dir()?,
+            };
+            Box::new(apeiron_plugin::PluginStore::open(&dir, &name, &config)?)
         }
     };
     Ok(match rate {

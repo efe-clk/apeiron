@@ -40,9 +40,19 @@ mod hook {
     wasmtime::component::bindgen!({ path: "wit", world: "hook-plugin" });
 }
 
+mod storage {
+    wasmtime::component::bindgen!({ path: "wit", world: "storage-plugin" });
+}
+
+mod gate;
+mod plugin_store;
+
+pub use plugin_store::PluginStore;
+
 use bindings::TypeDriverPlugin;
 use hook::HookPlugin;
 use importer::ImporterPlugin;
+use storage::StoragePlugin;
 
 /// The longest a call may run (PLUGIN.md §3).
 pub const TIME_LIMIT: Duration = Duration::from_secs(30);
@@ -89,8 +99,11 @@ pub enum Kind {
     TypeDriver,
     /// Reads archive formats for `apeiron import`.
     Importer,
-    /// Looks at operations before they take effect and may stop them.
+    /// Looks at operations before they take effect and may stop them, or
+    /// tells another service after them.
     Hook,
+    /// Keeps repository copies as the remote `plugin://<name>/<config>`.
+    Storage,
 }
 
 /// What a plugin says about itself (PLUGIN.md §2).
@@ -113,10 +126,29 @@ pub struct PluginInfo {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub events: Vec<String>,
     pub permissions: Vec<String>,
+    /// The permissions the user granted when installing it (PLUGIN.md §3.1).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub granted: Vec<String>,
 }
 
 /// The events a hook may be called for (PLUGIN.md §2.2).
-pub const EVENTS: &[&str] = &["backup"];
+pub const EVENTS: &[&str] = &["backup", "backup-done"];
+
+/// How long a storage backend may take for one call: a pack over a slow
+/// line.
+pub const STORAGE_TIME_LIMIT: Duration = Duration::from_secs(10 * 60);
+
+/// The host a `net:<host>[:<port>]` permission names; `None` for another
+/// permission.
+fn net_host(permission: &str) -> Option<&str> {
+    let host = permission.strip_prefix("net:")?;
+    let valid = !host.is_empty()
+        && host.len() <= 253
+        && host
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-' | b':'));
+    valid.then_some(host)
+}
 
 impl From<bindings::exports::apeiron::plugin::type_driver::Info> for PluginInfo {
     fn from(i: bindings::exports::apeiron::plugin::type_driver::Info) -> Self {
@@ -129,6 +161,7 @@ impl From<bindings::exports::apeiron::plugin::type_driver::Info> for PluginInfo 
             text_patterns: i.text_patterns,
             events: Vec::new(),
             permissions: i.permissions,
+            granted: Vec::new(),
         }
     }
 }
@@ -144,6 +177,7 @@ impl From<importer::exports::apeiron::plugin::importer::Info> for PluginInfo {
             text_patterns: Vec::new(),
             events: Vec::new(),
             permissions: i.permissions,
+            granted: Vec::new(),
         }
     }
 }
@@ -159,11 +193,50 @@ impl From<hook::exports::apeiron::plugin::hook::Info> for PluginInfo {
             text_patterns: Vec::new(),
             events: i.events,
             permissions: i.permissions,
+            granted: Vec::new(),
+        }
+    }
+}
+
+impl From<storage::exports::apeiron::plugin::storage::Info> for PluginInfo {
+    fn from(i: storage::exports::apeiron::plugin::storage::Info) -> Self {
+        PluginInfo {
+            name: i.name,
+            version: i.version,
+            description: i.description,
+            kind: Kind::Storage,
+            patterns: Vec::new(),
+            text_patterns: Vec::new(),
+            events: Vec::new(),
+            permissions: i.permissions,
+            granted: Vec::new(),
         }
     }
 }
 
 impl PluginInfo {
+    /// Refuses a plugin Apeiron cannot install (PLUGIN.md §2, §3), or one
+    /// that asks for permissions the user did not grant with `allow`.
+    fn check_granting(&mut self, allow: &[String]) -> Result<()> {
+        self.check()?;
+        let missing: Vec<&String> = self
+            .permissions
+            .iter()
+            .filter(|p| !allow.contains(p))
+            .collect();
+        if !missing.is_empty() {
+            let list: Vec<&str> = missing.iter().map(|p| p.as_str()).collect();
+            return Err(Error::Invalid(format!(
+                "plugin {} asks to reach {}; install it with --allow {} if you agree",
+                self.name,
+                list.join(", "),
+                list.join(" --allow ")
+            )));
+        }
+        self.granted.clone_from(&self.permissions);
+        Ok(())
+    }
+
     /// Refuses a plugin Apeiron cannot install (PLUGIN.md §2, §3).
     fn check(&self) -> Result<()> {
         let n = &self.name;
@@ -196,10 +269,14 @@ impl PluginInfo {
             }
             _ => {}
         }
-        if !self.permissions.is_empty() {
+        if let Some(p) = self.permissions.iter().find(|p| net_host(p).is_none()) {
             return Err(Error::Invalid(format!(
-                "plugin {n} asks for permissions ({}); this version of Apeiron grants none",
-                self.permissions.join(", ")
+                "plugin {n} asks for the permission {p:?}; there is only net:<host>"
+            )));
+        }
+        if !self.permissions.is_empty() && !matches!(self.kind, Kind::Hook | Kind::Storage) {
+            return Err(Error::Invalid(format!(
+                "plugin {n} asks to reach the network; only hooks and storage backends may"
             )));
         }
         Ok(())
@@ -225,11 +302,24 @@ pub fn default_dir() -> Result<PathBuf> {
         .ok_or(Error::NoFolder)
 }
 
-/// What a plugin instance can reach: an empty WASI context and its limits.
-struct State {
+/// What a plugin instance can reach: an empty WASI context, the hosts
+/// granted to it and its limits.
+pub(crate) struct State {
     wasi: WasiCtx,
     table: ResourceTable,
     limits: StoreLimits,
+    http: wasmtime_wasi_http::WasiHttpCtx,
+    gate: gate::Gate,
+}
+
+impl wasmtime_wasi_http::WasiHttpView for State {
+    fn http(&mut self) -> wasmtime_wasi_http::WasiHttpCtxView<'_> {
+        wasmtime_wasi_http::WasiHttpCtxView {
+            ctx: &mut self.http,
+            table: &mut self.table,
+            hooks: &mut self.gate,
+        }
+    }
 }
 
 impl WasiView for State {
@@ -242,7 +332,7 @@ impl WasiView for State {
 }
 
 /// The Wasmtime engine and linker, made when the first plugin runs.
-struct Runtime {
+pub(crate) struct Runtime {
     engine: Engine,
     linker: Linker<State>,
 }
@@ -257,6 +347,9 @@ impl Runtime {
         // WASI with nothing granted: plugins written with a standard library
         // import it, and get no files, network, variables or arguments.
         wasmtime_wasi::p2::add_to_linker_sync(&mut linker).map_err(failed)?;
+        // HTTP for every plugin, but every request is refused unless its host
+        // was granted (PLUGIN.md §3.1).
+        wasmtime_wasi_http::p2::add_only_http_to_linker_sync(&mut linker).map_err(failed)?;
         // Moves the clock of running calls forward until the engine is gone.
         let weak = engine.weak();
         thread::Builder::new()
@@ -285,7 +378,7 @@ impl Runtime {
         time_limit: Duration,
         f: impl FnOnce(&TypeDriverPlugin, &mut Store<State>) -> wasmtime::Result<T>,
     ) -> std::result::Result<T, String> {
-        self.run(time_limit, |store, linker| {
+        self.run(time_limit, &[], |store, linker| {
             let p = TypeDriverPlugin::instantiate(&mut *store, component, linker)
                 .map_err(|e| format!("does not fit version 0.2 of the plugin interface: {e}"))?;
             Ok(f(&p, store))
@@ -299,23 +392,40 @@ impl Runtime {
         time_limit: Duration,
         f: impl FnOnce(&ImporterPlugin, &mut Store<State>) -> wasmtime::Result<T>,
     ) -> std::result::Result<T, String> {
-        self.run(time_limit, |store, linker| {
+        self.run(time_limit, &[], |store, linker| {
             let p = ImporterPlugin::instantiate(&mut *store, component, linker)
                 .map_err(|e| format!("is not an importer: {e}"))?;
             Ok(f(&p, store))
         })
     }
 
-    /// Runs `f` on a new hook instance of `component`.
+    /// Runs `f` on a new hook instance of `component`, which may reach the
+    /// hosts `granted`.
     fn call_hook<T>(
         &self,
         component: &Component,
         time_limit: Duration,
+        granted: &[String],
         f: impl FnOnce(&HookPlugin, &mut Store<State>) -> wasmtime::Result<T>,
     ) -> std::result::Result<T, String> {
-        self.run(time_limit, |store, linker| {
+        self.run(time_limit, granted, |store, linker| {
             let p = HookPlugin::instantiate(&mut *store, component, linker)
                 .map_err(|e| format!("is not a hook: {e}"))?;
+            Ok(f(&p, store))
+        })
+    }
+
+    /// Runs `f` on a new storage backend instance of `component`.
+    pub(crate) fn call_storage<T>(
+        &self,
+        component: &Component,
+        time_limit: Duration,
+        granted: &[String],
+        f: impl FnOnce(&StoragePlugin, &mut Store<State>) -> wasmtime::Result<T>,
+    ) -> std::result::Result<T, String> {
+        self.run(time_limit, granted, |store, linker| {
+            let p = StoragePlugin::instantiate(&mut *store, component, linker)
+                .map_err(|e| format!("is not a storage backend: {e}"))?;
             Ok(f(&p, store))
         })
     }
@@ -325,6 +435,7 @@ impl Runtime {
     fn run<T>(
         &self,
         time_limit: Duration,
+        granted: &[String],
         call: impl FnOnce(
             &mut Store<State>,
             &Linker<State>,
@@ -337,6 +448,14 @@ impl Runtime {
                 .memory_size(MEMORY_LIMIT)
                 .trap_on_grow_failure(true)
                 .build(),
+            http: wasmtime_wasi_http::WasiHttpCtx::new(),
+            gate: gate::Gate::new(
+                granted
+                    .iter()
+                    .filter_map(|p| net_host(p))
+                    .map(str::to_owned)
+                    .collect(),
+            ),
         };
         let mut store = Store::new(&self.engine, state);
         store.limiter(|s| &mut s.limits);
@@ -369,12 +488,17 @@ fn describe(
             p.apeiron_plugin_importer().call_describe(store)
         }) {
             Ok(info) => Ok(info.into()),
-            Err(_) => runtime
-                .call_hook(component, limit, |p, store| {
-                    p.apeiron_plugin_hook().call_describe(store)
-                })
-                .map(PluginInfo::from)
-                .map_err(|_| driver),
+            Err(_) => match runtime.call_hook(component, limit, &[], |p, store| {
+                p.apeiron_plugin_hook().call_describe(store)
+            }) {
+                Ok(info) => Ok(info.into()),
+                Err(_) => runtime
+                    .call_storage(component, limit, &[], |p, store| {
+                        p.apeiron_plugin_storage().call_describe(store)
+                    })
+                    .map(PluginInfo::from)
+                    .map_err(|_| driver),
+            },
         },
     }
 }
@@ -385,7 +509,7 @@ pub struct Plugins {
     infos: Vec<PluginInfo>,
     runtime: OnceLock<std::result::Result<Runtime, String>>,
     compiled: Mutex<HashMap<String, Component>>,
-    time_limit: Duration,
+    pub(crate) time_limit: Duration,
 }
 
 impl Plugins {
@@ -434,7 +558,7 @@ impl Plugins {
         &self.infos
     }
 
-    fn runtime(&self) -> Result<&Runtime> {
+    pub(crate) fn runtime(&self) -> Result<&Runtime> {
         self.runtime
             .get_or_init(|| Runtime::new().map_err(|e| e.to_string()))
             .as_ref()
@@ -456,12 +580,18 @@ impl Plugins {
     /// Checks the component in `file` and installs it, replacing a plugin of
     /// the same name (PLUGIN.md §1).
     pub fn add(&mut self, file: &Path) -> Result<Added> {
+        self.add_allowing(file, &[])
+    }
+
+    /// [`Plugins::add`], granting the permissions in `allow`; a plugin that
+    /// asks for others is refused (PLUGIN.md §3.1).
+    pub fn add_allowing(&mut self, file: &Path, allow: &[String]) -> Result<Added> {
         let wasm = fs::read(file).map_err(io_at(file))?;
         let runtime = self.runtime()?;
         let invalid = |m: String| Error::Invalid(format!("{}: {m}", file.display()));
         let component = runtime.compile(&wasm).map_err(invalid)?;
-        let info = describe(runtime, &component, self.time_limit).map_err(invalid)?;
-        info.check()?;
+        let mut info = describe(runtime, &component, self.time_limit).map_err(invalid)?;
+        info.check_granting(allow)?;
         fs::create_dir_all(&self.dir).map_err(io_at(&self.dir))?;
         write_atomic(&self.dir.join(format!("{}.wasm", info.name)), &wasm)?;
         let json = serde_json::to_vec_pretty(&info)
@@ -482,6 +612,29 @@ impl Plugins {
         Ok(Added { info, replaced })
     }
 
+    /// The settings text of the plugin `name`, kept in `<name>.settings`;
+    /// empty when there is none.
+    pub fn settings(&self, name: &str) -> String {
+        fs::read_to_string(self.dir.join(format!("{name}.settings"))).unwrap_or_default()
+    }
+
+    /// Sets the settings of the installed plugin `name`, such as the address
+    /// a hook tells (PLUGIN.md §2.2); empty removes them.
+    pub fn set_settings(&self, name: &str, text: &str) -> Result<()> {
+        if !self.infos.iter().any(|i| i.name == name) {
+            return Err(Error::NotFound(name.to_owned()));
+        }
+        let path = self.dir.join(format!("{name}.settings"));
+        if text.is_empty() {
+            return match fs::remove_file(&path) {
+                Ok(()) => Ok(()),
+                Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
+                Err(e) => Err(io_at(&path)(e)),
+            };
+        }
+        write_atomic(&path, text.as_bytes())
+    }
+
     /// Removes an installed plugin.
     pub fn remove(&mut self, name: &str) -> Result<PluginInfo> {
         let index = self
@@ -490,7 +643,7 @@ impl Plugins {
             .position(|i| i.name == name)
             .ok_or_else(|| Error::NotFound(name.to_owned()))?;
         // The description goes first: without it the plugin is not installed.
-        for ext in ["json", "wasm"] {
+        for ext in ["json", "wasm", "settings"] {
             let path = self.dir.join(format!("{name}.{ext}"));
             match fs::remove_file(&path) {
                 Ok(()) => {}
@@ -575,9 +728,14 @@ impl Plugins {
         {
             let answer = self.component(&info.name).and_then(|component| {
                 self.runtime()?
-                    .call_hook(&component, self.time_limit, |p, store| {
-                        p.apeiron_plugin_hook()
-                            .call_check(store, event, ref_name, &changes)
+                    .call_hook(&component, self.time_limit, &info.granted, |p, store| {
+                        p.apeiron_plugin_hook().call_check(
+                            store,
+                            &self.settings(&info.name),
+                            event,
+                            ref_name,
+                            &changes,
+                        )
                     })
                     .map_err(|message| Error::Failed {
                         name: info.name.clone(),
@@ -615,7 +773,7 @@ impl Plugins {
             .map_err(|message| failed(format!("refused: {message}")))
     }
 
-    fn component(&self, name: &str) -> Result<Component> {
+    pub(crate) fn component(&self, name: &str) -> Result<Component> {
         if let Some(c) = self.lock().get(name) {
             return Ok(c.clone());
         }
@@ -778,6 +936,7 @@ mod tests {
             text_patterns: Vec::new(),
             events: Vec::new(),
             permissions: permissions.iter().map(|p| (*p).to_owned()).collect(),
+            granted: Vec::new(),
         }
     }
 
@@ -788,6 +947,17 @@ mod tests {
             assert!(info(bad, &[]).check().is_err(), "{bad:?}");
         }
         assert!(info("net", &["network"]).check().is_err());
+        // A type driver never reaches the network; a hook may, if granted.
+        assert!(info("net", &["net:example.com"]).check().is_err());
+        let mut hook = info("hook", &["net:hooks.example.com"]);
+        hook.kind = Kind::Hook;
+        hook.events = vec!["backup-done".to_owned()];
+        assert!(hook.clone().check_granting(&[]).is_err());
+        assert!(
+            hook.check_granting(&["net:hooks.example.com".to_owned()])
+                .is_ok()
+        );
+        assert_eq!(hook.granted, ["net:hooks.example.com"]);
         let mut none = info("x", &[]);
         none.patterns.clear();
         assert!(none.check().is_err());

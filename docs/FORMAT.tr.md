@@ -565,11 +565,14 @@ url = "s3://bucket/apeiron?endpoint=https://s3.example.com&region=eu-1"   # S3 u
 
 [remote.laptop]
 url = "peer://laptop.local:7865#3f9a…e1"            # başka bir cihaz, bölüm 15.9
+
+[remote.photos]
+url = "plugin://example-cloud/bucket=photos"          # bir depolama arka ucu eklentisi (PLUGIN.tr.md §2.3)
 ```
 
 - Dosya tek bir kopyaya özeldir; asla push edilmez. Adlar bölüm 9.3'teki ref adı kurallarına uyar, `/` içermez.
 - Gizli bilgi tutmaz. SFTP kullanıcının SSH anahtarlarını ve ajanını kullanır ve sunucuyu `~/.ssh/known_hosts` ile denetler; tanınmayan sunucu reddedilir. S3, `AWS_ACCESS_KEY_ID` ve `AWS_SECRET_ACCESS_KEY` değişkenlerini okur.
-- SFTP, S3 ya da eş (peer) uzak deposuna yalnızca şifreli bir depo (bölüm 14) push edilebilir. Harici disk gibi bir klasör uzak deposu şifresiz bir depo da tutabilir.
+- SFTP, S3, eş (peer) ya da eklenti uzak deposuna yalnızca şifreli bir depo (bölüm 14) push edilebilir. Harici disk gibi bir klasör uzak deposu şifresiz bir depo da tutabilir.
 
 ### 15.2 Depolama işlemleri
 
