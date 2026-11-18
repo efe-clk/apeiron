@@ -1,0 +1,26 @@
+[package]
+name = "apeiron-tui-rs"
+description = "Terminal interface of Apeiron: the desktop screens in a terminal"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "apeiron_tui"
+
+[dependencies]
+apeiron = { package = "apeiron-rs", path = "../apeiron" }
+apeiron-daemon = { package = "apeiron-daemon-rs", path = "../apeiron-daemon" }
+crossterm = "0.29.0"
+dirs = "6.0.0"
+jiff = "0.2.38"
+ratatui = { version = "0.30.2", default-features = false, features = ["crossterm"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+unicode-width = "0.2.2"
+
+[dev-dependencies]
+tempfile = "3.27.0"

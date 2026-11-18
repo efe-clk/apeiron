@@ -98,6 +98,7 @@ Masaüstü arayüzü önce gelir, çünkü çıkış kriterini tek başına kar�
 | 3 | Kullanıcılar ve izinler ([USERS.tr.md](USERS.tr.md)) | Tamamlandı |
 | 4 | Denetim kaydı ([AUDIT.tr.md](AUDIT.tr.md)) | Tamamlandı |
 | 5 | Paylaşım ([SHARE.tr.md](SHARE.tr.md)) | Tamamlandı |
+| 6 | Terminal arayüzü ([TUI.tr.md](TUI.tr.md)), ilk sürümden sonra eklendi | Tamamlandı |
 
 ## 7. Aşama 5 — Kurumsal
 

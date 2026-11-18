@@ -405,6 +405,14 @@ const en = {
   review_merge_ask: "Merge {from} into {into}?",
   review_changes_heading: "What differs from {into}",
   nav_reviews: "Reviews",
+  tui_keys: "↑↓ move · Enter choose · [letter] button · Esc back · Ctrl+C quit",
+  tui_keys_menu: "↑↓ choose a screen · Enter open · Esc back to the screen · q quit",
+  tui_folder_key: "F2: choose a folder",
+  tui_confirm: "y: yes · any other key: no",
+  tui_stop: "Esc: stop",
+  tui_back: "Esc: back",
+  tui_schedule_edit: "Edit the jobs file",
+  tui_schedule_draft: "Nothing was saved. Edit the file again to mend it; your changes are kept.",
   cancelled: "Stopped.",
 };
 
@@ -813,6 +821,14 @@ const tr = {
   review_merge_ask: "{from}, {into} içine birleştirilsin mi?",
   review_changes_heading: "{into} ile farkı",
   nav_reviews: "İncelemeler",
+  tui_keys: "↑↓ gezin · Enter seç · [harf] düğme · Esc geri · Ctrl+C çık",
+  tui_keys_menu: "↑↓ ekran seç · Enter aç · Esc ekrana dön · q çık",
+  tui_folder_key: "F2: klasör seç",
+  tui_confirm: "y ya da e: evet · başka bir tuş: hayır",
+  tui_stop: "Esc: durdur",
+  tui_back: "Esc: geri",
+  tui_schedule_edit: "İş dosyasını düzenle",
+  tui_schedule_draft: "Hiçbir şey kaydedilmedi. Düzeltmek için dosyayı yeniden düzenleyin; değişiklikleriniz duruyor.",
   cancelled: "Durduruldu.",
 };
 

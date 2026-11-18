@@ -6,7 +6,7 @@
 
 Apeiron, bir yazılımcının deposuna, bir müzisyenin projesine ve bir ailenin fotoğraf arşivine aynı gözle bakar: hepsi, içerik adresli ve değişmez nesnelerden oluşan snapshot'lardır. Yedek, arşiv, senkron ve sürümleme dört ayrı motor değil, aynı nesne grafiği üzerinde çalışan farklı politikalardır. Yerel önceliklidir: hiçbir temel işlev bulut, hesap ya da internet bağlantısı istemez.
 
-> **Durum:** Erken geliştirme. Aşama 0 (format ve çekirdek) tamamlandı; Aşama 1 (yerel MVP) tamamlandı; Aşama 2 (uzak ve senkron) tamamlandı; Aşama 3 (geliştirici ve ekosistem) tamamlandı; Aşama 4 (arayüzler ve çok kullanıcı) tamamlandı; Aşama 5 (kurumsal) devam ediyor. `apeiron` komutu klasörleri yedekleyebiliyor, senkronlayabiliyor, dallayıp birleştirebiliyor, arayabiliyor ve geri yükleyebiliyor, Git depolarını içe aktarabiliyor; ancak henüz bir sürüm ya da kararlı API yok. Bkz. [docs/ROADMAP.tr.md](docs/ROADMAP.tr.md).
+> **Durum:** Erken geliştirme. Aşama 0 (format ve çekirdek) tamamlandı; Aşama 1 (yerel MVP) tamamlandı; Aşama 2 (uzak ve senkron) tamamlandı; Aşama 3 (geliştirici ve ekosistem) tamamlandı; Aşama 4 (arayüzler ve çok kullanıcı) tamamlandı; Aşama 5 (kurumsal) devam ediyor. `apeiron` komutu klasörleri yedekleyebiliyor, senkronlayabiliyor, dallayıp birleştirebiliyor, arayabiliyor ve geri yükleyebiliyor, Git depolarını içe aktarabiliyor; ilk sürüm 0.1.0 çıktı, ancak API henüz kararlı değil. Bkz. [docs/ROADMAP.tr.md](docs/ROADMAP.tr.md).
 
 ## Temel ilkeler
 
@@ -55,6 +55,7 @@ Her katman yalnızca hemen altındaki katmanı kullanır. Ayrıntılar: [docs/AR
 | CLI | `apeiron-cli` | `apeiron` komutu ([docs/CLI.tr.md](docs/CLI.tr.md)) | Devam ediyor |
 | Arka plan hizmeti | `apeiron-daemon` | Zamanlanmış işler ve geri yükleme testi ([docs/DAEMON.tr.md](docs/DAEMON.tr.md)) | Tamamlandı |
 | Masaüstü arayüzü | `apeiron-server`, `apeiron-desktop` | Komut satırı olmadan yedeklemek ve geri yüklemek için sayfalar, yerel bir sunucu ve bir pencere ([docs/DESKTOP.tr.md](docs/DESKTOP.tr.md)) | Tamamlandı |
+| Terminal arayüzü | `apeiron-tui`, `apeiron-cli` | Masaüstü arayüzünün ekranları bir terminalin içinde; ekranı olmayan sunucular ve SSH için ([docs/TUI.tr.md](docs/TUI.tr.md)) | Tamamlandı |
 | Web arayüzü | `apeiron-server`, `apeiron-cli` | Aynı sayfaların başka bilgisayarlara TLS ile, rolleri ve kendi yedekleri olan kullanıcılara sunulması ([docs/WEB.tr.md](docs/WEB.tr.md), [docs/USERS.tr.md](docs/USERS.tr.md)) | Tamamlandı |
 | Git | `apeiron-git` | Git depolarını aynı commit kimlikleriyle içe ve dışa aktarma ([docs/GIT.tr.md](docs/GIT.tr.md)) | Tamamlandı |
 | Eklentiler | `apeiron-plugin` | WebAssembly eklenti ortamı; tür sürücüleri dosyaları birleştirir ([docs/PLUGIN.tr.md](docs/PLUGIN.tr.md)) | Tamamlandı |
@@ -122,6 +123,7 @@ Kod, commit ve format değişikliği kuralları: [CONTRIBUTING.tr.md](CONTRIBUTI
 | [Eklentiler](docs/PLUGIN.tr.md) | WebAssembly eklentileri ve tür sürücüleri |
 | [Metin eklentisi](docs/TEXT.tr.md) | Metin dosyalarını satır satır birleştirmek ve farklarını göstermek |
 | [Masaüstü arayüzü](docs/DESKTOP.tr.md) | Komut satırı olmadan, bir pencerede yedekleme ve geri yükleme |
+| [Terminal arayüzü](docs/TUI.tr.md) | Aynı ekranlar bir terminalin içinde; sunucular ve SSH için |
 | [Web arayüzü](docs/WEB.tr.md) | Bir yedek sunucusunu başka bir bilgisayardaki tarayıcıdan kullanmak |
 | [Kullanıcılar ve izinler](docs/USERS.tr.md) | Tek bir yedek sunucusunda, her biri kendi yedekleriyle birkaç kişi |
 | [Denetim kaydı](docs/AUDIT.tr.md) | Web arayüzünde kimin ne yaptığının, fark edilmeden değiştirilemeyen kaydı |

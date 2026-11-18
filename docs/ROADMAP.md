@@ -98,6 +98,7 @@ The desktop interface comes first, because it alone meets the exit criterion; th
 | 3 | Users and permissions ([USERS.md](USERS.md)) | Done |
 | 4 | Audit log ([AUDIT.md](AUDIT.md)) | Done |
 | 5 | Sharing ([SHARE.md](SHARE.md)) | Done |
+| 6 | Terminal interface ([TUI.md](TUI.md)), added after the first release | Done |
 
 ## 7. Stage 5 — Enterprise
 

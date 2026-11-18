@@ -103,6 +103,8 @@ Bu listede olmayan, belgelerin istediği ama yazılmamış işler `docs/ROADMAP.
 
 **Bitirme.** Proje sahibi 2026-11-17'de 0.1.0 yayımlanmadan önce §8'in kalan bütün işlerinin yazılmasını istedi. Sıra küçükten büyüğe: ~~raporlarda GDPR~~, ~~işlem günlüğü (`apeiron oplog`)~~, ~~inceleme/onay/yorum (`apeiron review`, `docs/REVIEW.md`, masaüstü ve web sayfası)~~, ~~API'nin uzak kipi (`apeiron call`, `web token`, `web --schedule`)~~, ~~SSH üzerinden Git (`apeiron git ssh`)~~, ~~eklenti mağazası, içe aktarıcı ve kanca eklentileri~~ (Git eklenti olmadı, ADR-049), ~~SAML (`apeiron web saml`, saml-rs, ADR-050; Keycloak 26 ile denendi)~~, ~~sunucusuz senkron (`apeiron peer serve`, `peer://`, ADR-051)~~, ~~ağa ulaşan depolama ve entegrasyon eklentileri (`--allow net:`, `plugin://`, `backup-done`, ADR-052)~~; ~~0.1.0 yayımı~~ (2026-11-18). Format yükseltme aracı, format 2. sürüme geçene kadar taşıyacağı bir şey olmadığı için bekler.
 
+**0.1.0 sonrası.** Proje sahibi 2026-11-18'de masaüstüyle aynı ekranlara sahip bir terminal arayüzü istedi: ~~`apeiron tui` (`crates/apeiron-tui`, `docs/TUI.md`, ADR-053)~~. Ekranları sayfaların işlemlerini (`apeiron::json`) ve sözlüğünü (`web/i18n.js`, yalnızca terminalin metinleri `tui_` önekli) kullanır; ekranı olmayan bilgisayarda `apeiron-desktop` çökmek yerine `apeiron tui`'yi önerir.
+
 ## Çalışma düzeni
 
 - Proje `efe-clk/apeiron` reposuyla eşzamanlı ilerler: yapılan iş commit edilir, `master`'a push edilir, CI arka planda beklenir; CI kırılırsa önce o düzeltilir. Push'tan sonra `cargo install --locked --path crates/apeiron-cli`.

@@ -54,6 +54,13 @@ Bu belge şimdiye kadar alınan her teknik kararı ADR (architecture decision re
 | [044](#adr-044-paketleri-küçük-betikler-yapar-ve-etiket-yalnızca-taslak-oluşturur) | Paketler | `dpkg-deb`, `hdiutil` ve NSIS kullanan, her sistemde denenen betikler; etiket sürüm değil taslak oluşturur | Kabul edildi |
 | [045](#adr-045-c-abi-iş-parçacığı-olmadan-okur-bir-iş-parçacığıyla-yazar) | C ABI akışları | Kilit tutmayan bir okuyucu; kendi iş parçacığında çalışan ve yalnızca `finish` ile saklayan bir yazıcı | Kabul edildi |
 | [046](#adr-046-c-sdksı-tek-başlık-dosyasıdır-ve-jsonı-metin-olarak-geçirir) | C++ SDK'sı | Tek C++17 başlık dosyası; RAII tutamaçlar, tür başına bir istisna sınıfı, JSON metni olarak istek ve sonuçlar | Kabul edildi |
+| [047](#adr-047-incelemeler-kendi-refinde-dosya-olarak-tutulan-adımlardır) | İncelemeler | `apeiron/reviews` ref'inde olay dosyaları olarak adımlar; onaylar bir anlık görüntüye bağlı | Kabul edildi |
+| [048](#adr-048-uzak-kullanım-web-sunucusunun-apisinin-erişim-belirteçleriyle-kullanılmasıdır) | Uzak API | Web sunucusunun JSON API'si; erişim belirteçleri özet olarak tutulur | Kabul edildi |
+| [049](#adr-049-git-eklenti-değil-kendi-cratei-olarak-kalır) | Git | `apeiron-git` crate'i olarak kalır; diğer biçimleri eklentiler içe aktarır | Kabul edildi |
+| [050](#adr-050-saml-genç-ve-saf-rust-bir-kütüphane-olan-saml-rs-ile) | SAML | Saf Rust saml-rs; istekler sunucunun RSA anahtarıyla imzalanır | Kabul edildi |
+| [051](#adr-051-cihazlar-doğrudan-eşitlenir-giriş-izni-deponun-anahtarıdır) | Sunucusuz senkron | Sabitlenmiş sertifikalı HTTPS üzerinden `peer://`; erişimi deponun anahtarı verir | Kabul edildi |
+| [052](#adr-052-eklentiler-ağa-yalnızca-kullanıcının-kurarken-izin-verdiği-ana-makineler-için-ulaşır) | Ağa ulaşan eklentiler | Yalnızca kurarken izin verilen `net:<host>`; her isteği bir kapı denetler | Kabul edildi |
+| [053](#adr-053-bir-terminal-arayüzü-masaüstü-ekranlarını-aynı-işlemler-ve-sözcüklerle-çizer) | Terminal arayüzü | `apeiron-tui` içinde ratatui ve crossterm; sayfaların işlemleri ve sözlüğü | Kabul edildi |
 
 ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)). ADR 009–013, depolama formatıyla birlikte 2026-10-27'de onaylandı ([FORMAT.tr.md](FORMAT.tr.md)). ADR-014, 2026-10-28'de onaylandı. ADR-036 ve ADR-037, kendi kayıtları olmadan daha önce alınan kararları ve eski ADR'lerde değişenleri 2026-11-06'da kaydeder.
 
@@ -1126,3 +1133,24 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Ayrı bir entegrasyon türü | Daha sonra çalışan bir kanca olurdu; bunu olay söyler |
 
 **Sonuçlar.** Bir depolama arka ucu ref değişikliklerinin atomik olduğu sözünü tutmalıdır; Apeiron bunu denetleyemez. İzin verilmiş bir ana makinesi olan eklenti kendisine gösterileni oraya gönderebilir; bu yüzden izin vermek kullanıcının güven kararıdır.
+
+## ADR-053: Bir terminal arayüzü masaüstü ekranlarını aynı işlemler ve sözcüklerle çizer
+
+**Durum:** Kabul edildi (2026-11-18)
+
+**Bağlam.** Masaüstü uygulaması bir ekran, tarayıcı arayüzü de bilgisayara ulaşabilen bir tarayıcı ister. Bir ev sunucusunda ya da SSH ile ulaşılan bir bilgisayarda ikisi de yoktur; sahibinin elinde yalnızca CLI vardı.
+
+**Karar.** `apeiron tui`, masaüstü arayüzünün her ekranını terminalde gösterir; yeni bir crate'te, `apeiron-tui`'de ratatui ve crossterm ile çizilir. Herkese açık API'nin adla çağrılan işlemlerini, sayfaların çağırdıklarını çağırır ve metinlerini sayfaların sözlüğünden okur. İş dosyasını düzenlemek kullanıcının düzenleyicisini açar.
+
+**Gerekçe.** Aynı işlemleri çağırmak, ikinci bir kural takımı olmadan her ekranın sayfasının yaptığını yapmasını sağlar. Tek sözlük, iki arayüzün sözcüklerini iki dilde de aynı tutar. ratatui ve crossterm saf Rust'tır ve Linux, macOS ve Windows terminallerinde çalışır.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| `apeiron ui` üzerinde bir metin tarayıcısı | Sayfalar JavaScript ister; metin tarayıcıları onu çalıştırmaz |
+| `apeiron ui`'yi SSH üzerinden yönlendirmek | Çalışır, ama öbür bilgisayarda tarayıcı ve port yönlendirme ister |
+| Rust API'sinin tipli çağrıları | Her ekran, sayfaların zaten gönderdiği istekleri yeniden kurardı |
+| İş dosyası için terminalin içinde bir düzenleyici | Metni düzenlemekte kullanıcının kendi düzenleyicisi daha iyidir |
+
+**Sonuçlar.** Sayfalara eklenen bir metin terminalde de kullanılabilir; yalnızca terminalin kullandığı bir metin aynı sözlükte `tui_` önekiyle tutulur. Web arayüzünün çok kullanıcılı ekranları tarayıcıda kalır.

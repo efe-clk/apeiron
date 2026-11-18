@@ -54,6 +54,13 @@ This document records every technical decision made so far, in ADR (architecture
 | [044](#adr-044-packages-are-made-by-small-scripts-and-a-tag-only-makes-a-draft) | Packages | Scripts with `dpkg-deb`, `hdiutil` and NSIS, tried on each system; a tag makes a draft, not a release | Accepted |
 | [045](#adr-045-the-c-abi-reads-without-a-thread-and-writes-with-one) | C ABI streams | A reader that holds no lock; a writer on its own thread that stores only on `finish` | Accepted |
 | [046](#adr-046-the-c-sdk-is-one-header-and-passes-json-as-text) | C++ SDK | One C++17 header; RAII handles, one exception class per kind, requests and results as JSON text | Accepted |
+| [047](#adr-047-reviews-are-steps-kept-as-files-in-a-ref-of-their-own) | Reviews | Steps as event files in the `apeiron/reviews` ref; approvals tied to a snapshot | Accepted |
+| [048](#adr-048-the-remote-mode-is-the-web-servers-api-with-access-tokens) | Remote API | The web server's JSON API with access tokens kept as hashes | Accepted |
+| [049](#adr-049-git-stays-a-crate-of-its-own-not-a-plugin) | Git | Stays the `apeiron-git` crate; plugins import other formats | Accepted |
+| [050](#adr-050-saml-through-saml-rs-a-young-pure-rust-library) | SAML | saml-rs, pure Rust; requests signed with an RSA key of the server | Accepted |
+| [051](#adr-051-devices-sync-directly-with-the-repositorys-key-as-the-pass) | Sync without a server | `peer://` over HTTPS with a pinned certificate; the repository's key gives access | Accepted |
+| [052](#adr-052-plugins-reach-the-network-only-to-hosts-the-user-grants-at-install) | Network plugins | Only `net:<host>` granted at install; a gate checks every request | Accepted |
+| [053](#adr-053-a-terminal-interface-draws-the-desktop-screens-with-the-same-operations-and-words) | Terminal interface | ratatui and crossterm in `apeiron-tui`; the pages' operations and dictionary | Accepted |
 
 ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009–013 were approved together with the storage format on 2026-10-27 ([FORMAT.md](FORMAT.md)). ADR-014 was approved on 2026-10-28. ADR-036 and ADR-037 record on 2026-11-06 decisions made earlier without a record of their own, including what changed in older ADRs.
 
@@ -1126,3 +1133,24 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | A separate integration kind | It would be a hook that runs later; the event says that |
 
 **Consequences.** A storage backend must keep its promise that ref swaps are atomic; Apeiron cannot check it. A plugin with a granted host can send what it is shown there, so granting is the user's decision of trust.
+
+## ADR-053: A terminal interface draws the desktop screens with the same operations and words
+
+**Status:** Accepted (2026-11-18)
+
+**Context.** The desktop app needs a screen and the browser interface needs a browser that can reach the computer. A home server or a computer reached over SSH has neither, so its owner had only the CLI.
+
+**Decision.** `apeiron tui` shows every screen of the desktop interface in the terminal, drawn with ratatui and crossterm in a new crate, `apeiron-tui`. It calls the operations by name of the public API, the ones the pages call, and reads its texts from the pages' dictionary. Editing the jobs file opens the user's editor.
+
+**Rationale.** Calling the same operations makes each screen do what its page does without a second set of rules. One dictionary keeps the words of both interfaces the same in both languages. ratatui and crossterm are pure Rust and work in the terminals of Linux, macOS and Windows.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| A text browser on `apeiron ui` | The pages need JavaScript, which text browsers do not run |
+| Forwarding `apeiron ui` over SSH | It works, but needs a browser and port forwarding on the other computer |
+| Typed calls of the Rust API | Each screen would rebuild the requests the pages already send |
+| An editor inside the terminal for the jobs file | The user's own editor is better at editing text |
+
+**Consequences.** A text added to the pages is available to the terminal; one used only by the terminal is kept in the same dictionary with a `tui_` prefix. The web interface's screens for many users stay in the browser.

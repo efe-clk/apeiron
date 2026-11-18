@@ -427,6 +427,8 @@ enum Command {
         #[command(subcommand)]
         command: RemoteCommand,
     },
+    /// Show the desktop interface's screens in this terminal (docs/TUI.md)
+    Tui,
     /// Open the desktop interface in the browser (docs/DESKTOP.md)
     Ui {
         /// Print the address instead of opening a browser
@@ -3612,6 +3614,15 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             None,
             dry_run,
         ),
+        Command::Tui => {
+            let mut options = apeiron_tui::Options::for_user();
+            if cli.repo.is_some() {
+                options.repo = Some(open(cli.repo, password_file)?);
+            }
+            apeiron_tui::run(options)
+                .map_err(|e| Failure::Api(Error::new(ErrorKind::Io, e.to_string())))?;
+            Ok(0)
+        }
         Command::Ui { no_browser } => {
             let mut options = apeiron_server::Options::with_memory();
             if cli.repo.is_some() {
