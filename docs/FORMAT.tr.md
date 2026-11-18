@@ -562,11 +562,14 @@ url = "sftp://user@nas.local:22/srv/apeiron"         # SFTP
 
 [remote.cloud]
 url = "s3://bucket/apeiron?endpoint=https://s3.example.com&region=eu-1"   # S3 uyumlu
+
+[remote.laptop]
+url = "peer://laptop.local:7865#3f9a…e1"            # başka bir cihaz, bölüm 15.9
 ```
 
 - Dosya tek bir kopyaya özeldir; asla push edilmez. Adlar bölüm 9.3'teki ref adı kurallarına uyar, `/` içermez.
 - Gizli bilgi tutmaz. SFTP kullanıcının SSH anahtarlarını ve ajanını kullanır ve sunucuyu `~/.ssh/known_hosts` ile denetler; tanınmayan sunucu reddedilir. S3, `AWS_ACCESS_KEY_ID` ve `AWS_SECRET_ACCESS_KEY` değişkenlerini okur.
-- SFTP ya da S3 uzak deposuna yalnızca şifreli bir depo (bölüm 14) push edilebilir. Harici disk gibi bir klasör uzak deposu şifresiz bir depo da tutabilir.
+- SFTP, S3 ya da eş (peer) uzak deposuna yalnızca şifreli bir depo (bölüm 14) push edilebilir. Harici disk gibi bir klasör uzak deposu şifresiz bir depo da tutabilir.
 
 ### 15.2 Depolama işlemleri
 
@@ -644,6 +647,16 @@ Yalnızca bu deponun yazdığı bir uzak depo, örneğin bir replika ([REPLICATI
 6. Diğer her indeks dosyasını, sonra ölü paketleri, sonra `locks/gc`'yi sil.
 
 Bir deneme çalışması 1., 3. ve 4. adımları yapar ve hiçbir şey yazmaz. 24 saatten yeni bir `locks/gc` varken push, pull ve clone "locked" ile durur; bir push da uzak ref'i değiştirmeden hemen önce yeniden bakar, böylece çalışmadan önce başlamış bir push, çalışmanın silebileceği nesnelerin üstüne bir ref taşımaz. Daha eski bir sürümün programı `locks/gc`'yi bilmez; böyle bir program ya da başka herhangi bir depo, uzak depo temizlenirken ona yazmamalıdır. Kesintiler 13.3'teki durumları ve ayrıca kilidi bırakır; kilidi bir sonraki çalışma 24 saat sonra değiştirir ya da elle silinebilir.
+
+### 15.9 Eş uzak depoları
+
+`apeiron peer serve` çalıştıran bir cihaz (SYNC.tr.md §7), depo klasörünü bölüm 15.2'deki depolama işlemleriyle HTTPS üzerinden, `/peer/v1/<işlem>` adresinde, düz bayt ve JSON olarak sunar.
+
+- `peer://<host>[:<port>]#<parmak izi>` adresi, cihazın kendinden imzalı sertifikasının SHA-256'sını 64 küçük hex karakter olarak adlandırır; istemci başka hiçbir sertifikayı kabul etmez.
+- Her istek `Authorization: Bearer <belirteç>` taşır. Belirteç `hex(BLAKE3-keyed(derive_key("apeiron 2026-11-18 peer token", data_key), fingerprint))`'tir: deponun veri anahtarını (bölüm 14.1) tutan her kopya aynısını yapar ve belirteç cihazın sertifikasına bağlıdır. Cihaz, kendisine gösterilenin SHA-256'sını kendi belirtecininkiyle karşılaştırır.
+- Eşleştirme sırasında (`--pair` ile başladıktan sonraki on dakika) okumalar belirteç olmadan da çalışır; yazma, silme ve ref değişiklikleri asla.
+- Yollar `/` ile ayrılmış, `a-z A-Z 0-9 . _ -` karakterlerinden adlardır; en fazla 16 düzey, asla `.` ya da `..`; ref adları bölüm 9.3'e uyar. 128 MiB'tan büyük bir dosya ya da aralık reddedilir.
+- Başarısız bir ref değişikliği hatanın türüyle (`ref_conflict`, `ref_locked` …) yanıtlanır; istemci bir klasördekiyle aynı hataları görür.
 
 ## 16. Saklama kuralları (`retention/`)
 

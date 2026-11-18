@@ -77,6 +77,7 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | `apeiron remote list` | Uzak depoları listeler | Tamamlandı |
 | `apeiron remote remove <name>` | Bir uzak depoyu unutur; kopyanın kendisine dokunulmaz | Tamamlandı |
 | `apeiron clone <url> <path> [--rate <hız>]` | Bir uzak kopyadan aynı parolayla yeni bir depo oluşturur, her ref'i pull eder ve uzak depoya `origin` adını verir; ikinci bir cihazı kurmanın yolu | Tamamlandı |
+| `apeiron peer serve [--listen <address>] [--pair]` | Şifreli bir depoyu kullanıcının diğer cihazlarına sunar; onlar onu `peer://<host>:<port>#<parmak izi>` uzak deposu olarak kullanır; `--pair` yeni bir cihazın onu on dakika boyunca kopyalamasına izin verir ([SYNC.tr.md](SYNC.tr.md) §7) | Tamamlandı |
 | `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run] [--rate <hız>] [--exclude <pattern>]...` | Bir klasörü bir uzak depo üzerinden birkaç cihazda eşit tutar: yedekler, pull eder, birleştirir, klasörü değiştirir ve push eder ([SYNC.tr.md](SYNC.tr.md)); eklenen, silinen ve değişen dosyalar için `+`, `-` ve `~`, her çatışma için bir satır yazar | Tamamlandı |
 | `apeiron ref create <name> [<snapshot>]` | Bir snapshot'ta (varsayılan `main`) dal gibi bir ref oluşturur ([BRANCH.tr.md](BRANCH.tr.md)) | Tamamlandı |
 | `apeiron ref delete <name>` | Bir ref'i siler; `apeiron reflog <name>` onun nereye işaret ettiğini yine gösterir | Tamamlandı |

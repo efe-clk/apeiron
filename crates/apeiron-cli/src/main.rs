@@ -490,6 +490,12 @@ enum Command {
         #[arg(long, global = true, value_name = "NAME")]
         tenant: Option<String>,
     },
+    /// Offer this repository to your other devices, to sync without a
+    /// server (docs/SYNC.md)
+    Peer {
+        #[command(subcommand)]
+        command: PeerCommand,
+    },
     /// Run scheduled jobs: backups, pushes, checks and restore tests
     Daemon {
         #[command(subcommand)]
@@ -686,6 +692,20 @@ enum HoldCommand {
         id: String,
         #[arg(long)]
         reason: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum PeerCommand {
+    /// Serve the repository to devices that hold its key, until stopped
+    Serve {
+        /// Address and port to listen on
+        #[arg(long, default_value = "0.0.0.0:7865", value_name = "ADDRESS")]
+        listen: std::net::SocketAddr,
+        /// For ten minutes, let a new device read without the key, so it
+        /// can clone the repository
+        #[arg(long)]
+        pair: bool,
     },
 }
 
@@ -3326,6 +3346,48 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     });
                 }
             }
+            Ok(0)
+        }
+        Command::Peer {
+            command: PeerCommand::Serve { listen, pair },
+        } => {
+            let path = cli.repo.clone().ok_or_else(|| {
+                Failure::Usage("no repository given; use --repo or set APEIRON_REPO".to_owned())
+            })?;
+            let repo = open(cli.repo, password_file)?;
+            if !repo.info().encrypted {
+                return Err(Failure::Usage(
+                    "only an encrypted repository is offered to other devices; create one with `init --encrypt`"
+                        .to_owned(),
+                ));
+            }
+            // One identity per repository folder, so its address stays the same.
+            let (_, state) = web_roots()?;
+            let canonical = std::fs::canonicalize(&path)
+                .map_err(|e| Failure::Usage(format!("{}: {e}", path.display())))?;
+            let identity = apeiron_server::PeerIdentity::for_repo(&state, &canonical)?;
+            let fingerprint = identity.fingerprint()?;
+            let token = repo.peer_token(&fingerprint)?;
+            drop(repo);
+            let server = apeiron_server::serve_peer(apeiron_server::PeerOptions {
+                repo: canonical,
+                listen,
+                identity,
+                token,
+                pair,
+            })?;
+            let host = gethostname::gethostname().to_string_lossy().into_owned();
+            let port = server.address().port();
+            say!("On your other devices, with the same repository's key:");
+            say!("  apeiron remote add {host} 'peer://{host}:{port}#{fingerprint}'");
+            say!("  apeiron sync <folder> {host}");
+            if pair {
+                say!(
+                    "For ten minutes a new device may also copy it: apeiron clone 'peer://{host}:{port}#{fingerprint}' <folder>"
+                );
+            }
+            say!("Serving on {}; press Ctrl+C to stop.", server.address());
+            server.wait();
             Ok(0)
         }
         Command::Review { command } => {

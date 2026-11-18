@@ -118,7 +118,7 @@ impl Repository {
             ctl.update(|p| p.phase = Phase::Copying);
             // The copy is already where the user stored it; whether it is
             // encrypted is known only after reading it.
-            let store = open_store(&remote, true, request.rate)?;
+            let store = open_store(&remote, None, request.rate)?;
             let (core, reports) = core::Repository::clone_from(
                 &*store,
                 &request.path,
@@ -140,6 +140,13 @@ impl Repository {
                     .collect(),
             })
         })
+    }
+
+    /// What this copy shows another device, whose certificate has
+    /// `fingerprint`, to prove it holds the repository's data key (SYNC.md
+    /// §7); only an encrypted repository has one.
+    pub fn peer_token(&self, fingerprint: &str) -> Result<String> {
+        Ok(self.read().peer_token(fingerprint)?)
     }
 
     /// Every operation that changed the repository, newest first, at most
@@ -327,7 +334,7 @@ impl Repository {
         Job::spawn("sync", move |ctl| {
             let detail = Some(options.ref_name.clone());
             let result = (|| {
-                let store = open_store(&remote, repo.info().encrypted, request.rate)?;
+                let store = open_store(&remote, Some(&repo), request.rate)?;
                 let _writer = repo.lock_writer();
                 let _lock = core::RepoLock::shared(repo.path())?;
                 let plugins = repo.plugins()?;
@@ -639,7 +646,7 @@ impl Repository {
             let result = (|| {
                 let _writer = repo.lock_writer();
                 ctl.update(|p| p.phase = crate::Phase::Finishing);
-                let store = open_store(&remote, repo.info().encrypted, None)?;
+                let store = open_store(&remote, Some(&repo), None)?;
                 let host = gethostname::gethostname().into_string().ok();
                 let report = repo
                     .read()
@@ -1169,7 +1176,7 @@ impl Repository {
             let detail = Some(format!("{} {}", request.remote, request.ref_name));
             let result = (|| {
                 ctl.update(|p| p.phase = Phase::Copying);
-                let store = open_store(&remote, repo.info().encrypted, request.rate)?;
+                let store = open_store(&remote, Some(&repo), request.rate)?;
                 let view = repo.view()?;
                 let report = if request.replace {
                     view.push_replacing(&*store, &request.ref_name, &mut |r| copied(ctl, r))?
@@ -1193,7 +1200,7 @@ impl Repository {
             let detail = Some(format!("{} {}", request.remote, request.ref_name));
             let result = (|| {
                 ctl.update(|p| p.phase = Phase::Copying);
-                let store = open_store(&remote, repo.info().encrypted, request.rate)?;
+                let store = open_store(&remote, Some(&repo), request.rate)?;
                 let _writer = repo.lock_writer();
                 let _lock = core::RepoLock::shared(repo.path())?;
                 let mut core = repo.read().reopen()?;
@@ -1217,7 +1224,7 @@ impl Repository {
             let detail = Some(request.remote.clone());
             let result = (|| {
                 ctl.update(|p| p.phase = Phase::Copying);
-                let store = open_store(&remote, repo.info().encrypted, request.rate)?;
+                let store = open_store(&remote, Some(&repo), request.rate)?;
                 let outcomes = repo.view()?.push_all(&*store, &mut |r| copied(ctl, r))?;
                 ctl.update(|p| p.phase = Phase::Done);
                 Ok(mirrored(outcomes))
@@ -1237,7 +1244,7 @@ impl Repository {
             let detail = Some(request.remote.clone());
             let result = (|| {
                 ctl.update(|p| p.phase = Phase::Copying);
-                let store = open_store(&remote, repo.info().encrypted, request.rate)?;
+                let store = open_store(&remote, Some(&repo), request.rate)?;
                 let _writer = repo.lock_writer();
                 let _lock = core::RepoLock::shared(repo.path())?;
                 let mut core = repo.read().reopen()?;
@@ -1291,7 +1298,7 @@ impl Repository {
             let result = (|| {
                 let _writer = repo.lock_writer();
                 ctl.update(|p| p.phase = Phase::Copying);
-                let store = open_store(&remote, repo.info().encrypted, request.rate)?;
+                let store = open_store(&remote, Some(&repo), request.rate)?;
                 let mut core = repo.read().reopen()?;
                 let report = core.repair_from(&*store, &mut |objects| {
                     ctl.update(|p| p.items_done = objects);
@@ -1392,16 +1399,18 @@ fn absolute_url(url: &str) -> Result<String> {
 /// network (FORMAT.md §15.1).
 pub(crate) fn open_store(
     remote: &Remote,
-    encrypted: bool,
+    repo: Option<&Repository>,
     rate: Option<u64>,
 ) -> Result<Box<dyn core::Store>> {
+    // A clone has no repository yet; its copy is checked once read.
+    let encrypted = repo.is_none_or(|r| r.info().encrypted);
     let network_needs_encryption = || {
         if encrypted {
             return Ok(());
         }
         Err(Error::new(
             ErrorKind::InvalidInput,
-            "only an encrypted repository can use an SFTP or S3 remote; \
+            "only an encrypted repository can use an SFTP, S3 or peer remote; \
              create one with `init --encrypt`",
         ))
     };
@@ -1415,6 +1424,16 @@ pub(crate) fn open_store(
         core::RemoteUrl::S3(url) => {
             network_needs_encryption()?;
             Box::new(apeiron_remote::S3Store::connect(&url)?)
+        }
+        core::RemoteUrl::Peer(url) => {
+            network_needs_encryption()?;
+            // A copy shows the device it holds the data key; a clone has
+            // none yet and reads during the device's pairing time.
+            let token = match repo {
+                Some(r) => Some(r.read().peer_token(&url.fingerprint)?),
+                None => None,
+            };
+            Box::new(apeiron_remote::PeerStore::connect(&url, token)?)
         }
     };
     Ok(match rate {

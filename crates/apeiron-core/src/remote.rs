@@ -51,7 +51,22 @@ pub enum RemoteUrl {
     Folder(PathBuf),
     Sftp(SftpUrl),
     S3(S3Url),
+    /// Another device running `apeiron peer serve` (SYNC.md §7).
+    Peer(PeerUrl),
 }
+
+/// `peer://host[:port]#<SHA-256 of the device's certificate, hex>`
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PeerUrl {
+    pub host: String,
+    pub port: u16,
+    /// The fingerprint the device's certificate must have: 64 hex
+    /// characters, lowercase.
+    pub fingerprint: String,
+}
+
+/// The port of `apeiron peer serve` when none is given.
+pub const PEER_PORT: u16 = 7865;
 
 /// `sftp://[user@]host[:port]/path`
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -110,6 +125,38 @@ impl RemoteUrl {
                 host: host.to_owned(),
                 port,
                 path: path.to_owned(),
+            }));
+        }
+        if let Some(rest) = url.strip_prefix("peer://") {
+            let (authority, fingerprint) = rest
+                .split_once('#')
+                .ok_or_else(|| invalid("the URL has no #fingerprint of the device"))?;
+            let authority = authority.trim_end_matches('/');
+            let fingerprint = fingerprint.to_ascii_lowercase();
+            if fingerprint.len() != 64 || !fingerprint.bytes().all(|b| b.is_ascii_hexdigit()) {
+                return Err(invalid("the fingerprint is not 64 hex characters"));
+            }
+            let (host, port) = match authority.strip_prefix('[') {
+                Some(v6) => {
+                    let (host, after) = v6.split_once(']').ok_or_else(|| invalid("missing `]`"))?;
+                    (host, after.strip_prefix(':'))
+                }
+                None => match authority.rsplit_once(':') {
+                    Some((host, port)) => (host, Some(port)),
+                    None => (authority, None),
+                },
+            };
+            if host.is_empty() || host.contains('/') {
+                return Err(invalid("the host name is empty or has a path"));
+            }
+            let port = match port {
+                Some(port) => port.parse().map_err(|_| invalid("bad port number"))?,
+                None => PEER_PORT,
+            };
+            return Ok(RemoteUrl::Peer(PeerUrl {
+                host: host.to_owned(),
+                port,
+                fingerprint,
             }));
         }
         if let Some(rest) = url.strip_prefix("s3://") {

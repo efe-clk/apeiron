@@ -13,6 +13,7 @@ name = "apeiron"
 path = "src/main.rs"
 
 [dependencies]
+gethostname = "1.1.0"
 apeiron = { package = "apeiron-rs", path = "../apeiron" }
 apeiron-daemon = { package = "apeiron-daemon-rs", path = "../apeiron-daemon" }
 apeiron-server = { package = "apeiron-server-rs", path = "../apeiron-server" }

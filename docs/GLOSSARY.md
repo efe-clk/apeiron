@@ -67,7 +67,7 @@ Terms used across the Apeiron documentation and code, with their Turkish equival
 | Legal hold | yasal saklama kilidi | Keeps refs and every version they had until it is lifted, with a permanent record of the lift |
 | Merge | birleştirme | Combining two lines of history into one |
 | Rebase | yeniden temellendirme (rebase) | Replaying changes on top of a different starting point |
-| Remote | uzak depo | Another complete copy of a repository: a folder, SFTP or S3 |
+| Remote | uzak depo | Another complete copy of a repository: a folder, SFTP, S3 or another device (`peer://`) |
 | Replica | replika | A remote that receives every ref of a server, soon after each backup |
 | Restore | geri yükleme | Writing data from a snapshot back to files |
 | Restore test | geri yükleme testi | Regularly restoring a backup to a separate area to prove it works |

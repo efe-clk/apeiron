@@ -13,7 +13,9 @@ name = "apeiron_server"
 
 [dependencies]
 apeiron = { package = "apeiron-rs", path = "../apeiron" }
+apeiron-core = { package = "apeiron-core-rs", path = "../apeiron-core" }
 apeiron-daemon = { package = "apeiron-daemon-rs", path = "../apeiron-daemon" }
+apeiron-remote = { package = "apeiron-remote-rs", path = "../apeiron-remote" }
 argon2 = "0.6.0"
 aws-lc-rs = "1.19.0"
 axum = { version = "0.8.9", default-features = false, features = ["http1", "json", "query", "tokio"] }

@@ -12,7 +12,7 @@ use crate::crypto::{Keys, SecretKey};
 use crate::error::{Error, IoContext, Result};
 use crate::fsutil;
 use crate::hold;
-use crate::id::{IdKey, ObjectId, ObjectType};
+use crate::id::{IdKey, ObjectId, ObjectType, to_hex};
 use crate::index::{self, Location};
 use crate::keyfile::{self, KeyInfo};
 use crate::lock::RepoLock;
@@ -172,6 +172,18 @@ impl Repository {
 
     pub fn chunker(&self) -> ChunkerParams {
         self.config.chunker
+    }
+
+    /// What a device shows another one, whose certificate has
+    /// `fingerprint`, to prove it holds this repository's data key
+    /// (FORMAT.md §15.9): 64 hex characters, the same on every copy. Only
+    /// an encrypted repository has one.
+    pub fn peer_token(&self, fingerprint: &str) -> Result<String> {
+        let data = self.keys.data.as_ref().ok_or(Error::NotEncrypted)?;
+        let key = blake3::derive_key("apeiron 2026-11-18 peer token", data.as_bytes());
+        Ok(to_hex(
+            blake3::keyed_hash(&key, fingerprint.to_ascii_lowercase().as_bytes()).as_bytes(),
+        ))
     }
 
     pub fn is_encrypted(&self) -> bool {

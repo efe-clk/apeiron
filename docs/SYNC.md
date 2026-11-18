@@ -102,15 +102,39 @@ The folder ref moves only after the folder has been applied. An interrupted appl
 
 `apeiron clone` creates a new local repository from a remote (FORMAT.md §15.6): it copies `config` and `keys/`, creates the folders of a repository, then pulls every ref of the remote and names it `origin`. The password of the remote repository opens the clone. This is the only operation that copies keys from a remote.
 
-## 7. Not part of this work item
+## 7. Without a remote
+
+Two devices can sync without a disk or server between them: one offers its own repository, and the other uses it as its remote. Both need the same encrypted repository; the key is what lets them in.
+
+```text
+# On the desktop, which holds the repository:
+$ apeiron peer serve --pair
+On your other devices, with the same repository's key:
+  apeiron remote add desktop 'peer://desktop:7865#3f9a…e1'
+For ten minutes a new device may also copy it: apeiron clone 'peer://desktop:7865#3f9a…e1' <folder>
+# On the laptop, the first time:
+$ apeiron clone 'peer://desktop:7865#3f9a…e1' ~/apeiron
+$ apeiron sync ~/Documents origin
+```
+
+| Rule | Detail |
+| --- | --- |
+| Address | `peer://<host>[:<port>]#<fingerprint>`, port 7865 by default; the fingerprint is the SHA-256 of the device's self-signed certificate, made once per repository folder and kept in the state folder (`peer/`), so the address stays the same |
+| Connection | HTTPS; the certificate must be exactly the one the address names, so no one in between can pose as the device |
+| Access | Every request shows a token that only a holder of the repository's data key can make (FORMAT.md §15.9); a device without it is refused. The address holds no secret, so it can be written down or shown in reports |
+| Pairing | `--pair` also lets a device read without the token for ten minutes, so a new device can clone before it has the key. Reading gives the encrypted data and the key files, which are protected by the password (FORMAT.md §14.2); use it on a network you trust |
+| Sync | The device that serves is a remote like any other: sync, push, pull and `gc --remote` work through it. It does not sync its own folder by serving; it runs `apeiron sync` against the other device, or the other device's rounds bring its changes when it syncs with a remote of its own |
+
+Both devices must be reachable on the network; finding each other on the local network without an address is not done.
+
+## 8. Not part of this work item
 
 | Item | Where |
 | --- | --- |
-| Peer-to-peer sync without a remote | Later; a remote covers Stage 2 |
+| Finding devices on the local network | Later; a device is named by its address (section 7) |
 | Choosing per device with a file that does not sync | `--exclude` covers it for now |
-| Operating the daemon from another device (remote API) | Not written, except a tenant's jobs on the Schedule page ([DAEMON.md](DAEMON.md) §3.1) |
 
-## 8. Crates
+## 9. Crates
 
 | Crate | Role | Status |
 | --- | --- | --- |
@@ -119,3 +143,4 @@ The folder ref moves only after the folder has been applied. An interrupted appl
 | `apeiron` | `sync` operation (API.md §8.3) | Done |
 | `apeiron-cli` | `apeiron clone` | Done |
 | `apeiron-cli`, `apeiron-daemon` | `apeiron sync`, `do = "sync"` | Done |
+| `apeiron-remote`, `apeiron-server`, `apeiron-cli` | `peer://` remotes, `apeiron peer serve` (section 7) | Done |

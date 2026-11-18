@@ -67,7 +67,7 @@ Apeiron belgelerinde ve kodunda geçen terimler ve İngilizce karşılıkları. 
 | Legal hold | yasal saklama kilidi | Ref'leri sahip oldukları her sürümle birlikte kaldırılana dek tutar; kaldırılması kalıcı bir kayıt bırakır |
 | Merge | birleştirme | İki geçmiş çizgisini tek bir çizgide birleştirmek |
 | Rebase | yeniden temellendirme (rebase) | Değişiklikleri farklı bir başlangıç noktasının üzerine yeniden uygulamak |
-| Remote | uzak depo | Bir deponun başka bir tam kopyası: klasör, SFTP ya da S3 |
+| Remote | uzak depo | Bir deponun başka bir tam kopyası: klasör, SFTP, S3 ya da başka bir cihaz (`peer://`) |
 | Replica | replika | Bir sunucunun her ref'ini her yedekten kısa süre sonra alan uzak depo |
 | Restore | geri yükleme | Bir snapshot'taki veriyi dosyalara geri yazmak |
 | Restore test | geri yükleme testi | Bir yedeğin çalıştığını kanıtlamak için onu düzenli olarak ayrı bir alana geri yüklemek |

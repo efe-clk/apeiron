@@ -1940,7 +1940,11 @@ impl Web {
         Web::serve(listen, tls, crate::by_host(registry))
     }
 
-    fn serve(listen: SocketAddr, tls: Option<Tls>, router: axum::Router) -> Result<Self, Error> {
+    pub(crate) fn serve(
+        listen: SocketAddr,
+        tls: Option<Tls>,
+        router: axum::Router,
+    ) -> Result<Self, Error> {
         let io_error = |e: io::Error| Error::new(ErrorKind::Io, e.to_string());
         let (tls, background) = match tls.as_ref().map(Tls::config).transpose()? {
             Some((config, background)) => (Some(config), background),

@@ -77,6 +77,7 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | `apeiron remote list` | Lists the remotes | Done |
 | `apeiron remote remove <name>` | Forgets a remote; the copy itself is not touched | Done |
 | `apeiron clone <url> <path> [--rate <speed>]` | Makes a new repository from a remote copy, with the same password, pulls every ref and names the remote `origin`; the way to set up a second device | Done |
+| `apeiron peer serve [--listen <address>] [--pair]` | Offers an encrypted repository to the user's other devices, which use it as the remote `peer://<host>:<port>#<fingerprint>`; `--pair` lets a new device clone it for ten minutes ([SYNC.md](SYNC.md) §7) | Done |
 | `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run] [--rate <speed>] [--exclude <pattern>]...` | Keeps a folder equal on several devices through a remote: backs it up, pulls, merges, changes the folder and pushes ([SYNC.md](SYNC.md)); prints `+`, `-` and `~` for added, removed and changed files and one line per conflict | Done |
 | `apeiron ref create <name> [<snapshot>]` | Creates a ref, such as a branch, at a snapshot (default `main`) ([BRANCH.md](BRANCH.md)) | Done |
 | `apeiron ref delete <name>` | Deletes a ref; `apeiron reflog <name>` still shows where it pointed | Done |

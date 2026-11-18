@@ -102,15 +102,39 @@ Klasör ref'i ancak klasör uygulandıktan sonra taşınır. Yarıda kalan bir u
 
 `apeiron clone`, bir uzak depodan yeni bir yerel depo oluşturur (FORMAT.tr.md §15.6): `config`'i ve `keys/`'i kopyalar, bir deponun klasörlerini oluşturur, ardından uzak deponun her ref'ini pull eder ve ona `origin` adını verir. Uzak deponun parolası klonu açar. Uzak depodan anahtar kopyalayan tek işlem budur.
 
-## 7. Bu işin parçası olmayanlar
+## 7. Uzak depo olmadan
+
+İki cihaz aralarında bir disk ya da sunucu olmadan eşitlenebilir: biri kendi deposunu sunar, öbürü onu uzak deposu olarak kullanır. İkisinin de aynı şifreli depoya ihtiyacı vardır; onları içeri alan anahtardır.
+
+```text
+# Depoyu tutan masaüstünde:
+$ apeiron peer serve --pair
+On your other devices, with the same repository's key:
+  apeiron remote add desktop 'peer://desktop:7865#3f9a…e1'
+For ten minutes a new device may also copy it: apeiron clone 'peer://desktop:7865#3f9a…e1' <folder>
+# Dizüstünde, ilk kez:
+$ apeiron clone 'peer://desktop:7865#3f9a…e1' ~/apeiron
+$ apeiron sync ~/Documents origin
+```
+
+| Kural | Ayrıntı |
+| --- | --- |
+| Adres | `peer://<host>[:<port>]#<parmak izi>`, varsayılan bağlantı noktası 7865; parmak izi, cihazın kendinden imzalı sertifikasının SHA-256'sıdır; her depo klasörü için bir kez yapılır ve durum klasöründe (`peer/`) tutulur, böylece adres değişmez |
+| Bağlantı | HTTPS; sertifika tam olarak adresin adlandırdığı olmalıdır, böylece aradaki kimse cihaz gibi davranamaz |
+| Erişim | Her istek, yalnızca deponun veri anahtarına sahip birinin yapabileceği bir belirteç gösterir (FORMAT.tr.md §15.9); bu anahtarı olmayan bir cihaz reddedilir. Adres sır taşımaz; yazılabilir ya da raporlarda gösterilebilir |
+| Eşleştirme | `--pair`, on dakika boyunca bir cihazın belirteç olmadan okumasına da izin verir; böylece yeni bir cihaz, anahtara sahip olmadan önce kopyalayabilir. Okumak şifreli veriyi ve parolayla korunan anahtar dosyalarını verir (FORMAT.tr.md §14.2); bunu güvendiğiniz bir ağda kullanın |
+| Senkron | Sunan cihaz diğerleri gibi bir uzak depodur: senkron, push, pull ve `gc --remote` onun üzerinden çalışır. Sunmakla kendi klasörünü eşitlemez; öbür cihaza karşı `apeiron sync` çalıştırır |
+
+İki cihaz da ağda ulaşılabilir olmalıdır; yerel ağda adres olmadan birbirini bulmak yapılmaz.
+
+## 8. Bu işin parçası olmayanlar
 
 | Konu | Nerede |
 | --- | --- |
-| Uzak depo olmadan eşler arası senkron | Daha sonra; Aşama 2 için bir uzak depo yeterlidir |
+| Yerel ağda cihazları bulmak | Daha sonra; bir cihaz adresiyle anılır (bölüm 7) |
 | Eşitlenmeyen bir dosyayla cihaz başına seçim | Şimdilik `--exclude` karşılar |
-| Daemon'u başka bir cihazdan yönetmek (uzak API) | Yazılmadı; yalnızca bir kiracının işleri Zamanlama sayfasındadır ([DAEMON.tr.md](DAEMON.tr.md) §3.1) |
 
-## 8. Crate'ler
+## 9. Crate'ler
 
 | Crate | Görev | Durum |
 | --- | --- | --- |
@@ -119,3 +143,4 @@ Klasör ref'i ancak klasör uygulandıktan sonra taşınır. Yarıda kalan bir u
 | `apeiron` | `sync` işlemi (API.tr.md §8.3) | Tamamlandı |
 | `apeiron-cli` | `apeiron clone` | Tamamlandı |
 | `apeiron-cli`, `apeiron-daemon` | `apeiron sync`, `do = "sync"` | Tamamlandı |
+| `apeiron-remote`, `apeiron-server`, `apeiron-cli` | `peer://` uzak depoları, `apeiron peer serve` (bölüm 7) | Tamamlandı |

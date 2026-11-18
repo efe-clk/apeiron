@@ -562,11 +562,14 @@ url = "sftp://user@nas.local:22/srv/apeiron"         # SFTP
 
 [remote.cloud]
 url = "s3://bucket/apeiron?endpoint=https://s3.example.com&region=eu-1"   # S3-compatible
+
+[remote.laptop]
+url = "peer://laptop.local:7865#3f9a…e1"            # another device, section 15.9
 ```
 
 - The file is local to one copy; it is never pushed. Names follow the ref name rules of section 9.3, without `/`.
 - It holds no secrets. SFTP uses the user's SSH keys and agent and checks the server against `~/.ssh/known_hosts`; an unknown server is refused. S3 reads `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
-- Only an encrypted repository (section 14) can be pushed to an SFTP or S3 remote. A folder remote, such as an external disk, may hold a repository that is not encrypted.
+- Only an encrypted repository (section 14) can be pushed to an SFTP, S3 or peer remote. A folder remote, such as an external disk, may hold a repository that is not encrypted.
 
 ### 15.2 Store operations
 
@@ -643,6 +646,16 @@ A remote that only this repository writes to, such as a replica ([REPLICATION.md
 6. Delete every other index file, then the dead packs, then `locks/gc`.
 
 A dry run does steps 1, 3 and 4 and writes nothing. Push, pull and clone stop with "locked" while a `locks/gc` younger than 24 hours exists, and a push checks again just before it replaces the remote ref, so one that began before the run does not move a ref onto objects the run may delete. A program of an older version does not know `locks/gc`; such a program, or any other repository, must not write to the remote while it is cleaned. Interruptions leave the states of 13.3, plus the lock, which the next run replaces after 24 hours or which can be deleted by hand.
+
+### 15.9 Peer remotes
+
+A device running `apeiron peer serve` (SYNC.md §7) offers its repository folder with the store operations of section 15.2 over HTTPS, at `/peer/v1/<operation>`, as plain bytes and JSON.
+
+- The address `peer://<host>[:<port>]#<fingerprint>` names the SHA-256 of the device's self-signed certificate, 64 lowercase hex characters; a client accepts no other certificate.
+- Every request carries `Authorization: Bearer <token>`. The token is `hex(BLAKE3-keyed(derive_key("apeiron 2026-11-18 peer token", data_key), fingerprint))`: every copy that holds the repository's data key (section 14.1) makes the same one, and it is bound to the device's certificate. The device compares the SHA-256 of what it is shown with that of its own token.
+- During pairing (ten minutes after starting with `--pair`) reads also work without a token; writes, deletes and ref changes never do.
+- Paths are names of `a-z A-Z 0-9 . _ -` separated by `/`, at most 16 deep, never `.` or `..`; ref names follow section 9.3. A file or range of more than 128 MiB is refused.
+- A failed ref change answers with the kind of error (`ref_conflict`, `ref_locked` …), so a client sees the same errors as from a folder.
 
 ## 16. Retention rules (`retention/`)
 

@@ -1086,3 +1086,23 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | No SAML | Organizations whose provider speaks only SAML could not use central identity |
 
 **Consequences.** The library has had no external security audit yet, so the document recommends OpenID Connect where a provider offers both, and its updates should be followed closely. Assertions used before are remembered only until the server restarts.
+
+## ADR-051: Devices sync directly, with the repository's key as the pass
+
+**Status:** Accepted (2026-11-18)
+
+**Context.** The vision asks for peer-to-peer sync where suitable. Sync works through any remote, and an SFTP remote can already point at another device, but only one that runs an SSH server, which phones and most laptops do not.
+
+**Decision.** `apeiron peer serve` offers a repository folder with the store operations of a remote over HTTPS. A `peer://` address pins the device's self-signed certificate by its SHA-256, and access needs a token derived from the repository's data key and that certificate (FORMAT.md §15.9). A ten-minute pairing time allows reads without the token, so a new device can clone. The serving code uses the folder store of the core directly, below the API, as push and pull do on the other end.
+
+**Rationale.** The devices of one person already share the repository's key, so the key is the natural pass: nothing new to keep or leak, and the address holds no secret. Pinning the certificate needs no certificate authority on a home network. Reusing the store operations makes every remote feature work with peers at once.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| A random token in the address | It would be a secret in the `remotes` file, in `remote list` and in compliance reports |
+| An SFTP remote to the other device | Needs an SSH server there |
+| A new protocol of snapshots instead of files | Push and pull would have to be written again for it |
+
+**Consequences.** Only encrypted repositories sync this way. During pairing, anyone on the network can read the encrypted data and try to guess the password offline, so pairing is short and explicit. Finding devices without an address is left for later.

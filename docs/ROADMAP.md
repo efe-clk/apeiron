@@ -125,4 +125,4 @@ Every work item is done (2026-10-30); the stage ends with its exit criterion, th
 | Storage backends and integrations as plugins | [PLUGIN.md](PLUGIN.md) §7 | Type drivers, importers, hooks and a plugin store; plugins cannot reach the network |
 | More standards in reports | [REPORTS.md](REPORTS.md) §6 | ISO/IEC 27001, SOC 2 and the GDPR |
 | Format upgrade tool | [FORMAT.md](FORMAT.md) §18 | The format is at version 1 |
-| Sync without a remote, publishing the first release | [SYNC.md](SYNC.md) §7, [DESKTOP.md](DESKTOP.md) §5 | Sync through a remote, building from source |
+| Publishing the first release | [DESKTOP.md](DESKTOP.md) §5 | Building from source, or the packages of the release workflow's runs |

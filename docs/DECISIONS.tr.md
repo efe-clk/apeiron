@@ -1086,3 +1086,23 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | SAML olmaması | Sağlayıcısı yalnızca SAML konuşan kuruluşlar merkezi kimliği kullanamazdı |
 
 **Sonuçlar.** Kütüphane henüz dışarıdan bir güvenlik denetiminden geçmedi; bu yüzden belge, bir sağlayıcı ikisini de sunuyorsa OpenID Connect'i önerir ve güncellemeleri yakından izlenmelidir. Daha önce kullanılmış onaylar yalnızca sunucu yeniden başlayana kadar hatırlanır.
+
+## ADR-051: Cihazlar doğrudan eşitlenir; giriş izni deponun anahtarıdır
+
+**Durum:** Kabul edildi (2026-11-18)
+
+**Bağlam.** Vizyon, uygun olduğunda eşler arası senkron ister. Senkron her uzak depo üzerinden çalışır ve bir SFTP uzak deposu zaten başka bir cihazı gösterebilir; ama yalnızca SSH sunucusu çalıştıran birini; telefonlar ve çoğu dizüstü bunu yapmaz.
+
+**Karar.** `apeiron peer serve`, bir depo klasörünü bir uzak deponun depolama işlemleriyle HTTPS üzerinden sunar. Bir `peer://` adresi cihazın kendinden imzalı sertifikasını SHA-256'sıyla sabitler; erişim, deponun veri anahtarından ve bu sertifikadan türetilen bir belirteç ister (FORMAT.tr.md §15.9). On dakikalık bir eşleştirme süresi belirteçsiz okumaya izin verir; böylece yeni bir cihaz kopyalayabilir. Sunan kod, push ve pull'un öbür uçta yaptığı gibi, çekirdeğin klasör deposunu API'nin altında doğrudan kullanır.
+
+**Gerekçe.** Bir kişinin cihazları deponun anahtarını zaten paylaşır; bu yüzden anahtar doğal giriş iznidir: saklanacak ya da sızacak yeni bir şey yoktur ve adres sır taşımaz. Sertifikayı sabitlemek ev ağında bir sertifika yetkilisi gerektirmez. Depolama işlemlerini yeniden kullanmak her uzak depo özelliğinin eşlerle hemen çalışmasını sağlar.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Adreste rastgele bir belirteç | `remotes` dosyasında, `remote list`'te ve uyumluluk raporlarında bir sır olurdu |
+| Öbür cihaza bir SFTP uzak deposu | Orada bir SSH sunucusu ister |
+| Dosyalar yerine snapshot'lardan yeni bir protokol | Push ve pull onun için yeniden yazılmak zorunda kalırdı |
+
+**Sonuçlar.** Bu yolla yalnızca şifreli depolar eşitlenir. Eşleştirme sırasında ağdaki herkes şifreli veriyi okuyup parolayı çevrimdışı tahmin etmeyi deneyebilir; bu yüzden eşleştirme kısa ve açıktır. Adres olmadan cihaz bulmak sonraya kaldı.
