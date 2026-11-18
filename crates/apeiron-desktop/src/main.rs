@@ -22,7 +22,24 @@ fn main() {
     }
 }
 
+/// Whether a window can be shown: on Linux and the BSDs a graphical
+/// session names its display; elsewhere there always is one.
+fn has_display() -> bool {
+    if cfg!(any(target_os = "windows", target_os = "macos")) {
+        return true;
+    }
+    ["WAYLAND_DISPLAY", "DISPLAY"]
+        .iter()
+        .any(|v| std::env::var_os(v).is_some_and(|s| !s.is_empty()))
+}
+
 fn run() -> Result<(), Box<dyn Error>> {
+    if !has_display() {
+        return Err("there is no screen to show a window on; \
+             use `apeiron tui` in this terminal, or `apeiron ui --no-browser` \
+             and open the address from another computer"
+            .into());
+    }
     let server = Local::start(Options::with_memory())?;
     let url = server.url().to_owned();
     // Everything the pages may open is on the server's own address.

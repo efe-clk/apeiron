@@ -25,6 +25,8 @@ flowchart LR
 
 The pages call only the JSON API, and the JSON API calls only the public API (ARCHITECTURE.md §1); there is no other way into a repository.
 
+On a computer without a screen, `apeiron-desktop` says so and names `apeiron tui`, which shows the same screens in the terminal ([TUI.md](TUI.md)).
+
 ## 2. What the user can do
 
 | Screen | What it does | Status |

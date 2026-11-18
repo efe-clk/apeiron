@@ -25,6 +25,8 @@ flowchart LR
 
 Sayfalar yalnızca JSON API'yi, JSON API de yalnızca herkese açık API'yi çağırır (ARCHITECTURE.tr.md §1); bir depoya başka bir yol yoktur.
 
+Ekranı olmayan bir bilgisayarda `apeiron-desktop` bunu söyler ve aynı ekranları terminalde gösteren `apeiron tui`'yi önerir ([TUI.tr.md](TUI.tr.md)).
+
 ## 2. Kullanıcının yapabildikleri
 
 | Ekran | Ne yapar | Durum |
