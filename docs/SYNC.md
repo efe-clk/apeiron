@@ -21,7 +21,7 @@ Sync keeps the same folder, such as `~/Documents`, equal on several devices. It 
 | Command | What it does | Status |
 | --- | --- | --- |
 | `apeiron clone <url> <path>` | Creates a local repository that is a copy of a remote one: the same config and keys, then pulls every ref; the remote is then named `origin` | Done |
-| `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run] [--exclude <pattern>]...` | Runs one sync round (section 3); the default ref is `sync/<folder name>`, lowercased, with other characters than `a-z 0-9 . _ -` replaced by `-`; exit code 3 when there are conflicts or files left for the next round | Done |
+| `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run] [--exclude <pattern>]... [--gitignore]` | Runs one sync round (section 3); the default ref is `sync/<folder name>`, lowercased, with other characters than `a-z 0-9 . _ -` replaced by `-`; exit code 3 when there are conflicts or files left for the next round | Done |
 
 The background service runs sync as a job (`do = "sync"`, [DAEMON.md](DAEMON.md)), for example every 15 minutes. A second device starts with `apeiron clone`, then `apeiron sync`. `--dry-run` stores the folder's new content in the repository, where garbage collection removes it, but moves no ref and changes neither the folder nor the remote.
 
@@ -94,6 +94,7 @@ The folder ref moves only after the folder has been applied. An interrupted appl
 `--exclude <pattern>` and the folder's `.apeironignore` ([CLI.md](CLI.md) §4.1) name paths this device leaves alone, which also gives selective sync: other devices keep such a file, and this one neither receives it nor removes it.
 
 - L takes the entry of a left-out path from the snapshot of the folder ref instead of from the disk, so leaving it out is not a deletion and spreads to nobody. A folder gone from the disk keeps only its left-out paths in L. A path no earlier snapshot holds stays only on this device.
+- A path this device left out in its last round, which a changed rule no longer leaves out, is not a deletion either: while it is missing from the disk, L keeps its entry, and once the round ends it is written to the disk from the new snapshot. The rules of the last round are kept in this copy of the repository only (FORMAT.md §2).
 - Applying a snapshot skips left-out paths: what is on the disk there is neither replaced nor removed, and nothing is written there. A folder another device removed stays while a left-out file is in it, and is reported as left for the next round.
 - `.apeironignore` is synced as any file, so a rule added on one device reaches the others in the next round; `--exclude` holds for the device that gives it, which is the way to choose per device.
 - `apeiron switch` leaves alone what the folder's `.apeironignore` names in the same way.
@@ -127,14 +128,27 @@ $ apeiron sync ~/Documents origin
 
 Both devices must be reachable on the network; finding each other on the local network without an address is not done.
 
-## 8. Not part of this work item
+## 8. Dotfiles
+
+`apeiron dotfiles` keeps chosen files of the home folder, such as `.bashrc`, `.gitconfig` and `.config/nvim`, equal on several devices, without syncing the rest of the home folder.
+
+| Command | What it does |
+| --- | --- |
+| `apeiron dotfiles add <path>...` | Adds files or folders inside the home folder to the list `~/.apeiron-dotfiles`: one path from the home folder per line |
+| `apeiron dotfiles remove <path>...` | Takes them off the list; nothing is deleted, here or elsewhere |
+| `apeiron dotfiles list` | Shows the list |
+| `apeiron dotfiles sync <remote>` | Syncs the home folder with the ref `sync/dotfiles`, leaving out everything but the list and the paths on it (`+` patterns, CLI.md §4.1) |
+
+The list is synced too, so a new device needs only `apeiron clone` and `apeiron dotfiles sync origin`: the first round brings the list, and a second round in the same command brings what it names. Taking a path off the list leaves it alone, as any path left out (section 5.1). A file that differs on both devices at the first round becomes a conflict copy; `--mode receive` on a new device takes the other device's versions without sending its own.
+
+## 9. Not part of this work item
 
 | Item | Where |
 | --- | --- |
 | Finding devices on the local network | Later; a device is named by its address (section 7) |
 | Choosing per device with a file that does not sync | `--exclude` covers it for now |
 
-## 9. Crates
+## 10. Crates
 
 | Crate | Role | Status |
 | --- | --- | --- |

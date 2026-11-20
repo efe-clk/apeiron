@@ -61,12 +61,14 @@ Implementation status (`apeiron-core`):
 ├── oplog                  # Operation log, section 9.5
 ├── retention/             # Retention rules, section 16
 ├── holds/                 # Legal holds, section 17
+├── left-out/              # Patterns a synced folder left out, of this copy only
 └── tmp/                   # Temporary files being written
 ```
 
 - Every file outside `tmp/` is either completely written and flushed to disk, or does not exist at all (section 9).
 - Files in `tmp/` are never repository content. Temporary files older than one hour may be deleted.
 - A reader ignores top-level folders it does not know; a writer does not touch them.
+- `left-out/folder/<ref>` holds the patterns the last sync round of that folder ref left out, one per line, as given and as read from `.apeironignore` (SYNC.md §5.1). Like `remotes`, it belongs to this copy: push, pull and clone never copy it. A missing file means none.
 
 ## 3. The `config` file
 

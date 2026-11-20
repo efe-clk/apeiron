@@ -21,7 +21,7 @@ Senkron, `~/Documents` gibi aynı klasörü birden fazla cihazda eşit tutar. Va
 | Komut | Ne yapar | Durum |
 | --- | --- | --- |
 | `apeiron clone <url> <path>` | Bir uzak deponun kopyası olan yerel bir depo oluşturur: aynı config ve anahtarlar, ardından her ref pull edilir; uzak depo artık `origin` adını taşır | Tamamlandı |
-| `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run] [--exclude <pattern>]...` | Bir senkron turu çalıştırır (bölüm 3); varsayılan ref `sync/<klasör adı>`'dır; ad küçük harfe çevrilir ve `a-z 0-9 . _ -` dışındaki karakterler `-` olur; çatışma ya da sonraki tura bırakılan dosya varsa çıkış kodu 3'tür | Tamamlandı |
+| `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run] [--exclude <pattern>]... [--gitignore]` | Bir senkron turu çalıştırır (bölüm 3); varsayılan ref `sync/<klasör adı>`'dır; ad küçük harfe çevrilir ve `a-z 0-9 . _ -` dışındaki karakterler `-` olur; çatışma ya da sonraki tura bırakılan dosya varsa çıkış kodu 3'tür | Tamamlandı |
 
 Arka plan hizmeti senkronu bir iş olarak çalıştırır (`do = "sync"`, [DAEMON.tr.md](DAEMON.tr.md)), örneğin 15 dakikada bir. İkinci bir cihaz `apeiron clone`, ardından `apeiron sync` ile başlar. `--dry-run`, klasörün yeni içeriğini depoya kaydeder (çöp toplama onu siler), ama hiçbir ref'i taşımaz; ne klasörü ne de uzak depoyu değiştirir.
 
@@ -94,6 +94,7 @@ Klasör ref'i ancak klasör uygulandıktan sonra taşınır. Yarıda kalan bir u
 `--exclude <pattern>` ve klasörün `.apeironignore` dosyası ([CLI.tr.md](CLI.tr.md) §4.1), bu cihazın dokunmadığı yolları adlandırır; bu aynı zamanda seçmeli senkron sağlar: diğer cihazlar böyle bir dosyayı tutar, bu cihaz onu ne alır ne de siler.
 
 - L, dışarıda bırakılan bir yolun girdisini diskten değil, klasör ref'inin snapshot'ından alır; böylece dışarıda bırakmak silme sayılmaz ve kimseye yayılmaz. Diskten kaybolan bir klasör L'de yalnızca dışarıda bırakılan yollarını tutar. Daha önceki hiçbir snapshot'ın tutmadığı yol yalnızca bu cihazda kalır.
+- Bu cihazın son turunda dışarıda bıraktığı, değişen bir kuralın artık dışarıda bırakmadığı bir yol da silme sayılmaz: diskte yokken L onun girdisini tutar ve tur bitince yeni snapshot'tan diske yazılır. Son turun kuralları yalnızca deponun bu kopyasında tutulur (FORMAT.tr.md §2).
 - Bir snapshot uygulanırken dışarıda bırakılan yollar atlanır: diskte orada olan değiştirilmez ya da silinmez ve oraya bir şey yazılmaz. Başka bir cihazın sildiği klasör, içinde dışarıda bırakılan dosya oldukça kalır ve sonraki tura bırakılmış olarak bildirilir.
 - `.apeironignore` her dosya gibi eşitlenir, bu yüzden bir cihaza eklenen kural sonraki turda diğerlerine ulaşır; `--exclude`, onu veren cihaz için geçerlidir ve cihaz başına seçimin yoludur.
 - `apeiron switch`, klasörün `.apeironignore` dosyasının adlandırdıklarına aynı şekilde dokunmaz.
@@ -127,14 +128,27 @@ $ apeiron sync ~/Documents origin
 
 İki cihaz da ağda ulaşılabilir olmalıdır; yerel ağda adres olmadan birbirini bulmak yapılmaz.
 
-## 8. Bu işin parçası olmayanlar
+## 8. Dotfiles
+
+`apeiron dotfiles`, ev klasörünün `.bashrc`, `.gitconfig` ve `.config/nvim` gibi seçilmiş dosyalarını, ev klasörünün geri kalanını senkronlamadan birkaç cihazda eşit tutar.
+
+| Komut | Ne yapar |
+| --- | --- |
+| `apeiron dotfiles add <path>...` | Ev klasörü içindeki dosya ya da klasörleri `~/.apeiron-dotfiles` listesine ekler: satır başına ev klasöründen bir yol |
+| `apeiron dotfiles remove <path>...` | Onları listeden çıkarır; ne burada ne başka yerde bir şey silinir |
+| `apeiron dotfiles list` | Listeyi gösterir |
+| `apeiron dotfiles sync <remote>` | Ev klasörünü `sync/dotfiles` ref'iyle senkronlar; liste ve listedeki yollar dışında her şeyi dışarıda bırakır (`+` kalıpları, CLI.tr.md §4.1) |
+
+Liste de senkronlanır; bu yüzden yeni bir cihaz için yalnızca `apeiron clone` ve `apeiron dotfiles sync origin` yeter: ilk tur listeyi getirir, aynı komuttaki ikinci tur listenin adlandırdıklarını getirir. Bir yolu listeden çıkarmak, dışarıda bırakılan her yol gibi onu olduğu gibi bırakır (bölüm 5.1). İlk turda iki cihazda farklı olan bir dosya çatışma kopyası olur; yeni bir cihazda `--mode receive` kendi sürümlerini göndermeden öbür cihazın sürümlerini alır.
+
+## 9. Bu işin parçası olmayanlar
 
 | Konu | Nerede |
 | --- | --- |
 | Yerel ağda cihazları bulmak | Daha sonra; bir cihaz adresiyle anılır (bölüm 7) |
 | Eşitlenmeyen bir dosyayla cihaz başına seçim | Şimdilik `--exclude` karşılar |
 
-## 9. Crate'ler
+## 10. Crate'ler
 
 | Crate | Görev | Durum |
 | --- | --- | --- |

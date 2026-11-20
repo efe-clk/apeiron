@@ -1154,3 +1154,23 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | An editor inside the terminal for the jobs file | The user's own editor is better at editing text |
 
 **Consequences.** A text added to the pages is available to the terminal; one used only by the terminal is kept in the same dictionary with a `tui_` prefix. The web interface's screens for many users stay in the browser.
+
+## ADR-054: Ready sets, `.gitignore` on request and kept-only paths extend the exclusion language
+
+**Status:** Accepted (2026-11-20)
+
+**Context.** Developers back up folders full of build output (`target/`, `node_modules/`, `.venv`) and already keep `.gitignore` files. Dotfiles live among everything else in the home folder. ADR-039 chose a pattern language without Git's rules, and sync forgot which paths a device had left out, so a rule removed on one device turned its missing paths into deletions on every device.
+
+**Decision.** Patterns starting with `@` name ready sets, `@gitignore` adds the folder's `.gitignore` files read by the `ignore` crate, and `+<path>` keeps only the paths named ([CLI.md](CLI.md) §4.1). They work wherever patterns do: `--exclude`, `.apeironignore` and `exclude` of a job, so the API gains no field. `--gitignore` is a short form; the default stays ADR-039. Each copy of a repository keeps the patterns its last sync round of a folder left out in `left-out/` ([FORMAT.md](FORMAT.md) §2); a path left out then and not now, missing from the disk, is kept and written to the disk instead of being deleted ([SYNC.md](SYNC.md) §5.1). `apeiron dotfiles` is sync of the home folder with `+` patterns from a list that syncs as well ([SYNC.md](SYNC.md) §8).
+
+**Rationale.** Patterns are already carried by every request, job and file, so new kinds of patterns reach all of them at once. `.gitignore` files on request keep personal backups predictable while developers reuse the rules they have. The rules of a round belong to one device, so they are kept beside its refs and never copied.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| Reading `.gitignore` files by default | A backup could silently miss files Git does not track, such as local notes |
+| Keeping the rules of a round in the snapshot's `meta` | A received snapshot is another device's, and two copies can carry the same host name |
+| A dotfiles store with links into the home folder | Links break programs that rewrite their files; sync writes ordinary files |
+
+**Consequences.** Removing a rule brings the paths it left out to the disk at the next round. A repository synced before this version records its rules at its next round; a rule removed before then still counts as a deletion once.

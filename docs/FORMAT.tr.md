@@ -61,12 +61,14 @@ Uygulama durumu (`apeiron-core`):
 ├── oplog                  # İşlem günlüğü, bölüm 9.5
 ├── retention/             # Saklama kuralları, bölüm 16
 ├── holds/                 # Yasal saklama kilitleri, bölüm 17
+├── left-out/              # Senkronlanan klasörün dışarıda bıraktığı kalıplar, yalnızca bu kopyanın
 └── tmp/                   # Yazılmakta olan geçici dosyalar
 ```
 
 - `tmp/` dışındaki her dosya, ya tamamen yazılmış ve diske sabitlenmiştir ya da hiç yoktur (bölüm 9).
 - `tmp/` içindeki dosyalar hiçbir zaman depo içeriği sayılmaz. Bir saatten eski geçici dosyalar silinebilir.
 - Okuyucu tanımadığı üst düzey klasörleri yok sayar; yazıcı onlara dokunmaz.
+- `left-out/folder/<ref>`, o klasör ref'inin son senkron turunun dışarıda bıraktığı kalıpları satır başına bir tane, verildiği ve `.apeironignore`'dan okunduğu gibi tutar (SYNC.tr.md §5.1). `remotes` gibi bu kopyaya aittir: push, pull ve clone onu asla kopyalamaz. Dosya yoksa kalıp da yoktur.
 
 ## 3. `config` dosyası
 

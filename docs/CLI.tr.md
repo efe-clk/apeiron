@@ -55,7 +55,7 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | Komut | Ne yapar | Durum |
 | --- | --- | --- |
 | `apeiron init <path> [--encrypt]` | Boş bir depo oluşturur; `--encrypt` onu bir parolayla şifreler (bölüm 2.1) | Tamamlandı |
-| `apeiron backup <folder> [--ref <name>] [--message <text>] [--author <text>] [--host <text>] [--exclude <pattern>]... [--reread]` | Klasörü yeni bir snapshot olarak saklar ve ref'i ona taşır (varsayılan ref: `main`) | Tamamlandı |
+| `apeiron backup <folder> [--ref <name>] [--message <text>] [--author <text>] [--host <text>] [--exclude <pattern>]... [--gitignore] [--reread]` | Klasörü yeni bir snapshot olarak saklar ve ref'i ona taşır (varsayılan ref: `main`) | Tamamlandı |
 | `apeiron log [<ref>] [--grep <metin>]` | Bir ref'in snapshot'larını en yeniden başlayarak listeler; `--grep`, mesajı, yazarı, makinesi ya da üst verisi metni büyük-küçük harf ayırmadan içerenleri bırakır | Tamamlandı |
 | `apeiron ls <snapshot> [<path>]` | Bir snapshot'taki dosya ve klasörleri listeler | Tamamlandı |
 | `apeiron diff <snapshot> <snapshot> [--text]` | İki snapshot arasında eklenen, silinen ve değişen dosyaları listeler; `--text` bir eklentinin işlediği dosyaların değişen satırlarını da gösterir ([TEXT.tr.md](TEXT.tr.md)) | Tamamlandı |
@@ -80,7 +80,8 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | `apeiron remote remove <name>` | Bir uzak depoyu unutur; kopyanın kendisine dokunulmaz | Tamamlandı |
 | `apeiron clone <url> <path> [--rate <hız>]` | Bir uzak kopyadan aynı parolayla yeni bir depo oluşturur, her ref'i pull eder ve uzak depoya `origin` adını verir; ikinci bir cihazı kurmanın yolu | Tamamlandı |
 | `apeiron peer serve [--listen <address>] [--pair]` | Şifreli bir depoyu kullanıcının diğer cihazlarına sunar; onlar onu `peer://<host>:<port>#<parmak izi>` uzak deposu olarak kullanır; `--pair` yeni bir cihazın onu on dakika boyunca kopyalamasına izin verir ([SYNC.tr.md](SYNC.tr.md) §7) | Tamamlandı |
-| `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run] [--rate <hız>] [--exclude <pattern>]...` | Bir klasörü bir uzak depo üzerinden birkaç cihazda eşit tutar: yedekler, pull eder, birleştirir, klasörü değiştirir ve push eder ([SYNC.tr.md](SYNC.tr.md)); eklenen, silinen ve değişen dosyalar için `+`, `-` ve `~`, her çatışma için bir satır yazar | Tamamlandı |
+| `apeiron sync <folder> <remote> [--ref <name>] [--mode two-way\|send\|receive] [--dry-run] [--rate <hız>] [--exclude <pattern>]... [--gitignore]` | Bir klasörü bir uzak depo üzerinden birkaç cihazda eşit tutar: yedekler, pull eder, birleştirir, klasörü değiştirir ve push eder ([SYNC.tr.md](SYNC.tr.md)); eklenen, silinen ve değişen dosyalar için `+`, `-` ve `~`, her çatışma için bir satır yazar | Tamamlandı |
+| `apeiron dotfiles add\|remove <path>...`, `dotfiles list`, `dotfiles sync <remote> [--mode two-way\|send\|receive] [--dry-run]` | Ev klasörünün `.bashrc` ve `.config/nvim` gibi seçilmiş dosyalarını birkaç cihazda eşit tutar ([SYNC.tr.md](SYNC.tr.md) §8) | Tamamlandı |
 | `apeiron ref create <name> [<snapshot>]` | Bir snapshot'ta (varsayılan `main`) dal gibi bir ref oluşturur ([BRANCH.tr.md](BRANCH.tr.md)) | Tamamlandı |
 | `apeiron ref delete <name>` | Bir ref'i siler; `apeiron reflog <name>` onun nereye işaret ettiğini yine gösterir | Tamamlandı |
 | `apeiron merge <from> [--into <ref>] [--message <text>] [--dry-run]` | Bir snapshot'ı, genellikle bir dalı, bir ref'e (varsayılan `main`) birleştirir; çatışma varsa çıkış kodu 3'tür | Tamamlandı |
@@ -143,6 +144,10 @@ Okunurken değişen bir dosya okunduğu hâliyle saklanır ve uyarı olarak rapo
 | --- | --- |
 | `*.tmp`, `node_modules`, `build/` | Her derinlikte o ad, büyük küçük harf ayrımı olmadan; `*` herhangi karakterler, `?` tek karakter yerine geçer |
 | `docs/old`, `/notes.txt` | Klasörün kökünden o yol; orada `*` `/` üzerinden de geçer |
+| `@node`, `@python`, `@rust`, `@java`, `@cache`, `@os`, `@editors` | Hazır bir küme: `node_modules`, `.next` …; `__pycache__`, `.venv`, `*.pyc` …; `target`; `.gradle`; `.cache`; `.DS_Store`, `Thumbs.db` …; `*.swp`, `*~` |
+| `@dev` | `@rust`, `@node`, `@python`, `@java`, `@os` ve `@editors` birlikte |
+| `@gitignore` | Klasörün `.gitignore` dosyalarının adlandırdıkları, Git'in okuduğu gibi, `!` ile ve en derindeki dosyanın kararıyla; `--gitignore` da aynısını verir |
+| `+.bashrc`, `+/.config/nvim` | Kökten yalnızca bu yollar ve içlerindekiler; geri kalan her şey dışarıda kalır |
 | `# metin`, boş satır | Dosyada hiçbir şey |
 
 `.apeironignore` sıradan bir dosyadır: diğerleri gibi yedeklenir, geri yüklenir ve eşitlenir. Yeni bir yedeğin dışında bırakılan yol eski yedeklerde durur. Senkron böyle yolları silmek yerine onlara dokunmaz ([SYNC.tr.md](SYNC.tr.md) §5.1).

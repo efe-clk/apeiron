@@ -98,6 +98,9 @@ enum Command {
         /// Leave out what matches this pattern; can be given more than once
         #[arg(long, value_name = "PATTERN")]
         exclude: Vec<String>,
+        /// Also leave out what the folder's .gitignore files name
+        #[arg(long)]
+        gitignore: bool,
         /// Read every file, also those whose size and time did not change
         #[arg(long)]
         reread: bool,
@@ -553,6 +556,15 @@ enum Command {
         /// Leave alone on this device what matches this pattern; can be given more than once
         #[arg(long, value_name = "PATTERN")]
         exclude: Vec<String>,
+        /// Also leave alone what the folder's .gitignore files name
+        #[arg(long)]
+        gitignore: bool,
+    },
+    /// Keep chosen files of the home folder, such as .bashrc, equal on
+    /// several devices through a remote
+    Dotfiles {
+        #[command(subcommand)]
+        command: DotfilesCommand,
     },
     /// Copy the snapshots of a ref to a remote and move the ref there
     Push {
@@ -587,6 +599,31 @@ enum Command {
 enum PriorityArg {
     Low,
     Normal,
+}
+
+#[derive(Subcommand)]
+enum DotfilesCommand {
+    /// Add files or folders of the home folder to the list
+    Add {
+        #[arg(required = true)]
+        paths: Vec<PathBuf>,
+    },
+    /// Take files or folders off the list; they stay where they are
+    Remove {
+        #[arg(required = true)]
+        paths: Vec<PathBuf>,
+    },
+    /// Show the list
+    List,
+    /// Sync the files on the list with a remote
+    Sync {
+        remote: String,
+        #[arg(long, value_enum, default_value = "two-way")]
+        mode: ModeArg,
+        /// Only show what would change
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -2706,9 +2743,13 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             message,
             author,
             host,
-            exclude,
+            mut exclude,
+            gitignore,
             reread,
         } => {
+            if gitignore {
+                exclude.push("@gitignore".to_owned());
+            }
             let audit = CliAudit::find(cli.repo.as_deref())?;
             let repo = open(cli.repo, password_file)?;
             let mut request = BackupRequest::new(folder, ref_name.clone());
@@ -4236,8 +4277,12 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             mode,
             dry_run,
             rate,
-            exclude,
+            mut exclude,
+            gitignore,
         } => {
+            if gitignore {
+                exclude.push("@gitignore".to_owned());
+            }
             let repo = open(cli.repo, password_file)?;
             let mut request = SyncRequest::new(folder, remote.clone());
             request.exclude = exclude;
@@ -4253,6 +4298,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                 code => code,
             })
         }
+        Command::Dotfiles { command } => run_dotfiles(out, cli.repo, password_file, command),
         Command::Push {
             remote,
             all: true,
@@ -4708,6 +4754,139 @@ fn print_switch(r: &apeiron::SwitchReport, snapshot: &str, dry_run: bool) {
         format::short_id(&r.snapshot),
         format::count(r.changes.len() as u64, "change")
     );
+}
+
+/// The list of `apeiron dotfiles` in the home folder (SYNC.md §8): one path
+/// from the home folder per line. It is synced too, so another device learns
+/// the list at its first sync.
+const DOTFILES_LIST: &str = ".apeiron-dotfiles";
+
+fn dotfiles_list(home: &Path) -> Result<Vec<String>, Failure> {
+    let file = home.join(DOTFILES_LIST);
+    match std::fs::read_to_string(&file) {
+        Ok(text) => Ok(text
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+            .map(str::to_owned)
+            .collect()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
+        Err(e) => Err(Failure::Usage(format!("{}: {e}", file.display()))),
+    }
+}
+
+/// A path given on the command line as a path from the home folder, with `/`.
+fn from_home(home: &Path, path: &Path) -> Result<String, Failure> {
+    let full = std::path::absolute(path)
+        .map_err(|e| Failure::Usage(format!("{}: {e}", path.display())))?;
+    let inside = full
+        .strip_prefix(home)
+        .ok()
+        .filter(|r| !r.as_os_str().is_empty())
+        .filter(|r| {
+            r.components()
+                .all(|c| matches!(c, std::path::Component::Normal(_)))
+        })
+        .ok_or_else(|| {
+            Failure::Usage(format!(
+                "{} is not inside the home folder {}",
+                path.display(),
+                home.display()
+            ))
+        })?;
+    let parts: Vec<String> = inside
+        .components()
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    Ok(parts.join("/"))
+}
+
+fn run_dotfiles(
+    out: &Output,
+    repo: Option<PathBuf>,
+    password_file: Option<&Path>,
+    command: DotfilesCommand,
+) -> Result<u8, Failure> {
+    let home =
+        dirs::home_dir().ok_or_else(|| Failure::Usage("cannot find the home folder".to_owned()))?;
+    let save = |list: &[String]| -> Result<(), Failure> {
+        let mut text = String::from("# Files kept equal by `apeiron dotfiles sync`\n");
+        for path in list {
+            text.push_str(path);
+            text.push('\n');
+        }
+        let file = home.join(DOTFILES_LIST);
+        std::fs::write(&file, text).map_err(|e| Failure::Usage(format!("{}: {e}", file.display())))
+    };
+    match command {
+        DotfilesCommand::Add { paths } => {
+            let mut list = dotfiles_list(&home)?;
+            for path in &paths {
+                let path = from_home(&home, path)?;
+                if !list.contains(&path) {
+                    list.push(path);
+                }
+            }
+            list.sort();
+            save(&list)?;
+            out.result(&list, |list| say!("{} on the list", list.len()));
+            Ok(0)
+        }
+        DotfilesCommand::Remove { paths } => {
+            let mut list = dotfiles_list(&home)?;
+            for path in &paths {
+                let path = from_home(&home, path)?;
+                list.retain(|p| *p != path);
+            }
+            save(&list)?;
+            out.result(&list, |list| say!("{} on the list", list.len()));
+            Ok(0)
+        }
+        DotfilesCommand::List => {
+            let list = dotfiles_list(&home)?;
+            out.result(&list, |list| {
+                for path in list {
+                    say!("{path}");
+                }
+                if list.is_empty() {
+                    say!("The list is empty; add files with `apeiron dotfiles add`");
+                }
+            });
+            Ok(0)
+        }
+        DotfilesCommand::Sync {
+            remote,
+            mode,
+            dry_run,
+        } => {
+            let repo = open(repo, password_file)?;
+            let round = |list: &[String]| -> Result<SyncReport, Failure> {
+                let mut request = SyncRequest::new(&home, remote.clone());
+                request.ref_name = Some("sync/dotfiles".to_owned());
+                request.mode = mode.into();
+                request.dry_run = dry_run;
+                request.exclude = std::iter::once(DOTFILES_LIST)
+                    .chain(list.iter().map(String::as_str))
+                    .map(|p| format!("+/{p}"))
+                    .collect();
+                watch(out, repo.sync(request)?)
+            };
+            let before = dotfiles_list(&home)?;
+            let mut report = round(&before)?;
+            // A list that came from the other device brings its files in a
+            // second round.
+            let after = dotfiles_list(&home)?;
+            if after != before && !dry_run {
+                report = round(&after)?;
+            }
+            out.result(&report, |r| print_sync(r, &remote, dry_run));
+            let attention = !report.conflicts.is_empty() || !report.skipped.is_empty();
+            Ok(match warnings_exit(out, &report.warnings) {
+                0 if attention => EXIT_WARNINGS,
+                code => code,
+            })
+        }
+    }
 }
 
 fn print_sync(r: &SyncReport, remote: &str, dry_run: bool) {

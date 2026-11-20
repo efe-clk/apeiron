@@ -173,6 +173,7 @@ fn round(
 
     // 1. Back up the folder as L.
     let state = folder_ref(name);
+    let left_out_before = left_out_before(repo, &state)?;
     let previous = repo.read_ref(&state)?;
     let previous_snapshot = previous.map(|id| repo.read_snapshot(&id)).transpose()?;
     let previous_tree = previous_snapshot.as_ref().map(|s| s.tree);
@@ -186,10 +187,12 @@ fn round(
             tree: previous_tree,
             time: previous_snapshot.as_ref().map(|s| s.time),
             keep_excluded: true,
+            left_out_before: left_out_before.clone(),
         },
         ctl,
     )?;
     outcome.warnings = stored.warnings;
+    let (revived, left_out) = (stored.revived, stored.left_out);
     let local_tree = stored.tree;
     let local = if previous_tree != Some(local_tree) && !dry_run {
         let id = writer.put_snapshot(&snapshot(
@@ -288,7 +291,7 @@ fn round(
             }
         }
         Plan::Receive(r) => receive(repo, options, local_tree, local, r, &mut outcome, ctl)?,
-        Plan::Merge { base, remote: r } => {
+        Plan::Merge { base, remote: r } => 'merge: {
             let base_tree = base
                 .map(|b| repo.read_snapshot(&b).map(|s| s.tree))
                 .transpose()?;
@@ -307,8 +310,8 @@ fn round(
             writer.finish()?;
             if same_content(repo, merged, remote_snapshot.tree)? {
                 outcome.conflicts = conflicts;
-                return receive(repo, options, local_tree, local, r, &mut outcome, ctl)
-                    .map(|()| outcome);
+                receive(repo, options, local_tree, local, r, &mut outcome, ctl)?;
+                break 'merge;
             }
             let mut message = "sync: merge".to_owned();
             describe(&mut message, &conflicts, &outcome.plugin_merges);
@@ -337,7 +340,103 @@ fn round(
             }
         }
     }
+    if !dry_run {
+        if !revived.is_empty() {
+            revive(repo, options, outcome.snapshot, &revived, &mut outcome, ctl)?;
+        }
+        if left_out != left_out_before {
+            save_left_out(repo, &state, &left_out)?;
+        }
+    }
     Ok(outcome)
+}
+
+/// The file of this copy of the repository that keeps the patterns the last
+/// round of a folder left out (FORMAT.md §2, SYNC.md §5.1).
+fn left_out_file(repo: &Repository, state: &str) -> PathBuf {
+    repo.path().join("left-out").join(state)
+}
+
+/// The patterns of this device's last round; none before the first.
+fn left_out_before(repo: &Repository, state: &str) -> Result<Vec<String>> {
+    let path = left_out_file(repo, state);
+    match fs::read_to_string(&path) {
+        Ok(text) => Ok(text.lines().map(str::to_owned).collect()),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(Vec::new()),
+        Err(e) => Err(e).at(&path),
+    }
+}
+
+/// Replaces the patterns of the last round durably (FORMAT.md §9.1).
+fn save_left_out(repo: &Repository, state: &str, patterns: &[String]) -> Result<()> {
+    let path = left_out_file(repo, state);
+    let dir = path.parent().unwrap_or(repo.path());
+    fs::create_dir_all(dir).at(dir)?;
+    let tmp = dir.join(format!(".{}.tmp", tmp_name()));
+    let mut text = patterns.join("\n");
+    text.push('\n');
+    let written = File::create(&tmp)
+        .and_then(|mut f| f.write_all(text.as_bytes()).and_then(|()| f.sync_all()))
+        .and_then(|()| fs::rename(&tmp, &path));
+    if written.is_err() {
+        let _ = fs::remove_file(&tmp);
+    }
+    written.at(&path)
+}
+
+/// Writes to the disk the paths a changed rule no longer leaves out, from
+/// the snapshot the round ended with, where they are missing.
+fn revive(
+    repo: &Repository,
+    options: &SyncOptions,
+    snapshot: Option<ObjectId>,
+    paths: &[Name],
+    outcome: &mut SyncOutcome,
+    ctl: &Control,
+) -> Result<()> {
+    let Some(snapshot) = snapshot else {
+        return Ok(());
+    };
+    let root = repo.read_snapshot(&snapshot)?.tree;
+    let exclude = Exclude::for_folder(&options.folder, &options.exclude)?;
+    let mut apply = Apply {
+        repo,
+        ctl,
+        exclude: &exclude,
+        suffix: "",
+        dry_run: false,
+        outcome,
+    };
+    'paths: for rel in paths {
+        let parts: Vec<&[u8]> = rel.as_bytes().split(|&b| b == b'/').collect();
+        let mut tree = repo.read_tree(&root)?;
+        let mut dir = options.folder.clone();
+        let mut entry = None;
+        for (i, part) in parts.iter().enumerate() {
+            let Some(found) = tree.entries.iter().find(|e| e.name == *part).cloned() else {
+                continue 'paths;
+            };
+            let Some(os_name) = os::os_name(part) else {
+                continue 'paths;
+            };
+            if i + 1 < parts.len() {
+                dir = dir.join(os_name);
+                tree = tree_of(repo, Some(&found))?;
+            } else {
+                entry = Some((found, dir.join(os_name)));
+            }
+        }
+        let Some((entry, path)) = entry else {
+            continue;
+        };
+        if fs::symlink_metadata(&path).is_ok() {
+            continue;
+        }
+        fs::create_dir_all(&dir).at(&dir)?;
+        apply.create(&dir, &path, rel, &entry)?;
+        apply.change(rel.clone(), ChangeKind::Added);
+    }
+    Ok(())
 }
 
 /// Applies the remote snapshot `remote` to the folder and moves the local

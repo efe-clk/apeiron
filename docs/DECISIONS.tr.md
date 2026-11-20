@@ -1154,3 +1154,23 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | İş dosyası için terminalin içinde bir düzenleyici | Metni düzenlemekte kullanıcının kendi düzenleyicisi daha iyidir |
 
 **Sonuçlar.** Sayfalara eklenen bir metin terminalde de kullanılabilir; yalnızca terminalin kullandığı bir metin aynı sözlükte `tui_` önekiyle tutulur. Web arayüzünün çok kullanıcılı ekranları tarayıcıda kalır.
+
+## ADR-054: Hazır kümeler, istenince `.gitignore` ve yalnızca tutulan yollar dışlama dilini genişletir
+
+**Durum:** Kabul edildi (2026-11-20)
+
+**Bağlam.** Geliştiriciler derleme çıktısıyla (`target/`, `node_modules/`, `.venv`) dolu klasörleri yedekler ve zaten `.gitignore` dosyaları tutar. Dotfiles, ev klasöründe her şeyin arasında durur. ADR-039 Git'in kuralları olmadan bir kalıp dili seçti ve senkron bir cihazın hangi yolları dışarıda bıraktığını unutuyordu; bu yüzden bir cihazda kaldırılan bir kural, onun eksik yollarını her cihazda silmeye çeviriyordu.
+
+**Karar.** `@` ile başlayan kalıplar hazır kümeleri adlandırır, `@gitignore` klasörün `ignore` crate'iyle okunan `.gitignore` dosyalarını ekler ve `+<path>` yalnızca adlandırılan yolları tutar ([CLI.tr.md](CLI.tr.md) §4.1). Kalıpların geçtiği her yerde çalışırlar: `--exclude`, `.apeironignore` ve bir işin `exclude`'u; böylece API'ye alan eklenmez. `--gitignore` kısa biçimdir; varsayılan ADR-039 olarak kalır. Deponun her kopyası, bir klasörün son senkron turunda dışarıda bıraktığı kalıpları `left-out/` içinde tutar ([FORMAT.tr.md](FORMAT.tr.md) §2); o zaman dışarıda bırakılıp şimdi bırakılmayan ve diskte olmayan bir yol silinmek yerine tutulur ve diske yazılır ([SYNC.tr.md](SYNC.tr.md) §5.1). `apeiron dotfiles`, kendisi de senkronlanan bir listeden `+` kalıplarıyla ev klasörünün senkronudur ([SYNC.tr.md](SYNC.tr.md) §8).
+
+**Gerekçe.** Kalıplar zaten her istek, iş ve dosyayla taşınıyor; bu yüzden yeni kalıp türleri hepsine birden ulaşır. İstenince okunan `.gitignore` dosyaları kişisel yedekleri öngörülebilir tutarken geliştiricilerin elindeki kuralları yeniden kullanmasını sağlar. Bir turun kuralları tek bir cihaza aittir; bu yüzden onun ref'lerinin yanında tutulur ve asla kopyalanmaz.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| `.gitignore` dosyalarını varsayılan olarak okumak | Bir yedek, yerel notlar gibi Git'in izlemediği dosyaları sessizce kaçırabilirdi |
+| Bir turun kurallarını snapshot'ın `meta`'sında tutmak | Alınan bir snapshot başka bir cihazındır ve iki kopya aynı bilgisayar adını taşıyabilir |
+| Ev klasörüne bağlantılarla bir dotfiles deposu | Bağlantılar dosyalarını yeniden yazan programları bozar; senkron sıradan dosyalar yazar |
+
+**Sonuçlar.** Bir kuralı kaldırmak, onun dışarıda bıraktığı yolları bir sonraki turda diske getirir. Bu sürümden önce senkronlanmış bir depo kurallarını bir sonraki turunda kaydeder; o zamana kadar kaldırılan bir kural bir kez daha silme sayılır.

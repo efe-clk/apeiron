@@ -133,7 +133,7 @@ Proje sahibi 2026-11-20'de hem kişisel geliştiriciler hem kurumlar için bu ö
 | Sürüm | İş | Durum |
 | --- | --- | --- |
 | `0.2.0` | Gözlemlenebilirlik: Prometheus `/metrics` ve bir iş bitince ya da başarısız olunca webhook'lar (Slack, Teams, PagerDuty) ([DAEMON.tr.md](DAEMON.tr.md) §7, §8) | Tamamlandı |
-| `0.3.0` | Geliştirici ön ayarları: hazır dışlama kuralları (`target/`, `node_modules/`, `.venv` …), istenirse `.gitignore` dosyaları (`--gitignore`, varsayılan ADR-039 olarak kalır), dotfiles'ın cihazlar arasında tek komutla senkronu | Başlanmadı |
+| `0.3.0` | Geliştirici ön ayarları: hazır dışlama kuralları (`target/`, `node_modules/`, `.venv` …), istenirse `.gitignore` dosyaları (`--gitignore`, varsayılan ADR-039 olarak kalır), dotfiles'ın cihazlar arasında tek komutla senkronu (ADR-054) | Tamamlandı |
 | `0.4.0` | Fidye yazılımı erken uyarısı: değişen dosya oranı ya da entropi fırlayınca alarm, istenirse hedefin değiştirilemez kilitlenmesi | Başlanmadı |
 | `0.5.0` | Kiracı ve kullanıcı başına kota, bant genişliği sınırı ([VISION.tr.md](VISION.tr.md)), SCIM ile kullanıcı oluşturma ve kapatma | Başlanmadı |
 | `0.6.0` | Sürümlere güven: formatın fuzzing'i, yeniden üretilebilir derleme, Sigstore ile imzalı sürümler | Başlanmadı |

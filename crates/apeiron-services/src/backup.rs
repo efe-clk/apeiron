@@ -108,6 +108,7 @@ pub fn backup_with(
                 tree: Some(snapshot.tree),
                 time: Some(snapshot.time),
                 keep_excluded: false,
+                left_out_before: Vec::new(),
             }
         }
         _ => Previous::default(),
@@ -194,6 +195,12 @@ pub fn backup_with(
 /// A folder stored as a tree.
 pub(crate) struct Stored {
     pub(crate) tree: ObjectId,
+    /// Paths left out in the last round of a sync that no rule leaves out
+    /// now and that are missing from the disk: kept from the earlier tree,
+    /// to be written to the disk (SYNC.md §5.1).
+    pub(crate) revived: Vec<Name>,
+    /// The patterns this store left out, for `sync.left-out`.
+    pub(crate) left_out: Vec<String>,
     pub(crate) files: u64,
     pub(crate) dirs: u64,
     pub(crate) symlinks: u64,
@@ -213,6 +220,8 @@ pub(crate) struct Previous {
     pub(crate) time: Option<Time>,
     /// Keeps what the tree holds at left-out paths (SYNC.md §5.1).
     pub(crate) keep_excluded: bool,
+    /// With `keep_excluded`: the patterns of the last round of a sync.
+    pub(crate) left_out_before: Vec<String>,
 }
 
 /// How much older than the snapshot a file's time must be for its time to
@@ -259,9 +268,13 @@ pub(crate) fn store_folder(
         ctl,
         for_sync,
         exclude: &exclude,
+        before: (previous.keep_excluded && !previous.left_out_before.is_empty())
+            .then(|| Exclude::from_sources(source, &previous.left_out_before)),
+        revived: Vec::new(),
         excluded: 0,
         unchanged: 0,
-        keep_excluded: previous.keep_excluded && !exclude.is_empty(),
+        keep_excluded: previous.keep_excluded
+            && !(exclude.is_empty() && previous.left_out_before.is_empty()),
         newer_than: previous
             .time
             .map(|t| t.seconds.saturating_sub(TIME_MARGIN_SECONDS)),
@@ -276,6 +289,8 @@ pub(crate) fn store_folder(
         .ok_or_else(|| Error::InvalidInput(format!("{} cannot be read", source.display())))?;
     Ok(Stored {
         tree,
+        revived: walk.revived,
+        left_out: exclude.sources().to_vec(),
         files: walk.files,
         dirs: walk.dirs,
         symlinks: walk.symlinks,
@@ -324,6 +339,9 @@ struct Walk<'c> {
     ctl: &'c Control,
     for_sync: bool,
     exclude: &'c Exclude,
+    /// The rules of the last round of a sync, when known.
+    before: Option<Exclude>,
+    revived: Vec<Name>,
     excluded: u64,
     unchanged: u64,
     keep_excluded: bool,
@@ -347,6 +365,20 @@ impl Walk<'_> {
 
     /// What `tree` holds at paths that are left out, as a tree; `None` if
     /// nothing. For a folder of `previous` that is gone from the disk.
+    /// Whether a recorded path missing from the disk keeps its entry: it is
+    /// left out now, or was in the last round of a sync, and is then to be
+    /// written to the disk.
+    fn left_out(&mut self, path: &Name, name: &[u8]) -> bool {
+        if self.exclude.matches(path, name) {
+            return true;
+        }
+        let before = self.before.as_ref().is_some_and(|b| b.matches(path, name));
+        if before {
+            self.revived.push(path.clone());
+        }
+        before
+    }
+
     fn kept_part(
         &mut self,
         writer: &mut ObjectWriter<'_>,
@@ -356,7 +388,7 @@ impl Walk<'_> {
         let mut entries = Vec::new();
         for entry in writer.read_tree(tree)?.entries {
             let child = rel.join(&entry.name);
-            if self.exclude.matches(&child, &entry.name) {
+            if self.left_out(&child, &entry.name) {
                 entries.push(entry);
             } else if let EntryKind::Directory { tree } = entry.kind
                 && let Some(tree) = self.kept_part(writer, &tree, &child)?
@@ -474,7 +506,7 @@ impl Walk<'_> {
                 continue;
             }
             let child = rel.join(&entry.name);
-            if self.exclude.matches(&child, &entry.name) {
+            if self.left_out(&child, &entry.name) {
                 entries.push(entry.clone());
             } else if let EntryKind::Directory { tree } = entry.kind
                 && let Some(tree) = self.kept_part(writer, &tree, &child)?

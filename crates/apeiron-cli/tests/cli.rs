@@ -1542,3 +1542,95 @@ fn ape_is_the_same_command() {
         assert_eq!(short.stderr, long.stderr, "{args:?}");
     }
 }
+
+#[test]
+fn backup_leaves_out_presets_and_gitignore_files() {
+    let s = Setup::new();
+    fs::create_dir_all(s.root.join("src/node_modules/x")).unwrap();
+    fs::write(s.root.join("src/node_modules/x/i.js"), b"1").unwrap();
+    fs::write(s.root.join("src/.gitignore"), b"*.log\n").unwrap();
+    fs::write(s.root.join("src/debug.log"), b"2").unwrap();
+    let plain = s.json(&["backup", &s.path("src"), "--exclude", "@node"]);
+    let ls = s.ok(&["ls", "main"]);
+    assert!(!ls.contains("node_modules"), "{ls}");
+    assert!(ls.contains("debug.log"), "{ls}");
+    assert!(plain["excluded"].as_u64().unwrap() >= 1, "{plain}");
+    s.ok(&["backup", &s.path("src"), "--gitignore", "--exclude", "@dev"]);
+    let ls = s.ok(&["ls", "main"]);
+    assert!(!ls.contains("debug.log"), "{ls}");
+    assert!(ls.contains(".gitignore"), "{ls}");
+    let wrong = s.run(&["backup", &s.path("src"), "--exclude", "@nothing"]);
+    assert_eq!(
+        code(&wrong),
+        Some(1),
+        "{}",
+        String::from_utf8_lossy(&wrong.stderr)
+    );
+}
+
+/// `apeiron dotfiles` on two home folders, through a folder remote.
+#[cfg(unix)]
+#[test]
+fn dotfiles_follow_their_list_to_another_device() {
+    let s = Setup::new();
+    let (a, b) = (s.root.join("home-a"), s.root.join("home-b"));
+    fs::create_dir_all(a.join(".config/nvim")).unwrap();
+    fs::create_dir_all(a.join("Documents")).unwrap();
+    fs::create_dir_all(&b).unwrap();
+    fs::write(a.join(".bashrc"), b"alias ll='ls -l'\n").unwrap();
+    fs::write(a.join(".config/nvim/init.lua"), b"-- nvim\n").unwrap();
+    fs::write(a.join(".config/other"), b"not on the list").unwrap();
+    fs::write(a.join("Documents/big.pdf"), b"not on the list").unwrap();
+    let remote = s.path("remote");
+    let repo_b = s.root.join("repo-b");
+    let on = |home: &Path, repo: &Path, args: &[&str]| {
+        let out = Command::new(env!("CARGO_BIN_EXE_apeiron"))
+            .args(args)
+            .current_dir(home)
+            .env("HOME", home)
+            .env("APEIRON_REPO", repo)
+            .output()
+            .unwrap();
+        assert_eq!(
+            code(&out),
+            Some(0),
+            "{args:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8(out.stdout).unwrap()
+    };
+    on(&a, &s.repo(), &["remote", "add", "origin", &remote]);
+    on(
+        &a,
+        &s.repo(),
+        &["dotfiles", "add", ".bashrc", ".config/nvim"],
+    );
+    let list = on(&a, &s.repo(), &["dotfiles", "list"]);
+    assert_eq!(list, ".bashrc\n.config/nvim\n");
+    on(&a, &s.repo(), &["dotfiles", "sync", "origin"]);
+    // The second device starts from a copy of the repository.
+    on(&b, &repo_b, &["clone", &remote, repo_b.to_str().unwrap()]);
+
+    on(&b, &repo_b, &["dotfiles", "sync", "origin"]);
+    assert_eq!(fs::read(b.join(".bashrc")).unwrap(), b"alias ll='ls -l'\n");
+    assert_eq!(
+        fs::read(b.join(".config/nvim/init.lua")).unwrap(),
+        b"-- nvim\n"
+    );
+    assert!(!b.join(".config/other").exists());
+    assert!(!b.join("Documents").exists());
+
+    // A change on one device reaches the other.
+    fs::write(b.join(".bashrc"), b"alias la='ls -a'\n").unwrap();
+    on(&b, &repo_b, &["dotfiles", "sync", "origin"]);
+    on(&a, &s.repo(), &["dotfiles", "sync", "origin"]);
+    assert_eq!(fs::read(a.join(".bashrc")).unwrap(), b"alias la='ls -a'\n");
+    assert!(a.join("Documents/big.pdf").exists());
+
+    let outside = Command::new(env!("CARGO_BIN_EXE_apeiron"))
+        .args(["dotfiles", "add", "/etc/hosts"])
+        .env("HOME", &a)
+        .output()
+        .unwrap();
+    assert_eq!(code(&outside), Some(2));
+}

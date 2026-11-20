@@ -470,3 +470,31 @@ fn a_rule_added_later_keeps_what_was_recorded_elsewhere() {
     round(&mut s.a, &s.remote);
     assert_eq!(names(&s.a.folder), ["notes.txt", "sub/plan.md"]);
 }
+
+#[test]
+fn a_path_no_longer_left_out_is_received_not_deleted() {
+    let mut s = setup();
+    write(&s.a.folder, "videos/big.bin", "video");
+    round(&mut s.a, &s.remote);
+    round_excluding(&mut s.b, &s.remote, "videos");
+    assert!(!s.b.folder.join("videos").exists());
+
+    // b stops leaving the videos out: it gets them instead of deleting them
+    // everywhere.
+    let out = round(&mut s.b, &s.remote);
+    assert_eq!(
+        fs::read_to_string(s.b.folder.join("videos/big.bin")).unwrap(),
+        "video",
+        "{out:?}"
+    );
+    round(&mut s.a, &s.remote);
+    assert_eq!(
+        fs::read_to_string(s.a.folder.join("videos/big.bin")).unwrap(),
+        "video"
+    );
+    // From now on a deletion at b is a real one.
+    fs::remove_dir_all(s.b.folder.join("videos")).unwrap();
+    round(&mut s.b, &s.remote);
+    round(&mut s.a, &s.remote);
+    assert!(!s.a.folder.join("videos").exists());
+}
