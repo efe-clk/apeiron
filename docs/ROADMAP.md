@@ -136,7 +136,7 @@ The owner asked on 2026-11-20 for these features, for personal developers and or
 | `0.3.0` | Developer presets: ready exclusion rules (`target/`, `node_modules/`, `.venv` …), `.gitignore` files on request (`--gitignore`, ADR-039 stays the default), dotfiles synced between devices with one command (ADR-054) | Done |
 | `0.4.0` | Ransomware early warning: an alarm when the share of changed files or their entropy jumps, and on request an immutable lock of the target ([CLI.md](CLI.md) §4.3) | Done |
 | `0.5.0` | Quotas per tenant and user, bandwidth limits ([VISION.md](VISION.md)), users made and closed through SCIM ([USERS.md](USERS.md) §2.1, §4.1, [TENANTS.md](TENANTS.md) §2.1) | Done |
-| `0.6.0` | Trust in releases: fuzzing of the format, reproducible builds, releases signed with Sigstore | Not started |
+| `0.6.0` | Trust in releases: fuzzing of the format, reproducible builds, releases signed with Sigstore ([SECURITY.md](../SECURITY.md) §4) | Done, except that `apeiron` is not yet byte-identical between builds: Wasmtime's generated code differs |
 | `0.7.0` | Packages: Homebrew, AUR, winget, Chocolatey, Flathub, RPM and Nix, beside the `.deb` and `cargo install --git` | Not started |
 | `0.8.0` | `apeiron mount`: every snapshot as a read-only folder through FUSE (Linux, macOS) and ProjFS (Windows) | Not started |
 | `0.9.0` | Importing restic and Borg repositories, and the large files of Git LFS | Not started |

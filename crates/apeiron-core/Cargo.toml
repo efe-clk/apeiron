@@ -11,6 +11,10 @@ publish = false
 [lib]
 name = "apeiron_core"
 
+[features]
+# Entry points for cargo-fuzz (fuzz/); not for programs.
+fuzz = []
+
 [dependencies]
 apeiron-sys = { package = "apeiron-sys-rs", version = "0.5.0", path = "../apeiron-sys" }
 argon2 = { version = "0.6.0", default-features = false, features = ["alloc"] }

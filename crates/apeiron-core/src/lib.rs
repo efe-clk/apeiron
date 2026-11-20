@@ -12,6 +12,9 @@ mod error;
 #[cfg(test)]
 mod fault;
 mod fsutil;
+#[cfg(feature = "fuzz")]
+#[doc(hidden)]
+pub mod fuzz;
 mod hold;
 mod id;
 mod index;

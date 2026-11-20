@@ -39,3 +39,19 @@ Your report is visible only to the maintainers. You will get an answer as soon a
 | No forced third parties | Data is never sent to a third party as a requirement | In effect |
 
 The full security model is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## 4. Verifying a release
+
+Every file of a release from 0.6.0 on can be checked in three ways:
+
+| Check | How | What it proves |
+| --- | --- | --- |
+| Checksum | `sha256sum -c SHA256SUMS --ignore-missing` beside the downloaded files | The file is the one the release page lists |
+| Sigstore | `gh attestation verify <file> --repo efe-clk/apeiron` | The file was built by the `Release` workflow of this repository, from the commit of its tag, and has not changed since; the signature is made through Sigstore with a short-lived certificate, so there is no long-lived key to steal |
+| Build record | `BUILDINFO-linux-<architecture>.txt` | The commit, the Rust version, the build flags and the checksums of the programs inside the Linux packages, for building them again |
+
+The macOS and Windows packages are not signed with an Apple or Microsoft certificate, so those systems still warn about them (§1); the Sigstore attestation covers them too.
+
+Builds are made to be repeatable: the time is the commit's (`SOURCE_DATE_EPOCH`), paths of the build machine are mapped to `/build`, `/cargo` and `/rustup`, and the archives are written with sorted names and no times of their own. `ape` comes out byte for byte the same from two builds. `apeiron` does not yet: the WebAssembly runtime it contains, Wasmtime 50, generates code that differs from one build to the next even in the same folder, so two builds of the same commit differ there. The build record lists what to compare once that is solved.
+
+The decoders of the storage format (objects, index files, pack entries, ref, reflog and operation log lines, `config` and remote addresses) are fuzzed: `fuzz/` holds a target for each, which CI runs for a minute on every push. To run one longer: `cd fuzz && cargo +nightly fuzz run objects` (needs `cargo install cargo-fuzz`). An external security audit has not been made; it needs a third party the owner chooses.

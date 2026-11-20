@@ -42,4 +42,8 @@ dpkg-deb --root-owner-group --build "$root" "$out/apeiron_${version}_${arch}.deb
 tarball=$(mktemp -d)
 mkdir "$tarball/apeiron-$version"
 cp target/release/apeiron target/release/ape LICENSE-MIT LICENSE-APACHE "$tarball/apeiron-$version/"
-tar -C "$tarball" -czf "$out/apeiron-$version-linux-$(uname -m).tar.gz" "apeiron-$version"
+# The same bytes for the same build: sorted names, the commit's time and no
+# owner or time in the gzip header (SECURITY.md §4).
+mtime=${SOURCE_DATE_EPOCH:-0}
+tar -C "$tarball" --sort=name --mtime="@$mtime" --owner=0 --group=0 --numeric-owner \
+  -cf - "apeiron-$version" | gzip -n > "$out/apeiron-$version-linux-$(uname -m).tar.gz"

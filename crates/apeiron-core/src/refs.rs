@@ -111,7 +111,7 @@ impl ReflogEntry {
         format!("{body} {check}\n")
     }
 
-    fn decode(line: &str) -> Option<Self> {
+    pub(crate) fn decode(line: &str) -> Option<Self> {
         let (body, check) = line.rsplit_once(' ')?;
         if short_check(body) != check {
             return None;
@@ -136,7 +136,7 @@ impl ReflogEntry {
     }
 }
 
-fn short_check(body: &str) -> String {
+pub(crate) fn short_check(body: &str) -> String {
     to_hex(&blake3::hash(body.as_bytes()).as_bytes()[..8])
 }
 

@@ -39,3 +39,19 @@ Bildiriminizi yalnızca proje yürütücüleri görür. En kısa sürede yanıt 
 | Zorunlu üçüncü taraf yok | Veri hiçbir zaman zorunlu olarak üçüncü bir tarafa gönderilmez | Uygulanıyor |
 
 Güvenlik modelinin tamamı [docs/ARCHITECTURE.tr.md](docs/ARCHITECTURE.tr.md) içindedir.
+
+## 4. Bir sürümü doğrulamak
+
+0.6.0'dan itibaren bir sürümün her dosyası üç yolla denetlenebilir:
+
+| Denetim | Nasıl | Neyi kanıtlar |
+| --- | --- | --- |
+| Sağlama toplamı | İndirilen dosyaların yanında `sha256sum -c SHA256SUMS --ignore-missing` | Dosya, sürüm sayfasının listelediğidir |
+| Sigstore | `gh attestation verify <file> --repo efe-clk/apeiron` | Dosya, bu deponun `Release` iş akışı tarafından etiketinin commit'inden derlenmiş ve o zamandan beri değişmemiştir; imza Sigstore üzerinden kısa ömürlü bir sertifikayla atılır, bu yüzden çalınabilecek uzun ömürlü bir anahtar yoktur |
+| Derleme kaydı | `BUILDINFO-linux-<mimari>.txt` | Yeniden derlemek için commit, Rust sürümü, derleme bayrakları ve Linux paketlerindeki programların sağlama toplamları |
+
+macOS ve Windows paketleri bir Apple ya da Microsoft sertifikasıyla imzalı değildir, bu yüzden bu sistemler yine uyarır (§1); Sigstore kanıtı onları da kapsar.
+
+Derlemeler tekrarlanabilir olacak biçimde yapılır: zaman commit'in zamanıdır (`SOURCE_DATE_EPOCH`), derleme makinesinin yolları `/build`, `/cargo` ve `/rustup` olarak eşlenir ve arşivler sıralı adlarla, kendi zamanları olmadan yazılır. `ape` iki derlemeden bayt bayt aynı çıkar. `apeiron` henüz çıkmaz: içerdiği WebAssembly çalışma ortamı Wasmtime 50, aynı klasörde bile bir derlemeden ötekine değişen kod üretir; bu yüzden aynı commit'in iki derlemesi orada farklıdır. Derleme kaydı, bu çözüldüğünde neyin karşılaştırılacağını listeler.
+
+Depolama formatının çözücüleri (nesneler, dizin dosyaları, pack girdileri, ref, reflog ve işlem günlüğü satırları, `config` ve uzak depo adresleri) fuzz edilir: `fuzz/` her biri için bir hedef tutar ve CI her push'ta her birini bir dakika çalıştırır. Birini daha uzun çalıştırmak için: `cd fuzz && cargo +nightly fuzz run objects` (`cargo install cargo-fuzz` gerekir). Dış bir güvenlik denetimi yapılmadı; proje sahibinin seçeceği bir üçüncü taraf gerektirir.

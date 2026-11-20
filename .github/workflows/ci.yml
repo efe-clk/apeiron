@@ -133,3 +133,21 @@ jobs:
       - if: failure()
         run: docker logs pebble; docker logs challtestsrv
 
+
+  # Each fuzz target of the format for a minute (fuzz/, SECURITY.md §4).
+  fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install --locked cargo-fuzz
+      - run: |
+          cd fuzz
+          for target in objects index pack_entry text; do
+            cargo +nightly fuzz run "$target" -- -max_total_time=60 -rss_limit_mb=2048
+          done
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-artifacts
+          path: fuzz/artifacts/

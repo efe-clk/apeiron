@@ -1,0 +1,44 @@
+[package]
+name = "apeiron-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "MIT OR Apache-2.0"
+
+# Not part of the main workspace: it needs nightly Rust and cargo-fuzz.
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+apeiron-core = { package = "apeiron-core-rs", path = "../crates/apeiron-core", features = ["fuzz"] }
+
+[[bin]]
+name = "objects"
+path = "fuzz_targets/objects.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "index"
+path = "fuzz_targets/index.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pack_entry"
+path = "fuzz_targets/pack_entry.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "text"
+path = "fuzz_targets/text.rs"
+test = false
+doc = false
+bench = false
