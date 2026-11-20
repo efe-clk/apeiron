@@ -4798,8 +4798,16 @@ fn dotfiles_list(home: &Path) -> Result<Vec<String>, Failure> {
 fn from_home(home: &Path, path: &Path) -> Result<String, Failure> {
     let full = std::path::absolute(path)
         .map_err(|e| Failure::Usage(format!("{}: {e}", path.display())))?;
+    // Folders are compared by their real path (on macOS /var is
+    // /private/var); the file itself may be a link and stays as it is.
+    let real = |p: &Path| p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
+    let full = match (full.parent(), full.file_name()) {
+        (Some(dir), Some(name)) => real(dir).join(name),
+        _ => full,
+    };
+    let home = real(home);
     let inside = full
-        .strip_prefix(home)
+        .strip_prefix(&home)
         .ok()
         .filter(|r| !r.as_os_str().is_empty())
         .filter(|r| {

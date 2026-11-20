@@ -1627,6 +1627,22 @@ fn dotfiles_follow_their_list_to_another_device() {
     assert_eq!(fs::read(a.join(".bashrc")).unwrap(), b"alias la='ls -a'\n");
     assert!(a.join("Documents/big.pdf").exists());
 
+    // A home folder named through a link, as /var is on macOS.
+    let link = s.root.join("link-a");
+    std::os::unix::fs::symlink(&a, &link).unwrap();
+    let out = Command::new(env!("CARGO_BIN_EXE_apeiron"))
+        .args(["dotfiles", "add", "Documents"])
+        .current_dir(&a)
+        .env("HOME", &link)
+        .output()
+        .unwrap();
+    assert_eq!(
+        code(&out),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
     let outside = Command::new(env!("CARGO_BIN_EXE_apeiron"))
         .args(["dotfiles", "add", "/etc/hosts"])
         .env("HOME", &a)
