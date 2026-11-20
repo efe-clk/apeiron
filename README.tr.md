@@ -47,7 +47,7 @@ Her katman yalnızca hemen altındaki katmanı kullanır. Ayrıntılar: [docs/AR
 | Katman | Crate | Rol | Durum |
 | --- | --- | --- | --- |
 | Çekirdek | `apeiron-core` | Nesne modeli, chunk bölme, paket/indeks dosyaları, ref ve reflog | Devam ediyor |
-| Depolama hedefleri | `apeiron-core`, `apeiron-remote` | Klasör (yerel ya da harici disk), SFTP ve S3 uzak depoları | Tamamlandı |
+| Depolama hedefleri | `apeiron-core`, `apeiron-remote`, `apeiron-plugin` | Klasör (yerel ya da harici disk), SFTP, S3 ve başka bir cihaz (`peer://`) uzak depo olarak; eklentiler daha fazlasını ekler (`plugin://`) | Tamamlandı |
 | Hizmetler | `apeiron-services` | Bugün yedek, geri yükleme, listeleme, fark, senkron, birleştirme, arama ve eski yedekleri budama | Devam ediyor |
 | Herkese açık API | `apeiron` | Tüm işlemler için Rust API ([docs/API.tr.md](docs/API.tr.md) §8) | Devam ediyor |
 | Sistem çağrıları | `apeiron-sys` | `unsafe` gerektiren işletim sistemi çağrıları (Windows write-through) | Tamamlandı |
@@ -58,7 +58,7 @@ Her katman yalnızca hemen altındaki katmanı kullanır. Ayrıntılar: [docs/AR
 | Terminal arayüzü | `apeiron-tui`, `apeiron-cli` | Masaüstü arayüzünün ekranları bir terminalin içinde; ekranı olmayan sunucular ve SSH için ([docs/TUI.tr.md](docs/TUI.tr.md)) | Tamamlandı |
 | Web arayüzü | `apeiron-server`, `apeiron-cli` | Aynı sayfaların başka bilgisayarlara TLS ile, rolleri ve kendi yedekleri olan kullanıcılara sunulması ([docs/WEB.tr.md](docs/WEB.tr.md), [docs/USERS.tr.md](docs/USERS.tr.md)) | Tamamlandı |
 | Git | `apeiron-git` | Git depolarını aynı commit kimlikleriyle içe ve dışa aktarma ([docs/GIT.tr.md](docs/GIT.tr.md)) | Tamamlandı |
-| Eklentiler | `apeiron-plugin` | WebAssembly eklenti ortamı; tür sürücüleri dosyaları birleştirir ([docs/PLUGIN.tr.md](docs/PLUGIN.tr.md)) | Tamamlandı |
+| Eklentiler | `apeiron-plugin` | WebAssembly eklenti ortamı; tür sürücüleri, içe aktarıcılar, kancalar ve depolama arka uçları, ve bir eklenti mağazası ([docs/PLUGIN.tr.md](docs/PLUGIN.tr.md)) | Tamamlandı |
 
 Planlanan katmanların crate adları, o katmana başlanırken belirlenir.
 

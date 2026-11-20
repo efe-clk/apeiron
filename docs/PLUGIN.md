@@ -130,7 +130,7 @@ The SHA-256 makes sure the file is the one the index lists, not that the index i
 | Item | Where |
 | --- | --- |
 | Line-by-line text merge and showing a difference | The text plugin ([TEXT.md](TEXT.md)) |
-| Hooks of other events than `backup` | Later, as uses for them appear |
+| Hooks of other events than `backup` and `backup-done` | Later, as uses for them appear |
 | Git as a plugin | Not planned; ADR-049 ([DECISIONS.md](DECISIONS.md)) |
 
 ## 8. Crates

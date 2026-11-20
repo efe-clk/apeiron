@@ -66,7 +66,7 @@ The jobs of a web server's background service are edited on its Schedule page fr
 | Progress reporting | Long jobs report progress (items and bytes done and total, current phase) | Done |
 | Cancellation | Every long job can be cancelled; cancellation leaves the repository in a valid state (old or new, never half) | Done |
 | Timeouts | SDKs support timeouts using the same cancellation mechanism | Done (Python) |
-| Result query | A finished job's result can be read later, including in remote mode | Done for embedded use and the web server; no remote mode yet |
+| Result query | A finished job's result can be read later, including in remote mode | Done for embedded use and in remote mode through a web server (section 2.1) |
 
 Cancellation is safe by construction: objects become visible only after they are flushed, and refs are updated last ([FORMAT.md](FORMAT.md) §9).
 
@@ -273,7 +273,7 @@ Problems that do not stop an operation (an unreadable file during a backup, a fi
 
 | Rule | Description |
 | --- | --- |
-| Serialisable | Every request, result, progress and error value can be written as JSON (`serde`). The CLI's `--json` output, the C ABI and the future remote mode use this form |
+| Serialisable | Every request, result, progress and error value can be written as JSON (`serde`). The CLI's `--json` output, the C ABI and the remote mode (section 2.1) use this form |
 | Ids | Object ids are 64-character lowercase hex strings in JSON |
 | Times | Unix seconds and nanoseconds, UTC |
 | Paths and names | A string when the bytes are valid UTF-8; otherwise an object `{"hex": "…"}` holding the raw bytes, so no name is ever lost |

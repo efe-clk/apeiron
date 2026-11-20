@@ -2,7 +2,7 @@
 
 # Apeiron User Guide
 
-> **Status:** For trying Apeiron on your own data. Apeiron has no release yet; it is built from source. All commands below work today. The full command reference is [CLI.md](CLI.md).
+> **Status:** For trying Apeiron on your own data. It is installed from a ready-made package (section 2.4) or built from source. All commands below work today. The full command reference is [CLI.md](CLI.md).
 
 This guide takes you from installation to a daily backup on an external disk, restoring files, and a routine for one month of trying it.
 
@@ -46,7 +46,7 @@ cargo install --locked --force --git https://github.com/efe-clk/apeiron apeiron-
 
 ### 2.4 Ready-made packages
 
-Packages come with each release on [the releases page](https://github.com/efe-clk/apeiron/releases). No release is published yet.
+Packages come with each release on [the releases page](https://github.com/efe-clk/apeiron/releases); the first, 0.1.0, was published on 2026-11-18.
 
 | System | File | After installing |
 | --- | --- | --- |
@@ -57,7 +57,7 @@ Packages come with each release on [the releases page](https://github.com/efe-cl
 
 The packages are not signed yet, so the system warns about them. On macOS, right-click the app and choose Open. On Windows, choose More info, then Run anyway. To check a file first, compare it with `SHA256SUMS` on the same page.
 
-The plugins for text and documents are on the same page: `apeiron plugin add apeiron_text.wasm`. Uninstalling removes the program; your backups and settings stay.
+The plugins for text and documents are on the same page: `apeiron plugin install text` downloads and installs one (`apeiron plugin add apeiron_text.wasm` installs a downloaded file). Uninstalling removes the program; your backups and settings stay.
 
 ## 3. Creating the repository
 
@@ -245,7 +245,7 @@ When both `main` and the branch changed the same file, `main` keeps its version 
 
 ### 6.8 Merging text files line by line
 
-Without a plugin, two changes to the same text file always leave a conflict copy. The text plugin joins changes to different lines ([TEXT.md](TEXT.md)). It is built once and installed for your user:
+Without a plugin, two changes to the same text file always leave a conflict copy. The text plugin joins changes to different lines ([TEXT.md](TEXT.md)). `apeiron plugin install text` downloads it from the latest release and installs it for your user; to build it from source instead:
 
 ```bash
 git clone https://github.com/efe-clk/apeiron.git

@@ -39,11 +39,11 @@ Temel tasarım fikirleri:
 | Katman | Sorumluluk | Crate | Durum |
 | --- | --- | --- | --- |
 | Arayüzler | CLI, arka plan hizmeti, masaüstü, terminal, web, mobil | `apeiron-cli`, `apeiron-daemon`, `apeiron-server`, `apeiron-desktop`, `apeiron-tui` | Devam ediyor (CLI, arka plan hizmeti, masaüstü, terminal ve web tamamlandı) |
-| Herkese açık API | Kararlı Rust API; diğer diller için C ABI; üstünde SDK'lar | `apeiron`, `apeiron-ffi` | Devam ediyor (Rust API, C ABI ve Python SDK'sı tamamlandı) |
+| Herkese açık API | Kararlı Rust API; diğer diller için C ABI; üstünde SDK'lar | `apeiron`, `apeiron-ffi` | Devam ediyor (Rust API, C ABI, Python ve C++ SDK'ları tamamlandı) |
 | Hizmetler | Sürümleme, arşiv, yedek, senkron, arama, politika | `apeiron-services`, `apeiron-git` | Devam ediyor (yedek, geri yükleme, fark, senkron, birleştirme, arama, Git içe ve dışa aktarma) |
 | Çekirdek | Nesne modeli, depolama motoru, bütünlük, şifreleme, işlem günlüğü | `apeiron-core` | Devam ediyor |
-| Depolama hedefleri | Yerel disk, harici disk, ağ depolaması, uzak hedefler | `apeiron-core` (`Store`, klasörler), `apeiron-remote` (SFTP, S3) | Tamamlandı |
-| Eklentiler | Type driver'lar, storage backend'ler, içe/dışa aktarıcılar, hook'lar | `apeiron-plugin` | Devam ediyor (ortam ve tür sürücüleri tamamlandı) |
+| Depolama hedefleri | Yerel disk, harici disk, ağ depolaması, uzak hedefler | `apeiron-core` (`Store`, klasörler), `apeiron-remote` (SFTP, S3, `peer://` ile başka bir cihaz), `apeiron-plugin` (depolama arka ucu eklentileri, `plugin://`) | Tamamlandı |
+| Eklentiler | Type driver'lar, storage backend'ler, içe/dışa aktarıcılar, hook'lar | `apeiron-plugin` | Devam ediyor (ortam, tür sürücüleri, içe aktarıcılar, kancalar, depolama arka uçları ve eklenti mağazası tamamlandı; dışa aktarıcılar yazılmadı) |
 
 Her crate için geçerli kurallar:
 
@@ -95,7 +95,7 @@ Ref bir snapshot'a ad verir; snapshot bir kök tree'yi ve ebeveyn snapshot'ları
 | Ref | Bir snapshot'ı gösteren ad; dal, etiket ve yedek noktası aynı şeydir | Tamamlandı |
 | Store | Nesnelerin saklandığı yer; her hedef için aynı arayüz | Tamamlandı (klasör, SFTP, S3) |
 | Policy | Saklama, şifreleme, senkron ve doğrulama kuralları | Devam ediyor (saklama kuralları, yasal saklama kilitleri ve budama tamamlandı, [ARCHIVE.tr.md](ARCHIVE.tr.md), [FORMAT.tr.md](FORMAT.tr.md) §13.4; politika olarak senkron ve doğrulama kuralları yazılmadı) |
-| Type driver | Türe özgü diff, birleştirme, önizleme ve indeksleme; eklenti olarak | Devam ediyor (fark ve birleştirme tamamlandı, [PLUGIN.tr.md](PLUGIN.tr.md); önizleme ve indeksleme yazılmadı) |
+| Type driver | Türe özgü diff, birleştirme, önizleme ve indeksleme; eklenti olarak | Devam ediyor (fark, birleştirme ve arama için metin tamamlandı, [PLUGIN.tr.md](PLUGIN.tr.md); önizleme yazılmadı) |
 
 Blob, tree ve snapshot `minicbor` ile kanonik CBOR olarak kodlanır. Bunları gerçek dosyalardan yedek ve sürümleme hizmetleri oluşturur.
 
@@ -182,7 +182,7 @@ Senkron yedek değildir: her cihaz kendi geçmişini ve reflog'larını tutar, b
 
 ## 6. Eklenti sınırı
 
-Durum: Devam ediyor. Ortam ve ilk eklenti türü olan tür sürücüleri tamamlandı ([PLUGIN.tr.md](PLUGIN.tr.md)); eklenti API'sinin 0.2 sürümü hiç izin vermez.
+Durum: Devam ediyor. Ortam, tür sürücüleri, içe aktarıcılar, kancalar ve depolama arka uçları tamamlandı ([PLUGIN.tr.md](PLUGIN.tr.md)); eklenti API'sinin 0.2 sürümünün tek izni, kurulumda verilen ağ ana makinelerine ulaşmaktır (PLUGIN.tr.md §3.1).
 
 ```mermaid
 flowchart LR
@@ -221,7 +221,7 @@ flowchart LR
 | Şifreleme | İstemci tarafı şifreleme; uzak hedef düz metni hiç görmez; anahtarlar kullanıcıda kalır | Tamamlandı |
 | Kimlik ve izinler | Okuma, yazma, silme, paylaşma ve yönetme izinleri ayrıdır | Web arayüzü için tamamlandı ([USERS.tr.md](USERS.tr.md), [SHARE.tr.md](SHARE.tr.md)) |
 | Denetim kaydı | Hassas işlemler kaydedilir; hassas veri hiçbir zaman kaydedilmez | Web arayüzü için tamamlandı ([AUDIT.tr.md](AUDIT.tr.md)) |
-| Eklentiler | Bildirilmiş ve kullanıcının onayladığı izinlerle WASM sandbox | Yerinde; henüz izin verilmiyor |
+| Eklentiler | Bildirilmiş ve kullanıcının onayladığı izinlerle WASM sandbox | Yerinde; yalnızca kurulumda verilen ağ ana makineleri (PLUGIN.tr.md §3.1) |
 | Bellek güvenliği | `unsafe` yalnızca FFI crate'inde ve `apeiron-sys` içinde | Uygulanıyor |
 | Uzak erişim | Varsayılan olarak kapalı; açıkça yapılandırılır | Uygulanıyor (`apeiron web` yalnızca istenince başlar; `apeiron ui` yalnızca bu bilgisayarda dinler) |
 | Telemetri | Varsayılan olarak kapalı; veri hiçbir zaman zorunlu olarak üçüncü tarafa gönderilmez | Uygulanıyor (telemetri yok) |

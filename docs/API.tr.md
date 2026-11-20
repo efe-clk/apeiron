@@ -66,7 +66,7 @@ Bir web sunucusunun arka plan hizmetinin işleri, herhangi bir bilgisayardan Zam
 | İlerleme bildirimi | Uzun işler ilerlemeyi bildirir (biten ve toplam öğe ve bayt, o anki evre) | Tamamlandı |
 | İptal | Her uzun iş iptal edilebilir; iptal, depoyu geçerli bir durumda bırakır (eski ya da yeni, asla yarım) | Tamamlandı |
 | Zaman aşımı | SDK'lar aynı iptal mekanizmasıyla zaman aşımını destekler | Tamamlandı (Python) |
-| Sonuç sorgulama | Biten bir işin sonucu sonradan okunabilir; uzak kullanımda da | Gömülü kullanım ve web sunucusu için tamamlandı; uzak kullanım henüz yok |
+| Sonuç sorgulama | Biten bir işin sonucu sonradan okunabilir; uzak kullanımda da | Gömülü kullanımda ve web sunucusu üzerinden uzak kullanımda tamamlandı (bölüm 2.1) |
 
 İptal, tasarım gereği güvenlidir: nesneler ancak diske sabitlendikten sonra görünür ve ref'ler en son güncellenir ([FORMAT.tr.md](FORMAT.tr.md) §9).
 
@@ -273,7 +273,7 @@ Bir işlemi durdurmayan sorunlar (yedek sırasında okunamayan bir dosya, okunur
 
 | Kural | Açıklama |
 | --- | --- |
-| Serileştirilebilir | Her istek, sonuç, ilerleme ve hata değeri JSON olarak yazılabilir (`serde`). CLI'ın `--json` çıktısı, C ABI ve ileride uzak kullanım bu biçimi kullanır |
+| Serileştirilebilir | Her istek, sonuç, ilerleme ve hata değeri JSON olarak yazılabilir (`serde`). CLI'ın `--json` çıktısı, C ABI ve uzak kullanım (bölüm 2.1) bu biçimi kullanır |
 | Kimlikler | Nesne kimlikleri JSON'da 64 karakterlik küçük harfli hex metinlerdir |
 | Zamanlar | Unix saniyesi ve nanosaniye, UTC |
 | Yollar ve adlar | Baytlar geçerli UTF-8 ise metin; değilse ham baytları tutan bir `{"hex": "…"}` nesnesi; böylece hiçbir ad kaybolmaz |

@@ -86,7 +86,7 @@ An error is the error value of API.md §8.6 with status 400 for `invalid_input`,
 | Item | Where |
 | --- | --- |
 | Reaching the server from other computers, users and logins | Web interface ([WEB.md](WEB.md)) and users and permissions, work items 2 and 3 |
-| Publishing the installers | With the first release; they are built and tried by the `Release` workflow (ADR-044) |
+| Publishing the installers | Done with the first release, 0.1.0; they are built and tried by the `Release` workflow (ADR-044) |
 
 ## 6. Crates
 

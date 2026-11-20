@@ -25,7 +25,7 @@ flowchart LR
 | 1. Local MVP | CLI; taking snapshots, history, file-level diff, restore, verification; local and external disk backup targets; tar, zip and 7z export | Backing up and restoring your own data with nothing but Apeiron for one month | Done (one-month test skipped) |
 | 2. Remote and sync | Background service, scheduled backup, encryption, SFTP and S3 targets, one-/two-way sync, conflict detection, restore test | One month of trouble-free sync between two devices and a remote server | Done (one-month test skipped) |
 | 3. Developer and ecosystem | Branching and merging, Git import/export (goal: Git network protocol), C ABI and Python SDK, WebAssembly plugin system, text diff plugin, search | A real Git repository can be moved into Apeiron and back | Done |
-| 4. Interfaces and multi-user | Desktop and web interface, users and permissions, audit log, sharing | A non-technical user can back up and restore without the CLI | Done (installing still needs a terminal until the first release brings installers) |
+| 4. Interfaces and multi-user | Desktop and web interface, users and permissions, audit log, sharing | A non-technical user can back up and restore without the CLI | Done (installers since the first release, 0.1.0) |
 | 5. Enterprise | Central identity, multi-tenant use, replication, high availability, immutable archive, compliance reports | First enterprise pilot installation | In progress |
 
 ## 2. Stage 0 — Format and core
@@ -125,4 +125,3 @@ Every work item is done (2026-10-30); the stage ends with its exit criterion, th
 | Measuring the performance targets on a Raspberry Pi 4 | [VISION.md](VISION.md), [API.md](API.md) §4 | Measured on a stronger computer ([PERFORMANCE.md](PERFORMANCE.md)); it needs the device |
 | More standards in reports | [REPORTS.md](REPORTS.md) §6 | ISO/IEC 27001, SOC 2 and the GDPR |
 | Format upgrade tool | [FORMAT.md](FORMAT.md) §18 | The format is at version 1 |
-| Publishing the first release | [DESKTOP.md](DESKTOP.md) §5 | Building from source, or the packages of the release workflow's runs |

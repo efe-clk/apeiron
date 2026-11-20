@@ -2,7 +2,7 @@
 
 # Apeiron Kullanım Rehberi
 
-> **Durum:** Apeiron'u kendi verinizle denemek için. Apeiron'un henüz bir sürümü yok; kaynak koddan derlenir. Aşağıdaki tüm komutlar bugün çalışır. Tam komut başvurusu [CLI.tr.md](CLI.tr.md) içindedir.
+> **Durum:** Apeiron'u kendi verinizle denemek için. Hazır bir paketten kurulur (bölüm 2.4) ya da kaynak koddan derlenir. Aşağıdaki tüm komutlar bugün çalışır. Tam komut başvurusu [CLI.tr.md](CLI.tr.md) içindedir.
 
 Bu rehber kurulumdan harici diske günlük yedeğe, dosyaları geri yüklemeye ve bir aylık deneme düzenine kadar yol gösterir.
 
@@ -46,7 +46,7 @@ cargo install --locked --force --git https://github.com/efe-clk/apeiron apeiron-
 
 ### 2.4 Hazır paketler
 
-Paketler her sürümle birlikte [sürümler sayfasında](https://github.com/efe-clk/apeiron/releases) yer alır. Henüz yayımlanmış bir sürüm yoktur.
+Paketler her sürümle birlikte [sürümler sayfasında](https://github.com/efe-clk/apeiron/releases) yer alır; ilki olan 0.1.0, 2026-11-18'de yayımlandı.
 
 | Sistem | Dosya | Kurulumdan sonra |
 | --- | --- | --- |
@@ -57,7 +57,7 @@ Paketler her sürümle birlikte [sürümler sayfasında](https://github.com/efe-
 
 Paketler henüz imzalı değildir, bu yüzden sistem uyarı verir. macOS'ta uygulamaya sağ tıklayıp Aç'ı seçin. Windows'ta Ek bilgi'yi, ardından Yine de çalıştır'ı seçin. Bir dosyayı önce denetlemek için aynı sayfadaki `SHA256SUMS` ile karşılaştırın.
 
-Metin ve belge eklentileri aynı sayfadadır: `apeiron plugin add apeiron_text.wasm`. Kaldırma yalnızca programı siler; yedekleriniz ve ayarlarınız kalır.
+Metin ve belge eklentileri aynı sayfadadır: `apeiron plugin install text` birini indirip kurar (`apeiron plugin add apeiron_text.wasm` indirilmiş bir dosyayı kurar). Kaldırma yalnızca programı siler; yedekleriniz ve ayarlarınız kalır.
 
 ## 3. Depoyu oluşturma
 
@@ -245,7 +245,7 @@ Hem `main` hem dal aynı dosyayı değiştirdiyse `main` kendi sürümünü tuta
 
 ### 6.8 Metin dosyalarını satır satır birleştirmek
 
-Eklenti olmadan, aynı metin dosyasındaki iki değişiklik her zaman bir çatışma kopyası bırakır. Metin eklentisi farklı satırlardaki değişiklikleri birleştirir ([TEXT.tr.md](TEXT.tr.md)). Bir kez derlenir ve kullanıcınız için kurulur:
+Eklenti olmadan, aynı metin dosyasındaki iki değişiklik her zaman bir çatışma kopyası bırakır. Metin eklentisi farklı satırlardaki değişiklikleri birleştirir ([TEXT.tr.md](TEXT.tr.md)). `apeiron plugin install text` onu son sürümden indirip kullanıcınız için kurar; kaynaktan derlemek için:
 
 ```bash
 git clone https://github.com/efe-clk/apeiron.git

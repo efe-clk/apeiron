@@ -130,7 +130,7 @@ SHA-256, dosyanın indekstekiyle aynı olduğunu güvenceye alır, indeksin dür
 | Konu | Nerede |
 | --- | --- |
 | Satır satır metin birleştirme ve bir farkı göstermek | Metin eklentisi ([TEXT.tr.md](TEXT.tr.md)) |
-| `backup` dışındaki olayların kancaları | Daha sonra, kullanımları ortaya çıktıkça |
+| `backup` ve `backup-done` dışındaki olayların kancaları | Daha sonra, kullanımları ortaya çıktıkça |
 | Eklenti olarak Git | Planlanmadı; ADR-049 ([DECISIONS.tr.md](DECISIONS.tr.md)) |
 
 ## 8. Crate'ler

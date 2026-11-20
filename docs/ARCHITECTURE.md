@@ -39,11 +39,11 @@ Key design ideas:
 | Layer | Responsibility | Crate | Status |
 | --- | --- | --- | --- |
 | Interfaces | CLI, background service, desktop, terminal, web, mobile | `apeiron-cli`, `apeiron-daemon`, `apeiron-server`, `apeiron-desktop`, `apeiron-tui` | In progress (CLI, background service, desktop, terminal and web done) |
-| Public API | Stable Rust API; C ABI for other languages; SDKs on top | `apeiron`, `apeiron-ffi` | In progress (Rust API, C ABI and Python SDK done) |
+| Public API | Stable Rust API; C ABI for other languages; SDKs on top | `apeiron`, `apeiron-ffi` | In progress (Rust API, C ABI, Python and C++ SDKs done) |
 | Services | Versioning, archive, backup, sync, search, policy | `apeiron-services`, `apeiron-git` | In progress (backup, restore, diff, sync, merge, search, Git import and export) |
 | Core | Object model, storage engine, integrity, encryption, operation log | `apeiron-core` | In progress |
-| Storage targets | Local disk, external disk, network storage, remote targets | `apeiron-core` (`Store`, folders), `apeiron-remote` (SFTP, S3) | Done |
-| Plugins | Type drivers, storage backends, importers/exporters, hooks | `apeiron-plugin` | In progress (host and type drivers done) |
+| Storage targets | Local disk, external disk, network storage, remote targets | `apeiron-core` (`Store`, folders), `apeiron-remote` (SFTP, S3, another device with `peer://`), `apeiron-plugin` (storage backend plugins, `plugin://`) | Done |
+| Plugins | Type drivers, storage backends, importers/exporters, hooks | `apeiron-plugin` | In progress (host, type drivers, importers, hooks, storage backends and the plugin store done; exporters not written) |
 
 Rules that apply to every crate:
 
@@ -95,7 +95,7 @@ A ref names a snapshot; a snapshot points at a root tree and at its parent snaps
 | Ref | A name pointing at a snapshot; branch, tag and backup point alike | Done |
 | Store | Where objects are kept; the same interface for every target | Done (folder, SFTP, S3) |
 | Policy | Retention, encryption, sync and verification rules | In progress (retention rules, legal holds and pruning are done, [ARCHIVE.md](ARCHIVE.md), [FORMAT.md](FORMAT.md) §13.4; sync and verification rules as policy are not) |
-| Type driver | Type-specific diff, merge, preview and indexing, as a plugin | In progress (diff and merge are done, [PLUGIN.md](PLUGIN.md); preview and indexing are not) |
+| Type driver | Type-specific diff, merge, preview and indexing, as a plugin | In progress (diff, merge and the text for search are done, [PLUGIN.md](PLUGIN.md); preview is not) |
 
 Blob, tree and snapshot are encoded in canonical CBOR with `minicbor`. The backup and versioning services create them from real files.
 
@@ -182,7 +182,7 @@ Sync is not backup: every device keeps its own history and reflogs, so a deletio
 
 ## 6. Plugin boundary
 
-Status: In progress. The host and the first plugin type, type drivers, are done ([PLUGIN.md](PLUGIN.md)); version 0.2 of the plugin API grants no permissions.
+Status: In progress. The host, type drivers, importers, hooks and storage backends are done ([PLUGIN.md](PLUGIN.md)); the only permission of version 0.2 of the plugin API is reaching network hosts granted at install (PLUGIN.md §3.1).
 
 ```mermaid
 flowchart LR
@@ -221,7 +221,7 @@ flowchart LR
 | Encryption | Client-side encryption; the remote target never sees plaintext; keys stay with the user | Done |
 | Identity and permissions | Separate read, write, delete, share and admin permissions | Done for the web interface ([USERS.md](USERS.md), [SHARE.md](SHARE.md)) |
 | Audit log | Sensitive operations are logged; sensitive data never is | Done for the web interface ([AUDIT.md](AUDIT.md)) |
-| Plugins | WASM sandbox with declared, user-approved permissions | In place; no permissions granted yet |
+| Plugins | WASM sandbox with declared, user-approved permissions | In place; only network hosts granted at install (PLUGIN.md §3.1) |
 | Memory safety | `unsafe` only in the FFI crate and `apeiron-sys` | In effect |
 | Remote access | Off by default; configured explicitly | In effect (`apeiron web` starts only when asked; `apeiron ui` listens only on this computer) |
 | Telemetry | Off by default; data is never sent to a third party as a requirement | In effect (there is no telemetry) |

@@ -53,7 +53,7 @@ The plugin handles files by name, ignoring case: plain text and documents (`*.tx
 | Item | Where |
 | --- | --- |
 | Merging by other structures, such as XML elements | Later plugins |
-| A ready-built plugin file to download | With the first release |
+| A ready-built plugin file to download | Done: every release carries it, and `apeiron plugin install text` installs it ([PLUGIN.md](PLUGIN.md) §6) |
 
 ## 6. Parts
 

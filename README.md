@@ -47,7 +47,7 @@ Each layer uses only the layer directly below it. Details: [docs/ARCHITECTURE.md
 | Layer | Crate | Role | Status |
 | --- | --- | --- | --- |
 | Core | `apeiron-core` | Object model, chunking, pack/index files, refs and reflogs | In progress |
-| Storage targets | `apeiron-core`, `apeiron-remote` | Folder (local or external disk), SFTP and S3 remotes | Done |
+| Storage targets | `apeiron-core`, `apeiron-remote`, `apeiron-plugin` | Folder (local or external disk), SFTP, S3 and another device (`peer://`) as remotes; plugins add more (`plugin://`) | Done |
 | Services | `apeiron-services` | Backup, restore, listing, diff, sync, merge, search and pruning old backups today | In progress |
 | Public API | `apeiron` | Rust API for all operations ([docs/API.md](docs/API.md) §8) | In progress |
 | System calls | `apeiron-sys` | Operating system calls that need `unsafe` (Windows write-through) | Done |
@@ -58,7 +58,7 @@ Each layer uses only the layer directly below it. Details: [docs/ARCHITECTURE.md
 | Terminal interface | `apeiron-tui`, `apeiron-cli` | The screens of the desktop interface inside a terminal, for servers without a screen and SSH ([docs/TUI.md](docs/TUI.md)) | Done |
 | Web interface | `apeiron-server`, `apeiron-cli` | The same pages served to other computers over TLS, to users with roles and their own backups ([docs/WEB.md](docs/WEB.md), [docs/USERS.md](docs/USERS.md)) | Done |
 | Git | `apeiron-git` | Import and export of Git repositories with the same commit ids ([docs/GIT.md](docs/GIT.md)) | Done |
-| Plugins | `apeiron-plugin` | WebAssembly plugin host; type drivers merge files ([docs/PLUGIN.md](docs/PLUGIN.md)) | Done |
+| Plugins | `apeiron-plugin` | WebAssembly plugin host; type drivers, importers, hooks and storage backends, and a plugin store ([docs/PLUGIN.md](docs/PLUGIN.md)) | Done |
 
 Crate names for planned layers are chosen when the layer is started.
 

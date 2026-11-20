@@ -137,7 +137,7 @@ Sistemin SSH sunucusu (OpenSSH) anahtarı denetler ve onun için `apeiron git ss
 | --- | --- |
 | Bir Git çalışma ağacına checkout | `apeiron restore` bir snapshot'ı bir klasöre yazar |
 | Apeiron içinde dallanma ve birleştirme | [BRANCH.tr.md](BRANCH.tr.md) |
-| Kodu eklenti arayüzünün arkasına taşımak | Yapılmadı; içe aktarıcı eklenti türü gerekir ([ROADMAP.tr.md](ROADMAP.tr.md) §8) |
+| Kodu eklenti arayüzünün arkasına taşımak | Planlanmadı; ADR-049 ([DECISIONS.tr.md](DECISIONS.tr.md)) |
 
 ## 9. Crate'ler ve kütüphaneler
 

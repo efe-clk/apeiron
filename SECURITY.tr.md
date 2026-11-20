@@ -4,12 +4,12 @@
 
 ## 1. Desteklenen sürümler
 
-Apeiron erken geliştirme aşamasındadır ve henüz bir sürümü yayımlanmadı; şu anki aşamayı [docs/ROADMAP.tr.md](docs/ROADMAP.tr.md) gösterir. Güvenlik düzeltmeleri yalnızca `master` dalının en son hâline yapılır.
+Apeiron erken geliştirme aşamasındadır; ilk sürüm 0.1.0, 2026-11-18'de yayımlandı ve şu anki aşamayı [docs/ROADMAP.tr.md](docs/ROADMAP.tr.md) gösterir. Güvenlik düzeltmeleri yalnızca `master` dalının en son hâline yapılır; kullanıcılara bir sonraki sürümle ulaşır.
 
 | Sürüm | Destekleniyor |
 | --- | --- |
 | `master` | Evet |
-| Yayımlanmış sürümler | Henüz yok |
+| Yayımlanmış sürümler | Hayır; düzeltmeler bir sonraki sürümle gelir |
 
 ## 2. Güvenlik açığı bildirme
 
@@ -34,7 +34,7 @@ Bildiriminizi yalnızca proje yürütücüleri görür. En kısa sürede yanıt 
 | Şifreleme | İstemci tarafında; anahtarlar kullanıcıya aittir; uzak hedef düz metni hiç görmez ([FORMAT.tr.md](docs/FORMAT.tr.md) §14) | Tamamlandı |
 | İzinler | Okuma, yazma, silme, paylaşma ve yönetme izinleri ayrıdır | Web arayüzü için tamamlandı ([USERS.tr.md](docs/USERS.tr.md), [SHARE.tr.md](docs/SHARE.tr.md)) |
 | Denetim kaydı | Hassas işlemler kaydedilir; hassas veri hiçbir zaman kaydedilmez | Web arayüzü için tamamlandı ([AUDIT.tr.md](docs/AUDIT.tr.md)) |
-| Eklenti yalıtımı | Eklentiler, bildirilmiş ve kullanıcının onayladığı izinlerle WebAssembly sandbox'ında çalışır | Yerinde; eklenti API'sinin 0.2 sürümü hiçbir izin vermez ([PLUGIN.tr.md](docs/PLUGIN.tr.md)) |
+| Eklenti yalıtımı | Eklentiler, bildirilmiş ve kullanıcının onayladığı izinlerle WebAssembly sandbox'ında çalışır | Yerinde; tek izin, kancalar ve depolama arka uçları için kullanıcının kurulumda verdiği ağ ana makinelerine ulaşmaktır ([PLUGIN.tr.md](docs/PLUGIN.tr.md) §3.1) |
 | Güvenli varsayılanlar | Uzak erişim ve telemetri varsayılan olarak kapalıdır | Uygulanıyor (web sunucusu yalnızca istenince başlar, `apeiron ui` yalnızca bu bilgisayarda dinler ve telemetri yoktur) |
 | Zorunlu üçüncü taraf yok | Veri hiçbir zaman zorunlu olarak üçüncü bir tarafa gönderilmez | Uygulanıyor |
 

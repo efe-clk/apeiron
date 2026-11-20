@@ -25,7 +25,7 @@ flowchart LR
 | 1. Yerel MVP | CLI; snapshot alma, geçmiş, dosya düzeyi diff, geri yükleme, doğrulama; yerel ve harici disk yedek hedefi; tar, zip ve 7z dışa aktarma | Kendi verini bir ay boyunca yalnızca Apeiron ile yedekleyip geri yükleyebilmek | Tamamlandı (bir aylık deneme atlandı) |
 | 2. Uzak ve senkron | Arka plan hizmeti, zamanlanmış yedek, şifreleme, SFTP ve S3 hedefleri, tek/çift yönlü senkron, çatışma tespiti, geri yükleme testi | İki cihaz ve bir uzak sunucu arasında bir ay sorunsuz senkron | Tamamlandı (bir aylık deneme atlandı) |
 | 3. Geliştirici ve ekosistem | Dal ve birleştirme, Git içe/dışa aktarma (hedef: Git ağ protokolü), C ABI ve Python SDK, WebAssembly eklenti sistemi, metin diff eklentisi, arama | Gerçek bir Git deposu Apeiron'a taşınıp geri alınabiliyor | Tamamlandı |
-| 4. Arayüzler ve çok kullanıcı | Masaüstü ve web arayüzü, kullanıcı ve izinler, denetim kaydı, paylaşım | Teknik olmayan bir kullanıcı CLI'sız yedek alıp geri yükleyebiliyor | Tamamlandı (ilk sürüm kurulum dosyalarını getirene kadar kurulum için terminal gerekir) |
+| 4. Arayüzler ve çok kullanıcı | Masaüstü ve web arayüzü, kullanıcı ve izinler, denetim kaydı, paylaşım | Teknik olmayan bir kullanıcı CLI'sız yedek alıp geri yükleyebiliyor | Tamamlandı (ilk sürüm 0.1.0'dan beri kurulum dosyaları var) |
 | 5. Kurumsal | Merkezi kimlik, çok kiracılı kullanım, replikasyon, yüksek erişilebilirlik, değiştirilemez arşiv, uyumluluk raporları | İlk kurumsal pilot kurulum | Devam ediyor |
 
 ## 2. Aşama 0 — Format ve çekirdek
@@ -125,4 +125,3 @@ Her iş tamamlandı (2026-10-30); aşama, çıkış kriteri olan ilk kurumsal pi
 | Performans hedeflerini Raspberry Pi 4'te ölçmek | [VISION.tr.md](VISION.tr.md), [API.tr.md](API.tr.md) §4 | Daha güçlü bir bilgisayarda ölçüldü ([PERFORMANCE.tr.md](PERFORMANCE.tr.md)); cihaz gerekir |
 | Raporlarda başka standartlar | [REPORTS.tr.md](REPORTS.tr.md) §6 | ISO/IEC 27001, SOC 2 ve GDPR |
 | Format yükseltme aracı | [FORMAT.tr.md](FORMAT.tr.md) §18 | Format 1. sürümde |
-| İlk sürümün yayımlanması | [DESKTOP.tr.md](DESKTOP.tr.md) §5 | Kaynaktan derleme ya da yayın iş akışının çalıştırmalarının paketleri |

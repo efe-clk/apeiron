@@ -137,7 +137,7 @@ The system's SSH server (OpenSSH) checks the key and runs `apeiron git ssh` for 
 | --- | --- |
 | Checking out into a Git working tree | `apeiron restore` writes a snapshot into a folder |
 | Branching and merging inside Apeiron | [BRANCH.md](BRANCH.md) |
-| Moving the code behind the plugin interface | Not done; it needs an importer plugin type ([ROADMAP.md](ROADMAP.md) §8) |
+| Moving the code behind the plugin interface | Not planned; ADR-049 ([DECISIONS.md](DECISIONS.md)) |
 
 ## 9. Crates and libraries
 

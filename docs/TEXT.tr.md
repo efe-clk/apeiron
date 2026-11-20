@@ -53,7 +53,7 @@ Eklenti dosyaları büyük/küçük harf ayırmadan ada göre işler: düz metin
 | Konu | Nerede |
 | --- | --- |
 | XML öğeleri gibi başka yapılara göre birleştirme | Sonraki eklentiler |
-| İndirilecek hazır derlenmiş bir eklenti dosyası | İlk sürümle |
+| İndirilecek hazır derlenmiş bir eklenti dosyası | Yapıldı: her sürümde bulunur, `apeiron plugin install text` kurar ([PLUGIN.tr.md](PLUGIN.tr.md) §6) |
 
 ## 6. Parçalar
 

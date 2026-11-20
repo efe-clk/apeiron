@@ -86,7 +86,7 @@ Bir hata, API.tr.md §8.6'daki hata değeridir; durum kodu `invalid_input`, `amb
 | Konu | Nerede |
 | --- | --- |
 | Sunucuya başka bilgisayarlardan ulaşmak, kullanıcılar ve oturum açma | Web arayüzü ([WEB.tr.md](WEB.tr.md)) ve kullanıcılar ve izinler, 2. ve 3. işler |
-| Kurulum dosyalarının yayımlanması | İlk sürümle; `Release` iş akışı onları üretir ve dener (ADR-044) |
+| Kurulum dosyalarının yayımlanması | İlk sürüm 0.1.0 ile yapıldı; `Release` iş akışı onları üretir ve dener (ADR-044) |
 
 ## 6. Crate'ler
 
