@@ -1634,3 +1634,46 @@ fn dotfiles_follow_their_list_to_another_device() {
         .unwrap();
     assert_eq!(code(&outside), Some(2));
 }
+
+#[test]
+fn a_backup_that_looks_like_ransomware_warns_and_can_hold_the_ref() {
+    let s = Setup::new();
+    let dir = s.root.join("src/many");
+    fs::create_dir_all(&dir).unwrap();
+    for i in 0..30 {
+        let text =
+            format!("Letter {i}: the quick brown fox jumps over the lazy dog.\n").repeat(200);
+        fs::write(dir.join(format!("{i}.txt")), text).unwrap();
+    }
+    s.ok(&["backup", &s.path("src")]);
+    // A small change is no alarm.
+    fs::write(dir.join("0.txt"), "changed").unwrap();
+    s.ok(&["backup", &s.path("src")]);
+
+    // Every file rewritten with what looks like encrypted bytes.
+    let mut x: u64 = 0x2545_f491_4f6c_dd1d;
+    for i in 0..30 {
+        let noise: Vec<u8> = (0..20_000)
+            .map(|_| {
+                x ^= x << 13;
+                x ^= x >> 7;
+                x ^= x << 17;
+                (x >> 24) as u8
+            })
+            .collect();
+        fs::write(dir.join(format!("{i}.txt")), noise).unwrap();
+    }
+    let out = s.run(&["backup", &s.path("src"), "--hold-on-alarm"]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(code(&out), Some(3), "{stderr}");
+    assert!(stderr.contains("possible ransomware"), "{stderr}");
+    let holds = s.ok(&["hold", "list"]);
+    assert!(holds.contains("main"), "{holds}");
+    // The ref still only moves forward: older versions cannot be pruned.
+    let prune = s.run(&["prune", "main", "--keep-last", "1"]);
+    assert_ne!(code(&prune), Some(0));
+
+    // The alarm can be turned off.
+    fs::write(dir.join("1.txt"), "x").unwrap();
+    s.ok(&["backup", &s.path("src"), "--alarm-percent", "0"]);
+}

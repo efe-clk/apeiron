@@ -79,6 +79,7 @@ every = "week"
 | `at` | `day` ve `week` için: günün en erken yerel saati, `HH:MM` |
 | `sample_mb` | `restore-test` için: ne kadarının geri yükleneceği, varsayılan 100 |
 | `on_change` | `backup` ve `sync` için: klasördeki bir değişiklikten sonra, klasör bu kadar süre sessiz kalınca da çalış: `s`, `m` ya da `h` ile bir sayı, `5s` ile `24h` arası (bölüm 4) |
+| `alarm_percent`, `hold_on_alarm` | `backup` için: fidye yazılımı alarmının yüzdesi (varsayılan 50, 0 kapatır) ve alarm çalınca ref'e yasal saklama kilidi koymak için `true`; alarmlı bir çalışma başarısız olur ve hiçbir şey push etmez ([CLI.tr.md](CLI.tr.md) §4.3) |
 | `rate_kb` | `backup`, `push`, `pull`, `repair` ve `sync` için: uzak depolara giden ya da onlardan gelen, saniyede ortalama en çok kibibayt ([SYNC.tr.md](SYNC.tr.md) §2); varsayılan olarak sınır yoktur |
 
 Bir yolun başındaki `~` ev klasörüdür. Bir iş adı, `/` içermeyen ref adı kurallarına uyar. Geçersiz bir dosya, `daemon run` ve `daemon once` komutlarını satırı belirten bir hatayla durdurur; daemon dosya değişince onu yeniden okur ve yeni dosya geçersizse eski işleri korur. Masaüstü arayüzünün Zamanlama sayfası işleri gösterir ve bu dosyayı düzenler; yalnızca geçerli bir dosyayı kaydeder (DESKTOP.tr.md §2).

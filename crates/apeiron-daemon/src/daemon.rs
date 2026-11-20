@@ -397,11 +397,30 @@ fn try_run(job: &Job, stop: &AtomicBool) -> apeiron::Result<(RunResult, String)>
             message,
             push,
             exclude,
+            alarm_percent,
+            hold_on_alarm,
         } => {
             let mut request = BackupRequest::new(folder.clone(), ref_name.clone());
             request.message = message.clone();
             request.exclude = exclude.clone();
+            request.alarm_percent = *alarm_percent;
             let report = wait(repo.backup(request)?, stop)?;
+            // The copies elsewhere keep what they had: nothing is pushed,
+            // and the job fails so that its webhooks tell (CLI.md §4.3).
+            if let Some(alarm) = &report.alarm {
+                let mut text = format!(
+                    "snapshot {}: {}; not pushed",
+                    short(&report.snapshot),
+                    alarm.message
+                );
+                if *hold_on_alarm {
+                    match repo.add_legal_hold(ref_name, &alarm.message) {
+                        Ok(_) => text.push_str(&format!("; {ref_name} is held")),
+                        Err(e) => text.push_str(&format!("; the hold failed: {}", e.message)),
+                    }
+                }
+                return Ok((RunResult::Failed, text));
+            }
             let mut text = format!(
                 "snapshot {}: {} files, {} new bytes",
                 short(&report.snapshot),

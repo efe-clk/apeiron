@@ -94,6 +94,46 @@
       ],
       "type": "object"
     },
+    "Alarm": {
+      "description": "Why a backup looks like the work of ransomware.",
+      "properties": {
+        "files_before": {
+          "description": "Files of the previous snapshot.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "message": {
+          "type": "string"
+        },
+        "sampled": {
+          "description": "Changed files read to judge their content.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "touched": {
+          "description": "Of them, files changed or removed.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "turned_random": {
+          "description": "Of them, files whose content turned random.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "files_before",
+        "touched",
+        "sampled",
+        "turned_random",
+        "message"
+      ],
+      "type": "object"
+    },
     "ArchiveFormat": {
       "description": "Archive formats `export` can write.",
       "enum": [
@@ -106,6 +146,15 @@
     "BackupOptions": {
       "description": "What to back up and how to describe the snapshot.",
       "properties": {
+        "alarm_percent": {
+          "description": "The percentage of the previous snapshot's files that may change or\ngo before the ransomware alarm (CLI.md §4.3); 50 when absent, and 0\nturns the alarm off.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "author": {
           "default": null,
           "type": [
@@ -173,6 +222,17 @@
     },
     "BackupOutcome": {
       "properties": {
+        "alarm": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Alarm"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Set when the backup looks like the work of ransomware (CLI.md §4.3);\nthe snapshot is stored all the same."
+        },
         "bytes": {
           "description": "Size of all files read.",
           "format": "uint64",

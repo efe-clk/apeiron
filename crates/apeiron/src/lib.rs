@@ -38,7 +38,7 @@ pub use apeiron_plugin::{
 };
 pub use apeiron_services::PluginMerge;
 pub use apeiron_services::{
-    AddFileOptions as AddFileRequest, AddFileOutcome as AddFileReport, ArchiveFormat,
+    AddFileOptions as AddFileRequest, AddFileOutcome as AddFileReport, Alarm, ArchiveFormat,
     BackupOptions as BackupRequest, BackupOutcome as BackupReport, Change, ChangeKind, Conflict,
     ConflictCopy, ConflictKind, EntryInfo, ExportOutcome as ExportReport, ImportFormat,
     ImportOptions as ImportRequest, ImportOutcome as ImportReport, Keep, Kind, Name, Phase,

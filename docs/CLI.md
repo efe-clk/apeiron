@@ -55,7 +55,7 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | Command | What it does | Status |
 | --- | --- | --- |
 | `apeiron init <path> [--encrypt]` | Creates an empty repository; `--encrypt` encrypts it with a password (section 2.1) | Done |
-| `apeiron backup <folder> [--ref <name>] [--message <text>] [--author <text>] [--host <text>] [--exclude <pattern>]... [--gitignore] [--reread]` | Stores the folder as a new snapshot and moves the ref to it (default ref: `main`) | Done |
+| `apeiron backup <folder> [--ref <name>] [--message <text>] [--author <text>] [--host <text>] [--exclude <pattern>]... [--gitignore] [--reread] [--alarm-percent <n>] [--hold-on-alarm]` | Stores the folder as a new snapshot and moves the ref to it (default ref: `main`); warns of ransomware (§4.3) | Done |
 | `apeiron log [<ref>] [--grep <text>]` | Lists the snapshots of a ref, newest first; `--grep` keeps those whose message, author, host or metadata hold the text, ignoring case | Done |
 | `apeiron ls <snapshot> [<path>]` | Lists the files and folders inside a snapshot | Done |
 | `apeiron diff <snapshot> <snapshot> [--text]` | Lists files added, removed and changed between two snapshots; `--text` also shows the changed lines of files a plugin handles ([TEXT.md](TEXT.md)) | Done |
@@ -167,6 +167,17 @@ A file with the size and time the last snapshot of the ref recorded, and a time 
 | Truncated or damaged data | The command fails and the ref does not move; what was stored is removed by `gc` |
 
 A 7z archive must use LZMA, LZMA2 or no compression and no password; others stop with an error. RAR archives cannot be imported. Another format is read by an importer plugin whose pattern matches the file's name ([PLUGIN.md](PLUGIN.md) §2.1).
+
+### 4.3 Ransomware alarm
+
+Ransomware encrypts files in place, or writes encrypted copies and deletes the originals, and then looks for the backups. Each backup with an earlier snapshot of its ref is compared with it:
+
+| Sign | Alarm when |
+| --- | --- |
+| Many files touched | At least 20 files of the earlier snapshot changed or were removed, and they are at least `--alarm-percent` of its files (50 by default) |
+| Content turned random | Of up to 100 changed files, at least 10, and at least half of those read, look random now (more than 7.8 bits per byte in their first 64 KiB) and did not before (less than 7.0) |
+
+The snapshot is stored all the same, since it is evidence and the earlier ones stay in the history. `backup` then writes `warning: possible ransomware: …`, the `alarm` field of `--json` holds the counts, and the exit code is 3. `--hold-on-alarm` also places a legal hold on the ref ([ARCHIVE.md](ARCHIVE.md) §2.1): it then only moves forward, cannot be deleted or pruned, and garbage collection keeps every version, until an admin lifts the hold. A job of the background service fails instead, pushes nothing, so the copies elsewhere keep what they had, and its webhooks tell ([DAEMON.md](DAEMON.md) §3, §8). `--alarm-percent 0` turns the alarm off, for instance for a planned reorganization.
 
 ## 5. Exit codes
 

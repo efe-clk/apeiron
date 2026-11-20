@@ -4,6 +4,7 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 
+mod alarm;
 mod backup;
 mod conflicts;
 mod control;
@@ -26,6 +27,7 @@ mod sync;
 mod tags;
 mod upload;
 
+pub use alarm::Alarm;
 pub use backup::{BackupOptions, BackupOutcome, backup, backup_with};
 pub use conflicts::{ConflictCopy, Keep, find_conflicts, original_name, resolve_conflict};
 pub use control::{Control, Phase, Progress, Warning, WarningKind};

@@ -40,6 +40,11 @@ pub struct BackupOptions {
     /// change (CLI.md §4).
     #[serde(default)]
     pub reread: bool,
+    /// The percentage of the previous snapshot's files that may change or
+    /// go before the ransomware alarm (CLI.md §4.3); 50 when absent, and 0
+    /// turns the alarm off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alarm_percent: Option<u32>,
 }
 
 impl BackupOptions {
@@ -53,6 +58,7 @@ impl BackupOptions {
             meta: Vec::new(),
             exclude: Vec::new(),
             reread: false,
+            alarm_percent: None,
         }
     }
 }
@@ -76,6 +82,10 @@ pub struct BackupOutcome {
     #[serde(default)]
     pub unchanged: u64,
     pub warnings: Vec<Warning>,
+    /// Set when the backup looks like the work of ransomware (CLI.md §4.3);
+    /// the snapshot is stored all the same.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alarm: Option<crate::alarm::Alarm>,
 }
 
 /// Stores `options.source` as a new snapshot and moves the ref to it.
@@ -140,6 +150,18 @@ pub fn backup_with(
     ctl.check()?;
     ctl.set_phase(Phase::Finishing);
     writer.finish()?;
+    let alarm = match parent {
+        Some(p) => crate::alarm::check(
+            repo,
+            &repo.read_snapshot(&p)?.tree,
+            &tree,
+            stored.files,
+            options
+                .alarm_percent
+                .unwrap_or(crate::alarm::DEFAULT_PERCENT),
+        )?,
+        None => None,
+    };
     let hooked = match hooks {
         Some(hooks) => crate::hooks::run_hooks(
             repo,
@@ -189,6 +211,7 @@ pub fn backup_with(
             .chain(hooked)
             .chain(told)
             .collect(),
+        alarm,
     })
 }
 

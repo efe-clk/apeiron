@@ -119,6 +119,8 @@ mod tests {
                 message: None,
                 push: Vec::new(),
                 exclude: Vec::new(),
+                alarm_percent: None,
+                hold_on_alarm: false,
             },
             every: Every::Days(1),
             at: None,

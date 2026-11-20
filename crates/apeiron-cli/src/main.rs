@@ -104,6 +104,13 @@ enum Command {
         /// Read every file, also those whose size and time did not change
         #[arg(long)]
         reread: bool,
+        /// Warn of ransomware when more than this percentage of the files
+        /// changed or went; 0 turns it off (default 50)
+        #[arg(long, value_name = "PERCENT")]
+        alarm_percent: Option<u32>,
+        /// Place a legal hold on the ref when the ransomware alarm goes off
+        #[arg(long)]
+        hold_on_alarm: bool,
     },
     /// List the snapshots of a ref, newest first
     Log {
@@ -2746,6 +2753,8 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             mut exclude,
             gitignore,
             reread,
+            alarm_percent,
+            hold_on_alarm,
         } => {
             if gitignore {
                 exclude.push("@gitignore".to_owned());
@@ -2758,6 +2767,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             request.host = host;
             request.exclude = exclude;
             request.reread = reread;
+            request.alarm_percent = alarm_percent;
             let detail = serde_json::json!({
                 "source": request.source,
                 "ref": request.ref_name,
@@ -2780,7 +2790,16 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     format::bytes(r.new_bytes),
                 );
             });
-            Ok(warnings_exit(out, &report.warnings))
+            let code = warnings_exit(out, &report.warnings);
+            let Some(alarm) = &report.alarm else {
+                return Ok(code);
+            };
+            eprintln!("warning: {}", alarm.message);
+            if hold_on_alarm {
+                let hold = repo.add_legal_hold(&ref_name, &alarm.message)?;
+                eprintln!("{} is held as {}", ref_name, hold.id);
+            }
+            Ok(code.max(EXIT_WARNINGS))
         }
         Command::Log {
             snapshot,

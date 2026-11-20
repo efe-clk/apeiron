@@ -79,6 +79,7 @@ every = "week"
 | `at` | For `day` and `week`: the earliest local time of day, `HH:MM` |
 | `sample_mb` | For `restore-test`: how much to restore, default 100 |
 | `on_change` | For `backup` and `sync`: also run after a change to the folder, once it has been quiet this long: a number with `s`, `m` or `h`, from `5s` to `24h` (section 4) |
+| `alarm_percent`, `hold_on_alarm` | For `backup`: the ransomware alarm's percentage (50 by default, 0 turns it off), and `true` to place a legal hold on the ref when it goes off; a run with the alarm fails and pushes nothing ([CLI.md](CLI.md) §4.3) |
 | `rate_kb` | For `backup`, `push`, `pull`, `repair` and `sync`: the most kibibytes per second moved to or from remotes, on average ([SYNC.md](SYNC.md) §2); no limit by default |
 
 `~` at the start of a path is the home folder. A job name follows the ref name rules without `/`. An invalid file stops `daemon run` and `daemon once` with an error that names the line; the daemon reads the file again when it changes and keeps the old jobs if the new file is invalid. The Schedule page of the desktop interface shows the jobs and edits this file, and saves only a valid one (DESKTOP.md §2).

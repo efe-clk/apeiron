@@ -67,6 +67,10 @@ pub enum Action {
         push: Vec<String>,
         /// What to leave out (CLI.md §4.1).
         exclude: Vec<String>,
+        /// The ransomware alarm's percentage (CLI.md §4.3); `None` for 50.
+        alarm_percent: Option<u32>,
+        /// Places a legal hold on the ref when the alarm goes off.
+        hold_on_alarm: bool,
     },
     Push {
         /// `None` for every ref (`ref = "*"`, REPLICATION.md §3).
@@ -160,6 +164,8 @@ struct RawJob {
     keep_weekly: Option<u32>,
     keep_monthly: Option<u32>,
     keep_yearly: Option<u32>,
+    alarm_percent: Option<u32>,
+    hold_on_alarm: Option<bool>,
 }
 
 /// Reads the jobs file; jobs come sorted by name, the order they run in.
@@ -246,6 +252,10 @@ fn to_job(name: &str, raw: RawJob, scope: Option<&Scope>) -> std::result::Result
             Ok(())
         }
     };
+    if raw.action != "backup" {
+        not_here("alarm_percent", raw.alarm_percent.is_some())?;
+        not_here("hold_on_alarm", raw.hold_on_alarm.is_some())?;
+    }
     let action = match raw.action.as_str() {
         "backup" => {
             not_here("sample_mb", raw.sample_mb.is_some())?;
@@ -256,6 +266,8 @@ fn to_job(name: &str, raw: RawJob, scope: Option<&Scope>) -> std::result::Result
                 message: raw.message.clone(),
                 push: raw.push.clone().unwrap_or_default(),
                 exclude: raw.exclude.clone().unwrap_or_default(),
+                alarm_percent: raw.alarm_percent,
+                hold_on_alarm: raw.hold_on_alarm.unwrap_or(false),
             }
         }
         "push" => {
@@ -625,6 +637,8 @@ mod tests {
                 message: None,
                 push: vec!["nas".to_owned()],
                 exclude: Vec::new(),
+                alarm_percent: None,
+                hold_on_alarm: false,
             }
         );
         assert_eq!(

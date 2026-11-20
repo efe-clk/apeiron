@@ -55,7 +55,7 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | Komut | Ne yapar | Durum |
 | --- | --- | --- |
 | `apeiron init <path> [--encrypt]` | Boş bir depo oluşturur; `--encrypt` onu bir parolayla şifreler (bölüm 2.1) | Tamamlandı |
-| `apeiron backup <folder> [--ref <name>] [--message <text>] [--author <text>] [--host <text>] [--exclude <pattern>]... [--gitignore] [--reread]` | Klasörü yeni bir snapshot olarak saklar ve ref'i ona taşır (varsayılan ref: `main`) | Tamamlandı |
+| `apeiron backup <folder> [--ref <name>] [--message <text>] [--author <text>] [--host <text>] [--exclude <pattern>]... [--gitignore] [--reread] [--alarm-percent <n>] [--hold-on-alarm]` | Klasörü yeni bir snapshot olarak saklar ve ref'i ona taşır (varsayılan ref: `main`); fidye yazılımına karşı uyarır (§4.3) | Tamamlandı |
 | `apeiron log [<ref>] [--grep <metin>]` | Bir ref'in snapshot'larını en yeniden başlayarak listeler; `--grep`, mesajı, yazarı, makinesi ya da üst verisi metni büyük-küçük harf ayırmadan içerenleri bırakır | Tamamlandı |
 | `apeiron ls <snapshot> [<path>]` | Bir snapshot'taki dosya ve klasörleri listeler | Tamamlandı |
 | `apeiron diff <snapshot> <snapshot> [--text]` | İki snapshot arasında eklenen, silinen ve değişen dosyaları listeler; `--text` bir eklentinin işlediği dosyaların değişen satırlarını da gösterir ([TEXT.tr.md](TEXT.tr.md)) | Tamamlandı |
@@ -167,6 +167,17 @@ Okunurken değişen bir dosya okunduğu hâliyle saklanır ve uyarı olarak rapo
 | Kesik ya da bozuk veri | Komut başarısız olur, ref taşınmaz; saklananı `gc` siler |
 
 Bir 7z arşivi LZMA, LZMA2 kullanmalı ya da sıkıştırmasız olmalı ve parolasız olmalıdır; diğerleri hatayla durur. RAR arşivleri içe aktarılamaz. Başka bir biçimi, deseni dosyanın adına uyan bir içe aktarıcı eklenti okur ([PLUGIN.tr.md](PLUGIN.tr.md) §2.1).
+
+### 4.3 Fidye yazılımı alarmı
+
+Fidye yazılımı dosyaları yerinde şifreler ya da şifreli kopyalarını yazıp asıllarını siler, sonra yedekleri arar. Ref'inin daha önce bir snapshot'ı olan her yedek onunla karşılaştırılır:
+
+| İşaret | Alarm ne zaman |
+| --- | --- |
+| Çok dosyaya dokunulmuş | Önceki snapshot'ın en az 20 dosyası değişmiş ya da silinmiş ve bunlar dosyalarının en az `--alarm-percent`'i (varsayılan 50) |
+| İçerik rastgeleleşmiş | En çok 100 değişmiş dosyadan en az 10'u ve okunanların en az yarısı şimdi rastgele görünüyor (ilk 64 KiB'ında bayt başına 7,8 bitten fazla) ve önceden görünmüyordu (7,0'dan az) |
+
+Snapshot yine de saklanır; çünkü kanıttır ve öncekiler geçmişte kalır. `backup` ardından `warning: possible ransomware: …` yazar, `--json` çıktısındaki `alarm` alanı sayıları tutar ve çıkış kodu 3'tür. `--hold-on-alarm` ref'e ayrıca bir yasal saklama kilidi koyar ([ARCHIVE.tr.md](ARCHIVE.tr.md) §2.1): ref bir `admin` kilidi kaldırana kadar yalnızca ileri gider, silinemez ya da budanamaz ve çöp toplama her sürümü tutar. Arka plan hizmetinin bir işi ise başarısız olur, hiçbir şey push etmez, böylece başka yerlerdeki kopyalar ellerindekini korur ve webhook'ları haber verir ([DAEMON.tr.md](DAEMON.tr.md) §3, §8). `--alarm-percent 0` alarmı kapatır, örneğin planlı bir yeniden düzenleme için.
 
 ## 5. Çıkış kodları
 
