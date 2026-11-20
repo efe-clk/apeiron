@@ -55,7 +55,7 @@ Each layer uses only the layer directly below it. Details: [docs/ARCHITECTURE.md
 | CLI | `apeiron-cli` | The `apeiron` command ([docs/CLI.md](docs/CLI.md)) | In progress |
 | Background service | `apeiron-daemon` | Scheduled jobs and the restore test ([docs/DAEMON.md](docs/DAEMON.md)) | Done |
 | Desktop interface | `apeiron-server`, `apeiron-desktop` | Pages, a local server and a window for backing up and restoring without the command line ([docs/DESKTOP.md](docs/DESKTOP.md)) | Done |
-| Mount | `apeiron-mount`, `apeiron-cli` | Every snapshot as a read-only folder through FUSE on Linux and macOS ([docs/MOUNT.md](docs/MOUNT.md)) | Done |
+| Mount | `apeiron-mount`, `apeiron-cli` | Every snapshot as a read-only folder through FUSE on Linux ([docs/MOUNT.md](docs/MOUNT.md)) | Done |
 | Terminal interface | `apeiron-tui`, `apeiron-cli` | The screens of the desktop interface inside a terminal, for servers without a screen and SSH ([docs/TUI.md](docs/TUI.md)) | Done |
 | Web interface | `apeiron-server`, `apeiron-cli` | The same pages served to other computers over TLS, to users with roles and their own backups ([docs/WEB.md](docs/WEB.md), [docs/USERS.md](docs/USERS.md)) | Done |
 | Git | `apeiron-git` | Import and export of Git repositories with the same commit ids ([docs/GIT.md](docs/GIT.md)) | Done |

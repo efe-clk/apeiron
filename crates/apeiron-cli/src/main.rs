@@ -125,7 +125,7 @@ enum Command {
         grep: Option<String>,
     },
     /// Show every snapshot as a read-only folder at an empty folder, until
-    /// Ctrl+C or until it is unmounted (Linux and macOS)
+    /// Ctrl+C or until it is unmounted (Linux)
     Mount {
         /// An empty folder
         mountpoint: PathBuf,
@@ -4853,7 +4853,7 @@ fn print_switch(r: &apeiron::SwitchReport, snapshot: &str, dry_run: bool) {
 
 /// `apeiron mount` (docs/MOUNT.md): serves the snapshots until Ctrl+C or
 /// until the folder is unmounted from outside.
-#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[cfg(target_os = "linux")]
 fn run_mount(
     repo: Option<PathBuf>,
     password_file: Option<&Path>,
@@ -4862,8 +4862,7 @@ fn run_mount(
     let repo = open(repo, password_file)?;
     let mounted = apeiron_mount::mount(repo, mountpoint).map_err(|e| {
         Failure::Usage(format!(
-            "cannot mount at {}: {e}; on Linux the fuse3 package gives fusermount3, \
-             on macOS install macFUSE",
+            "cannot mount at {}: {e}; the fuse3 package gives fusermount3",
             mountpoint.display()
         ))
     })?;
@@ -4885,7 +4884,7 @@ fn run_mount(
     Ok(0)
 }
 
-#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+#[cfg(not(target_os = "linux"))]
 fn run_mount(
     _repo: Option<PathBuf>,
     _password_file: Option<&Path>,
@@ -4893,7 +4892,7 @@ fn run_mount(
 ) -> Result<u8, Failure> {
     Err(Error::new(
         ErrorKind::Unsupported,
-        "apeiron mount works on Linux and macOS; on Windows, restore what you need",
+        "apeiron mount works on Linux; elsewhere, restore what you need",
     )
     .into())
 }

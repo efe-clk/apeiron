@@ -1213,7 +1213,7 @@ ADR 001â€“008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009â€
 | A writable mount that makes a snapshot on unmount | Writes would have to be held somewhere and could be lost; `backup` already does this |
 | Windows through Projected File System now | It needs a Windows-only layer of system calls in `apeiron-sys`, a large separate work item |
 
-**Consequences.** A mount needs `fusermount3` on Linux and macFUSE on macOS. Listings of snapshots stay in memory while mounted.
+**Consequences.** A mount needs `fusermount3` on Linux. On macOS `fuser` needs macFUSE's files to build, so the mount is built for Linux only until macOS can be built where macFUSE is installed. Listings of snapshots stay in memory while mounted.
 
 ## ADR-057: restic and Borg are read through their own programs, Git LFS through its store
 

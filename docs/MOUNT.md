@@ -2,7 +2,7 @@
 
 # Mounting a Repository
 
-> **Status: Done on Linux and macOS.** `apeiron mount` shows every snapshot of a repository as a read-only folder, so that its files can be opened, searched with `grep` or compared with `diff` without restoring them first. The decision behind it is ADR-056 ([DECISIONS.md](DECISIONS.md)).
+> **Status: Done on Linux.** `apeiron mount` shows every snapshot of a repository as a read-only folder, so that its files can be opened, searched with `grep` or compared with `diff` without restoring them first. The decision behind it is ADR-056 ([DECISIONS.md](DECISIONS.md)).
 
 ## 1. Command
 
@@ -39,13 +39,14 @@ The mount uses only the public API ([API.md](API.md)): the refs, the history of 
 | System | Needs | Status |
 | --- | --- | --- |
 | Linux | FUSE 3: the `fuse3` package, which gives `fusermount3` | Done |
-| macOS | [macFUSE](https://macfuse.github.io) | Built and tested on Linux only; macOS needs macFUSE installed by the user |
+| macOS | [macFUSE](https://macfuse.github.io) | Not built: `fuser` needs macFUSE's files when it is compiled, which the release machines do not have (§5) |
 | Windows | — | Not written: Windows has no FUSE, and Projected File System needs a separate layer (§5) |
 
 ## 5. Not part of this work item
 
 | Item | Where |
 | --- | --- |
+| macOS, built where macFUSE is installed | Later |
 | Windows, through Projected File System or WinFsp | Later; `apeiron restore` and the desktop interface's Browse page meanwhile |
 | Writing into a mounted snapshot | Not planned: snapshots never change; back up a folder instead |
 | Mounting a remote without a local repository | Later; clone or pull it first |

@@ -15,7 +15,8 @@ name = "apeiron_mount"
 apeiron = { package = "apeiron-rs", path = "../apeiron" }
 jiff = "0.2.38"
 
-[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
+# On macOS fuser needs macFUSE's headers to build (MOUNT.md §4).
+[target.'cfg(target_os = "linux")'.dependencies]
 fuser = { version = "0.18.0", default-features = false }
 
 [dev-dependencies]

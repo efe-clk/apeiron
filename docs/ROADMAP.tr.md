@@ -138,7 +138,7 @@ Proje sahibi 2026-11-20'de hem kişisel geliştiriciler hem kurumlar için bu ö
 | `0.5.0` | Kiracı ve kullanıcı başına kota, bant genişliği sınırı ([VISION.tr.md](VISION.tr.md)), SCIM ile kullanıcı oluşturma ve kapatma ([USERS.tr.md](USERS.tr.md) §2.1, §4.1, [TENANTS.tr.md](TENANTS.tr.md) §2.1) | Tamamlandı |
 | `0.6.0` | Sürümlere güven: formatın fuzzing'i, yeniden üretilebilir derleme, Sigstore ile imzalı sürümler ([SECURITY.tr.md](../SECURITY.tr.md) §4) | Tamamlandı; yalnızca `apeiron` derlemeler arasında henüz bayt bayt aynı değil: Wasmtime'ın ürettiği kod değişiyor |
 | `0.7.0` | Paketler: `.deb` ve `cargo install --git` yanında Homebrew, AUR, winget, Chocolatey, Flathub, RPM ve Nix ([GUIDE.tr.md](GUIDE.tr.md) §2.4) | RPM, Homebrew ve Nix için tamamlandı; AUR, Chocolatey ve winget dosyaları her sürüm için yazılır ve proje sahibinin hesaplarını bekler; Flathub hazırlanmadı |
-| `0.8.0` | `apeiron mount`: her snapshot'ı FUSE (Linux, macOS) ve ProjFS (Windows) ile salt okunur bir klasör olarak açma ([MOUNT.tr.md](MOUNT.tr.md)) | Linux ve macOS için tamamlandı; Windows yazılmadı |
+| `0.8.0` | `apeiron mount`: her snapshot'ı FUSE (Linux, macOS) ve ProjFS (Windows) ile salt okunur bir klasör olarak açma ([MOUNT.tr.md](MOUNT.tr.md)) | Linux için tamamlandı; macOS ve Windows derlenmiyor |
 | `0.9.0` | restic ve Borg depolarını ve Git LFS'in büyük dosyalarını içe aktarma ([CLI.tr.md](CLI.tr.md) §4.4, [GIT.tr.md](GIT.tr.md) §2.3) | Tamamlandı |
 | `0.10.0` | Yapay zekâ ajanları için kontrol noktaları, bir ajanın işini geri alma, geçmiş, fark ve arama için bir MCP sunucusu | Başlanmadı |
 | `0.11.0` | Uygulama tutarlı yedek: PostgreSQL ve MySQL dökümleri, Windows VSS, btrfs, ZFS ve LVM snapshot'ları, Docker birimleri, Kubernetes birimleri | Başlanmadı |

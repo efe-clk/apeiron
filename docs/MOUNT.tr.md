@@ -2,7 +2,7 @@
 
 # Bir Depoyu Bağlamak
 
-> **Durum: Linux ve macOS'ta tamamlandı.** `apeiron mount`, bir deponun her snapshot'ını salt okunur bir klasör olarak gösterir; böylece dosyaları önce geri yüklemeden açılabilir, `grep` ile aranabilir ya da `diff` ile karşılaştırılabilir. Arkasındaki karar ADR-056'dır ([DECISIONS.tr.md](DECISIONS.tr.md)).
+> **Durum: Linux'ta tamamlandı.** `apeiron mount`, bir deponun her snapshot'ını salt okunur bir klasör olarak gösterir; böylece dosyaları önce geri yüklemeden açılabilir, `grep` ile aranabilir ya da `diff` ile karşılaştırılabilir. Arkasındaki karar ADR-056'dır ([DECISIONS.tr.md](DECISIONS.tr.md)).
 
 ## 1. Komut
 
@@ -39,13 +39,14 @@ Bağlama yalnızca herkese açık API'yi kullanır ([API.tr.md](API.tr.md)): ref
 | Sistem | Gerekenler | Durum |
 | --- | --- | --- |
 | Linux | FUSE 3: `fusermount3`'ü veren `fuse3` paketi | Tamamlandı |
-| macOS | [macFUSE](https://macfuse.github.io) | Yalnızca Linux'ta derlendi ve sınandı; macOS'ta kullanıcının macFUSE kurması gerekir |
+| macOS | [macFUSE](https://macfuse.github.io) | Derlenmez: `fuser` derlenirken macFUSE'un dosyalarını ister; sürüm makinelerinde bunlar yok (§5) |
 | Windows | — | Yazılmadı: Windows'ta FUSE yok ve Projected File System ayrı bir katman ister (§5) |
 
 ## 5. Bu işin parçası olmayanlar
 
 | Konu | Nerede |
 | --- | --- |
+| macFUSE'un kurulu olduğu yerde derlenen macOS | Daha sonra |
 | Projected File System ya da WinFsp ile Windows | Daha sonra; o zamana kadar `apeiron restore` ve masaüstü arayüzünün Göz at sayfası |
 | Bağlı bir snapshot'a yazmak | Planlanmadı: snapshot'lar asla değişmez; bunun yerine bir klasörü yedekleyin |
 | Yerel depo olmadan bir uzak depoyu bağlamak | Daha sonra; önce onu clone ya da pull edin |

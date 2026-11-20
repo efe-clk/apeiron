@@ -1213,7 +1213,7 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Çözülünce bir snapshot alan yazılabilir bir bağlama | Yazılanların bir yerde tutulması gerekir ve kaybolabilir; `backup` bunu zaten yapar |
 | Projected File System ile Windows'u şimdi yapmak | `apeiron-sys` içinde yalnızca Windows'a özgü bir sistem çağrıları katmanı ister; büyük ve ayrı bir iş |
 
-**Sonuçlar.** Bir bağlama Linux'ta `fusermount3`'e, macOS'ta macFUSE'a ihtiyaç duyar. Snapshot listeleri bağlıyken bellekte kalır.
+**Sonuçlar.** Bir bağlama Linux'ta `fusermount3`'e ihtiyaç duyar. macOS'ta `fuser` derlenmek için macFUSE'un dosyalarını ister; bu yüzden bağlama, macOS macFUSE'un kurulu olduğu yerde derlenene kadar yalnızca Linux için derlenir. Snapshot listeleri bağlıyken bellekte kalır.
 
 ## ADR-057: restic ve Borg kendi programları üzerinden, Git LFS kendi deposu üzerinden okunur
 
