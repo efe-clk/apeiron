@@ -51,13 +51,27 @@ Paketler her sürümle birlikte [sürümler sayfasında](https://github.com/efe-
 | Sistem | Dosya | Kurulumdan sonra |
 | --- | --- | --- |
 | Debian, Ubuntu | `apeiron_<sürüm>_<mimari>.deb`: `sudo apt install ./<dosya>` | `apeiron` ve uygulama menüsünde uygulama |
+| Fedora, RHEL, openSUSE | `apeiron-<sürüm>-1.<mimari>.rpm`: `sudo dnf install ./<dosya>` | Aynısı |
 | Linux sunucu | `apeiron-<sürüm>-linux-<mimari>.tar.gz` | Yalnızca komut; istediğiniz yere kopyalanır |
 | Apple işlemcili macOS | `Apeiron-<sürüm>-macos-arm64.dmg`: uygulamayı Applications klasörüne sürükleyin | Uygulama; komut onun içinde, `Contents/MacOS` altındadır |
 | Windows, 64 bit | `Apeiron-<sürüm>-windows-x86_64.exe` | Başlat menüsünde uygulama; komut programın klasöründedir |
 
-Paketler henüz imzalı değildir, bu yüzden sistem uyarı verir. macOS'ta uygulamaya sağ tıklayıp Aç'ı seçin. Windows'ta Ek bilgi'yi, ardından Yine de çalıştır'ı seçin. Bir dosyayı önce denetlemek için aynı sayfadaki `SHA256SUMS` ile karşılaştırın.
+macOS ve Windows paketleri bir Apple ya da Microsoft sertifikasıyla imzalı değildir, bu yüzden sistem uyarı verir; bunun yerine her dosyanın bir Sigstore kanıtı vardır ([SECURITY.tr.md](../SECURITY.tr.md) §4). macOS'ta uygulamaya sağ tıklayıp Aç'ı seçin. Windows'ta Ek bilgi'yi, ardından Yine de çalıştır'ı seçin. Bir dosyayı önce denetlemek için aynı sayfadaki `SHA256SUMS` ile karşılaştırın.
 
 Metin ve belge eklentileri aynı sayfadadır: `apeiron plugin install text` birini indirip kurar (`apeiron plugin add apeiron_text.wasm` indirilmiş bir dosyayı kurar). Kaldırma yalnızca programı siler; yedekleriniz ve ayarlarınız kalır.
+
+Paket yöneticileri komutu bir sürümün kaynağından derler:
+
+| Paket yöneticisi | Komut | Durum |
+| --- | --- | --- |
+| Homebrew (macOS, Linux) | `brew install efe-clk/apeiron/apeiron` | Yayımlandı, [efe-clk/homebrew-apeiron](https://github.com/efe-clk/homebrew-apeiron) tap'inde |
+| Nix | `nix profile install github:efe-clk/apeiron` | Yayımlandı: depo bir flake'tir |
+| Arch Linux (AUR) | `yay -S apeiron` | Henüz yayımlanmadı: AUR proje sahibinin hesabını ister |
+| Chocolatey | `choco install apeiron` | Henüz yayımlanmadı: proje sahibinin API anahtarını ister |
+| winget | `winget install efe-clk.Apeiron` | Henüz yayımlanmadı: microsoft/winget-pkgs'e bir çekme isteği |
+| Flathub | — | Hazırlanmadı: Flathub ağsız derler; bunun için her crate'in bildirimde listelenmesi gerekir |
+
+`packaging/manifests.py <version> <folder>`, yayımlanmış bir sürüm için Homebrew, AUR, Chocolatey ve winget dosyalarını yazar; böylece her biri kendi hesabıyla yayımlanabilir.
 
 ## 3. Depoyu oluşturma
 

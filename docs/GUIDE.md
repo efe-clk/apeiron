@@ -51,13 +51,27 @@ Packages come with each release on [the releases page](https://github.com/efe-cl
 | System | File | After installing |
 | --- | --- | --- |
 | Debian, Ubuntu | `apeiron_<version>_<architecture>.deb`: `sudo apt install ./<file>` | `apeiron` and the app in the application menu |
+| Fedora, RHEL, openSUSE | `apeiron-<version>-1.<architecture>.rpm`: `sudo dnf install ./<file>` | The same |
 | Linux server | `apeiron-<version>-linux-<architecture>.tar.gz` | The command alone, to copy where you want it |
 | macOS on Apple silicon | `Apeiron-<version>-macos-arm64.dmg`: drag the app to Applications | The app; the command is inside it, in `Contents/MacOS` |
 | Windows, 64-bit | `Apeiron-<version>-windows-x86_64.exe` | The app in the Start menu; the command is in the folder of the program |
 
-The packages are not signed yet, so the system warns about them. On macOS, right-click the app and choose Open. On Windows, choose More info, then Run anyway. To check a file first, compare it with `SHA256SUMS` on the same page.
+The packages for macOS and Windows are not signed with an Apple or Microsoft certificate, so the system warns about them; every file has a Sigstore attestation instead ([SECURITY.md](../SECURITY.md) §4). On macOS, right-click the app and choose Open. On Windows, choose More info, then Run anyway. To check a file first, compare it with `SHA256SUMS` on the same page.
 
 The plugins for text and documents are on the same page: `apeiron plugin install text` downloads and installs one (`apeiron plugin add apeiron_text.wasm` installs a downloaded file). Uninstalling removes the program; your backups and settings stay.
+
+Package managers build the command from the source of a release:
+
+| Package manager | Command | Status |
+| --- | --- | --- |
+| Homebrew (macOS, Linux) | `brew install efe-clk/apeiron/apeiron` | Published, in the tap [efe-clk/homebrew-apeiron](https://github.com/efe-clk/homebrew-apeiron) |
+| Nix | `nix profile install github:efe-clk/apeiron` | Published: the repository is a flake |
+| Arch Linux (AUR) | `yay -S apeiron` | Not published yet: the AUR needs the owner's account |
+| Chocolatey | `choco install apeiron` | Not published yet: needs the owner's API key |
+| winget | `winget install efe-clk.Apeiron` | Not published yet: a pull request to microsoft/winget-pkgs |
+| Flathub | — | Not prepared: Flathub builds without a network, which needs every crate listed in the manifest |
+
+`packaging/manifests.py <version> <folder>` writes the files of Homebrew, the AUR, Chocolatey and winget for a published release, so that each can be published with its account.
 
 ## 3. Creating the repository
 

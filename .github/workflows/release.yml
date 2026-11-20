@@ -60,7 +60,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
-      - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev xvfb
+      - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev xvfb rpm
       # Builds that anyone can repeat byte for byte (SECURITY.md §4): the
       # time of the commit and paths that do not depend on the machine.
       - run: |
@@ -78,6 +78,17 @@ jobs:
             sha256sum target/release/apeiron target/release/ape | sed "s|target/release/||"
           } > "dist/BUILDINFO-linux-$(uname -m).txt"
       - run: packaging/linux.sh "${{ needs.version.outputs.version }}" dist
+      - run: packaging/rpm.sh "${{ needs.version.outputs.version }}" dist
+      - name: Install the RPM on Fedora
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work fedora:latest bash -euc '
+            dnf install -q -y ./dist/*.rpm > /dev/null
+            if ldd /usr/bin/apeiron-desktop | grep "not found"; then exit 1; fi
+            packaging/try.sh apeiron
+            packaging/try.sh ape
+            dnf remove -q -y apeiron > /dev/null
+            if command -v apeiron; then exit 1; fi
+          '
       - name: Install on clean systems
         run: |
           for image in ubuntu:22.04 ubuntu:24.04 debian:12; do
