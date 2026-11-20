@@ -16,7 +16,7 @@ name = "apeiron_core"
 fuzz = []
 
 [dependencies]
-apeiron-sys = { package = "apeiron-sys-rs", version = "0.7.0", path = "../apeiron-sys" }
+apeiron-sys = { package = "apeiron-sys-rs", version = "0.8.0", path = "../apeiron-sys" }
 argon2 = { version = "0.6.0", default-features = false, features = ["alloc"] }
 blake3 = "1.8.7"
 chacha20poly1305 = { version = "0.11.0", default-features = false, features = ["alloc"] }
