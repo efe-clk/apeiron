@@ -13,7 +13,7 @@ interface type-driver {
     // File name patterns of the files `extract-text` reads; none for a plugin
     // that does not.
     text-patterns: list<string>,
-    // Permissions the plugin asks for; this version grants none.
+    // Permissions the plugin asks for; type drivers get none (docs/PLUGIN.md §3.1).
     permissions: list<string>,
   }
 
@@ -44,7 +44,7 @@ interface importer {
     description: string,
     // File name patterns of the archives it reads, such as `*.mbox`.
     patterns: list<string>,
-    // Permissions the plugin asks for; this version grants none.
+    // Permissions the plugin asks for; importers get none (docs/PLUGIN.md §3.1).
     permissions: list<string>,
   }
 
@@ -70,6 +70,8 @@ interface hook {
     // The events it is called for: `backup`, before a backup's ref moves,
     // and `backup-done`, after it moved.
     events: list<string>,
+    // `net:<host>` for each host it reaches, granted when it is installed
+    // (docs/PLUGIN.md §3.1).
     permissions: list<string>,
   }
 
