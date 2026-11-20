@@ -70,7 +70,8 @@ jobs:
           mkdir -p target/cpp
           flags="-std=c++17 -Wall -Wextra -Wpedantic -Werror -I crates/apeiron-ffi/include -I sdk/cpp/include"
           if [ "$RUNNER_OS" = Windows ]; then
-            clang++ $flags sdk/cpp/tests/run.cpp target/debug/apeiron.dll.lib -o target/cpp/run.exe
+            # The runner's Visual Studio may ship an STL newer than its clang.
+            clang++ $flags -D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH sdk/cpp/tests/run.cpp target/debug/apeiron.dll.lib -o target/cpp/run.exe
             PATH="$PWD/target/debug:$PATH" target/cpp/run.exe sdk/conformance
           else
             c++ $flags sdk/cpp/tests/run.cpp -L target/debug -lapeiron -Wl,-rpath,"$PWD/target/debug" -o target/cpp/run
