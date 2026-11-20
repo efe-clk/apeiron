@@ -171,7 +171,7 @@ checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
 name = "apeiron-cli-rs"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "apeiron-daemon-rs",
  "apeiron-mount-rs",
@@ -193,7 +193,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-core-rs"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "apeiron-sys-rs",
  "argon2",
@@ -214,7 +214,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-daemon-rs"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "apeiron-rs",
  "apeiron-sys-rs",
@@ -233,7 +233,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-desktop-rs"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "apeiron-server-rs",
  "tao",
@@ -242,7 +242,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-ffi-rs"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "apeiron-rs",
  "cbindgen",
@@ -254,7 +254,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-git-rs"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "apeiron-core-rs",
  "flate2",
@@ -268,7 +268,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-mount-rs"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "apeiron-rs",
  "fuser",
@@ -278,7 +278,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-plugin-rs"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "apeiron-core-rs",
  "apeiron-services-rs",
@@ -300,7 +300,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-remote-rs"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "apeiron-core-rs",
  "object_store",
@@ -318,7 +318,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-rs"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "apeiron-core-rs",
  "apeiron-git-rs",
@@ -336,7 +336,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-server-rs"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "apeiron-core-rs",
  "apeiron-daemon-rs",
@@ -373,7 +373,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-services-rs"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "apeiron-core-rs",
  "flate2",
@@ -392,7 +392,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-sys-rs"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "libc",
  "tempfile",
@@ -401,7 +401,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-tui-rs"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "apeiron-daemon-rs",
  "apeiron-rs",
