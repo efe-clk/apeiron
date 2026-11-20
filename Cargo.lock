@@ -171,7 +171,7 @@ checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
 name = "apeiron-cli-rs"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "apeiron-daemon-rs",
  "apeiron-rs",
@@ -192,7 +192,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-core-rs"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "apeiron-sys-rs",
  "argon2",
@@ -213,14 +213,16 @@ dependencies = [
 
 [[package]]
 name = "apeiron-daemon-rs"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "apeiron-rs",
  "apeiron-sys-rs",
  "dirs 6.0.0",
  "fs4",
+ "gethostname",
  "jiff",
  "notify",
+ "reqwest",
  "serde",
  "serde_json",
  "tempfile",
@@ -230,7 +232,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-desktop-rs"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "apeiron-server-rs",
  "tao",
@@ -239,7 +241,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-ffi-rs"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "apeiron-rs",
  "cbindgen",
@@ -251,7 +253,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-git-rs"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "apeiron-core-rs",
  "flate2",
@@ -264,7 +266,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-plugin-rs"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "apeiron-core-rs",
  "apeiron-services-rs",
@@ -286,7 +288,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-remote-rs"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "apeiron-core-rs",
  "object_store",
@@ -304,7 +306,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-rs"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "apeiron-core-rs",
  "apeiron-git-rs",
@@ -322,7 +324,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-server-rs"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "apeiron-core-rs",
  "apeiron-daemon-rs",
@@ -359,7 +361,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-services-rs"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "apeiron-core-rs",
  "flate2",
@@ -377,7 +379,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-sys-rs"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "libc",
  "tempfile",
@@ -386,7 +388,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-tui-rs"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "apeiron-daemon-rs",
  "apeiron-rs",
@@ -6383,6 +6385,7 @@ checksum = "16a1cfa75cc186dd73d5818e510e042e40927bccc9c236b061cea97e1eb08029"
 dependencies = [
  "base64 0.23.1",
  "bytes",
+ "futures-channel",
  "futures-core",
  "futures-util",
  "h2",

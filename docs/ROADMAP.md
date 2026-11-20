@@ -132,7 +132,7 @@ The owner asked on 2026-11-20 for these features, for personal developers and or
 
 | Release | Work item | Status |
 | --- | --- | --- |
-| `0.2.0` | Observability: Prometheus `/metrics` and webhooks when a job ends or fails (Slack, Teams, PagerDuty) | Not started |
+| `0.2.0` | Observability: Prometheus `/metrics` and webhooks when a job ends or fails (Slack, Teams, PagerDuty) ([DAEMON.md](DAEMON.md) §7, §8) | Done |
 | `0.3.0` | Developer presets: ready exclusion rules (`target/`, `node_modules/`, `.venv` …), `.gitignore` files on request (`--gitignore`, ADR-039 stays the default), dotfiles synced between devices with one command | Not started |
 | `0.4.0` | Ransomware early warning: an alarm when the share of changed files or their entropy jumps, and on request an immutable lock of the target | Not started |
 | `0.5.0` | Quotas per tenant and user, bandwidth limits ([VISION.md](VISION.md)), users made and closed through SCIM | Not started |
