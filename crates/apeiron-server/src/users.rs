@@ -74,6 +74,14 @@ pub struct User {
     /// backups and folders at each sign-in (IDENTITY.md §2.1).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub from_groups: bool,
+    /// The most the newest snapshots of the user's backups may hold
+    /// together, in bytes (USERS.md §2.1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_bytes: Option<u64>,
+    /// Turned off, through SCIM (USERS.md §4.1): it cannot sign in, and its
+    /// sessions and tokens stop.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub disabled: bool,
 }
 
 impl User {

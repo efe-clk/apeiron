@@ -75,6 +75,8 @@ fn tenant(dir: &Path, name: &str, host: &str) -> TenantOptions {
         oidc: None,
         totp: None,
         from_groups: false,
+        max_bytes: None,
+        disabled: false,
     })
     .unwrap();
     list.save(&users).unwrap();
@@ -426,6 +428,7 @@ fn a_tenants_admin_edits_its_jobs() {
             repo: dir.path().join("acme/repo"),
             password_file: None,
             folders: vec![home.clone()],
+            max_rate: None,
         }),
     });
     let server =

@@ -36,12 +36,25 @@ pub struct Tenant {
     /// The most long operations it may run at once.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_jobs: Option<u32>,
+    /// The most bytes per second its syncs and scheduled jobs move to or
+    /// from remotes, on average (TENANTS.md §2.1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_rate: Option<u64>,
     /// Its admins manage the tenants in the pages (TENANTS.md §4.1).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub operator: bool,
 }
 
 impl Tenant {
+    /// What the tenant may use at most.
+    pub fn limits(&self) -> crate::Limits {
+        crate::Limits {
+            max_bytes: self.max_bytes,
+            max_jobs: self.max_jobs,
+            max_rate: self.max_rate,
+        }
+    }
+
     /// The folder of the tenant's users file, `web.json`.
     pub fn config_dir(&self) -> Option<PathBuf> {
         dirs::config_dir().map(|d| d.join("apeiron").join("tenants").join(&self.name))
@@ -58,6 +71,7 @@ impl Tenant {
                 repo: self.repo.clone(),
                 password_file: self.password_file.clone(),
                 folders: self.folders.clone(),
+                max_rate: self.max_rate,
             }),
         }
     }
@@ -216,6 +230,7 @@ mod tests {
             replicas: Vec::new(),
             max_bytes: None,
             max_jobs: None,
+            max_rate: None,
             operator: false,
         }
     }

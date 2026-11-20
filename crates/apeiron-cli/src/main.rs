@@ -924,6 +924,9 @@ enum TenantCommand {
         /// The most long operations it may run at once
         #[arg(long, value_name = "N")]
         max_jobs: Option<u32>,
+        /// The most its syncs and scheduled jobs move per second, such as 2M
+        #[arg(long, value_parser = parse_size, value_name = "SPEED")]
+        max_rate: Option<u64>,
     },
     /// List the tenants
     List,
@@ -1027,6 +1030,7 @@ fn web_tenant(command: TenantCommand, out: &Output) -> Result<(), Failure> {
                 replicas,
                 max_bytes: max_bytes.filter(|&n| n > 0),
                 max_jobs: max_jobs.filter(|&n| n > 0),
+                max_rate: None,
                 operator,
             };
             tenants.add(tenant.clone())?;
@@ -1059,8 +1063,12 @@ fn web_tenant(command: TenantCommand, out: &Output) -> Result<(), Failure> {
             name,
             max_bytes,
             max_jobs,
+            max_rate,
         } => {
             let tenant = tenants.get_mut(&name)?;
+            if let Some(n) = max_rate {
+                tenant.max_rate = (n > 0).then_some(n);
+            }
             if let Some(n) = max_bytes {
                 tenant.max_bytes = (n > 0).then_some(n);
             }
@@ -1694,6 +1702,9 @@ enum UserCommand {
         /// address; the user then needs no password
         #[arg(long, visible_alias = "identity", value_name = "IDENTITY")]
         oidc: Option<String>,
+        /// The most the user's backups may hold together, such as 50G
+        #[arg(long, value_name = "SIZE", value_parser = parse_size)]
+        max_bytes: Option<u64>,
     },
     /// Replace the role, backups or folders of a user
     Change {
@@ -1710,6 +1721,10 @@ enum UserCommand {
         /// Remove the user's password, so it signs in only through the provider
         #[arg(long)]
         no_password: bool,
+        /// The most the user's backups may hold together, such as 50G; 0
+        /// removes the limit
+        #[arg(long, value_name = "SIZE", value_parser = parse_size)]
+        max_bytes: Option<u64>,
     },
     /// Set a new password for a user; ends the user's sessions
     Password { name: String },
@@ -2191,6 +2206,7 @@ fn web_user(files: &WebFiles, command: UserCommand, out: &Output) -> Result<(), 
             backups,
             folders,
             oidc,
+            max_bytes,
         } => {
             if users.get(&name).is_some() {
                 return Err(Error::new(
@@ -2212,6 +2228,8 @@ fn web_user(files: &WebFiles, command: UserCommand, out: &Output) -> Result<(), 
                 oidc,
                 totp: None,
                 from_groups: false,
+                max_bytes: max_bytes.filter(|&n| n > 0),
+                disabled: false,
             })?;
             users.need_admin()?;
             users.save(file)?;
@@ -2225,8 +2243,12 @@ fn web_user(files: &WebFiles, command: UserCommand, out: &Output) -> Result<(), 
             folders,
             oidc,
             no_password,
+            max_bytes,
         } => {
             let user = users.get_mut(&name)?;
+            if let Some(n) = max_bytes {
+                user.max_bytes = (n > 0).then_some(n);
+            }
             if oidc.is_some() {
                 user.oidc = oidc;
             }
@@ -3829,10 +3851,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                     let asking = format!("Password or recovery key of {}: ", t.name);
                     let audit = copy_audit(files.audit, &audit_syslog, Some(&t.name));
                     let jobs = Some(t.jobs(&roots.0, &roots.1));
-                    let limits = apeiron_server::Limits {
-                        max_bytes: t.max_bytes,
-                        max_jobs: t.max_jobs,
-                    };
+                    let limits = t.limits();
                     options.push(apeiron_server::TenantOptions {
                         repo: unlock(&t.repo, t.password_file.as_deref(), &asking)?,
                         name: t.name,
@@ -3887,6 +3906,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                                     .iter()
                                     .map(|f| absolute(f))
                                     .collect::<Result<_, _>>()?,
+                                max_rate: None,
                             }),
                         })
                     }

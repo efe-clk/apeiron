@@ -60,6 +60,7 @@ The tenants are listed in `tenants.json` in the configuration folder (`~/.config
 | `replicas` | Remotes of its repository every ref is pushed to after each backup ([REPLICATION.md](REPLICATION.md) §4); none if left out |
 | `max_bytes` | The most its repository may hold, in bytes (§2.1); no limit if left out |
 | `max_jobs` | The most long operations it may run at once (§2.1); no limit if left out |
+| `max_rate` | The most bytes per second its syncs and scheduled jobs move (§2.1); no limit if left out |
 | `operator` | `true` for a tenant whose admins manage the tenants in the pages (§4.1) |
 
 The other files of a tenant are kept by its name:
@@ -80,6 +81,7 @@ A tenant's limits keep it from taking the disk or the processors of the others. 
 | --- | --- | --- |
 | `max_bytes` | The size of every file in the tenant's repository folder, before a backup, a sync, an upload through a link (SHARE.md §7) and a `git push` (GIT.md §7.1) | They are refused with "the repository holds … bytes, its limit is …"; restoring, reading and deleting go on, and `apeiron gc` frees space after old versions are removed. One that started below the limit runs to its end, so a repository can pass its limit by one backup |
 | `max_jobs` | Long operations of the tenant's users still running (`backup`, `restore`, `verify`, `search`, `report`, `sync`) | A new one is refused (`locked`) until one ends |
+| `max_rate` | Bytes per second its syncs started in the pages and its scheduled jobs that move data move to or from remotes, on average | A sync or a job that asks for more, or for no limit, gets this one ([SYNC.md](SYNC.md) §2); replication pushes and downloads are not limited |
 
 A refusal is recorded in the tenant's audit log as `start:<operation>` with its error.
 
@@ -104,7 +106,7 @@ The host names must lead to the server, through DNS records or the proxy.
 | Command | What it does |
 | --- | --- |
 | `apeiron web tenant add <name> --host <host> --repo <path> [--folder <path>]... [--password-file <path>] [--replicate <remote>]... [--max-bytes <size>] [--max-jobs <n>] [--operator]` | Adds a tenant and prints the command for its first admin; `--operator` makes its admins manage the tenants in the pages (§4.1) |
-| `apeiron web tenant limit <name> [--max-bytes <size>] [--max-jobs <n>]` | Sets the limits of §2.1, such as `--max-bytes 500G`; 0 lifts one |
+| `apeiron web tenant limit <name> [--max-bytes <size>] [--max-jobs <n>] [--max-rate <speed>]` | Sets the limits of §2.1, such as `--max-bytes 500G`; 0 lifts one |
 | `apeiron web tenant list` | Lists the tenants with their hosts and repositories |
 | `apeiron web tenant remove <name>` | Stops serving a tenant; its files stay |
 | `apeiron web --tenants [--listen <address>] [--cert <file> --key <file> \| --plain]` | Serves every tenant |

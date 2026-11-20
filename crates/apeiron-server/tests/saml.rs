@@ -158,6 +158,8 @@ fn signing_in_through_a_saml_provider() {
             oidc: Some("ayse@example.com".to_owned()),
             totp: None,
             from_groups: false,
+            max_bytes: None,
+            disabled: false,
         }],
     };
     users.save(&file).unwrap();

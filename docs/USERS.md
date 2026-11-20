@@ -48,15 +48,21 @@ Users are kept in `web.json` in the configuration folder, readable only by its o
 | `role` | `admin`, `member` or `reader` |
 | `backups` | Ref names, with `*` at the end for a prefix; ignored for `admin` |
 | `folders` | Folders of the server |
+| `max_bytes` | The most its backups may hold together (§2.1); no limit if left out |
+| `disabled` | `true` for a user turned off through SCIM (§4.1): it cannot sign in, and its sessions and access tokens stop at their next request |
 
 The server reads the file again when it changes, so a user added, changed or removed while it runs counts from the next request. A session ends when its user is removed or its password changes.
+
+### 2.1 Quotas
+
+A user's `max_bytes` is checked before each backup and sync it starts in the pages or the JSON API: the newest snapshots of every ref it may use (`backups`, or every ref for an `admin`, without those under `apeiron/`) are added up by the size of their files, and when they hold the limit or more, the operation is refused with "your backups hold … bytes, your limit is …". Older versions and files shared by several backups count in each newest snapshot that holds them, so the number is what the user would get back by restoring them all; the space on the disk is the tenant's limit (TENANTS.md §2.1). Restoring, reading and deleting go on.
 
 ## 3. Commands
 
 | Command | What it does |
 | --- | --- |
-| `apeiron web user add <name> --role <role> [--backup <ref>]... [--folder <path>]...` | Adds a user; asks for the password twice |
-| `apeiron web user change <name> [--role <role>] [--backup <ref>]... [--folder <path>]...` | Replaces the role, backups or folders given |
+| `apeiron web user add <name> --role <role> [--backup <ref>]... [--folder <path>]... [--max-bytes <size>]` | Adds a user; asks for the password twice |
+| `apeiron web user change <name> [--role <role>] [--backup <ref>]... [--folder <path>]... [--max-bytes <size>]` | Replaces the role, backups, folders or quota given; `--max-bytes 0` lifts the quota |
 | `apeiron web user password <name>` | Sets a new password; ends the user's sessions |
 | `apeiron web user second-factor <name> [--off]` | Makes signing in with the password also ask for a code from an authenticator app, and shows the secret to enter in the app; `--off` turns it off; ends the user's sessions ([IDENTITY.md](IDENTITY.md) §4) |
 | `apeiron web user remove <name>` | Removes a user; the last `admin` cannot be removed |
@@ -83,6 +89,20 @@ The server reads the file again when it changes, so a user added, changed or rem
 | `POST /api/users/<name>/remove` | For an `admin`: removes a user other than itself |
 
 The pages show the user's name next to Sign out and hide what the role cannot do: Back up for a `reader`, Restore for a `reader`, Check for everyone but an `admin`. An `admin` also has a Users page, which adds, changes and removes users with the requests above; every change is recorded in the audit log under that admin's name, and a changed password or identity ends the user's sessions. Changes of the pages and of `apeiron web user` are written whole, one at a time (`web.json.lock`).
+
+### 4.1 SCIM
+
+An organization's identity provider, such as Microsoft Entra ID or Okta, keeps the users of a web server in step with its own through SCIM 2.0 at `https://<server>/scim/v2`, with an access token of an `admin` ([API.md](API.md) §2.1) as its secret token. Each change is recorded in the audit log as `scim_user_add`, `scim_user_change` or `scim_user_remove`.
+
+| Request | What it does |
+| --- | --- |
+| `GET /scim/v2/ServiceProviderConfig` | What is supported: the requests below, `PATCH` and the filter `userName eq "…"` |
+| `GET /scim/v2/Users[?filter=userName eq "…"][&startIndex=…&count=…]` | Lists users, at most 200 at a time |
+| `POST /scim/v2/Users` `{"userName", "active"}` | Makes a user who signs in through the provider: `userName` becomes its identity (`oidc`) and its name the part before `@` as for groups ([IDENTITY.md](IDENTITY.md) §2.1); it is a `member` with the backups `backup/<name>-*` and no folders, which an admin can change. `409` when a user already has that identity |
+| `GET`, `PUT`, `PATCH /scim/v2/Users/<id>` | Shows or changes `userName` and `active`; `active: false` turns the user off (`disabled`). Other attributes, such as names and e-mail addresses, stay with the provider |
+| `DELETE /scim/v2/Users/<id>` | Removes the user; the last `admin` cannot be removed |
+
+The `id` is the user's name. Groups are not provisioned: roles, backups and folders come from the defaults above, from an admin, or from the group rules at sign-in.
 
 ## 5. Not part of this work item
 

@@ -45,6 +45,8 @@ pub struct Scope {
     pub repo: PathBuf,
     pub password_file: Option<PathBuf>,
     pub folders: Vec<PathBuf>,
+    /// The tenant's most bytes per second; a job's `rate_kb` cannot exceed it.
+    pub max_rate: Option<u64>,
 }
 
 impl Scope {
@@ -418,6 +420,15 @@ fn to_job(name: &str, raw: RawJob, scope: Option<&Scope>) -> std::result::Result
         Some(kb) => Some(kb.saturating_mul(1024)),
         None => None,
     };
+    // A tenant's limit holds for every job that moves data (TENANTS.md §2.1).
+    let moves_data = !matches!(
+        action,
+        Action::Verify | Action::Gc | Action::RestoreTest { .. }
+    );
+    let rate = match scope.and_then(|s| s.max_rate) {
+        Some(max) if moves_data => Some(rate.map_or(max, |r| r.min(max))),
+        _ => rate,
+    };
     let on_change = match (&raw.on_change, &action) {
         (None, _) => None,
         (Some(text), Action::Backup { .. } | Action::Sync { .. }) => Some(parse_quiet(text)?),
@@ -545,6 +556,28 @@ mod tests {
         parse_jobs(Path::new("jobs.toml"), text, None).map_err(|e| e.to_string())
     }
 
+    /// A tenant's speed limit caps its jobs that move data.
+    #[test]
+    fn a_tenants_speed_limit_caps_its_jobs() {
+        let scope = Scope {
+            repo: PathBuf::from("/srv/acme"),
+            password_file: None,
+            folders: Vec::new(),
+            max_rate: Some(100 * 1024),
+        };
+        let parse = |text: &str| parse_jobs(Path::new("jobs.toml"), text, Some(&scope)).unwrap();
+        let none = parse("[job.p]\ndo = \"push\"\npush = [\"nas\"]\nevery = \"day\"");
+        assert_eq!(none[0].rate, Some(100 * 1024));
+        let lower =
+            parse("[job.p]\ndo = \"push\"\npush = [\"nas\"]\nevery = \"day\"\nrate_kb = 10");
+        assert_eq!(lower[0].rate, Some(10 * 1024));
+        let higher =
+            parse("[job.p]\ndo = \"push\"\npush = [\"nas\"]\nevery = \"day\"\nrate_kb = 999");
+        assert_eq!(higher[0].rate, Some(100 * 1024));
+        let check = parse("[job.v]\ndo = \"verify\"\nevery = \"day\"");
+        assert_eq!(check[0].rate, None);
+    }
+
     /// A tenant's jobs use its repository and only its folders.
     #[cfg(unix)]
     #[test]
@@ -553,6 +586,7 @@ mod tests {
             repo: PathBuf::from("/srv/acme"),
             password_file: Some(PathBuf::from("/etc/acme.key")),
             folders: vec![PathBuf::from("/data/acme")],
+            max_rate: None,
         };
         let parse = |text: &str| {
             parse_jobs(Path::new("jobs.toml"), text, Some(&scope)).map_err(|e| e.to_string())

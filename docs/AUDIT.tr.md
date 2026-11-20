@@ -23,6 +23,7 @@ Birkaç kişi bir yedek sunucusunu paylaştığında admin, "bu klasörü kim, n
 | `share_add`, `share_remove` | Bir paylaşım bağlantısı oluşturmak ya da kaldırmak | Bağlantının kimliği, sürümü, yolu ve bitişi ([SHARE.tr.md](SHARE.tr.md) §6) |
 | `shared:list`, `shared:read`, `shared:upload` | Bir paylaşım bağlantısının oturum açmadan her kullanımı; `shared:upload` gönderilen dosyayı adlandırır ([SHARE.tr.md](SHARE.tr.md) §7) | Bağlantının kimliği ve yol; bağlantının gizli kısmı asla |
 | `shared:unlock` | Bir paylaşım bağlantısı için girilen her parola | Bağlantının kimliği; parola ya da gizli kısım asla |
+| `scim_user_add`, `scim_user_change`, `scim_user_remove` | Bir admin'in anahtarıyla SCIM üzerinden kimlik sağlayıcısı ([USERS.tr.md](USERS.tr.md) §4.1) | Ad, kimlik ve etkin olup olmadığı |
 | `user_add`, `user_change`, `user_password`, `user_remove` | `apeiron web user` ya da Kullanıcılar sayfasında bir admin | Ad, rol, yedekler, klasörler ve kimlik; parola asla |
 | `user_second_factor_on`, `user_second_factor_off` | `apeiron web user second-factor` | Ad; gizli anahtar asla |
 | `oidc_set`, `oidc_remove`, `oidc_group`, `oidc_ungroup` | `apeiron web oidc` | Sağlayıcının ayarları; gizli anahtar asla |

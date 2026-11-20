@@ -855,6 +855,21 @@ impl Repository {
         )?)
     }
 
+    /// The total size of the files of each snapshot, for quotas (USERS.md
+    /// §2); a folder shared by several of them is counted in each.
+    pub fn sizes(&self, specs: &[String]) -> Result<Vec<u64>> {
+        let core = self.view()?;
+        let mut known = std::collections::HashMap::new();
+        specs
+            .iter()
+            .map(|s| {
+                let id = spec::resolve(&core, s)?;
+                let tree = core.read_snapshot(&id)?.tree;
+                Ok(services::tree_size(&core, &tree, &mut known)?)
+            })
+            .collect()
+    }
+
     /// The changed paths between two snapshots with the difference the
     /// plugin handling each file shows (TEXT.md §3).
     pub fn diff_text(&self, request: &DiffRequest) -> Result<Vec<TextDiff>> {

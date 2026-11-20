@@ -252,6 +252,8 @@ fn start(dir: &Path, idp: &Shared) -> (Web, SocketAddr, std::path::PathBuf) {
                 oidc: None,
                 totp: None,
                 from_groups: false,
+                max_bytes: None,
+                disabled: false,
             },
             User {
                 name: "ayse".to_owned(),
@@ -262,6 +264,8 @@ fn start(dir: &Path, idp: &Shared) -> (Web, SocketAddr, std::path::PathBuf) {
                 oidc: Some("Ayse@Example.com".to_owned()),
                 totp: None,
                 from_groups: false,
+                max_bytes: None,
+                disabled: false,
             },
         ],
     };
@@ -554,6 +558,8 @@ fn settings_that_cannot_work_are_refused() {
         oidc: Some(id.to_owned()),
         totp: None,
         from_groups: false,
+        max_bytes: None,
+        disabled: false,
     };
     let users = Users {
         saml: None,

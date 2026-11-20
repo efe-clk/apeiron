@@ -17,6 +17,7 @@ mod operator;
 mod peer;
 mod replicate;
 mod saml;
+mod scim;
 mod shares;
 mod tenants;
 mod tokens;
@@ -1429,6 +1430,15 @@ fn router(app: Arc<App>) -> Router {
         .route("/api/session", get(session))
         .route("/api/health", get(health))
         .route("/metrics", get(metrics))
+        .route("/scim/v2/ServiceProviderConfig", get(scim::config))
+        .route("/scim/v2/Users", get(scim::list).post(scim::add))
+        .route(
+            "/scim/v2/Users/{id}",
+            get(scim::get)
+                .put(scim::put)
+                .patch(scim::patch)
+                .delete(scim::remove),
+        )
         .route("/api/login", post(login))
         .route("/api/logout", post(logout))
         .route("/api/oidc/start", get(oidc_start))

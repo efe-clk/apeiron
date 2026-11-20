@@ -488,6 +488,28 @@ pub(crate) fn wildcard(pattern: &[char], subject: &[char]) -> bool {
     pattern[p..].iter().all(|&c| c == '*')
 }
 
+/// The total size of the files below `tree`; `known` keeps the sizes of
+/// trees already counted.
+pub fn tree_size(
+    repo: &Repository,
+    tree: &ObjectId,
+    known: &mut HashMap<ObjectId, u64>,
+) -> Result<u64> {
+    if let Some(&size) = known.get(tree) {
+        return Ok(size);
+    }
+    let mut size = 0;
+    for entry in repo.read_tree(tree)?.entries {
+        size += match entry.kind {
+            EntryKind::File { size, .. } => size,
+            EntryKind::Directory { tree } => tree_size(repo, &tree, known)?,
+            EntryKind::Symlink { .. } => 0,
+        };
+    }
+    known.insert(*tree, size);
+    Ok(size)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

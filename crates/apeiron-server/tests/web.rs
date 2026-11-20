@@ -37,6 +37,8 @@ fn users_file(dir: &Path) -> PathBuf {
             oidc: None,
             totp: None,
             from_groups: false,
+            max_bytes: None,
+            disabled: false,
         })
         .unwrap();
     users.save(&file).unwrap();
@@ -584,6 +586,8 @@ fn the_users_file() {
         oidc: None,
         totp: None,
         from_groups: false,
+        max_bytes: None,
+        disabled: false,
     };
     assert!(users.add(user("Bad Name")).is_err());
     assert!(users.add(user("root")).is_err());
@@ -622,6 +626,8 @@ fn each_user_sees_and_uses_only_their_own() {
         oidc: None,
         totp: None,
         from_groups: false,
+        max_bytes: None,
+        disabled: false,
     };
     users
         .add(user(
@@ -873,6 +879,8 @@ fn every_request_is_recorded() {
             oidc: None,
             totp: None,
             from_groups: false,
+            max_bytes: None,
+            disabled: false,
         })
         .unwrap();
     users.save(&dir.path().join("config/web.json")).unwrap();
@@ -922,6 +930,8 @@ fn share_links() {
                 oidc: None,
                 totp: None,
                 from_groups: false,
+                max_bytes: None,
+                disabled: false,
             })
             .unwrap();
     }
@@ -1532,6 +1542,8 @@ fn an_admin_manages_remotes_sync_keys_and_plugins() {
             oidc: None,
             totp: None,
             from_groups: false,
+            max_bytes: None,
+            disabled: false,
         })
         .unwrap();
     users.save(&file).unwrap();
@@ -1637,6 +1649,8 @@ fn reviews_belong_to_the_signed_in_user() {
                 oidc: None,
                 totp: None,
                 from_groups: false,
+                max_bytes: None,
+                disabled: false,
             })
             .unwrap();
     }
@@ -1717,6 +1731,7 @@ fn the_server_runs_its_scheduled_jobs() {
             repo: repo_path.clone(),
             password_file: None,
             folders: vec![home.clone()],
+            max_rate: None,
         }),
     };
     let folder = home.join("src").to_string_lossy().replace('\\', "/");
@@ -1793,6 +1808,8 @@ fn a_program_uses_the_api_with_a_token() {
             oidc: None,
             totp: None,
             from_groups: false,
+            max_bytes: None,
+            disabled: false,
         })
         .unwrap();
     users.save(&file).unwrap();
@@ -1882,4 +1899,107 @@ fn an_admin_reads_metrics_for_prometheus() {
         "{}",
         reply.body
     );
+}
+
+#[test]
+fn an_identity_provider_manages_users_through_scim() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_server, root, _home) = start(dir.path());
+    let file = dir.path().join("config/web.json");
+    let tokens = apeiron_server::Tokens::beside(&file);
+    let (_, secret) = tokens.add("root", "entra").unwrap();
+    let bearer = format!("Authorization: Bearer {secret}");
+    let send =
+        |method: &str, path: &str, body: Option<&Value>| root.send(method, path, body, &[&bearer]);
+    assert_eq!(root.get("/scim/v2/Users").status, 401);
+    let config = send("GET", "/scim/v2/ServiceProviderConfig", None);
+    assert_eq!(config.json()["patch"]["supported"], true);
+
+    let made = send(
+        "POST",
+        "/scim/v2/Users",
+        Some(
+            &json!({"schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+                     "userName": "Zeynep.Kaya@example.com", "active": true}),
+        ),
+    );
+    assert_eq!(made.status, 201, "{}", made.body);
+    let id = made.json()["id"].as_str().unwrap().to_owned();
+    assert_eq!(id, "zeynep-kaya");
+    let again = send(
+        "POST",
+        "/scim/v2/Users",
+        Some(&json!({"userName": "Zeynep.Kaya@example.com"})),
+    );
+    assert_eq!(again.status, 409);
+    let found = send(
+        "GET",
+        "/scim/v2/Users?filter=userName%20eq%20%22Zeynep.Kaya@example.com%22",
+        None,
+    );
+    assert_eq!(found.json()["totalResults"], 1, "{}", found.body);
+    assert_eq!(found.json()["Resources"][0]["id"], id);
+    let user = Users::load(&file).unwrap().get(&id).cloned().unwrap();
+    assert_eq!(user.role, Role::Member);
+    assert_eq!(user.backups, ["backup/zeynep-kaya-*"]);
+
+    // Turned off: its own token stops at once.
+    let (_, own) = tokens.add(&id, "laptop").unwrap();
+    let own_header = format!("Authorization: Bearer {own}");
+    assert_eq!(
+        root.send("GET", "/api/state", None, &[&own_header]).status,
+        200
+    );
+    let off = send(
+        "PATCH",
+        &format!("/scim/v2/Users/{id}"),
+        Some(
+            &json!({"schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+                     "Operations": [{"op": "Replace", "path": "active", "value": "False"}]}),
+        ),
+    );
+    assert_eq!(off.status, 200, "{}", off.body);
+    assert_eq!(off.json()["active"], false);
+    assert_eq!(
+        root.send("GET", "/api/state", None, &[&own_header]).status,
+        401
+    );
+
+    assert_eq!(
+        send("DELETE", &format!("/scim/v2/Users/{id}"), None).status,
+        204
+    );
+    assert_eq!(
+        send("GET", &format!("/scim/v2/Users/{id}"), None).status,
+        404
+    );
+    let log = fs::read_to_string(dir.path().join("audit.log")).unwrap();
+    assert!(
+        log.contains("scim_user_add") && log.contains("scim_user_remove"),
+        "{log}"
+    );
+}
+
+#[test]
+fn a_user_quota_stops_new_backups() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_server, mut root, home) = start(dir.path());
+    let file = dir.path().join("config/web.json");
+    root.sign_in();
+    let done = root.run(
+        "backup",
+        json!({"source": home.join("src"), "ref": "backup/docs"}),
+    );
+    assert!(done["result"]["snapshot"].is_string(), "{done}");
+    Users::update(&file, |users| {
+        users.get_mut("root")?.max_bytes = Some(3);
+        Ok(())
+    })
+    .unwrap();
+    let refused = root.post(
+        "/api/start/backup",
+        json!({"source": home.join("src"), "ref": "backup/docs"}),
+    );
+    assert_ne!(refused.status, 200, "{}", refused.body);
+    assert!(refused.body.contains("your limit is 3"), "{}", refused.body);
 }

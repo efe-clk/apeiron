@@ -50,7 +50,7 @@ pub use restore::{RestoreOutcome, restore};
 pub use restore_test::{RestoreProblem, RestoreTestOutcome, restore_test};
 pub use search::{
     Duplicate, Query, SearchHit, SearchOptions, SearchOutcome, TextExtractor, TextLine, duplicates,
-    name_matches, search, search_with,
+    name_matches, search, search_with, tree_size,
 };
 pub use switch::{SwitchOptions, SwitchOutcome, switch};
 pub use sync::{SyncAction, SyncMode, SyncOptions, SyncOutcome, folder_ref, sync};

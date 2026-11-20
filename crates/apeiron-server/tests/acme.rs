@@ -26,6 +26,8 @@ fn start(dir: &Path, listen: SocketAddr, acme: Acme) -> apeiron::Result<Web> {
                 oidc: None,
                 totp: None,
                 from_groups: false,
+                max_bytes: None,
+                disabled: false,
             }],
         }
         .save(&users)

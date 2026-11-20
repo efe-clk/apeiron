@@ -17,7 +17,7 @@ use crate::audit::{Audit, Syslog};
 use crate::shares::Shares;
 use crate::tenants::{Tenant, Tenants};
 use crate::users::{Role, User, Users, hash_password};
-use crate::web::{Limits, Site, WebState, Who, site};
+use crate::web::{Site, WebState, Who, site};
 use crate::{Answer, App, Mode, blocking, body, host_name, invalid, outcome, router};
 
 /// What the server needs to add tenants while it runs.
@@ -221,6 +221,7 @@ pub(crate) async fn add(
             replicas: Vec::new(),
             max_bytes: form.max_bytes.filter(|&n| n > 0),
             max_jobs: form.max_jobs.filter(|&n| n > 0),
+            max_rate: None,
             operator: false,
         };
         let detail = serde_json::to_value(&tenant).unwrap_or_default();
@@ -247,6 +248,8 @@ pub(crate) async fn add(
                     oidc: None,
                     totp: None,
                     from_groups: false,
+                    max_bytes: None,
+                    disabled: false,
                 })
             })?;
             let served = site(Site {
@@ -257,10 +260,7 @@ pub(crate) async fn add(
                 shares,
                 replicas: Vec::new(),
                 standby: manage.standby,
-                limits: Limits {
-                    max_bytes: tenant.max_bytes,
-                    max_jobs: tenant.max_jobs,
-                },
+                limits: tenant.limits(),
                 jobs: Some(tenant.jobs(&manage.config, &manage.state)),
             })?;
             tenants.save(&manage.file)?;
@@ -322,10 +322,7 @@ pub(crate) async fn limit(
                 .find(|h| h.name == tenant.name)
                 .map(|h| &h.app.mode)
             {
-                served.set_limits(Limits {
-                    max_bytes: tenant.max_bytes,
-                    max_jobs: tenant.max_jobs,
-                });
+                served.set_limits(tenant.limits());
                 served
                     .audit
                     .record(&who.actor(), "tenant_limit", detail.clone(), "ok")?;

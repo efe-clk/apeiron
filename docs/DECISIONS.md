@@ -1174,3 +1174,23 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | A dotfiles store with links into the home folder | Links break programs that rewrite their files; sync writes ordinary files |
 
 **Consequences.** Removing a rule brings the paths it left out to the disk at the next round. A repository synced before this version records its rules at its next round; a rule removed before then still counts as a deletion once.
+
+## ADR-055: Quotas count what users would restore, SCIM reuses admin tokens, and speed limits cap rates
+
+**Status:** Accepted (2026-11-20)
+
+**Context.** A server sold to several organizations needs to stop one user or tenant from taking all the room or the line, and to follow the organization's directory when people join and leave. Tenants already had `max_bytes` on their repository folder (TENANTS.md §2.1).
+
+**Decision.** A user's `max_bytes` is checked before its backups and syncs against the total size of the newest snapshot of each ref it may use ([USERS.md](USERS.md) §2.1), through the new `sizes` operation of the Rust API. A tenant's `max_rate` caps the `rate` of the syncs started in its pages and of its scheduled jobs. SCIM 2.0 at `/scim/v2/Users` makes, changes, turns off (`disabled`) and removes users, authenticated by an `admin`'s access token ([USERS.md](USERS.md) §4.1).
+
+**Rationale.** Deduplication shares data between users, so no fair share of the disk exists; the size of what a user's backups hold is what the user understands and what grows with its use, while the tenant's limit stays the real disk. Speed limits already existed per request and job; a tenant's limit only needs to cap them. SCIM with an existing token kind needs no new secret and is recorded like every other change.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| Charging each user the new bytes its backups added | It depends on who backed up first, and drops when another user deletes the same file |
+| A SCIM token of its own | One more secret to keep and rotate; an admin token already names who acted |
+| Provisioning SCIM groups into roles | Group rules at sign-in already do this for OpenID Connect and SAML |
+
+**Consequences.** Counting a user's backups reads their trees, which takes longer for very large histories. A user turned off keeps its backups; removing it removes only the account.

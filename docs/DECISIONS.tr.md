@@ -1174,3 +1174,23 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Ev klasörüne bağlantılarla bir dotfiles deposu | Bağlantılar dosyalarını yeniden yazan programları bozar; senkron sıradan dosyalar yazar |
 
 **Sonuçlar.** Bir kuralı kaldırmak, onun dışarıda bıraktığı yolları bir sonraki turda diske getirir. Bu sürümden önce senkronlanmış bir depo kurallarını bir sonraki turunda kaydeder; o zamana kadar kaldırılan bir kural bir kez daha silme sayılır.
+
+## ADR-055: Kotalar kullanıcıların geri yükleyeceğini sayar, SCIM admin anahtarlarını kullanır, hız sınırları hızları üstten keser
+
+**Durum:** Kabul edildi (2026-11-20)
+
+**Bağlam.** Birkaç kuruma sunulan bir sunucunun, bir kullanıcının ya da kiracının bütün yeri ya da hattı almasını durdurması ve insanlar katılıp ayrılırken kurumun dizinini izlemesi gerekir. Kiracıların depo klasörlerinde zaten `max_bytes` vardı (TENANTS.tr.md §2.1).
+
+**Karar.** Bir kullanıcının `max_bytes`'ı, yedeklerinden ve senkronlarından önce, kullanabileceği her ref'in en yeni snapshot'ının toplam boyutuyla karşılaştırılır ([USERS.tr.md](USERS.tr.md) §2.1); bunun için Rust API'ye `sizes` işlemi eklenir. Bir kiracının `max_rate`'i, sayfalarında başlatılan senkronların ve zamanlanmış işlerinin `rate`'ini üstten keser. `/scim/v2/Users` adresindeki SCIM 2.0, bir `admin`'in erişim anahtarıyla kullanıcıları oluşturur, değiştirir, kapatır (`disabled`) ve siler ([USERS.tr.md](USERS.tr.md) §4.1).
+
+**Gerekçe.** Tekilleştirme veriyi kullanıcılar arasında paylaştırır; bu yüzden diskin adil bir payı yoktur. Bir kullanıcının yedeklerinin tuttuğunun boyutu, kullanıcının anladığı ve kullanımıyla büyüyen şeydir; kiracının sınırı ise gerçek disk olarak kalır. Hız sınırları zaten istek ve iş başına vardı; kiracının sınırının yalnızca onları üstten kesmesi gerekir. Var olan bir anahtar türüyle SCIM yeni bir gizli bilgi gerektirmez ve diğer her değişiklik gibi kaydedilir.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Her kullanıcıya yedeklerinin eklediği yeni baytları yazmak | Kimin önce yedeklediğine bağlıdır ve başka bir kullanıcı aynı dosyayı silince düşer |
+| Kendine ait bir SCIM anahtarı | Saklanacak ve yenilenecek bir gizli bilgi daha; bir admin anahtarı zaten kimin yaptığını söyler |
+| SCIM gruplarını rollere aktarmak | Oturum açarken grup kuralları bunu OpenID Connect ve SAML için zaten yapar |
+
+**Sonuçlar.** Bir kullanıcının yedeklerini saymak ağaçlarını okur; bu, çok büyük geçmişlerde daha uzun sürer. Kapatılan bir kullanıcının yedekleri kalır; silmek yalnızca hesabı siler.

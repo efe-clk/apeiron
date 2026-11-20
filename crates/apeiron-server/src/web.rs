@@ -363,11 +363,12 @@ pub struct TenantOptions {
 pub struct Limits {
     pub max_bytes: Option<u64>,
     pub max_jobs: Option<u32>,
+    pub max_rate: Option<u64>,
 }
 
 /// A name for a user made from the identity `value`: the part before `@`,
 /// in lowercase letters, digits, `-` and `_`, with `-2`, `-3` … when taken.
-fn free_name(users: &Users, value: &str) -> String {
+pub(crate) fn free_name(users: &Users, value: &str) -> String {
     let local = value
         .split('@')
         .next()
@@ -621,7 +622,11 @@ impl WebState {
 
     /// The user named `name` in the users file as it is now.
     fn user(&self, name: &str) -> Option<User> {
-        self.users().users.get(name).cloned()
+        self.users()
+            .users
+            .get(name)
+            .filter(|u| !u.disabled)
+            .cloned()
     }
 
     /// The identity provider's settings, if sign-ins through one are on.
@@ -1186,6 +1191,12 @@ impl WebState {
         }
         if matches!(operation, "backup" | "sync") {
             self.room(repo)?;
+            user_room(repo, user)?;
+        }
+        // A tenant's speed limit holds for its syncs (TENANTS.md §2.1).
+        if let (Some(max), "sync") = (self.limits().max_rate, operation) {
+            let asked = request.get("rate").and_then(Value::as_u64);
+            request["rate"] = json!(asked.map_or(max, |r| r.min(max)));
         }
         let allowed = match operation {
             "backup" | "restore" | "open_review" | "merge_review" => user.role != Role::Reader,
@@ -1579,6 +1590,12 @@ impl WebState {
         from: Option<String>,
     ) -> Result<User, Error> {
         let known = self.users().users.by_identity(value).cloned();
+        if known.as_ref().is_some_and(|u| u.disabled) {
+            return Err(Error::new(
+                ErrorKind::Key,
+                format!("{value} is turned off on this server"),
+            ));
+        }
         if let Some(user) = &known
             && !user.from_groups
         {
@@ -1626,6 +1643,8 @@ impl WebState {
                         oidc: Some(value.to_owned()),
                         totp: None,
                         from_groups: true,
+                        max_bytes: None,
+                        disabled: false,
                     };
                     users.add(user.clone())?;
                     Ok((user, Some("user_add")))
@@ -1686,6 +1705,32 @@ impl WebState {
         }
         Ok(())
     }
+}
+
+/// Fails when the newest snapshots of the backups `user` may use hold its
+/// `max_bytes` or more together (USERS.md §2.1).
+fn user_room(repo: &Repository, user: &User) -> Result<(), Error> {
+    let Some(max) = user.max_bytes else {
+        return Ok(());
+    };
+    // Refs under `apeiron/` belong to Apeiron itself, not to backups.
+    let names: Vec<String> = repo
+        .refs()?
+        .into_iter()
+        .map(|r| r.name)
+        .filter(|n| !n.starts_with("apeiron/") && (user.role == Role::Admin || user.owns(n)))
+        .collect();
+    let used: u64 = repo.sizes(&names)?.iter().sum();
+    if used >= max {
+        return Err(Error::new(
+            ErrorKind::Unsupported,
+            format!(
+                "your backups hold {used} bytes, your limit is {max}; \
+                 remove old backups or ask an admin for a higher limit"
+            ),
+        ));
+    }
+    Ok(())
 }
 
 fn not_here(operation: &str) -> Error {

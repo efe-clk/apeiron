@@ -175,6 +175,8 @@ pub(crate) async fn add(
                 oidc: None,
                 totp: None,
                 from_groups: false,
+                max_bytes: None,
+                disabled: false,
             };
             web.apply(&mut user, form)?;
             let detail = detail(&user);

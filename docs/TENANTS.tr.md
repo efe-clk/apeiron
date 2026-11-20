@@ -60,6 +60,7 @@ Kiracılar, yapılandırma klasöründeki (Linux'ta `~/.config/apeiron`) `tenant
 | `replicas` | Her yedekten sonra her ref'in push edildiği, deposunun uzak depoları ([REPLICATION.tr.md](REPLICATION.tr.md) §4); boş bırakılırsa hiçbiri |
 | `max_bytes` | Deposunun en fazla tutabileceği bayt (§2.1); boş bırakılırsa sınır yok |
 | `max_jobs` | Aynı anda en fazla kaç uzun işlem çalıştırabileceği (§2.1); boş bırakılırsa sınır yok |
+| `max_rate` | Senkronlarının ve zamanlanmış işlerinin saniyede en çok kaç bayt taşıyabileceği (§2.1); boş bırakılırsa sınır yok |
 | `operator` | Admin'leri kiracıları sayfalarda yöneten bir kiracı için `true` (§4.1) |
 
 Bir kiracının diğer dosyaları adıyla tutulur:
@@ -80,6 +81,7 @@ Bir kiracının sınırları, onun diğerlerinin diskini ya da işlemcilerini al
 | --- | --- | --- |
 | `max_bytes` | Kiracının depo klasöründeki bütün dosyaların boyutu; bir yedekten, bir senkrondan, bir bağlantı üzerinden yüklemeden (SHARE.tr.md §7) ve bir `git push`'tan (GIT.tr.md §7.1) önce | "Depo … bayt tutuyor, sınırı …" diye reddedilirler; geri yükleme, okuma ve silme sürer, eski sürümler kaldırıldıktan sonra `apeiron gc` yer açar. Sınırın altında başlamış biri sonuna kadar çalışır; bu yüzden bir depo sınırını bir yedek kadar aşabilir |
 | `max_jobs` | Kiracının kullanıcılarının hâlâ çalışan uzun işlemleri (`backup`, `restore`, `verify`, `search`, `report`, `sync`) | Biri bitene kadar yenisi reddedilir (`locked`) |
+| `max_rate` | Sayfalarda başlatılan senkronlarının ve veri taşıyan zamanlanmış işlerinin uzak depolara ya da onlardan saniyede ortalama taşıdığı bayt | Daha fazlasını ya da sınırsızı isteyen bir senkron ya da iş bunu alır ([SYNC.tr.md](SYNC.tr.md) §2); replikasyon push'ları ve indirmeler sınırlanmaz |
 
 Bir ret, kiracının denetim kaydına hatasıyla birlikte `start:<operation>` olarak yazılır.
 
@@ -104,7 +106,7 @@ Ana makine adları, DNS kayıtları ya da vekil sunucu üzerinden sunucuya ulaş
 | Komut | Ne yapar |
 | --- | --- |
 | `apeiron web tenant add <ad> --host <ana makine> --repo <yol> [--folder <yol>]... [--password-file <yol>] [--replicate <uzak>]... [--max-bytes <boyut>] [--max-jobs <n>] [--operator]` | Bir kiracı ekler ve ilk admin'i için komutu yazar; `--operator` onun admin'lerinin kiracıları sayfalarda yönetmesini sağlar (§4.1) |
-| `apeiron web tenant limit <ad> [--max-bytes <boyut>] [--max-jobs <n>]` | §2.1'deki sınırları koyar, örneğin `--max-bytes 500G`; 0 birini kaldırır |
+| `apeiron web tenant limit <ad> [--max-bytes <boyut>] [--max-jobs <n>] [--max-rate <hız>]` | §2.1'deki sınırları koyar, örneğin `--max-bytes 500G`; 0 birini kaldırır |
 | `apeiron web tenant list` | Kiracıları ana makineleri ve depolarıyla listeler |
 | `apeiron web tenant remove <ad>` | Bir kiracıyı sunmayı bırakır; dosyaları kalır |
 | `apeiron web --tenants [--listen <adres>] [--cert <dosya> --key <dosya> \| --plain]` | Her kiracıyı sunar |

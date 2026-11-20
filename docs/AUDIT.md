@@ -23,6 +23,7 @@ When several people share a backup server, the admin must be able to answer "who
 | `share_add`, `share_remove` | Making or removing a share link | The link's id, version, path and end ([SHARE.md](SHARE.md) §6) |
 | `shared:list`, `shared:read`, `shared:upload` | Every use of a share link, without signing in; `shared:upload` names the file sent ([SHARE.md](SHARE.md) §7) | The link's id and the path; never the link's secret |
 | `shared:unlock` | Every password given for a share link | The link's id; never the password or the secret |
+| `scim_user_add`, `scim_user_change`, `scim_user_remove` | The identity provider through SCIM, with an admin's token ([USERS.md](USERS.md) §4.1) | The name, identity and whether it is active |
 | `user_add`, `user_change`, `user_password`, `user_remove` | `apeiron web user`, or an admin on the Users page | The name, role, backups, folders and identity; never the password |
 | `user_second_factor_on`, `user_second_factor_off` | `apeiron web user second-factor` | The name; never the secret |
 | `oidc_set`, `oidc_remove`, `oidc_group`, `oidc_ungroup` | `apeiron web oidc` | The provider's settings; never the client secret |

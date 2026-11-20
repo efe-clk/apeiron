@@ -38,6 +38,8 @@ fn user(name: &str, role: Role, backups: &[&str], hash: &str) -> User {
         oidc: None,
         totp: None,
         from_groups: false,
+        max_bytes: None,
+        disabled: false,
     }
 }
 

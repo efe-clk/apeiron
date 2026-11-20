@@ -72,6 +72,8 @@ fn serve(dir: &Path, repo: Repository, replicas: &[&str], standby: bool) -> (Web
         oidc: None,
         totp: None,
         from_groups: false,
+        max_bytes: None,
+        disabled: false,
     })
     .unwrap();
     list.save(&users).unwrap();
