@@ -1194,3 +1194,23 @@ ADR 001â€“008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009â€
 | Provisioning SCIM groups into roles | Group rules at sign-in already do this for OpenID Connect and SAML |
 
 **Consequences.** Counting a user's backups reads their trees, which takes longer for very large histories. A user turned off keeps its backups; removing it removes only the account.
+
+## ADR-056: Mounting goes through FUSE with a pure Rust library, read-only
+
+**Status:** Accepted (2026-11-20)
+
+**Context.** Users of restic and Borg look into old backups by mounting them; restoring a whole snapshot to find one line is slow and needs room ([MOUNT.md](MOUNT.md)).
+
+**Decision.** `apeiron mount` serves every ref and snapshot as read-only folders through FUSE, using `fuser` without libfuse, in a crate of its own, `apeiron-mount`, which uses only the public API. Files are read from any offset with the new `FileReader::read_at`. Windows is left for later.
+
+**Rationale.** FUSE is the same interface on Linux and macOS, and a pure Rust client needs nothing built against libfuse. Read-only matches what a snapshot is. Using only the public API keeps the mount an interface like the CLI and the desktop.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| Binding libfuse | One more C library to build and ship on each system |
+| A writable mount that makes a snapshot on unmount | Writes would have to be held somewhere and could be lost; `backup` already does this |
+| Windows through Projected File System now | It needs a Windows-only layer of system calls in `apeiron-sys`, a large separate work item |
+
+**Consequences.** A mount needs `fusermount3` on Linux and macFUSE on macOS. Listings of snapshots stay in memory while mounted.

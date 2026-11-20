@@ -13,6 +13,10 @@ use crate::repo::Repository;
 #[derive(Debug)]
 pub struct FileReader {
     repo: Repository,
+    /// Every chunk with the offset it starts at, for [`FileReader::read_at`].
+    all: Vec<(u64, ObjectId, u32)>,
+    /// The chunk `read_at` read last, by its place in `all`.
+    cached: Option<(usize, Vec<u8>)>,
     chunks: std::vec::IntoIter<(ObjectId, u32)>,
     current: Vec<u8>,
     pos: usize,
@@ -25,8 +29,19 @@ pub struct FileReader {
 impl FileReader {
     pub(crate) fn new(repo: Repository, chunks: Vec<(ObjectId, u32)>) -> Self {
         let size = chunks.iter().map(|(_, len)| u64::from(*len)).sum();
+        let mut start = 0;
+        let all = chunks
+            .iter()
+            .map(|&(id, len)| {
+                let at = start;
+                start += u64::from(len);
+                (at, id, len)
+            })
+            .collect();
         FileReader {
             repo,
+            all,
+            cached: None,
             chunks: chunks.into_iter(),
             current: Vec::new(),
             pos: 0,
@@ -66,6 +81,32 @@ impl FileReader {
         buf[..n].copy_from_slice(&self.current[self.pos..self.pos + n]);
         self.pos += n;
         Ok(n)
+    }
+
+    /// Fills `buf` with the bytes from `offset` on, independent of
+    /// [`FileReader::read_some`], and returns how many; fewer than asked only
+    /// at the end of the file. The last chunk read is kept, so reading a file
+    /// piece by piece fetches each chunk once.
+    pub fn read_at(&mut self, offset: u64, buf: &mut [u8]) -> Result<usize> {
+        let mut done = 0;
+        while done < buf.len() {
+            let at = offset + done as u64;
+            if at >= self.size {
+                break;
+            }
+            let index = self.all.partition_point(|(start, ..)| *start <= at) - 1;
+            if self.cached.as_ref().is_none_or(|(i, _)| *i != index) {
+                let (_, id, len) = self.all[index];
+                self.cached = Some((index, self.fetch(&id, len)?));
+            }
+            let (start, ..) = self.all[index];
+            let chunk = self.cached.as_ref().map_or(&[][..], |(_, c)| c.as_slice());
+            let from = (at - start) as usize;
+            let n = (buf.len() - done).min(chunk.len() - from);
+            buf[done..done + n].copy_from_slice(&chunk[from..from + n]);
+            done += n;
+        }
+        Ok(done)
     }
 
     fn fetch(&self, id: &ObjectId, len: u32) -> Result<Vec<u8>> {

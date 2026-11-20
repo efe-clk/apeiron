@@ -749,3 +749,41 @@ fn a_review_is_approved_and_merged() {
         .note_review(&note(ReviewAction::Comment, "mehmet", Some("thanks")))
         .unwrap();
 }
+
+#[test]
+fn a_file_is_read_from_any_offset() {
+    let s = setup();
+    // Several chunks: pseudo-random bytes do not shrink and cut at their own
+    // boundaries.
+    let mut x: u64 = 0x9e37_79b9_7f4a_7c15;
+    let data: Vec<u8> = (0..6 << 20)
+        .map(|_| {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            (x >> 24) as u8
+        })
+        .collect();
+    fs::write(s.root.join("src/big.bin"), &data).unwrap();
+    backup(&s, "big");
+    let mut reader = s
+        .repo
+        .open_file(&ListRequest {
+            snapshot: "main".to_owned(),
+            path: "big.bin".into(),
+        })
+        .unwrap();
+    assert_eq!(reader.size(), data.len() as u64);
+    for (offset, len) in [
+        (0, 10),
+        (1_500_000, 3_000_000),
+        (data.len() - 5, 100),
+        (data.len(), 10),
+    ] {
+        let mut buf = vec![0; len];
+        let n = reader.read_at(offset as u64, &mut buf).unwrap();
+        let end = (offset + len).min(data.len());
+        assert_eq!(n, end - offset);
+        assert_eq!(&buf[..n], &data[offset..end]);
+    }
+}

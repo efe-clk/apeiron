@@ -1,0 +1,22 @@
+[package]
+name = "apeiron-mount-rs"
+description = "Snapshots of an Apeiron repository as a read-only folder through FUSE"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+name = "apeiron_mount"
+
+[dependencies]
+apeiron = { package = "apeiron-rs", path = "../apeiron" }
+jiff = "0.2.38"
+
+[target.'cfg(any(target_os = "linux", target_os = "macos"))'.dependencies]
+fuser = { version = "0.18.0", default-features = false }
+
+[dev-dependencies]
+tempfile = "3.27.0"

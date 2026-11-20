@@ -174,6 +174,7 @@ name = "apeiron-cli-rs"
 version = "0.7.0"
 dependencies = [
  "apeiron-daemon-rs",
+ "apeiron-mount-rs",
  "apeiron-rs",
  "apeiron-server-rs",
  "apeiron-tui-rs",
@@ -262,6 +263,16 @@ dependencies = [
  "serde",
  "tempfile",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "apeiron-mount-rs"
+version = "0.7.0"
+dependencies = [
+ "apeiron-rs",
+ "fuser",
+ "jiff",
+ "tempfile",
 ]
 
 [[package]]
@@ -2689,6 +2700,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42703706b716c37f96a77aea830392ad231f44c9e9a67872fa5548707e11b11c"
 
 [[package]]
+name = "fuser"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b82b6597d216503555ead6b358f341ef748869bf5c6fbae6a0cb9dd231baecfd"
+dependencies = [
+ "bitflags 2.13.2",
+ "libc",
+ "log",
+ "memchr",
+ "nix",
+ "num_enum",
+ "page_size",
+ "parking_lot",
+ "pkg-config",
+ "ref-cast",
+ "smallvec",
+ "zerocopy",
+]
+
+[[package]]
 name = "futures"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4945,6 +4976,7 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "libc",
+ "memoffset",
 ]
 
 [[package]]
@@ -5483,6 +5515,16 @@ dependencies = [
  "primefield",
  "primeorder",
  "sha2 0.11.0",
+]
+
+[[package]]
+name = "page_size"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "30d5b2194ed13191c1999ae0704b7839fb18384fa22e49b57eeaa97d79ce40da"
+dependencies = [
+ "libc",
+ "winapi",
 ]
 
 [[package]]

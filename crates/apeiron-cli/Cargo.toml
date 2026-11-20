@@ -21,6 +21,7 @@ gethostname = "1.1.0"
 apeiron = { package = "apeiron-rs", path = "../apeiron" }
 apeiron-daemon = { package = "apeiron-daemon-rs", path = "../apeiron-daemon" }
 apeiron-server = { package = "apeiron-server-rs", path = "../apeiron-server" }
+apeiron-mount = { package = "apeiron-mount-rs", path = "../apeiron-mount" }
 apeiron-tui = { package = "apeiron-tui-rs", path = "../apeiron-tui" }
 aws-lc-rs = "1.19.0"
 clap = { version = "4.6.7", features = ["derive", "env"] }

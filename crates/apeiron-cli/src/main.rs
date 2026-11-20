@@ -123,6 +123,12 @@ enum Command {
         #[arg(long)]
         grep: Option<String>,
     },
+    /// Show every snapshot as a read-only folder at an empty folder, until
+    /// Ctrl+C or until it is unmounted (Linux and macOS)
+    Mount {
+        /// An empty folder
+        mountpoint: PathBuf,
+    },
     /// List the files and folders inside a snapshot
     Ls {
         snapshot: String,
@@ -4338,6 +4344,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             })
         }
         Command::Dotfiles { command } => run_dotfiles(out, cli.repo, password_file, command),
+        Command::Mount { mountpoint } => run_mount(cli.repo, password_file, &mountpoint),
         Command::Push {
             remote,
             all: true,
@@ -4793,6 +4800,53 @@ fn print_switch(r: &apeiron::SwitchReport, snapshot: &str, dry_run: bool) {
         format::short_id(&r.snapshot),
         format::count(r.changes.len() as u64, "change")
     );
+}
+
+/// `apeiron mount` (docs/MOUNT.md): serves the snapshots until Ctrl+C or
+/// until the folder is unmounted from outside.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn run_mount(
+    repo: Option<PathBuf>,
+    password_file: Option<&Path>,
+    mountpoint: &Path,
+) -> Result<u8, Failure> {
+    let repo = open(repo, password_file)?;
+    let mounted = apeiron_mount::mount(repo, mountpoint).map_err(|e| {
+        Failure::Usage(format!(
+            "cannot mount at {}: {e}; on Linux the fuse3 package gives fusermount3, \
+             on macOS install macFUSE",
+            mountpoint.display()
+        ))
+    })?;
+    let stop = Arc::new(AtomicBool::new(false));
+    let flag = stop.clone();
+    let _ = ctrlc::set_handler(move || flag.store(true, Ordering::Relaxed));
+    eprintln!(
+        "Mounted at {}; press Ctrl+C or unmount it to stop",
+        mountpoint.display()
+    );
+    while !stop.load(Ordering::Relaxed) && mounted.is_mounted() {
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+    if mounted.is_mounted() {
+        mounted
+            .unmount()
+            .map_err(|e| Failure::Usage(format!("cannot unmount: {e}")))?;
+    }
+    Ok(0)
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+fn run_mount(
+    _repo: Option<PathBuf>,
+    _password_file: Option<&Path>,
+    _mountpoint: &Path,
+) -> Result<u8, Failure> {
+    Err(Error::new(
+        ErrorKind::Unsupported,
+        "apeiron mount works on Linux and macOS; on Windows, restore what you need",
+    )
+    .into())
 }
 
 /// The list of `apeiron dotfiles` in the home folder (SYNC.md §8): one path

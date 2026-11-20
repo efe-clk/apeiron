@@ -1194,3 +1194,23 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | SCIM gruplarını rollere aktarmak | Oturum açarken grup kuralları bunu OpenID Connect ve SAML için zaten yapar |
 
 **Sonuçlar.** Bir kullanıcının yedeklerini saymak ağaçlarını okur; bu, çok büyük geçmişlerde daha uzun sürer. Kapatılan bir kullanıcının yedekleri kalır; silmek yalnızca hesabı siler.
+
+## ADR-056: Bağlama, saf Rust bir kütüphaneyle FUSE üzerinden ve salt okunur yapılır
+
+**Durum:** Kabul edildi (2026-11-20)
+
+**Bağlam.** restic ve Borg kullanıcıları eski yedeklere onları bağlayarak bakar; tek bir satırı bulmak için bütün bir snapshot'ı geri yüklemek yavaştır ve yer ister ([MOUNT.tr.md](MOUNT.tr.md)).
+
+**Karar.** `apeiron mount`, her ref'i ve snapshot'ı FUSE üzerinden salt okunur klasörler olarak sunar; libfuse olmadan `fuser` kullanır ve yalnızca herkese açık API'yi kullanan kendi crate'inde, `apeiron-mount`'tadır. Dosyalar yeni `FileReader::read_at` ile herhangi bir konumdan okunur. Windows sonraya bırakılır.
+
+**Gerekçe.** FUSE, Linux ve macOS'ta aynı arayüzdür ve saf Rust bir istemci libfuse'a karşı derlenmiş hiçbir şey istemez. Salt okunur olmak bir snapshot'ın ne olduğuna uyar. Yalnızca herkese açık API'yi kullanmak bağlamayı CLI ve masaüstü gibi bir arayüz olarak tutar.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| libfuse'a bağlanmak | Her sistemde derlenip dağıtılacak bir C kütüphanesi daha |
+| Çözülünce bir snapshot alan yazılabilir bir bağlama | Yazılanların bir yerde tutulması gerekir ve kaybolabilir; `backup` bunu zaten yapar |
+| Projected File System ile Windows'u şimdi yapmak | `apeiron-sys` içinde yalnızca Windows'a özgü bir sistem çağrıları katmanı ister; büyük ve ayrı bir iş |
+
+**Sonuçlar.** Bir bağlama Linux'ta `fusermount3`'e, macOS'ta macFUSE'a ihtiyaç duyar. Snapshot listeleri bağlıyken bellekte kalır.
