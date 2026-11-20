@@ -10,6 +10,7 @@ macro_rules! say {
     };
 }
 
+mod foreign;
 mod format;
 mod sign;
 mod standard;
@@ -437,6 +438,16 @@ enum Command {
     Git {
         #[command(subcommand)]
         command: GitCommand,
+    },
+    /// Import the snapshots of a restic repository, each with its own time
+    Restic {
+        #[command(subcommand)]
+        command: ForeignCommand,
+    },
+    /// Import the archives of a Borg repository, each with its own time
+    Borg {
+        #[command(subcommand)]
+        command: ForeignCommand,
     },
     /// Manage the remote copies of the repository
     Remote {
@@ -2411,6 +2422,19 @@ fn print_added(out: &Output, added: &apeiron::PluginAdded) {
 }
 
 #[derive(Subcommand)]
+enum ForeignCommand {
+    /// Import every snapshot not imported yet, oldest first; the program
+    /// itself must be installed, and its password given as it reads it
+    Import {
+        /// The repository, as the program names it
+        source: String,
+        /// Where the history goes; restic adds /<host>/<folder>
+        #[arg(long = "ref", value_name = "NAME")]
+        prefix: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
 enum GitCommand {
     /// Store every branch and tag of a Git repository as snapshots
     Import {
@@ -4345,6 +4369,31 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
         }
         Command::Dotfiles { command } => run_dotfiles(out, cli.repo, password_file, command),
         Command::Mount { mountpoint } => run_mount(cli.repo, password_file, &mountpoint),
+        Command::Restic {
+            command: ForeignCommand::Import { source, prefix },
+        } => {
+            let repo = open(cli.repo, password_file)?;
+            let snapshots = foreign::restic_snapshots(&source)?;
+            let prefix = prefix.unwrap_or_else(|| "import/restic".to_owned());
+            let done = foreign::import(out, &repo, "restic", snapshots, &prefix, |s, file| {
+                foreign::restic_dump(&source, &s.id, file)
+            })?;
+            out.result(&done, |done| say!("{} snapshots imported", done.len()));
+            Ok(0)
+        }
+        Command::Borg {
+            command: ForeignCommand::Import { source, prefix },
+        } => {
+            let repo = open(cli.repo, password_file)?;
+            let archives = foreign::borg_archives(&source)?;
+            let prefix = prefix.unwrap_or_else(|| "import/borg".to_owned());
+            let done = foreign::import(out, &repo, "borg", archives, &prefix, |a, file| {
+                let name = a.label.trim_start_matches("borg archive ");
+                foreign::borg_dump(&source, name, file)
+            })?;
+            out.result(&done, |done| say!("{} archives imported", done.len()));
+            Ok(0)
+        }
         Command::Push {
             remote,
             all: true,

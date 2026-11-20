@@ -1335,8 +1335,36 @@
             "null"
           ]
         },
+        "meta": {
+          "description": "Free key-value pairs of the snapshot, such as where it came from.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
         "ref": {
           "type": "string"
+        },
+        "time": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Time"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The time of the snapshot; now when absent, such as the time of the\nbackup an archive came from (CLI.md §4.2)."
         }
       },
       "required": [

@@ -1214,3 +1214,23 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Projected File System ile Windows'u şimdi yapmak | `apeiron-sys` içinde yalnızca Windows'a özgü bir sistem çağrıları katmanı ister; büyük ve ayrı bir iş |
 
 **Sonuçlar.** Bir bağlama Linux'ta `fusermount3`'e, macOS'ta macFUSE'a ihtiyaç duyar. Snapshot listeleri bağlıyken bellekte kalır.
+
+## ADR-057: restic ve Borg kendi programları üzerinden, Git LFS kendi deposu üzerinden okunur
+
+**Durum:** Kabul edildi (2026-11-20)
+
+**Bağlam.** İnsanlar yıllarca restic ya da Borg yedeği tutar ve onlar olmadan taşınmaz ([CLI.tr.md](CLI.tr.md) §4.4). Git LFS büyük dosyaları Git'in dışında tutar; bu yüzden bir oyun ya da makine öğrenmesi projesinin içe aktarılması yalnızca işaretçileri getiriyordu ([GIT.tr.md](GIT.tr.md) §2.3).
+
+**Karar.** `apeiron restic import` ve `apeiron borg import`, kurulu programa her snapshot'ı bir tar arşivi olarak yazdırır; §4.2'deki arşiv içe aktarması onu snapshot'ın kendi zamanı ve artık bir içe aktarma isteğinde verilebilen `meta` ile saklar. İçeriği `.git/lfs/objects` içinde olan ve tam olarak Git LFS'in onun için yazdığı işaretçi olan bir Git LFS işaretçisi içeriği olarak saklanır, `git.lfs` ile işaretlenir ve aynı işaretçi olarak dışa aktarılır.
+
+**Gerekçe.** İki format da kendi anahtar düzenleriyle şifrelenir ve sürümler arasında değişir; programları onları doğru okur ve kullanıcının parolasını açmak için zaten gerekir. Bir tar akışı içerikleri, izinleri ve zamanları taşır; var olan içe aktarma bunları zaten işler. İşaretçiyi içerikten yeniden yazmak, GIT.tr.md'nin söz verdiği commit kimliklerini korur.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| restic ve Borg depolarını doğrudan okumak | Her programın her sürümüyle izlenecek iki şifreleme düzeni ve pack formatı |
+| Her snapshot'ı bir klasöre geri yükleyip yedeklemek | Diskte bütün bir snapshot kadar yer ister ve bir tar'ın tuttuğu hiçbir şeyi kazandırmaz |
+| LFS işaretçilerini ve LFS deposunu yan yana tutmak | Büyük dosyalar chunk'lara bölünmez ve tekilleştirilmezdi |
+
+**Sonuçlar.** İçe aktarma programın kurulu olmasını ve deponun `tmp/` klasöründe bir snapshot'ın tar arşivi kadar yer ister. Yerelde olmayan bir LFS nesnesi işaretçi olarak kalır.

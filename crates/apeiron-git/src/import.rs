@@ -8,6 +8,7 @@ use apeiron_core::{
 };
 use gix::ObjectId as GitId;
 
+use crate::lfs;
 use crate::raw::{self, GITLINK_MODE, LINK_MODE, TREE_MODE};
 use crate::{
     Error, ImportReport, OnObject, RefUpdate, Result, Skipped, apeiron_name, git_error, keys,
@@ -212,8 +213,9 @@ pub(crate) struct Run<'a> {
     path: &'a Path,
     /// Git commit or tag → its snapshot and that snapshot's tree.
     known: HashMap<GitId, (ObjectId, ObjectId)>,
-    /// Git blob → size and Apeiron blob, for this run.
-    blobs: HashMap<GitId, (u64, Option<ObjectId>)>,
+    /// Git blob → size, Apeiron blob and whether it was an LFS pointer
+    /// stored with its content, for this run.
+    blobs: HashMap<GitId, (u64, Option<ObjectId>, bool)>,
     /// Git tree → Apeiron tree and the submodule entries below it.
     trees: HashMap<GitId, (ObjectId, Gitlinks)>,
     done: u64,
@@ -371,6 +373,7 @@ impl<'a> Run<'a> {
         let mut out = Vec::with_capacity(entries.len());
         let mut gitlinks = Vec::new();
         for e in entries {
+            let mut xattrs = Vec::new();
             let child =
                 GitId::try_from(e.id.as_slice()).map_err(|_| Self::invalid(id, "bad entry id"))?;
             let (kind, mode) = match e.mode.as_slice() {
@@ -397,7 +400,10 @@ impl<'a> Run<'a> {
                         .ok()
                         .and_then(|m| u16::from_str_radix(m, 8).ok())
                         .ok_or_else(|| Self::invalid(id, "bad file mode"))?;
-                    let (size, blob) = self.store_blob(writer, child)?;
+                    let (size, blob, lfs) = self.store_blob(writer, child)?;
+                    if lfs {
+                        xattrs.push((lfs::ATTRIBUTE.to_vec(), Vec::new()));
+                    }
                     (EntryKind::File { size, blob }, Some(bits))
                 }
                 _ => return Err(Self::invalid(id, "unknown entry mode")),
@@ -409,7 +415,7 @@ impl<'a> Run<'a> {
                 mtime: None,
                 uid: None,
                 gid: None,
-                xattrs: Vec::new(),
+                xattrs,
             });
         }
         out.sort_by(|a, b| a.name.cmp(&b.name));
@@ -422,12 +428,21 @@ impl<'a> Run<'a> {
         &mut self,
         writer: &mut ObjectWriter<'_>,
         id: GitId,
-    ) -> Result<(u64, Option<ObjectId>)> {
+    ) -> Result<(u64, Option<ObjectId>, bool)> {
         if let Some(stored) = self.blobs.get(&id) {
             return Ok(*stored);
         }
         let (_, data) = self.read(id)?;
-        let stored = writer.put_file(data.as_slice())?;
+        let stored = match lfs::content(self.git.common_dir(), &data) {
+            Some(content) => {
+                let (size, blob) = writer.put_file(content.as_slice())?;
+                (size, blob, true)
+            }
+            None => {
+                let (size, blob) = writer.put_file(data.as_slice())?;
+                (size, blob, false)
+            }
+        };
         self.blobs.insert(id, stored);
         Ok(stored)
     }

@@ -76,6 +76,13 @@ pub struct ImportOptions {
     pub author: Option<String>,
     #[serde(default)]
     pub host: Option<String>,
+    /// The time of the snapshot; now when absent, such as the time of the
+    /// backup an archive came from (CLI.md §4.2).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time: Option<apeiron_core::Time>,
+    /// Free key-value pairs of the snapshot, such as where it came from.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub meta: Vec<(String, String)>,
 }
 
 impl ImportOptions {
@@ -87,6 +94,8 @@ impl ImportOptions {
             message: None,
             author: None,
             host: None,
+            time: None,
+            meta: Vec::new(),
         }
     }
 }
@@ -655,11 +664,18 @@ pub fn import_with(
     let snapshot = Snapshot {
         tree,
         parents: parent.into_iter().collect(),
-        time: os::to_time(SystemTime::now()),
+        time: options
+            .time
+            .unwrap_or_else(|| os::to_time(SystemTime::now())),
         author: options.author.clone(),
         host: options.host.clone(),
         message,
-        meta: Vec::new(),
+        meta: {
+            let mut meta = options.meta.clone();
+            meta.sort();
+            meta.dedup_by(|a, b| a.0 == b.0);
+            meta
+        },
     };
     let id = writer.put_snapshot(&snapshot)?;
     let new_bytes = writer.new_bytes();

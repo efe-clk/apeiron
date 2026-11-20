@@ -106,6 +106,7 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | `apeiron plugin add <file.wasm>` | Bir eklentiyi denetler ve kullanıcı için kurar; bundan sonra bir birleştirme ya da senkron, işlediği dosyaları çatışma kopyası yerine onun birleştirmesine bırakır ([PLUGIN.tr.md](PLUGIN.tr.md)) | Tamamlandı |
 | `apeiron plugin list` | Kurulu eklentileri listeler | Tamamlandı |
 | `apeiron plugin remove <name>` | Bir eklentiyi kaldırır | Tamamlandı |
+| `apeiron restic import <repository> [--ref <name>]`, `apeiron borg import <repository> [--ref <name>]` | restic'in ya da Borg'un henüz içe alınmamış her snapshot'ını ya da arşivini kendi zamanıyla içe aktarır (§4.4) | Tamamlandı |
 | `apeiron git import <git-repo> [--prefix <name>]` | Bir Git deposunun her dalını, etiketini ve uzak takip dalını geçmişiyle `git/` altında saklar ([GIT.tr.md](GIT.tr.md)) | Tamamlandı |
 | `apeiron git export <git-repo> [--prefix <name>]` | Onları aynı commit kimlikleriyle bir Git deposuna geri yazar; biri yeniden üretilemezse çıkış kodu 3'tür | Tamamlandı |
 | `apeiron git ssh --user <name> [--tenant <name>]`, `apeiron git ssh-key <user> <key.pub> [--tenant <name>]` | Web sunucusunun bir kullanıcısı olarak SSH üzerinden `git clone`, `fetch` ve `push`'u sunar; bir anahtar için SSH sunucusu çalıştırır; `ssh-key` bunun `authorized_keys` satırını yazdırır ([GIT.tr.md](GIT.tr.md) §7.2) | Tamamlandı |
@@ -179,6 +180,19 @@ Fidye yazılımı dosyaları yerinde şifreler ya da şifreli kopyalarını yaz�
 | İçerik rastgeleleşmiş | En çok 100 değişmiş dosyadan en az 10'u ve okunanların en az yarısı şimdi rastgele görünüyor (ilk 64 KiB'ında bayt başına 7,8 bitten fazla) ve önceden görünmüyordu (7,0'dan az) |
 
 Snapshot yine de saklanır; çünkü kanıttır ve öncekiler geçmişte kalır. `backup` ardından `warning: possible ransomware: …` yazar, `--json` çıktısındaki `alarm` alanı sayıları tutar ve çıkış kodu 3'tür. `--hold-on-alarm` ref'e ayrıca bir yasal saklama kilidi koyar ([ARCHIVE.tr.md](ARCHIVE.tr.md) §2.1): ref bir `admin` kilidi kaldırana kadar yalnızca ileri gider, silinemez ya da budanamaz ve çöp toplama her sürümü tutar. Arka plan hizmetinin bir işi ise başarısız olur, hiçbir şey push etmez, böylece başka yerlerdeki kopyalar ellerindekini korur ve webhook'ları haber verir ([DAEMON.tr.md](DAEMON.tr.md) §3, §8). `--alarm-percent 0` alarmı kapatır, örneğin planlı bir yeniden düzenleme için.
+
+### 4.4 restic ve Borg yedeklerini içe aktarmak
+
+`apeiron restic import <repository> [--ref <name>]` ve `apeiron borg import <repository> [--ref <name>]`, bu programların yedeklerini Apeiron'a getirir; böylece taşınırken geçmişleri kaybolmaz. Programın kendisi kurulu olmalıdır: restic'in her snapshot'ı ve Borg'un her arşivi için Apeiron, programa deponun `tmp/` klasörüne bir tar arşivi yazdırır (`restic dump --archive tar <id> /`, `borg export-tar`), onu §4.2'deki gibi içe aktarır ve siler. Parola programın okuduğu gibi okunur: `RESTIC_PASSWORD` ya da `RESTIC_PASSWORD_FILE`, `BORG_PASSPHRASE` ya da `BORG_PASSCOMMAND`.
+
+| | restic | Borg |
+| --- | --- | --- |
+| Ref | Bilgisayar ve snapshot'ın ilk klasörü başına `import/restic/<host>/<folder>`; `--ref`, `import/restic`'in yerini alır | `import/borg` ya da `--ref` |
+| Snapshot'ın zamanı | Snapshot'ınki | Arşivinki; onu yapan bilgisayarın yerel zamanı |
+| Mesaj, bilgisayar | `restic snapshot <kısa kimlik>`; snapshot'ın bilgisayarı | `borg archive <ad>` |
+| Sıra | En eski önce; böylece en yenisi ref'indir | Aynısı |
+
+İçe alınan her snapshot, geldiği kimliği `meta` içinde `import.restic` ya da `import.borg` olarak tutar ve ikinci bir çalıştırma yalnızca yeni olanı içe aktarır. İçerideki yollar, programın snapshot'ının kökünden itibaren sakladığı yollardır.
 
 ## 5. Çıkış kodları
 

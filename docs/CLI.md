@@ -106,6 +106,7 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | `apeiron plugin add <file.wasm>` | Checks a plugin and installs it for the user; a merge or sync then lets it merge the files it handles instead of making conflict copies ([PLUGIN.md](PLUGIN.md)) | Done |
 | `apeiron plugin list` | Lists the installed plugins | Done |
 | `apeiron plugin remove <name>` | Removes a plugin | Done |
+| `apeiron restic import <repository> [--ref <name>]`, `apeiron borg import <repository> [--ref <name>]` | Imports every snapshot of restic or archive of Borg not imported yet, each with its own time (§4.4) | Done |
 | `apeiron git import <git-repo> [--prefix <name>]` | Stores every branch, tag and remote-tracking branch of a Git repository, with its history, under `git/` ([GIT.md](GIT.md)) | Done |
 | `apeiron git export <git-repo> [--prefix <name>]` | Writes them back into a Git repository with the same commit ids; exit code 3 if one could not be reproduced | Done |
 | `apeiron git ssh --user <name> [--tenant <name>]`, `apeiron git ssh-key <user> <key.pub> [--tenant <name>]` | Serves `git clone`, `fetch` and `push` over SSH as a user of the web server, run by the SSH server for a key; `ssh-key` prints the `authorized_keys` line for it ([GIT.md](GIT.md) §7.2) | Done |
@@ -179,6 +180,19 @@ Ransomware encrypts files in place, or writes encrypted copies and deletes the o
 | Content turned random | Of up to 100 changed files, at least 10, and at least half of those read, look random now (more than 7.8 bits per byte in their first 64 KiB) and did not before (less than 7.0) |
 
 The snapshot is stored all the same, since it is evidence and the earlier ones stay in the history. `backup` then writes `warning: possible ransomware: …`, the `alarm` field of `--json` holds the counts, and the exit code is 3. `--hold-on-alarm` also places a legal hold on the ref ([ARCHIVE.md](ARCHIVE.md) §2.1): it then only moves forward, cannot be deleted or pruned, and garbage collection keeps every version, until an admin lifts the hold. A job of the background service fails instead, pushes nothing, so the copies elsewhere keep what they had, and its webhooks tell ([DAEMON.md](DAEMON.md) §3, §8). `--alarm-percent 0` turns the alarm off, for instance for a planned reorganization.
+
+### 4.4 Importing restic and Borg backups
+
+`apeiron restic import <repository> [--ref <name>]` and `apeiron borg import <repository> [--ref <name>]` bring the backups of those programs into Apeiron, so that their history is not lost when moving. The program itself must be installed: for each snapshot of restic and each archive of Borg, Apeiron has it write a tar archive (`restic dump --archive tar <id> /`, `borg export-tar`) into the repository's `tmp/` folder, imports it as in §4.2 and removes it. The password is read the way the program reads it: `RESTIC_PASSWORD` or `RESTIC_PASSWORD_FILE`, `BORG_PASSPHRASE` or `BORG_PASSCOMMAND`.
+
+| | restic | Borg |
+| --- | --- | --- |
+| Ref | `import/restic/<host>/<folder>` per computer and first folder of the snapshot; `--ref` replaces `import/restic` | `import/borg`, or `--ref` |
+| Time of the snapshot | The snapshot's | The archive's, a local time of the computer that made it |
+| Message, host | `restic snapshot <short id>`; the snapshot's host | `borg archive <name>` |
+| Order | Oldest first, so the newest is the ref's | The same |
+
+Each imported snapshot keeps `import.restic` or `import.borg` in its `meta` with the id it came from, and a second run imports only what is new. The paths inside are those the program stored, from the root of its snapshot.
 
 ## 5. Exit codes
 

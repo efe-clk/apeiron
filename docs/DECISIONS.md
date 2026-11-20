@@ -1214,3 +1214,23 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Windows through Projected File System now | It needs a Windows-only layer of system calls in `apeiron-sys`, a large separate work item |
 
 **Consequences.** A mount needs `fusermount3` on Linux and macFUSE on macOS. Listings of snapshots stay in memory while mounted.
+
+## ADR-057: restic and Borg are read through their own programs, Git LFS through its store
+
+**Status:** Accepted (2026-11-20)
+
+**Context.** People keep years of restic or Borg backups and will not move without them ([CLI.md](CLI.md) §4.4). Git LFS keeps large files outside Git, so an import of a game or machine-learning project brought only pointers ([GIT.md](GIT.md) §2.3).
+
+**Decision.** `apeiron restic import` and `apeiron borg import` have the installed program write each snapshot as a tar archive, which the archive import of §4.2 stores with the snapshot's own time and `meta`, now settable in an import request. A Git LFS pointer whose content is in `.git/lfs/objects`, and which is exactly the pointer Git LFS writes for it, is stored as its content, marked `git.lfs`, and exported as the same pointer.
+
+**Rationale.** Both formats are encrypted with their own key schemes and change between versions; their programs read them correctly and are needed anyway to open the password the user has. A tar stream carries contents, modes and times, which the existing import already handles. Writing the pointer again from the content keeps commit ids, which GIT.md promises.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| Reading restic and Borg repositories directly | Two encryption schemes and pack formats to follow, with every version of each program |
+| Restoring each snapshot into a folder and backing it up | Needs room for a whole snapshot on the disk and loses nothing a tar keeps |
+| Keeping LFS pointers and the LFS store side by side | The large files would not be chunked or deduplicated |
+
+**Consequences.** The import needs the program installed and room for one snapshot's tar archive in the repository's `tmp/`. An LFS object missing locally stays a pointer.

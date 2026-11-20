@@ -53,6 +53,12 @@ Dışa aktarma bir dosya kipini `100` ve ardından sekizlik `mode` olarak geri y
 
 `meta`, hizmetlerin serbestçe kullanabileceği bir alandır (FORMAT.tr.md §6.4); bu anahtarlar formatta bir değişiklik gerektirmez.
 
+### 2.3 Git LFS
+
+Git LFS büyük bir dosyayı Git'te küçük bir işaretçi olarak (`version https://git-lfs.github.com/spec/v1`, `oid sha256:<özet>` ve `size <bayt>`), dosyanın kendisini de `.git/lfs/objects` içinde tutar. İçe aktarma, dosyası orada olan ve tam olarak Git LFS'in o dosya için yazdığı işaretçi olan bir işaretçiyle karşılaşınca onun yerine dosyayı saklar; böylece içeriği her dosya gibi chunk'lara bölünür, tekilleştirilir ve geri yüklenir; girdiyi de `git.lfs` özniteliğiyle işaretler (FORMAT.tr.md §6.3). Dışa aktarma işaretçiyi içerikten yeniden yazar; böylece commit aynı kimliği alır ve dosyayı yazdığı Git deposunun LFS deposuna koyar; `git lfs pull` ve HTTP üzerinden Git istemcileri onu orada bulur.
+
+Dosyası `.git/lfs/objects` içinde olmayan (örneğin `git lfs fetch --all` olmadan yapılmış bir klondan sonra) ya da başka anahtarları olan bir işaretçi olduğu gibi işaretçi olarak saklanır. Her sürümü getirmek için içe aktarmadan önce `git lfs fetch --all` çalıştırın.
+
 ## 3. Ref adları
 
 Git, `feature/ABC-123` içindeki büyük harfler gibi, Apeiron ref adlarının izin vermediği adlara izin verir (FORMAT.tr.md §9.3). Bir Git adının her parçası kaçışlanır: `a-z`, `0-9`, `.` ve `-` kalır; bir parçanın başındaki `.` ve diğer her bayt `_` ve iki küçük onaltılık basamak olur. `feature/ABC-123`, `git/heads/feature/_41_42_43-123` olur; dışa aktarma bunu geri çevirir. Kaçıştan sonra 200 bayttan uzun bir ad bir uyarıyla atlanır.
@@ -85,7 +91,7 @@ Git alanları olmayan bir snapshot; snapshot'ın yazarıyla (ya da `Apeiron <ape
 | Sığ klonlar | Reddedilir: eksik ebeveynler saklanamaz |
 | Eski bozuk araçların yazdığı gibi girdileri yanlış sırada olan tree'ler | İçe alınır; dışa aktarma kesin olmayan olarak raporlanır |
 | Alt modül içeriği | İçe alınmaz; alt modülün kendi deposu ayrıca içe alınabilir |
-| Git LFS | Büyük dosyalar değil, işaretçi dosyalar içe alınır |
+| Git LFS | Büyük dosyalar `.git/lfs/objects` içindeyse içe alınır (§2.3); değilse işaretçiler |
 
 ## 7. HTTP üzerinden Git
 

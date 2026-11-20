@@ -53,6 +53,12 @@ Export writes a file mode back as `100` followed by `mode` in octal, so the old 
 
 `meta` is free for services to use (FORMAT.md §6.4); these keys need no change to the format.
 
+### 2.3 Git LFS
+
+Git LFS keeps a large file in Git as a small pointer, `version https://git-lfs.github.com/spec/v1`, `oid sha256:<hash>` and `size <bytes>`, and the file itself in `.git/lfs/objects`. When the import meets a pointer whose file is there and which is exactly the pointer Git LFS writes for that file, it stores the file instead, so its content is chunked, deduplicated and restored like any other, and marks the entry with the attribute `git.lfs` (FORMAT.md §6.3). Export writes the pointer again from the content, so the commit gets the same id, and puts the file into the LFS store of the Git repository it writes, where `git lfs pull` and Git over HTTP clients find it.
+
+A pointer whose file is not in `.git/lfs/objects`, as after a clone without `git lfs fetch --all`, or that has other keys, is stored as the pointer it is. Run `git lfs fetch --all` before the import to bring every version.
+
 ## 3. Ref names
 
 Git allows names that Apeiron ref names do not (FORMAT.md §9.3), such as capitals in `feature/ABC-123`. Each part of a Git name is escaped: `a-z`, `0-9`, `.` and `-` stay, a `.` at the start of a part and every other byte become `_` and two lowercase hex digits. `feature/ABC-123` becomes `git/heads/feature/_41_42_43-123`; export reverses it. A name longer than 200 bytes after escaping is skipped with a warning.
@@ -85,7 +91,7 @@ A snapshot without Git fields becomes a commit with the snapshot's author (or `A
 | Shallow clones | Refused: the missing parents cannot be stored |
 | Trees with entries in a wrong order, as old broken tools wrote | Imported; the export is reported as inexact |
 | Submodule content | Not imported; the submodule's own repository can be imported separately |
-| Git LFS | The pointer files are imported, not the large files |
+| Git LFS | The large files are imported when they are in `.git/lfs/objects` (§2.3); otherwise the pointers |
 
 ## 7. Git over HTTP
 

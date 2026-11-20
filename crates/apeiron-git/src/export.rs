@@ -9,6 +9,7 @@ use gix::ObjectId as GitId;
 use gix::objs::Write as _;
 use gix::refs::transaction::PreviousValue;
 
+use crate::lfs;
 use crate::raw::{self, Entry, GITLINK_MODE, LINK_MODE, TREE_MODE};
 use crate::{
     Error, ExportReport, OnObject, RefUpdate, Result, Skipped, check_git, git_error, git_name, keys,
@@ -107,7 +108,8 @@ struct Run<'a> {
     written: HashMap<ObjectId, GitId>,
     /// Apeiron tree without submodules below it → Git tree.
     trees: HashMap<ObjectId, GitId>,
-    blobs: HashMap<Option<ObjectId>, GitId>,
+    /// Apeiron blob, and whether it goes back as an LFS pointer → Git blob.
+    blobs: HashMap<(Option<ObjectId>, bool), GitId>,
     report: &'a mut ExportReport,
     done: u64,
 }
@@ -253,7 +255,10 @@ impl Run<'_> {
                     TREE_MODE.to_vec(),
                     self.write_tree(*tree, &child_path, gitlinks)?,
                 ),
-                EntryKind::File { blob, .. } => (file_mode(entry.mode), self.write_blob(*blob)?),
+                EntryKind::File { blob, .. } => {
+                    let lfs = entry.xattrs.iter().any(|(n, _)| n == lfs::ATTRIBUTE);
+                    (file_mode(entry.mode), self.write_blob(*blob, lfs)?)
+                }
                 EntryKind::Symlink { target } => (
                     LINK_MODE.to_vec(),
                     self.write(gix::object::Kind::Blob, target)?,
@@ -292,16 +297,24 @@ impl Run<'_> {
         Ok(id)
     }
 
-    fn write_blob(&mut self, blob: Option<ObjectId>) -> Result<GitId> {
-        if let Some(id) = self.blobs.get(&blob) {
+    /// Writes a file's content as a blob; with `lfs`, the LFS pointer goes
+    /// into Git and the content into its LFS store (GIT.md §2.3).
+    fn write_blob(&mut self, blob: Option<ObjectId>, lfs: bool) -> Result<GitId> {
+        if let Some(id) = self.blobs.get(&(blob, lfs)) {
             return Ok(*id);
         }
         let mut content = Vec::new();
         if let Some(blob) = &blob {
             self.repo.read_file(blob, &mut content)?;
         }
-        let id = self.write(gix::object::Kind::Blob, &content)?;
-        self.blobs.insert(blob, id);
+        let id = if lfs {
+            lfs::store(self.git.common_dir(), &content)
+                .map_err(|e| git_error(self.path, format!("Git LFS store: {e}")))?;
+            self.write(gix::object::Kind::Blob, &lfs::pointer(&content))?
+        } else {
+            self.write(gix::object::Kind::Blob, &content)?
+        };
+        self.blobs.insert((blob, lfs), id);
         Ok(id)
     }
 }

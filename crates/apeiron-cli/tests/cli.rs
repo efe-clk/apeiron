@@ -1693,3 +1693,84 @@ fn a_backup_that_looks_like_ransomware_warns_and_can_hold_the_ref() {
     fs::write(dir.join("1.txt"), "x").unwrap();
     s.ok(&["backup", &s.path("src"), "--alarm-percent", "0"]);
 }
+
+/// `apeiron restic import` and `apeiron borg import`, when the programs are
+/// installed: each snapshot keeps its time, and a second run adds nothing.
+#[test]
+fn restic_and_borg_backups_are_imported_with_their_times() {
+    let have = |p: &str| {
+        Command::new(p)
+            .arg("--version")
+            .output()
+            .is_ok_and(|o| o.status.success())
+    };
+    let s = Setup::new();
+    let data = s.root.join("data/docs");
+    fs::create_dir_all(&data).unwrap();
+    fs::write(data.join("a.txt"), "one").unwrap();
+    let tool = |program: &str, args: &[&str]| {
+        let out = Command::new(program)
+            .args(args)
+            .current_dir(s.root.join("data"))
+            .env("RESTIC_PASSWORD", "test")
+            .env("BORG_PASSPHRASE", "test")
+            .env("BORG_BASE_DIR", s.root.join("borg-home"))
+            .env("RESTIC_CACHE_DIR", s.root.join("restic-cache"))
+            .output()
+            .unwrap();
+        assert!(
+            out.status.success(),
+            "{program} {args:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    };
+    let ours = |args: &[&str]| {
+        let out = Command::new(env!("CARGO_BIN_EXE_apeiron"))
+            .args(args)
+            .env("APEIRON_REPO", s.repo())
+            .env("RESTIC_PASSWORD", "test")
+            .env("BORG_PASSPHRASE", "test")
+            .env("BORG_BASE_DIR", s.root.join("borg-home"))
+            .env("RESTIC_CACHE_DIR", s.root.join("restic-cache"))
+            .output()
+            .unwrap();
+        assert_eq!(
+            code(&out),
+            Some(0),
+            "{args:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8(out.stdout).unwrap()
+    };
+    if have("restic") {
+        let r = s.path("restic-repo");
+        tool("restic", &["-q", "-r", &r, "init"]);
+        tool("restic", &["-q", "-r", &r, "backup", "docs"]);
+        fs::write(data.join("a.txt"), "two").unwrap();
+        tool("restic", &["-q", "-r", &r, "backup", "docs"]);
+        assert!(ours(&["restic", "import", &r]).contains("2 snapshots imported"));
+        assert!(ours(&["restic", "import", &r]).contains("0 snapshots imported"));
+        let refs = ours(&["refs"]);
+        let name = refs.lines().find(|l| l.contains("import/restic/")).unwrap();
+        let name = name.split_whitespace().nth(1).unwrap();
+        let log = ours(&["--json", "log", name]);
+        assert_eq!(log.matches("restic snapshot").count(), 2, "{log}");
+    } else {
+        eprintln!("skipped restic: not installed");
+    }
+    if have("borg") {
+        fs::write(data.join("a.txt"), "one").unwrap();
+        let b = s.path("borg-repo");
+        tool("borg", &["init", "-e", "repokey", &b]);
+        tool("borg", &["create", &format!("{b}::first"), "docs"]);
+        fs::write(data.join("a.txt"), "two").unwrap();
+        tool("borg", &["create", &format!("{b}::second"), "docs"]);
+        assert!(ours(&["borg", "import", &b]).contains("2 archives imported"));
+        assert!(ours(&["borg", "import", &b]).contains("0 archives imported"));
+        let out = s.root.join("restored");
+        ours(&["restore", "import/borg~1", out.to_str().unwrap()]);
+        assert_eq!(fs::read_to_string(out.join("docs/a.txt")).unwrap(), "one");
+    } else {
+        eprintln!("skipped borg: not installed");
+    }
+}

@@ -7,6 +7,7 @@
 mod delta;
 mod export;
 mod import;
+mod lfs;
 mod names;
 mod raw;
 mod receive;

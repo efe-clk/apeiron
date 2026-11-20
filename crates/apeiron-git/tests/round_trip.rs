@@ -6,6 +6,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+use sha2::Digest;
+
 use apeiron_core::{
     ChunkerParams, EntryKind, ObjectId, Repository, Snapshot, Time, Tree, TreeEntry,
 };
@@ -546,4 +548,77 @@ fn pushed_commits_become_snapshots_and_refs_move_forward() {
     assert_eq!(push(&mut repo, "refs/heads/main", &new, &back, &[]), None);
     repo.add_retention_rule("git/heads/main", 1).unwrap();
     assert!(push(&mut repo, "refs/heads/main", &back, &zero, &[]).is_some());
+}
+
+/// A file kept in Git LFS is stored with its content and exported as the
+/// same pointer, with the content in the new repository's LFS store
+/// (GIT.md §2.3). The pointer is written by hand, as Git LFS writes it, so
+/// the test does not need Git LFS installed.
+#[test]
+fn git_lfs_files_are_stored_with_their_content() {
+    let Some(env) = Env::new() else { return };
+    let src = env.root.join("lfs");
+    fs::create_dir_all(&src).unwrap();
+    env.git(&src, &["init", "-q"]);
+    let content: Vec<u8> = (0..200_000u32)
+        .map(|i| (i.wrapping_mul(2_654_435_761) >> 11) as u8)
+        .collect();
+    let sha: String = sha2::Sha256::digest(&content)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    let pointer = format!(
+        "version https://git-lfs.github.com/spec/v1\noid sha256:{sha}\nsize {}\n",
+        content.len()
+    );
+    let store = src
+        .join(".git/lfs/objects")
+        .join(&sha[..2])
+        .join(&sha[2..4]);
+    fs::create_dir_all(&store).unwrap();
+    fs::write(store.join(&sha), &content).unwrap();
+    fs::write(src.join("model.bin"), &pointer).unwrap();
+    fs::write(
+        src.join(".gitattributes"),
+        "*.bin filter=lfs diff=lfs merge=lfs -text\n",
+    )
+    .unwrap();
+    env.git(&src, &["add", "."]);
+    env.git(&src, &["commit", "-q", "-m", "model"]);
+    let head = env.git(&src, &["rev-parse", "HEAD"]);
+
+    let mut repo = init(&env.root.join("repo"));
+    apeiron_git::import(&mut repo, &src, "git", &mut |_| Ok(())).unwrap();
+    let tip = repo.read_ref("git/heads/master").unwrap();
+    let tip = tip.or(repo.read_ref("git/heads/main").unwrap()).unwrap();
+    let snapshot = repo.read_snapshot(&tip).unwrap();
+    let tree = repo.read_tree(&snapshot.tree).unwrap();
+    let model = tree
+        .entries
+        .iter()
+        .find(|e| e.name == b"model.bin")
+        .unwrap();
+    assert_eq!(model.xattrs, [(b"git.lfs".to_vec(), Vec::new())]);
+    let EntryKind::File { size, blob } = &model.kind else {
+        panic!()
+    };
+    assert_eq!(*size, content.len() as u64);
+    let mut stored = Vec::new();
+    repo.read_file(blob.as_ref().unwrap(), &mut stored).unwrap();
+    assert_eq!(stored, content);
+
+    let out = env.root.join("out.git");
+    apeiron_git::export(&repo, &out, "git", &mut |_| Ok(())).unwrap();
+    let branch = env.git(&out, &["for-each-ref", "--format=%(refname)", "refs/heads"]);
+    assert_eq!(env.git(&out, &["rev-parse", &branch]), head);
+    assert_eq!(
+        fs::read(
+            out.join("lfs/objects")
+                .join(&sha[..2])
+                .join(&sha[2..4])
+                .join(&sha)
+        )
+        .unwrap(),
+        content
+    );
 }
