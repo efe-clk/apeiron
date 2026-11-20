@@ -15,6 +15,7 @@ The background service (daemon) runs backups and checks on a schedule, without t
 | Copies elsewhere | A backup job can push to remotes after it succeeds | Done |
 | Knowing that backups work | Scheduled `verify` and a restore test (section 5) | Done |
 | Knowing when something failed | `apeiron daemon status` and a log (section 6) | Done |
+| Watching it from a monitoring system | Metrics for Prometheus (section 7) and webhooks to a chat or an alerting service (section 8) | Done |
 
 ## 2. Commands
 
@@ -23,8 +24,10 @@ The background service (daemon) runs backups and checks on a schedule, without t
 | `apeiron daemon run` | Runs until stopped, starting each job when it is due | Done |
 | `apeiron daemon once` | Runs every job that is due now, then exits; exit code 4 if one of them failed | Done |
 | `apeiron daemon status` | Shows each job's last run, its result and the next run; exit code 4 if a job's last run failed | Done |
+| `apeiron daemon metrics` | Prints the metrics of section 7, for instance for the text file collector of node_exporter | Done |
+| `apeiron daemon test-webhooks` | Sends a test message to every webhook of section 8; exit code 4 if one was not accepted | Done |
 
-All three take `--jobs <file>` and `--state-dir <folder>` to use other files than the usual ones (sections 3 and 6). `apeiron restore-test [<snapshot>] [--sample-mb <n>]` runs the restore test of section 5 by hand.
+All of them take `--jobs <file>` and `--state-dir <folder>` to use other files than the usual ones (sections 3 and 6). `apeiron restore-test [<snapshot>] [--sample-mb <n>]` runs the restore test of section 5 by hand.
 
 `run` and `once` run the jobs at low priority, so that a backup gives way to what the user is doing: the CPU priority of a `nice` value of 10 and the lowest disk priority of the normal class on Linux, low CPU priority and throttled disk access on macOS, and background mode on Windows. `--priority normal` runs them as fast as other programs. Network speed is limited per job with `rate_kb` (section 3).
 
@@ -126,16 +129,63 @@ A backup is proven only by restoring it (VISION.md). The restore test does this 
 
 | File | Folder | Content |
 | --- | --- | --- |
-| `state.json` | `~/.local/state/apeiron` on Linux, the configuration folder on macOS, `%LOCALAPPDATA%\apeiron` on Windows | Per job: last start and end, result (`ok`, `warnings`, `failed` or `locked`) and message; `status` works out the next run from it. Replaced atomically after every run |
+| `state.json` | `~/.local/state/apeiron` on Linux, the configuration folder on macOS, `%LOCALAPPDATA%\apeiron` on Windows | Per job: last start and end, result (`ok`, `warnings`, `failed` or `locked`), message and the end of the last run that succeeded; `status` works out the next run from it. Replaced atomically after every run |
 | `daemon.log` | The same folder | One line per job run and per error; at 1 MiB it is renamed to `daemon.log.1` and a new one starts |
 
-## 7. Not part of this work item
+## 7. Metrics
+
+`apeiron daemon run --metrics <address>` answers Prometheus at `http://<address>/metrics`, such as `--metrics 127.0.0.1:9184`; `apeiron daemon metrics` prints the same text once. The values are worked out from the state file whenever they are asked for. The address has no password, so it belongs on this computer or a network only the monitoring system reaches; the metrics show job names and times, never messages or file names.
+
+| Metric | Labels | Value |
+| --- | --- | --- |
+| `apeiron_build_info` | `version` | 1 |
+| `apeiron_jobs` | | Jobs in the jobs file |
+| `apeiron_job_last_start_timestamp_seconds`, `apeiron_job_last_end_timestamp_seconds` | `job`, `do` | When the last run started and ended, in Unix seconds |
+| `apeiron_job_last_duration_seconds` | `job`, `do` | How long the last run took |
+| `apeiron_job_last_success_timestamp_seconds` | `job`, `do` | When the last run that succeeded ended; missing before the first |
+| `apeiron_job_last_result` | `job`, `do`, `result` | 1, with the result of the last run: `ok`, `warnings`, `failed` or `locked` |
+| `apeiron_job_failing` | `job`, `do` | 1 when the last run failed, otherwise 0 |
+| `apeiron_job_next_run_timestamp_seconds` | `job`, `do` | When the job runs next |
+
+A web server gives the same metrics of its scheduled jobs, with those of its repository, to an `admin` ([WEB.md](WEB.md) §4). A rule that warns when a backup has not succeeded for two days:
+
+```yaml
+- alert: ApeironBackupOld
+  expr: time() - apeiron_job_last_success_timestamp_seconds{do="backup"} > 2 * 86400
+```
+
+## 8. Webhooks
+
+A webhook tells a chat or an alerting service when a job starts failing, succeeds again or ends. Webhooks are in their own file beside the jobs file: `jobs.webhooks.toml` beside `jobs.toml`, `web-jobs.webhooks.toml` beside a web server's jobs and `tenants/<name>/jobs.webhooks.toml` for a tenant's. Only whoever runs the service writes it; the Schedule page cannot, so nobody signed in to a web server can make it call an address. The file is read for each run, so a change counts at once.
+
+```toml
+[webhook.team-chat]
+url_file = "~/.config/apeiron/slack-url"   # or url = "https://..."
+format = "slack"
+
+[webhook.on-call]
+format = "pagerduty"
+routing_key_file = "~/.config/apeiron/pagerduty-key"
+jobs = ["documents"]
+```
+
+| Key | Meaning |
+| --- | --- |
+| `url`, `url_file` | The address to post to, or a file whose first line it is; a chat's address is a secret, so `url_file` keeps it out of this file. PagerDuty has its own by default |
+| `format` | `json` (default), `slack`, `teams` (a Workflows webhook of Microsoft Teams) or `pagerduty` (Events API v2) |
+| `on` | `failed`: a run fails after one that did not; `recovered`: a run succeeds after one that failed; `done`: every run. Default `["failed", "recovered"]`; PagerDuty takes only these two, opening and closing one alert per job and computer |
+| `jobs` | Only these jobs; every job by default |
+| `routing_key_file` | For PagerDuty: a file whose first line is the integration's routing key |
+
+The `json` format posts `{"event", "job", "do", "result", "message", "start", "end", "host"}`; the others a line such as `Apeiron on nas: job documents failed: <message>`. A webhook that cannot be reached, or answers with an error, is noted in the log after at most 10 seconds and never fails the job. An invalid file is noted in the log the same way; `apeiron daemon test-webhooks` shows what is wrong with it.
+
+## 9. Not part of this work item
 
 | Item | Where |
 | --- | --- |
 | Jobs of a web server for several tenants inside the server | Each tenant's jobs run in an `apeiron daemon run --tenant` of their own (section 3.1) |
 
-## 8. Crates and libraries
+## 10. Crates and libraries
 
 | Crate | Role | Status |
 | --- | --- | --- |
@@ -147,6 +197,7 @@ A backup is proven only by restoring it (VISION.md). The restore test does this 
 | Local time of day and time zones | `jiff` | Correct across daylight saving changes on Linux, macOS and Windows; pure Rust |
 | Configuration and state folders | `dirs` | Small; knows the right folder on each system |
 | Jobs file and state | `toml`, `serde_json` | Already used |
+| Webhooks | `reqwest` (blocking), `gethostname` | Already used by the remotes and the CLI; the blocking client fits the daemon's thread |
 | Watching folders for `on_change` | `notify` | The common Rust watcher: inotify on Linux, FSEvents on macOS, ReadDirectoryChangesW on Windows; it runs its own thread and needs no Tokio |
 
 The daemon needs no Tokio: one thread sleeps until the next job is due and wakes at least every minute to notice a changed jobs file or a clock that jumped.

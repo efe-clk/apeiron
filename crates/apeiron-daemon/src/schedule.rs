@@ -88,6 +88,7 @@ mod tests {
             last_end: start + SignedDuration::from_mins(5),
             result,
             message: String::new(),
+            last_success: None,
         }
     }
 

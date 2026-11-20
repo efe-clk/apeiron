@@ -516,7 +516,7 @@ fn not_here_for(action: &str, key: &str, present: bool) -> std::result::Result<(
 }
 
 /// Replaces a leading `~` with the home folder.
-fn expand(path: &str) -> PathBuf {
+pub(crate) fn expand(path: &str) -> PathBuf {
     let home = || dirs::home_dir().unwrap_or_default();
     match path.strip_prefix('~') {
         Some("") => home(),

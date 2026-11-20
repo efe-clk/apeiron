@@ -19,6 +19,7 @@ use crate::notify;
 use crate::schedule::next_run;
 use crate::state::{JobState, RunResult, State};
 use crate::watch::Watches;
+use crate::webhook::{self, Event, Message};
 use crate::{Error, IoContext, Result};
 
 /// The daemon wakes at least this often to notice a changed jobs file or a
@@ -56,6 +57,41 @@ impl Paths {
     pub fn log_file(&self) -> PathBuf {
         self.state_dir.join("daemon.log")
     }
+
+    /// The webhooks file beside the jobs file: `jobs.webhooks.toml` for
+    /// `jobs.toml` (DAEMON.md §8).
+    pub fn webhooks(&self) -> PathBuf {
+        self.jobs.with_extension("webhooks.toml")
+    }
+}
+
+/// What `apeiron daemon test-webhooks` reports for a webhook.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct WebhookTest {
+    pub name: String,
+    /// Why it was not accepted; `None` when it was.
+    pub error: Option<String>,
+}
+
+/// Sends a test message to every webhook of `paths` (DAEMON.md §8).
+pub fn test_webhooks(paths: &Paths) -> Result<Vec<WebhookTest>> {
+    let host = webhook::host();
+    Ok(webhook::load_webhooks(&paths.webhooks())?
+        .into_iter()
+        .map(|hook| {
+            let message = Message {
+                event: Event::Test,
+                job: "test",
+                action: "test",
+                run: None,
+                host: &host,
+            };
+            WebhookTest {
+                error: hook.send(&message).err(),
+                name: hook.name,
+            }
+        })
+        .collect())
 }
 
 /// A job that ran.
@@ -161,11 +197,18 @@ impl Daemon {
         stop: &AtomicBool,
     ) -> Result<RunRecord> {
         let (result, message) = run_job(job, stop);
+        let end = Timestamp::now();
+        let succeeded = matches!(result, RunResult::Ok | RunResult::Warnings);
         let run = JobState {
             last_start: start,
-            last_end: Timestamp::now(),
+            last_end: end,
             result,
             message,
+            last_success: if succeeded {
+                Some(end)
+            } else {
+                state.jobs.get(&job.name).and_then(|p| p.last_success)
+            },
         };
         self.log(&format!(
             "{} {}: {}",
@@ -178,6 +221,7 @@ impl Daemon {
         if self.notify && notify::worth_telling(previous.as_ref(), &run) {
             notify::show(&format!("Apeiron: {} failed", job.name), &run.message);
         }
+        self.tell_webhooks(job, previous.as_ref(), &run);
         Ok(RunRecord {
             job: job.name.clone(),
             run,
@@ -197,6 +241,36 @@ impl Daemon {
             }
         }
         Ok(())
+    }
+
+    /// Sends a run's events to the webhooks that want them; a webhook that
+    /// fails is noted in the log and never fails the job (DAEMON.md §8).
+    fn tell_webhooks(&self, job: &Job, previous: Option<&JobState>, run: &JobState) {
+        let hooks = match webhook::load_webhooks(&self.paths.webhooks()) {
+            Ok(hooks) => hooks,
+            Err(e) => {
+                self.log(&format!("webhooks: {e}"));
+                return;
+            }
+        };
+        if hooks.is_empty() {
+            return;
+        }
+        let host = webhook::host();
+        for event in webhook::events(previous, run) {
+            for hook in hooks.iter().filter(|h| h.wants(event, &job.name)) {
+                let message = Message {
+                    event,
+                    job: &job.name,
+                    action: job.action.name(),
+                    run: Some(run),
+                    host: &host,
+                };
+                if let Err(e) = hook.send(&message) {
+                    self.log(&format!("webhook {}: {e}", hook.name));
+                }
+            }
+        }
     }
 
     fn watch(&self, jobs: &[Job]) -> Watches {
@@ -871,5 +945,121 @@ mod tests {
         daemon.run(&stop).unwrap();
         let log = fs::read_to_string(s.paths.log_file()).unwrap();
         assert!(log.contains("started with 3 jobs") && log.contains("stopped"));
+    }
+
+    /// Accepts `count` requests on a free port of this computer and returns
+    /// their bodies.
+    fn listen(count: usize) -> (String, std::thread::JoinHandle<Vec<String>>) {
+        use std::io::{BufRead, BufReader, Read};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/hook", listener.local_addr().unwrap());
+        let handle = std::thread::spawn(move || {
+            let mut bodies = Vec::new();
+            for stream in listener.incoming().take(count) {
+                let mut stream = stream.unwrap();
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                let mut length = 0;
+                loop {
+                    let mut line = String::new();
+                    reader.read_line(&mut line).unwrap();
+                    if line == "\r\n" {
+                        break;
+                    }
+                    if let Some(v) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                        length = v.trim().parse().unwrap();
+                    }
+                }
+                let mut body = vec![0; length];
+                reader.read_exact(&mut body).unwrap();
+                bodies.push(String::from_utf8(body).unwrap());
+                stream
+                    .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")
+                    .unwrap();
+            }
+            bodies
+        });
+        (url, handle)
+    }
+
+    #[test]
+    fn webhooks_hear_of_a_failure_once_and_metrics_show_it() {
+        let s = setup(
+            r#"
+            [job.docs]
+            repo = "ROOT/repo"
+            do = "backup"
+            folder = "ROOT/missing"
+            every = "15m"
+        "#,
+        );
+        // Failed, failed again (not told), then recovered: two messages.
+        let (url, server) = listen(2);
+        fs::write(
+            s.paths.webhooks(),
+            format!("[webhook.chat]\nurl = \"{url}\"\nformat = \"slack\"\n"),
+        )
+        .unwrap();
+        let daemon = Daemon::start(s.paths.clone()).unwrap();
+        let jobs = load_jobs(&s.paths.jobs).unwrap();
+        let stop = AtomicBool::new(false);
+        let mut state = State::load(&s.paths.state_file());
+        for _ in 0..2 {
+            let run = daemon
+                .run_one(&jobs[0], &mut state, Timestamp::now(), &stop)
+                .unwrap();
+            assert_eq!(run.run.result, RunResult::Failed);
+        }
+        let failing = crate::metrics(&s.paths).unwrap();
+        assert!(
+            failing.contains("apeiron_job_failing{job=\"docs\",do=\"backup\"} 1"),
+            "{failing}"
+        );
+        assert!(
+            !failing.contains("apeiron_job_last_success_timestamp_seconds"),
+            "{failing}"
+        );
+
+        fs::create_dir(s.dir.path().join("missing")).unwrap();
+        let ok = daemon
+            .run_one(&jobs[0], &mut state, Timestamp::now(), &stop)
+            .unwrap();
+        assert_eq!(ok.run.result, RunResult::Ok);
+        let bodies = server.join().unwrap();
+        assert!(bodies[0].contains("job docs failed"), "{bodies:?}");
+        assert!(bodies[1].contains("job docs succeeds again"), "{bodies:?}");
+
+        let text = crate::metrics(&s.paths).unwrap();
+        assert!(
+            text.contains("apeiron_job_failing{job=\"docs\",do=\"backup\"} 0"),
+            "{text}"
+        );
+        assert!(
+            text.contains("apeiron_job_last_result{job=\"docs\",do=\"backup\",result=\"ok\"} 1"),
+            "{text}"
+        );
+        assert!(
+            text.contains("apeiron_job_last_success_timestamp_seconds{job=\"docs\""),
+            "{text}"
+        );
+        assert!(
+            text.contains("# TYPE apeiron_jobs gauge\napeiron_jobs 1\n"),
+            "{text}"
+        );
+
+        // The same text over HTTP, as Prometheus reads it.
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        crate::serve_metrics(listener, s.paths.clone()).unwrap();
+        let mut stream = std::net::TcpStream::connect(address).unwrap();
+        stream
+            .write_all(b"GET /metrics HTTP/1.1\r\nHost: x\r\n\r\n")
+            .unwrap();
+        let mut answer = String::new();
+        std::io::Read::read_to_string(&mut stream, &mut answer).unwrap();
+        assert!(answer.starts_with("HTTP/1.1 200 OK"), "{answer}");
+        assert!(
+            answer.contains("apeiron_job_failing{job=\"docs\",do=\"backup\"} 0"),
+            "{answer}"
+        );
     }
 }

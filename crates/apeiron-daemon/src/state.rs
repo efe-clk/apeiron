@@ -22,6 +22,9 @@ pub struct JobState {
     pub last_end: Timestamp,
     pub result: RunResult,
     pub message: String,
+    /// The end of the last run that succeeded, with or without warnings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_success: Option<Timestamp>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

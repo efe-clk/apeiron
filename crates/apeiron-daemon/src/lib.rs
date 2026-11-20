@@ -6,18 +6,22 @@
 
 mod daemon;
 mod jobs;
+mod metrics;
 mod notify;
 mod schedule;
 mod state;
 mod watch;
+mod webhook;
 
 use std::io;
 use std::path::PathBuf;
 
-pub use daemon::{Daemon, JobStatus, Paths, RunRecord, status};
+pub use daemon::{Daemon, JobStatus, Paths, RunRecord, WebhookTest, status, test_webhooks};
 pub use jobs::{Action, Every, Job, Scope, load_jobs, load_scoped, save_jobs, save_scoped};
+pub use metrics::{CONTENT_TYPE, Metrics, Sample, job_metrics, metrics, serve_metrics};
 pub use schedule::next_run;
 pub use state::{JobState, RunResult, State};
+pub use webhook::{Event, Format, Webhook, load_webhooks};
 
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]

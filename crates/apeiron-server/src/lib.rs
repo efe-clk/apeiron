@@ -1345,6 +1345,68 @@ async fn saml_metadata(State(app): State<Arc<App>>) -> Response {
 
 /// For a load balancer or a monitor: whether the repository can be read
 /// and whether this is a standby, without signing in (REPLICATION.md §5).
+/// Metrics for Prometheus, for an `admin` of a web server (WEB.md §4):
+/// the scheduled jobs (DAEMON.md §7) and the newest snapshot of each ref.
+async fn metrics(State(app): State<Arc<App>>, who: Option<Extension<Who>>) -> Response {
+    let Mode::Web(web) = &app.mode else {
+        return StatusCode::NOT_FOUND.into_response();
+    };
+    match who {
+        Some(Extension(who)) if who.user.role == Role::Admin => {}
+        Some(_) => return (StatusCode::FORBIDDEN, "only an admin reads metrics\n").into_response(),
+        None => return (StatusCode::UNAUTHORIZED, "sign in first\n").into_response(),
+    }
+    let standby = web.standby();
+    let app = app.clone();
+    let text = blocking(move || {
+        let mut m = match &app.schedule {
+            Some(paths) => apeiron_daemon::job_metrics(paths)
+                .map_err(|e| Error::new(ErrorKind::Io, e.to_string()))?,
+            None => apeiron_daemon::Metrics::default(),
+        };
+        m.gauge(
+            "apeiron_server_standby",
+            "1 on a standby server, 0 on a primary.",
+            [(vec![], if standby { 1.0 } else { 0.0 })],
+        );
+        let repo = app.repo()?;
+        // Refs under `apeiron/` belong to Apeiron itself, not to backups.
+        let refs: Vec<_> = repo
+            .refs()?
+            .into_iter()
+            .filter(|r| !r.name.starts_with("apeiron/"))
+            .collect();
+        m.gauge(
+            "apeiron_refs",
+            "Refs of the repository, without those of Apeiron itself.",
+            [(vec![], refs.len() as f64)],
+        );
+        let mut times = Vec::new();
+        for r in refs {
+            let page = repo.log(&apeiron::LogRequest {
+                start: r.name.clone(),
+                limit: 1,
+                grep: None,
+            })?;
+            if let Some(newest) = page.snapshots.first() {
+                let t = newest.time.seconds as f64 + f64::from(newest.time.nanos) / 1e9;
+                times.push((vec![("ref", r.name)], t));
+            }
+        }
+        m.gauge(
+            "apeiron_ref_snapshot_timestamp_seconds",
+            "The time of the snapshot each ref points to.",
+            times,
+        );
+        Ok(m.into_text())
+    })
+    .await;
+    match text {
+        Ok(text) => ([(header::CONTENT_TYPE, apeiron_daemon::CONTENT_TYPE)], text).into_response(),
+        Err(e) => (StatusCode::SERVICE_UNAVAILABLE, format!("{e}\n")).into_response(),
+    }
+}
+
 async fn health(State(app): State<Arc<App>>) -> Response {
     let standby = match &app.mode {
         Mode::Web(web) => web.standby(),
@@ -1366,6 +1428,7 @@ fn router(app: Arc<App>) -> Router {
     Router::new()
         .route("/api/session", get(session))
         .route("/api/health", get(health))
+        .route("/metrics", get(metrics))
         .route("/api/login", post(login))
         .route("/api/logout", post(logout))
         .route("/api/oidc/start", get(oidc_start))

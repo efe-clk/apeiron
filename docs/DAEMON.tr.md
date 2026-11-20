@@ -15,6 +15,7 @@ Arka plan hizmeti (daemon), yedekleri ve denetimleri kullanıcı olmadan, bir za
 | Başka yerlerde kopyalar | Bir yedek işi, başarılı olduktan sonra uzak depolara push edebilir | Tamamlandı |
 | Yedeklerin çalıştığını bilmek | Zamanlanmış `verify` ve geri yükleme testi (bölüm 5) | Tamamlandı |
 | Bir şeyin başarısız olduğunu bilmek | `apeiron daemon status` ve bir kayıt dosyası (bölüm 6) | Tamamlandı |
+| Bir izleme sisteminden takip etmek | Prometheus için metrikler (bölüm 7) ve bir sohbete ya da uyarı hizmetine webhook'lar (bölüm 8) | Tamamlandı |
 
 ## 2. Komutlar
 
@@ -23,8 +24,10 @@ Arka plan hizmeti (daemon), yedekleri ve denetimleri kullanıcı olmadan, bir za
 | `apeiron daemon run` | Durdurulana kadar çalışır; her işi zamanı geldiğinde başlatır | Tamamlandı |
 | `apeiron daemon once` | Zamanı gelmiş her işi çalıştırır, sonra çıkar; biri başarısız olduysa çıkış kodu 4'tür | Tamamlandı |
 | `apeiron daemon status` | Her işin son çalışmasını, sonucunu ve bir sonraki çalışmasını gösterir; bir işin son çalışması başarısızsa çıkış kodu 4'tür | Tamamlandı |
+| `apeiron daemon metrics` | Bölüm 7'deki metrikleri yazdırır, örneğin node_exporter'ın metin dosyası toplayıcısı için | Tamamlandı |
+| `apeiron daemon test-webhooks` | Bölüm 8'deki her webhook'a bir deneme mesajı gönderir; biri kabul edilmezse çıkış kodu 4'tür | Tamamlandı |
 
-Üçü de, olağan dosyalar yerine başkalarını kullanmak için `--jobs <file>` ve `--state-dir <folder>` alır (bölüm 3 ve 6). `apeiron restore-test [<snapshot>] [--sample-mb <n>]`, bölüm 5'teki geri yükleme testini elle çalıştırır.
+Hepsi, olağan dosyalar yerine başkalarını kullanmak için `--jobs <file>` ve `--state-dir <folder>` alır (bölüm 3 ve 6). `apeiron restore-test [<snapshot>] [--sample-mb <n>]`, bölüm 5'teki geri yükleme testini elle çalıştırır.
 
 `run` ve `once` işleri düşük öncelikle çalıştırır; böylece bir yedek kullanıcının yaptığı işe yol verir: Linux'ta 10 `nice` değerinin işlemci önceliği ve olağan sınıfın en düşük disk önceliği, macOS'ta düşük işlemci önceliği ve kısılmış disk erişimi, Windows'ta arka plan kipi. `--priority normal` onları diğer programlar kadar hızlı çalıştırır. Ağ hızı her iş için `rate_kb` ile sınırlanır (bölüm 3).
 
@@ -126,16 +129,63 @@ Bir yedek ancak geri yüklenerek kanıtlanır (VISION.tr.md). Geri yükleme test
 
 | Dosya | Klasör | İçerik |
 | --- | --- | --- |
-| `state.json` | Linux'ta `~/.local/state/apeiron`, macOS'ta yapılandırma klasörü, Windows'ta `%LOCALAPPDATA%\apeiron` | Her iş için: son başlangıç ve bitiş, sonuç (`ok`, `warnings`, `failed` ya da `locked`) ve mesaj; `status` sonraki çalışmayı bundan hesaplar. Her çalışmadan sonra atomik olarak değiştirilir |
+| `state.json` | Linux'ta `~/.local/state/apeiron`, macOS'ta yapılandırma klasörü, Windows'ta `%LOCALAPPDATA%\apeiron` | Her iş için: son başlangıç ve bitiş, sonuç (`ok`, `warnings`, `failed` ya da `locked`), mesaj ve başarılı son çalışmanın bitişi; `status` sonraki çalışmayı bundan hesaplar. Her çalışmadan sonra atomik olarak değiştirilir |
 | `daemon.log` | Aynı klasör | Her iş çalışması ve her hata için bir satır; 1 MiB'a ulaşınca `daemon.log.1` olarak yeniden adlandırılır ve yenisi başlar |
 
-## 7. Bu işin parçası olmayanlar
+## 7. Metrikler
+
+`apeiron daemon run --metrics <address>`, Prometheus'a `http://<address>/metrics` adresinde yanıt verir, örneğin `--metrics 127.0.0.1:9184`; `apeiron daemon metrics` aynı metni bir kez yazdırır. Değerler her istendiğinde durum dosyasından hesaplanır. Adresin parolası yoktur; bu yüzden bu bilgisayarda ya da yalnızca izleme sisteminin ulaştığı bir ağda durmalıdır. Metrikler iş adlarını ve zamanları gösterir, mesajları ya da dosya adlarını asla göstermez.
+
+| Metrik | Etiketler | Değer |
+| --- | --- | --- |
+| `apeiron_build_info` | `version` | 1 |
+| `apeiron_jobs` | | İş dosyasındaki işler |
+| `apeiron_job_last_start_timestamp_seconds`, `apeiron_job_last_end_timestamp_seconds` | `job`, `do` | Son çalışmanın başladığı ve bittiği an, Unix saniyesi olarak |
+| `apeiron_job_last_duration_seconds` | `job`, `do` | Son çalışmanın sürdüğü süre |
+| `apeiron_job_last_success_timestamp_seconds` | `job`, `do` | Başarılı son çalışmanın bittiği an; ilkinden önce yoktur |
+| `apeiron_job_last_result` | `job`, `do`, `result` | Son çalışmanın sonucuyla birlikte 1: `ok`, `warnings`, `failed` ya da `locked` |
+| `apeiron_job_failing` | `job`, `do` | Son çalışma başarısızsa 1, değilse 0 |
+| `apeiron_job_next_run_timestamp_seconds` | `job`, `do` | İşin bir sonraki çalışması |
+
+Bir web sunucusu, zamanlanmış işlerinin aynı metriklerini deposununkilerle birlikte bir `admin`'e verir ([WEB.tr.md](WEB.tr.md) §4). Bir yedek iki gündür başarılı olmadığında uyaran bir kural:
+
+```yaml
+- alert: ApeironBackupOld
+  expr: time() - apeiron_job_last_success_timestamp_seconds{do="backup"} > 2 * 86400
+```
+
+## 8. Webhook'lar
+
+Bir webhook, bir iş başarısız olmaya başladığında, yeniden başarılı olduğunda ya da bittiğinde bir sohbete ya da uyarı hizmetine haber verir. Webhook'lar iş dosyasının yanındaki kendi dosyalarındadır: `jobs.toml` yanında `jobs.webhooks.toml`, bir web sunucusunun işlerinin yanında `web-jobs.webhooks.toml`, bir kiracınınkiler için `tenants/<name>/jobs.webhooks.toml`. Onu yalnızca hizmeti çalıştıran yazar; Zamanlama sayfası yazamaz, böylece bir web sunucusunda oturum açan hiç kimse ona bir adresi çağırtamaz. Dosya her çalışmada okunur, bu yüzden bir değişiklik hemen geçerli olur.
+
+```toml
+[webhook.team-chat]
+url_file = "~/.config/apeiron/slack-url"   # ya da url = "https://..."
+format = "slack"
+
+[webhook.on-call]
+format = "pagerduty"
+routing_key_file = "~/.config/apeiron/pagerduty-key"
+jobs = ["documents"]
+```
+
+| Anahtar | Anlamı |
+| --- | --- |
+| `url`, `url_file` | Gönderilecek adres ya da ilk satırı o olan bir dosya; bir sohbetin adresi gizlidir, bu yüzden `url_file` onu bu dosyanın dışında tutar. PagerDuty'nin varsayılan olarak kendi adresi vardır |
+| `format` | `json` (varsayılan), `slack`, `teams` (Microsoft Teams'in bir Workflows webhook'u) ya da `pagerduty` (Events API v2) |
+| `on` | `failed`: başarısız olmayan bir çalışmanın ardından bir çalışma başarısız olur; `recovered`: başarısız bir çalışmanın ardından bir çalışma başarılı olur; `done`: her çalışma. Varsayılan `["failed", "recovered"]`; PagerDuty yalnızca bu ikisini alır ve iş ve bilgisayar başına bir uyarı açıp kapatır |
+| `jobs` | Yalnızca bu işler; varsayılan olarak her iş |
+| `routing_key_file` | PagerDuty için: ilk satırı entegrasyonun yönlendirme anahtarı olan bir dosya |
+
+`json` biçimi `{"event", "job", "do", "result", "message", "start", "end", "host"}` gönderir; diğerleri `Apeiron on nas: job documents failed: <message>` gibi bir satır. Ulaşılamayan ya da hatayla yanıt veren bir webhook en çok 10 saniye sonra kayda yazılır ve işi asla başarısız kılmaz. Geçersiz bir dosya da aynı şekilde kayda yazılır; `apeiron daemon test-webhooks` neyin yanlış olduğunu gösterir.
+
+## 9. Bu işin parçası olmayanlar
 
 | Konu | Nerede |
 | --- | --- |
 | Birden çok kiracılı bir web sunucusunun işlerini sunucunun içinde çalıştırmak | Her kiracının işleri kendi `apeiron daemon run --tenant`'ında çalışır (bölüm 3.1) |
 
-## 8. Crate'ler ve kütüphaneler
+## 10. Crate'ler ve kütüphaneler
 
 | Crate | Görev | Durum |
 | --- | --- | --- |
@@ -147,6 +197,7 @@ Bir yedek ancak geri yüklenerek kanıtlanır (VISION.tr.md). Geri yükleme test
 | Günün yerel saati ve saat dilimleri | `jiff` | Linux, macOS ve Windows'ta yaz saati geçişlerinde doğru; saf Rust |
 | Yapılandırma ve durum klasörleri | `dirs` | Küçük; her sistemde doğru klasörü bilir |
 | İş dosyası ve durum | `toml`, `serde_json` | Zaten kullanılıyor |
+| Webhook'lar | `reqwest` (engelleyen), `gethostname` | Uzak depolar ve CLI zaten kullanıyor; engelleyen istemci hizmetin iş parçacığına uyar |
 | `on_change` için klasör izleme | `notify` | Rust'ın yaygın izleyicisi: Linux'ta inotify, macOS'ta FSEvents, Windows'ta ReadDirectoryChangesW; kendi iş parçacığında çalışır, Tokio gerektirmez |
 
 Daemon'un Tokio'ya ihtiyacı yoktur: tek bir iş parçacığı sıradaki işin zamanına kadar uyur ve değişen bir iş dosyasını ya da ileri geri atlayan bir saati fark etmek için en az dakikada bir uyanır.

@@ -596,11 +596,19 @@ enum DaemonCommand {
         /// Show no desktop notification when a job fails
         #[arg(long)]
         no_notify: bool,
+        /// Answer Prometheus at http://<address>/metrics, such as
+        /// 127.0.0.1:9184
+        #[arg(long, value_name = "ADDRESS")]
+        metrics: Option<String>,
     },
     /// Run every job that is due now, then exit
     Once,
     /// Show each job's last run, its result and the next run
     Status,
+    /// Print the jobs' metrics in the Prometheus text format
+    Metrics,
+    /// Send a test message to every webhook of the webhooks file
+    TestWebhooks,
 }
 
 #[derive(Subcommand)]
@@ -4400,10 +4408,15 @@ fn run_daemon(
         apeiron_daemon::lower_priority().map_err(daemon_error)?;
     }
     match command {
-        DaemonCommand::Run { no_notify } => {
-            let daemon = Daemon::start(paths)
+        DaemonCommand::Run { no_notify, metrics } => {
+            let daemon = Daemon::start(paths.clone())
                 .map_err(daemon_error)?
                 .notify_failures(!no_notify);
+            if let Some(address) = metrics {
+                let listener = std::net::TcpListener::bind(&address)
+                    .map_err(|e| Failure::Usage(format!("--metrics {address}: {e}")))?;
+                apeiron_daemon::serve_metrics(listener, paths).map_err(daemon_error)?;
+            }
             let stop = Arc::new(AtomicBool::new(false));
             let flag = stop.clone();
             let _ = ctrlc::set_handler(move || flag.store(true, Ordering::Relaxed));
@@ -4431,6 +4444,30 @@ fn run_daemon(
                 }
             });
             Ok(if runs.iter().any(|r| failed(r.run.result)) {
+                EXIT_DAMAGED
+            } else {
+                0
+            })
+        }
+        DaemonCommand::Metrics => {
+            let text = apeiron_daemon::metrics(&paths).map_err(daemon_error)?;
+            print!("{text}");
+            Ok(0)
+        }
+        DaemonCommand::TestWebhooks => {
+            let tests = apeiron_daemon::test_webhooks(&paths).map_err(daemon_error)?;
+            out.result(&tests, |tests| {
+                for t in tests {
+                    match &t.error {
+                        None => say!("{}: sent", t.name),
+                        Some(e) => say!("{}: FAILED: {e}", t.name),
+                    }
+                }
+                if tests.is_empty() {
+                    say!("No webhooks; see docs/DAEMON.md section 8");
+                }
+            });
+            Ok(if tests.iter().any(|t| t.error.is_some()) {
                 EXIT_DAMAGED
             } else {
                 0

@@ -65,7 +65,7 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | `apeiron plugin search [<text>] [--store <url>]`, `apeiron plugin install <name> [--store <url>]`, `apeiron plugin index <file.wasm>...` | Lists the plugins of a store, installs one after checking its SHA-256 against the store's index, or prints an index ([PLUGIN.md](PLUGIN.md) §6) | Done |
 | `apeiron plugin add <file.wasm> --allow net:<host>`, `apeiron plugin settings <name> [<text>]` | Installs a plugin that reaches the network, granting the hosts it asks for, and shows or sets the settings a hook gets ([PLUGIN.md](PLUGIN.md) §2.2, §3.1) | Done |
 | `apeiron restore-test [<snapshot>] [--sample-mb <n>]` | Restores a random sample (default 100 MiB) of a snapshot into a temporary folder, checks every file and removes the folder; exit code 4 if a file is damaged | Done |
-| `apeiron daemon run\|once\|status [--priority low\|normal] [--tenant <name>]` | Runs scheduled jobs, at low CPU and disk priority unless `--priority normal`; `run` shows a desktop notification when a job starts failing, unless `--no-notify` ([DAEMON.md](DAEMON.md) §2); `--tenant` runs the jobs of a web server's tenant (§3.1) | Done |
+| `apeiron daemon run\|once\|status\|metrics\|test-webhooks [--priority low\|normal] [--tenant <name>]` | Runs scheduled jobs, at low CPU and disk priority unless `--priority normal`; `run` shows a desktop notification when a job starts failing, unless `--no-notify` ([DAEMON.md](DAEMON.md) §2), and answers Prometheus with `--metrics <address>` (§7); `metrics` prints the metrics and `test-webhooks` tries the webhooks (§8); `--tenant` runs the jobs of a web server's tenant (§3.1) | Done |
 | `apeiron refs` | Lists all refs and the snapshots they point to | Done |
 | `apeiron oplog [-n <count>]` | Lists the operations that changed the repository, newest first: time, outcome, user, operation and what it worked on ([FORMAT.md](FORMAT.md) §9.5) | Done |
 | `apeiron verify` | Reads and checks every pack, index and object | Done |
@@ -171,7 +171,7 @@ A 7z archive must use LZMA, LZMA2 or no compression and no password; others stop
 | 1 | Error; nothing was changed in the repository |
 | 2 | Usage error (wrong command or option) |
 | 3 | Finished with warnings (for example skipped files), or `sync` or `merge` found conflicts, or `sync` left files for the next round |
-| 4 | Damage found by `verify`, `restore-test` or `report --verify`; data `repair --from` could not replace; a changed report or audit log (`report check`, `web audit verify`); a failed job in `daemon once` or `daemon status` |
+| 4 | Damage found by `verify`, `restore-test` or `report --verify`; data `repair --from` could not replace; a changed report or audit log (`report check`, `web audit verify`); a failed job in `daemon once` or `daemon status`; a webhook that was not accepted in `daemon test-webhooks` |
 | 130 | Cancelled with Ctrl+C |
 
 ## 6. Example session

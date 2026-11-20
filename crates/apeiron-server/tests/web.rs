@@ -1836,3 +1836,50 @@ fn a_program_uses_the_api_with_a_token() {
     tokens.remove("ayse", "laptop").unwrap();
     assert!(client.call("refs", &json!({})).is_err());
 }
+
+#[test]
+fn an_admin_reads_metrics_for_prometheus() {
+    let dir = tempfile::tempdir().unwrap();
+    let (_server, mut root, home) = start(dir.path());
+    assert_eq!(root.get("/metrics").status, 401);
+    root.sign_in();
+    let done = root.run(
+        "backup",
+        json!({"source": home.join("src"), "ref": "backup/docs"}),
+    );
+    assert!(done["result"]["snapshot"].is_string(), "{done}");
+
+    let file = dir.path().join("config/web.json");
+    let tokens = apeiron_server::Tokens::beside(&file);
+    let (_, secret) = tokens.add("root", "prometheus").unwrap();
+    let anyone = Client {
+        address: root.address,
+        tls: None,
+        cookie: None,
+    };
+    let reply = anyone.send(
+        "GET",
+        "/metrics",
+        None,
+        &[&format!("Authorization: Bearer {secret}")],
+    );
+    assert_eq!(reply.status, 200, "{}", reply.body);
+    assert!(
+        reply
+            .headers
+            .contains("content-type: text/plain; version=0.0.4")
+    );
+    assert!(reply.body.contains("apeiron_refs 1\n"), "{}", reply.body);
+    assert!(
+        reply
+            .body
+            .contains("apeiron_ref_snapshot_timestamp_seconds{ref=\"backup/docs\"} "),
+        "{}",
+        reply.body
+    );
+    assert!(
+        reply.body.contains("apeiron_server_standby 0\n"),
+        "{}",
+        reply.body
+    );
+}

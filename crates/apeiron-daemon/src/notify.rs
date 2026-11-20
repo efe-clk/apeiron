@@ -83,6 +83,7 @@ mod tests {
             last_end: jiff::Timestamp::UNIX_EPOCH,
             result,
             message: String::new(),
+            last_success: None,
         }
     }
 

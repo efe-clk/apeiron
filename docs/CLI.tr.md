@@ -65,7 +65,7 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | `apeiron plugin search [<text>] [--store <url>]`, `apeiron plugin install <name> [--store <url>]`, `apeiron plugin index <file.wasm>...` | Bir mağazanın eklentilerini listeler, birini SHA-256'sını mağazanın indeksine göre denetledikten sonra kurar ya da bir indeks yazdırır ([PLUGIN.tr.md](PLUGIN.tr.md) §6) | Tamamlandı |
 | `apeiron plugin add <file.wasm> --allow net:<host>`, `apeiron plugin settings <name> [<text>]` | Ağa ulaşan bir eklentiyi istediği ana makinelere izin vererek kurar ve bir kancanın aldığı ayarları gösterir ya da belirler ([PLUGIN.tr.md](PLUGIN.tr.md) §2.2, §3.1) | Tamamlandı |
 | `apeiron restore-test [<snapshot>] [--sample-mb <n>]` | Bir snapshot'tan rastgele bir örneği (varsayılan 100 MiB) geçici bir klasöre geri yükler, her dosyayı denetler ve klasörü siler; bir dosya bozuksa çıkış kodu 4'tür | Tamamlandı |
-| `apeiron daemon run\|once\|status [--priority low\|normal] [--tenant <name>]` | Zamanlanmış işleri, `--priority normal` verilmedikçe düşük işlemci ve disk önceliğiyle çalıştırır; `run`, `--no-notify` verilmedikçe bir iş başarısız olmaya başlayınca masaüstü bildirimi gösterir ([DAEMON.tr.md](DAEMON.tr.md) §2); `--tenant` bir web sunucusu kiracısının işlerini çalıştırır (§3.1) | Tamamlandı |
+| `apeiron daemon run\|once\|status\|metrics\|test-webhooks [--priority low\|normal] [--tenant <name>]` | Zamanlanmış işleri, `--priority normal` verilmedikçe düşük işlemci ve disk önceliğiyle çalıştırır; `run`, `--no-notify` verilmedikçe bir iş başarısız olmaya başlayınca masaüstü bildirimi gösterir ([DAEMON.tr.md](DAEMON.tr.md) §2) ve `--metrics <address>` ile Prometheus'a yanıt verir (§7); `metrics` metrikleri yazdırır, `test-webhooks` webhook'ları dener (§8); `--tenant` bir web sunucusu kiracısının işlerini çalıştırır (§3.1) | Tamamlandı |
 | `apeiron refs` | Tüm ref'leri ve gösterdikleri snapshot'ları listeler | Tamamlandı |
 | `apeiron oplog [-n <count>]` | Depoyu değiştiren işlemleri en yenisi önce listeler: zaman, sonuç, kullanıcı, işlem ve üzerinde çalıştığı şey ([FORMAT.tr.md](FORMAT.tr.md) §9.5) | Tamamlandı |
 | `apeiron verify` | Her paketi, indeksi ve nesneyi okuyup denetler | Tamamlandı |
@@ -171,7 +171,7 @@ Bir 7z arşivi LZMA, LZMA2 kullanmalı ya da sıkıştırmasız olmalı ve parol
 | 1 | Hata; depoda hiçbir şey değişmedi |
 | 2 | Kullanım hatası (yanlış komut ya da seçenek) |
 | 3 | Uyarılarla bitti (ör. atlanan dosyalar) ya da `sync` veya `merge` çatışma buldu ya da `sync` dosyaları sonraki tura bıraktı |
-| 4 | `verify`, `restore-test` ya da `report --verify` bozulma buldu; `repair --from` veriyi yerine koyamadı; rapor ya da denetim kaydı değişmiş (`report check`, `web audit verify`); `daemon once` ya da `daemon status` içinde başarısız bir iş |
+| 4 | `verify`, `restore-test` ya da `report --verify` bozulma buldu; `repair --from` veriyi yerine koyamadı; rapor ya da denetim kaydı değişmiş (`report check`, `web audit verify`); `daemon once` ya da `daemon status` içinde başarısız bir iş; `daemon test-webhooks` içinde kabul edilmeyen bir webhook |
 | 130 | Ctrl+C ile iptal edildi |
 
 ## 6. Örnek oturum
