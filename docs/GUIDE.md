@@ -36,7 +36,7 @@ cargo install --locked --git https://github.com/efe-clk/apeiron apeiron-cli-rs
 apeiron --version
 ```
 
-`cargo install` builds the program and copies it to `~/.cargo/bin/apeiron`. If `apeiron --version` says "command not found", add `~/.cargo/bin` to your `PATH` (rustup usually does this; open a new terminal first).
+`cargo install` builds the program and copies it to `~/.cargo/bin/apeiron`, with `ape`, a shorter name for the same command. If `apeiron --version` says "command not found", add `~/.cargo/bin` to your `PATH` (rustup usually does this; open a new terminal first).
 
 ### 2.3 Updating
 

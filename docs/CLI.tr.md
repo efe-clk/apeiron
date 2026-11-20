@@ -17,6 +17,7 @@ CLI, Apeiron'un ilk arayüzüdür. Diğer tüm arayüzler gibi yalnızca herkese
 | Güvenli iptal | Ctrl+C komutu durdurur; depo önceki durumunda kalır (eski ya da yeni, asla yarım) | Tamamlandı |
 | Okunamayan dosyada devam | Okunamayan bir dosya raporlanır ve atlanır; yedek devam eder | Tamamlandı |
 | Açık çıkış kodları | Her sonucun kendi çıkış kodu vardır (bölüm 5) | Tamamlandı |
+| Kısa ad | `ape` aynı komuttur: yanındaki `apeiron`'u aynı argümanlarla çalıştırır; her paket ve `cargo install` ikisini de kurar | Tamamlandı |
 
 ## 2. Deponun seçilmesi
 
@@ -192,7 +193,7 @@ apeiron verify
 | --- | --- | --- |
 | `apeiron` | Herkese açık Rust API'si ([API.tr.md](API.tr.md) §8) | Devam ediyor |
 | `apeiron-services` | API'nin kullandığı klasör ↔ snapshot, fark ve dışa aktarma mantığı | Devam ediyor |
-| `apeiron-cli` | `apeiron` programı | Devam ediyor |
+| `apeiron-cli` | `apeiron` programı ve kısa adı `ape` | Devam ediyor |
 | `apeiron-remote` | SFTP ve S3 uzak depoları (ADR-018) | Tamamlandı |
 
 | İhtiyaç | Önerilen kütüphane | Gerekçe |

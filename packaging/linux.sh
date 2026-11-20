@@ -11,6 +11,7 @@ chmod 755 "$root"
 mkdir -p "$out"
 
 install -Dm755 target/release/apeiron "$root/usr/bin/apeiron"
+install -Dm755 target/release/ape "$root/usr/bin/ape"
 install -Dm755 target/release/apeiron-desktop "$root/usr/bin/apeiron-desktop"
 install -Dm644 LICENSE-MIT "$root/usr/share/doc/apeiron/LICENSE-MIT"
 install -Dm644 LICENSE-APACHE "$root/usr/share/doc/apeiron/LICENSE-APACHE"
@@ -40,5 +41,5 @@ dpkg-deb --root-owner-group --build "$root" "$out/apeiron_${version}_${arch}.deb
 # The command alone, for a server without a desktop.
 tarball=$(mktemp -d)
 mkdir "$tarball/apeiron-$version"
-cp target/release/apeiron LICENSE-MIT LICENSE-APACHE "$tarball/apeiron-$version/"
+cp target/release/apeiron target/release/ape LICENSE-MIT LICENSE-APACHE "$tarball/apeiron-$version/"
 tar -C "$tarball" -czf "$out/apeiron-$version-linux-$(uname -m).tar.gz" "apeiron-$version"

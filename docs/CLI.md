@@ -17,6 +17,7 @@ The CLI is the first interface of Apeiron. Like every other interface it uses on
 | Safe cancellation | Ctrl+C stops a command; the repository stays in its previous state (old or new, never half) | Done |
 | Continue past unreadable files | A file that cannot be read is reported and skipped; the backup continues | Done |
 | Clear exit codes | Each outcome has its own exit code (section 5) | Done |
+| Short name | `ape` is the same command: it runs the `apeiron` beside it with the same arguments, and every package and `cargo install` install both | Done |
 
 ## 2. Choosing the repository
 
@@ -192,7 +193,7 @@ apeiron verify
 | --- | --- | --- |
 | `apeiron` | Public Rust API ([API.md](API.md) §8) | In progress |
 | `apeiron-services` | Folder ↔ snapshot, diff and export logic used by the API | In progress |
-| `apeiron-cli` | The `apeiron` program | In progress |
+| `apeiron-cli` | The `apeiron` program and its short name `ape` | In progress |
 | `apeiron-remote` | SFTP and S3 remotes (ADR-018) | Done |
 
 | Need | Proposed library | Reason |

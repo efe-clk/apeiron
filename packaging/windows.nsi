@@ -25,6 +25,7 @@ SetCompressor /SOLID lzma
 Section
   SetOutPath "$INSTDIR"
   File "..\target\release\apeiron.exe"
+  File "..\target\release\ape.exe"
   File "..\target\release\apeiron-desktop.exe"
   File "..\target\icons\apeiron.ico"
   File "..\LICENSE-MIT"
@@ -41,6 +42,7 @@ SectionEnd
 Section "Uninstall"
   Delete "$SMPROGRAMS\Apeiron.lnk"
   Delete "$INSTDIR\apeiron.exe"
+  Delete "$INSTDIR\ape.exe"
   Delete "$INSTDIR\apeiron-desktop.exe"
   Delete "$INSTDIR\apeiron.ico"
   Delete "$INSTDIR\LICENSE-MIT"

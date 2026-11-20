@@ -66,8 +66,9 @@ jobs:
               apt-get install -y -qq ./dist/*.deb > /dev/null
               if ldd /usr/bin/apeiron-desktop | grep "not found"; then exit 1; fi
               packaging/try.sh apeiron
+              packaging/try.sh ape
               apt-get remove -y -qq apeiron > /dev/null
-              if command -v apeiron; then exit 1; fi
+              if command -v apeiron || command -v ape; then exit 1; fi
             '
           done
       - name: Install here and open the app
@@ -96,6 +97,7 @@ jobs:
         run: |
           mkdir unpacked && tar -C unpacked -xzf dist/*.tar.gz
           packaging/try.sh unpacked/*/apeiron
+          packaging/try.sh unpacked/*/ape
       - uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.os }}
@@ -116,6 +118,7 @@ jobs:
           plutil -lint /tmp/apeiron/Apeiron.app/Contents/Info.plist
           test -x /tmp/apeiron/Apeiron.app/Contents/MacOS/apeiron-desktop
           packaging/try.sh /tmp/apeiron/Apeiron.app/Contents/MacOS/apeiron
+          packaging/try.sh /tmp/apeiron/Apeiron.app/Contents/MacOS/ape
           packaging/try_desktop.sh /tmp/apeiron/Apeiron.app/Contents/MacOS/apeiron-desktop
           hdiutil detach /tmp/apeiron
       - uses: actions/upload-artifact@v4
@@ -148,12 +151,13 @@ jobs:
         shell: bash
         run: |
           packaging/try.sh /c/ApeironTest/apeiron.exe
+          packaging/try.sh /c/ApeironTest/ape.exe
           packaging/try_desktop.sh /c/ApeironTest/apeiron-desktop.exe
       - name: Uninstall
         shell: pwsh
         run: |
           Start-Process -Wait -FilePath C:\ApeironTest\uninstall.exe -ArgumentList '/S','_?=C:\ApeironTest'
-          if (Test-Path C:\ApeironTest\apeiron.exe) { exit 1 }
+          if ((Test-Path C:\ApeironTest\apeiron.exe) -or (Test-Path C:\ApeironTest\ape.exe)) { exit 1 }
       - uses: actions/upload-artifact@v4
         with:
           name: windows

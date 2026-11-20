@@ -1529,3 +1529,16 @@ fn git_clones_and_pushes_over_ssh() {
         "{line}"
     );
 }
+
+#[test]
+fn ape_is_the_same_command() {
+    let run = |program: &str, args: &[&str]| Command::new(program).args(args).output().unwrap();
+    let apeiron = env!("CARGO_BIN_EXE_apeiron");
+    let ape = env!("CARGO_BIN_EXE_ape");
+    for args in [&["--version"][..], &["no-such-command"][..]] {
+        let (long, short) = (run(apeiron, args), run(ape, args));
+        assert_eq!(short.status.code(), long.status.code(), "{args:?}");
+        assert_eq!(short.stdout, long.stdout, "{args:?}");
+        assert_eq!(short.stderr, long.stderr, "{args:?}");
+    }
+}

@@ -36,7 +36,7 @@ cargo install --locked --git https://github.com/efe-clk/apeiron apeiron-cli-rs
 apeiron --version
 ```
 
-`cargo install` programı derler ve `~/.cargo/bin/apeiron` konumuna kopyalar. `apeiron --version` "command not found" derse `~/.cargo/bin`'i `PATH`'e ekleyin (rustup genellikle bunu yapar; önce yeni bir terminal açın).
+`cargo install` programı derler ve `~/.cargo/bin/apeiron` konumuna kopyalar; yanına aynı komutun kısa adı olan `ape`'yi de koyar. `apeiron --version` "command not found" derse `~/.cargo/bin`'i `PATH`'e ekleyin (rustup genellikle bunu yapar; önce yeni bir terminal açın).
 
 ### 2.3 Güncelleme
 

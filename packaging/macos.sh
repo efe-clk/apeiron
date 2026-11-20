@@ -7,7 +7,7 @@ out=$2
 work=$(mktemp -d)
 app="$work/image/Apeiron.app"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources" "$out"
-cp target/release/apeiron-desktop target/release/apeiron "$app/Contents/MacOS/"
+cp target/release/apeiron-desktop target/release/apeiron target/release/ape "$app/Contents/MacOS/"
 
 python3 packaging/make_icons.py "$work/icons"
 set_dir="$work/apeiron.iconset"

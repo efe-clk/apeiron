@@ -12,6 +12,10 @@ publish = false
 name = "apeiron"
 path = "src/main.rs"
 
+[[bin]]
+name = "ape"
+path = "src/ape.rs"
+
 [dependencies]
 gethostname = "1.1.0"
 apeiron = { package = "apeiron-rs", path = "../apeiron" }
