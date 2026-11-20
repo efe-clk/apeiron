@@ -125,3 +125,25 @@ Every work item is done (2026-10-30); the stage ends with its exit criterion, th
 | Measuring the performance targets on a Raspberry Pi 4 | [VISION.md](VISION.md), [API.md](API.md) §4 | Measured on a stronger computer ([PERFORMANCE.md](PERFORMANCE.md)); it needs the device |
 | More standards in reports | [REPORTS.md](REPORTS.md) §6 | ISO/IEC 27001, SOC 2 and the GDPR |
 | Format upgrade tool | [FORMAT.md](FORMAT.md) §18 | The format is at version 1 |
+
+## 9. After the first release
+
+The owner asked on 2026-11-20 for these features, for personal developers and organizations alike, and for a release after each one. They are written in this order, each as the next minor version.
+
+| Release | Work item | Status |
+| --- | --- | --- |
+| `0.2.0` | Observability: Prometheus `/metrics` and webhooks when a job ends or fails (Slack, Teams, PagerDuty) | Not started |
+| `0.3.0` | Developer presets: ready exclusion rules (`target/`, `node_modules/`, `.venv` …), `.gitignore` files on request (`--gitignore`, ADR-039 stays the default), dotfiles synced between devices with one command | Not started |
+| `0.4.0` | Ransomware early warning: an alarm when the share of changed files or their entropy jumps, and on request an immutable lock of the target | Not started |
+| `0.5.0` | Quotas per tenant and user, bandwidth limits ([VISION.md](VISION.md)), users made and closed through SCIM | Not started |
+| `0.6.0` | Trust in releases: fuzzing of the format, reproducible builds, releases signed with Sigstore | Not started |
+| `0.7.0` | Packages: Homebrew, AUR, winget, Chocolatey, Flathub, RPM and Nix, beside the `.deb` and `cargo install --git` | Not started |
+| `0.8.0` | `apeiron mount`: every snapshot as a read-only folder through FUSE (Linux, macOS) and ProjFS (Windows) | Not started |
+| `0.9.0` | Importing restic and Borg repositories, and the large files of Git LFS | Not started |
+| `0.10.0` | Checkpoints for AI agents, undoing an agent's work, and an MCP server for history, diff and search | Not started |
+| `0.11.0` | Application-consistent backups: PostgreSQL and MySQL dumps, Windows VSS, btrfs, ZFS and LVM snapshots, Docker volumes, Kubernetes volumes | Not started |
+| `0.12.0` | Key management: AWS and GCP KMS, HashiCorp Vault, PKCS#11 HSMs, key rotation, a recovery key split K of N with Shamir's scheme | Not started |
+| `0.13.0` | An rclone backend, for the storage services rclone reaches | Not started |
+| `0.14.0` | OpenTelemetry traces | Not started |
+
+Not in this list: an external security audit, which needs a third party the owner chooses, and the format upgrade tool, which waits for format version 2 (§8). Releases are signed with Sigstore only, so macOS and Windows still warn about them; publishing to crates.io stays postponed.

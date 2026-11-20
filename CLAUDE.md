@@ -105,6 +105,8 @@ Bu listede olmayan, belgelerin istediği ama yazılmamış işler `docs/ROADMAP.
 
 **0.1.0 sonrası.** Proje sahibi 2026-11-18'de masaüstüyle aynı ekranlara sahip bir terminal arayüzü istedi: ~~`apeiron tui` (`crates/apeiron-tui`, `docs/TUI.md`, ADR-053)~~. Ekranları sayfaların işlemlerini (`apeiron::json`) ve sözlüğünü (`web/i18n.js`, yalnızca terminalin metinleri `tui_` önekli) kullanır; ekranı olmayan bilgisayarda `apeiron-desktop` çökmek yerine `apeiron tui`'yi önerir.
 
+**Benimseme özellikleri (`docs/ROADMAP.md` §9).** Proje sahibi 2026-11-20'de kişisel geliştiriciler ve kurumlar için 13 özellik istedi; sırası §9'dadır, her biri bitince bir sonraki küçük sürüm (0.2.0, 0.3.0 ...) etiketlenir ve yayımlanır. Bu sürümler için onay verildi; taslak, `Release` iş akışı geçince yayımlanır. Kararlar: `.gitignore` yalnızca `--gitignore` ile okunur (ADR-039 varsayılan kalır); sürümler yalnızca Sigstore ile imzalanır (ücretli Apple/Windows sertifikası yok); paketler Homebrew (`efe-clk/homebrew-apeiron`), AUR, winget, Chocolatey, Flathub, RPM, Nix; AUR ve Chocolatey için hesap anahtarını proje sahibi ekler; crates.io ertelenmiş kalır. Dış güvenlik denetimi proje sahibinin seçeceği üçüncü tarafa kalır.
+
 ## Çalışma düzeni
 
 - Proje `efe-clk/apeiron` reposuyla eşzamanlı ilerler: yapılan iş commit edilir, `master`'a push edilir, CI arka planda beklenir; CI kırılırsa önce o düzeltilir. Push'tan sonra `cargo install --locked --path crates/apeiron-cli`.

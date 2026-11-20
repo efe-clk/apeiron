@@ -125,3 +125,25 @@ Her iş tamamlandı (2026-10-30); aşama, çıkış kriteri olan ilk kurumsal pi
 | Performans hedeflerini Raspberry Pi 4'te ölçmek | [VISION.tr.md](VISION.tr.md), [API.tr.md](API.tr.md) §4 | Daha güçlü bir bilgisayarda ölçüldü ([PERFORMANCE.tr.md](PERFORMANCE.tr.md)); cihaz gerekir |
 | Raporlarda başka standartlar | [REPORTS.tr.md](REPORTS.tr.md) §6 | ISO/IEC 27001, SOC 2 ve GDPR |
 | Format yükseltme aracı | [FORMAT.tr.md](FORMAT.tr.md) §18 | Format 1. sürümde |
+
+## 9. İlk sürümden sonra
+
+Proje sahibi 2026-11-20'de hem kişisel geliştiriciler hem kurumlar için bu özellikleri ve her birinden sonra bir sürüm istedi. Bu sırayla, her biri bir sonraki küçük sürüm olarak yazılır.
+
+| Sürüm | İş | Durum |
+| --- | --- | --- |
+| `0.2.0` | Gözlemlenebilirlik: Prometheus `/metrics` ve bir iş bitince ya da başarısız olunca webhook'lar (Slack, Teams, PagerDuty) | Başlanmadı |
+| `0.3.0` | Geliştirici ön ayarları: hazır dışlama kuralları (`target/`, `node_modules/`, `.venv` …), istenirse `.gitignore` dosyaları (`--gitignore`, varsayılan ADR-039 olarak kalır), dotfiles'ın cihazlar arasında tek komutla senkronu | Başlanmadı |
+| `0.4.0` | Fidye yazılımı erken uyarısı: değişen dosya oranı ya da entropi fırlayınca alarm, istenirse hedefin değiştirilemez kilitlenmesi | Başlanmadı |
+| `0.5.0` | Kiracı ve kullanıcı başına kota, bant genişliği sınırı ([VISION.tr.md](VISION.tr.md)), SCIM ile kullanıcı oluşturma ve kapatma | Başlanmadı |
+| `0.6.0` | Sürümlere güven: formatın fuzzing'i, yeniden üretilebilir derleme, Sigstore ile imzalı sürümler | Başlanmadı |
+| `0.7.0` | Paketler: `.deb` ve `cargo install --git` yanında Homebrew, AUR, winget, Chocolatey, Flathub, RPM ve Nix | Başlanmadı |
+| `0.8.0` | `apeiron mount`: her snapshot'ı FUSE (Linux, macOS) ve ProjFS (Windows) ile salt okunur bir klasör olarak açma | Başlanmadı |
+| `0.9.0` | restic ve Borg depolarını ve Git LFS'in büyük dosyalarını içe aktarma | Başlanmadı |
+| `0.10.0` | Yapay zekâ ajanları için kontrol noktaları, bir ajanın işini geri alma, geçmiş, fark ve arama için bir MCP sunucusu | Başlanmadı |
+| `0.11.0` | Uygulama tutarlı yedek: PostgreSQL ve MySQL dökümleri, Windows VSS, btrfs, ZFS ve LVM snapshot'ları, Docker birimleri, Kubernetes birimleri | Başlanmadı |
+| `0.12.0` | Anahtar yönetimi: AWS ve GCP KMS, HashiCorp Vault, PKCS#11 HSM'ler, anahtar rotasyonu, Shamir ile N'den K'ya bölünmüş kurtarma anahtarı | Başlanmadı |
+| `0.13.0` | rclone'un ulaştığı depolama hizmetleri için bir rclone arka ucu | Başlanmadı |
+| `0.14.0` | OpenTelemetry izleri | Başlanmadı |
+
+Bu listede olmayanlar: proje sahibinin seçeceği bir üçüncü taraf gerektiren dış güvenlik denetimi ve format 2. sürüme geçene kadar bekleyen format yükseltme aracı (§8). Sürümler yalnızca Sigstore ile imzalanır, bu yüzden macOS ve Windows yine uyarır; crates.io'ya yayımlama ertelenmiş kalır.
