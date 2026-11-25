@@ -399,8 +399,48 @@ fn try_run(job: &Job, stop: &AtomicBool) -> apeiron::Result<(RunResult, String)>
             exclude,
             alarm_percent,
             hold_on_alarm,
+            source,
+            pause,
         } => {
-            let mut request = BackupRequest::new(folder.clone(), ref_name.clone());
+            // The snapshot, dump or helper is removed when this is dropped.
+            let prepared = match source {
+                Some(spec) => {
+                    let source = crate::sources::Source::parse(spec)
+                        .map_err(|e| apeiron::Error::new(apeiron::ErrorKind::InvalidInput, e))?;
+                    Some(
+                        crate::sources::prepare(&source, &repo.path().join("tmp"), *pause)
+                            .map_err(|e| {
+                                apeiron::Error::new(apeiron::ErrorKind::Io, e.to_string())
+                            })?,
+                    )
+                }
+                None => None,
+            };
+            if let Some(p) = prepared.as_ref().filter(|p| p.tar) {
+                let mut request = apeiron::ImportRequest::new(&p.path, ref_name.clone());
+                request.format = Some(apeiron::ImportFormat::Tar);
+                request.message = message.clone();
+                let report = wait(repo.import_archive(request)?, stop)?;
+                let mut text = format!(
+                    "snapshot {}: {} files, {} new bytes",
+                    short(&report.snapshot),
+                    report.files,
+                    report.new_bytes
+                );
+                let mut result = RunResult::Ok;
+                match push_to(&repo, Some(ref_name), push, job.rate, stop) {
+                    Ok((_, pushed)) => text.push_str(&pushed),
+                    Err(e) => {
+                        text.push_str(&format!("; push failed: {}", e.message));
+                        result = RunResult::Failed;
+                    }
+                }
+                return Ok((result, text));
+            }
+            let folder = prepared
+                .as_ref()
+                .map_or_else(|| folder.clone(), |p| p.path.clone());
+            let mut request = BackupRequest::new(folder, ref_name.clone());
             request.message = message.clone();
             request.exclude = exclude.clone();
             request.alarm_percent = *alarm_percent;

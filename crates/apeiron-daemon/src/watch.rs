@@ -121,6 +121,8 @@ mod tests {
                 exclude: Vec::new(),
                 alarm_percent: None,
                 hold_on_alarm: false,
+                source: None,
+                pause: false,
             },
             every: Every::Days(1),
             at: None,

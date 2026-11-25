@@ -55,7 +55,7 @@ Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apei
 | Komut | Ne yapar | Durum |
 | --- | --- | --- |
 | `apeiron init <path> [--encrypt]` | Boş bir depo oluşturur; `--encrypt` onu bir parolayla şifreler (bölüm 2.1) | Tamamlandı |
-| `apeiron backup <folder> [--ref <name>] [--message <text>] [--author <text>] [--host <text>] [--exclude <pattern>]... [--gitignore] [--reread] [--alarm-percent <n>] [--hold-on-alarm]` | Klasörü yeni bir snapshot olarak saklar ve ref'i ona taşır (varsayılan ref: `main`); fidye yazılımına karşı uyarır (§4.3) | Tamamlandı |
+| `apeiron backup <folder>\|--source <kind>:<target> [--pause] [--ref <name>] [--message <text>] [--author <text>] [--host <text>] [--exclude <pattern>]... [--gitignore] [--reread] [--alarm-percent <n>] [--hold-on-alarm]` | Klasörü yeni bir snapshot olarak saklar ve ref'i ona taşır (varsayılan ref: `main`); fidye yazılımına karşı uyarır (§4.3); `--source` bunun yerine bir veritabanı dökümünü, bir dosya sistemi anlık görüntüsünü ya da bir birimi yedekler ([CONSISTENT.tr.md](CONSISTENT.tr.md)) | Tamamlandı |
 | `apeiron log [<ref>] [--grep <metin>]` | Bir ref'in snapshot'larını en yeniden başlayarak listeler; `--grep`, mesajı, yazarı, makinesi ya da üst verisi metni büyük-küçük harf ayırmadan içerenleri bırakır | Tamamlandı |
 | `apeiron ls <snapshot> [<path>]` | Bir snapshot'taki dosya ve klasörleri listeler | Tamamlandı |
 | `apeiron diff <snapshot> <snapshot> [--text]` | İki snapshot arasında eklenen, silinen ve değişen dosyaları listeler; `--text` bir eklentinin işlediği dosyaların değişen satırlarını da gösterir ([TEXT.tr.md](TEXT.tr.md)) | Tamamlandı |

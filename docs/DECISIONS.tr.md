@@ -1254,3 +1254,23 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Yedekleyen ve geri yükleyen MCP araçları | Bir ajan, kullanıcı karar vermeden kendi işini geri alırdı |
 
 **Sonuçlar.** Kontrol noktaları, bir depo verilmezse kendi depolarına gider; böylece bir yedek deposunu asla doldurmaz. `.env` gibi `.gitignore`'un adlandırdığı bir dosya ne kontrol noktasına girer ne de geri alma ona dokunur.
+
+## ADR-059: Tutarlı kaynaklar sistemin kendi programlarıyla hazırlanır ve yedekten sonra silinir
+
+**Durum:** Kabul edildi (2026-11-25)
+
+**Bağlam.** Çalışan bir veritabanının ya da yazılan bir diskin dosyaları, bir yedek onları okurken değişir; bu yüzden yedek hiç var olmamış bir durumu tutabilir ([CONSISTENT.tr.md](CONSISTENT.tr.md)).
+
+**Karar.** `apeiron backup --source <kind>:<target>` ve `source` iş anahtarı, kaynağın tek bir anını onun için yapılmış programla hazırlar (`pg_dump`, `mysqldump`, btrfs, ZFS ve LVM anlık görüntüleri, bir Docker ya da Kubernetes birimini okuyan bir konteyner, Windows'un gölge kopyası), verdiği klasörü yedekler ya da tar arşivini içe aktarır ve yapılanı siler; bunlar `apeiron-daemon`'un `sources` modülündedir. Kiracıların işleri kaynak kullanamaz.
+
+**Gerekçe.** Her sistem tutarlı bir görünüm vermeyi zaten bilir; onu çağırmak bizim bir sürücümüzü gerektirmez ve sürümler boyunca doğru kalır. Düz dökümler ve klasörler aynı yedekten geçer; böylece chunk'lara bölme ve tekilleştirme her dosyadaki gibi çalışır. Program çalıştırmak sunucunun sahibine aittir, bir kiracıya değil.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Yedekten önce döküm alan kullanıcı kancaları | Her kullanıcı aynı betikleri yazardı ve bir başarısızlıktan sonra temizlik kolayca yanlış yapılır |
+| Apeiron içinde veritabanı sürücüleri | Her veritabanının izlenecek protokolü ve sürümleri |
+| Sıkıştırılmış ya da özel biçimli dökümler | Bir günden ötekine tamamen değişir ve tekilleştirilmez |
+
+**Sonuçlar.** Kaynağın programı, yedeğin çalıştığı yerde kurulu olmalıdır. Gerçek bir sistemde denenmemiş kaynaklar, denenene kadar CONSISTENT.tr.md'de öyle işaretlenir.

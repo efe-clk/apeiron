@@ -32,6 +32,9 @@ impl Job {
     /// The folder a job reads, for watching it for changes.
     pub fn folder(&self) -> Option<&Path> {
         match &self.action {
+            Action::Backup {
+                source: Some(_), ..
+            } => None,
             Action::Backup { folder, .. } | Action::Sync { folder, .. } => Some(folder),
             _ => None,
         }
@@ -73,6 +76,11 @@ pub enum Action {
         alarm_percent: Option<u32>,
         /// Places a legal hold on the ref when the alarm goes off.
         hold_on_alarm: bool,
+        /// An application-consistent source instead of `folder`, as
+        /// `<kind>:<target>` (CONSISTENT.md).
+        source: Option<String>,
+        /// With a docker source: pause the containers using the volume.
+        pause: bool,
     },
     Push {
         /// `None` for every ref (`ref = "*"`, REPLICATION.md §3).
@@ -168,6 +176,8 @@ struct RawJob {
     keep_yearly: Option<u32>,
     alarm_percent: Option<u32>,
     hold_on_alarm: Option<bool>,
+    source: Option<String>,
+    pause: Option<bool>,
 }
 
 /// Reads the jobs file; jobs come sorted by name, the order they run in.
@@ -257,13 +267,32 @@ fn to_job(name: &str, raw: RawJob, scope: Option<&Scope>) -> std::result::Result
     if raw.action != "backup" {
         not_here("alarm_percent", raw.alarm_percent.is_some())?;
         not_here("hold_on_alarm", raw.hold_on_alarm.is_some())?;
+        not_here("source", raw.source.is_some())?;
+        not_here("pause", raw.pause.is_some())?;
     }
     let action = match raw.action.as_str() {
         "backup" => {
             not_here("sample_mb", raw.sample_mb.is_some())?;
-            let folder = raw.folder.as_deref().ok_or("`folder` is missing")?;
+            let source = match (&raw.source, &raw.folder) {
+                (Some(_), Some(_)) => return Err("give `folder` or `source`, not both".to_owned()),
+                (Some(s), None) => Some(crate::sources::Source::parse(s)?),
+                (None, Some(_)) => None,
+                (None, None) => return Err("`folder` is missing".to_owned()),
+            };
+            if scope.is_some() && source.is_some() {
+                return Err("a tenant's jobs back up its folders, not a `source`".to_owned());
+            }
+            if raw.pause.is_some() && !matches!(source, Some(crate::sources::Source::Docker(_))) {
+                return Err("`pause` is for a docker source".to_owned());
+            }
+            let ref_name = match (&source, &raw.ref_name) {
+                (Some(s), None) => s.default_ref(),
+                _ => ref_name,
+            };
             Action::Backup {
-                folder: expand(folder),
+                folder: raw.folder.as_deref().map(expand).unwrap_or_default(),
+                source: raw.source.clone(),
+                pause: raw.pause.unwrap_or(false),
                 ref_name,
                 message: raw.message.clone(),
                 push: raw.push.clone().unwrap_or_default(),
@@ -556,6 +585,43 @@ mod tests {
         parse_jobs(Path::new("jobs.toml"), text, None).map_err(|e| e.to_string())
     }
 
+    /// A backup can read a source instead of a folder (CONSISTENT.md).
+    #[test]
+    fn a_backup_job_can_read_a_source() {
+        let jobs = parse(
+            "[job.db]\nrepo = \"/r\"\ndo = \"backup\"\nsource = \"postgres:shop\"\nevery = \"day\"\n\
+             [job.vol]\nrepo = \"/r\"\ndo = \"backup\"\nsource = \"docker:data\"\npause = true\nevery = \"day\"",
+        )
+        .unwrap();
+        let Action::Backup {
+            source,
+            ref_name,
+            pause,
+            ..
+        } = &jobs[0].action
+        else {
+            panic!()
+        };
+        assert_eq!(
+            (source.as_deref(), ref_name.as_str(), *pause),
+            (Some("postgres:shop"), "postgres/shop", false)
+        );
+        assert!(jobs[0].folder().is_none());
+        let Action::Backup { pause, .. } = &jobs[1].action else {
+            panic!()
+        };
+        assert!(*pause);
+        for (text, why) in [
+            ("source = \"postgres:shop\"\nfolder = \"/x\"", "not both"),
+            ("source = \"tape:0\"", "unknown source"),
+            ("source = \"postgres:shop\"\npause = true", "docker"),
+        ] {
+            let job = format!("[job.x]\nrepo = \"/r\"\ndo = \"backup\"\nevery = \"day\"\n{text}");
+            let e = parse(&job).unwrap_err();
+            assert!(e.contains(why), "{text}: {e}");
+        }
+    }
+
     /// A tenant's speed limit caps its jobs that move data.
     #[test]
     fn a_tenants_speed_limit_caps_its_jobs() {
@@ -673,6 +739,8 @@ mod tests {
                 exclude: Vec::new(),
                 alarm_percent: None,
                 hold_on_alarm: false,
+                source: None,
+                pause: false,
             }
         );
         assert_eq!(

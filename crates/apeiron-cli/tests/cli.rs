@@ -1897,3 +1897,57 @@ fn an_agent_reads_history_through_mcp() {
     assert_eq!(replies[2]["result"]["content"][0]["text"], "first");
     assert_eq!(replies[3]["result"]["isError"], true);
 }
+
+/// `backup --source docker:<volume>` reads a Docker volume, when Docker is
+/// there (CONSISTENT.md).
+#[test]
+fn a_docker_volume_is_backed_up() {
+    let docker = |args: &[&str]| {
+        Command::new("docker")
+            .args(args)
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+    };
+    if docker(&["info"]).is_none() || cfg!(not(target_os = "linux")) {
+        eprintln!("skipped: no Docker");
+        return;
+    }
+    let s = Setup::new();
+    let volume = format!("apeiron-test-{}", std::process::id());
+    docker(&["volume", "create", &volume]).unwrap();
+    let write = docker(&[
+        "run",
+        "--rm",
+        "-v",
+        &format!("{volume}:/d"),
+        "busybox",
+        "sh",
+        "-c",
+        "echo hi > /d/a.txt",
+    ]);
+    if write.is_none() {
+        docker(&["volume", "rm", &volume]);
+        eprintln!("skipped: busybox cannot run");
+        return;
+    }
+    let out = s.run(&["backup", "--source", &format!("docker:{volume}")]);
+    docker(&["volume", "rm", &volume]);
+    assert_eq!(
+        code(&out),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let restored = s.root.join("vol");
+    s.ok(&[
+        "restore",
+        &format!("docker/{volume}"),
+        restored.to_str().unwrap(),
+    ]);
+    assert_eq!(fs::read_to_string(restored.join("a.txt")).unwrap(), "hi\n");
+    assert_eq!(
+        fs::read_dir(s.repo().join("tmp")).map_or(0, |d| d.count()),
+        0
+    );
+}

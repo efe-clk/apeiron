@@ -85,10 +85,22 @@ enum Command {
     },
     /// Store a folder as a new snapshot and move a ref to it
     Backup {
-        folder: PathBuf,
-        /// Ref to move to the new snapshot
-        #[arg(long = "ref", default_value = "main")]
-        ref_name: String,
+        /// The folder to back up
+        #[arg(required_unless_present = "source")]
+        folder: Option<PathBuf>,
+        /// Ref to move to the new snapshot; main, or for a source <kind>/<name>
+        #[arg(long = "ref")]
+        ref_name: Option<String>,
+        /// Back up a database, a file system snapshot or a volume, consistent
+        /// at one moment, instead of a folder: postgres:<db>, mysql:<db>,
+        /// btrfs:<subvolume>, zfs:<dataset>, lvm:<group>/<volume>,
+        /// docker:<volume>, kubernetes:<namespace>/<claim> or vss:<folder>
+        #[arg(long, value_name = "KIND:TARGET", conflicts_with = "folder")]
+        source: Option<String>,
+        /// With a docker source: pause the containers that use the volume
+        /// while it is read
+        #[arg(long, requires = "source")]
+        pause: bool,
         /// Description of the snapshot
         #[arg(short, long)]
         message: Option<String>,
@@ -2861,12 +2873,52 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             reread,
             alarm_percent,
             hold_on_alarm,
+            source,
+            pause,
         } => {
             if gitignore {
                 exclude.push("@gitignore".to_owned());
             }
+            let source = source
+                .map(|s| apeiron_daemon::sources::Source::parse(&s).map_err(Failure::Usage))
+                .transpose()?;
+            let ref_name = ref_name.unwrap_or_else(|| match &source {
+                Some(s) => s.default_ref(),
+                None => "main".to_owned(),
+            });
             let audit = CliAudit::find(cli.repo.as_deref())?;
             let repo = open(cli.repo, password_file)?;
+            // The snapshot, dump or helper is removed when this is dropped.
+            let prepared = match &source {
+                Some(s) => Some(
+                    apeiron_daemon::sources::prepare(s, &repo.path().join("tmp"), pause)
+                        .map_err(|e| Failure::Usage(e.to_string()))?,
+                ),
+                None => None,
+            };
+            if let Some(p) = prepared.as_ref().filter(|p| p.tar) {
+                let mut request = apeiron::ImportRequest::new(&p.path, ref_name.clone());
+                request.format = Some(apeiron::ImportFormat::Tar);
+                request.message = message;
+                request.host = host;
+                let report = watch(out, repo.import_archive(request)?)?;
+                out.result(&report, |r| {
+                    say!(
+                        "Snapshot {} ({ref_name}): {}, {}, {} read, {} new",
+                        format::short_id(&r.snapshot),
+                        format::count(r.files, "file"),
+                        format::count(r.dirs, "folder"),
+                        format::bytes(r.bytes),
+                        format::bytes(r.new_bytes)
+                    );
+                });
+                return Ok(warnings_exit(out, &report.warnings));
+            }
+            let folder = match (&prepared, folder) {
+                (Some(p), _) => p.path.clone(),
+                (None, Some(f)) => f,
+                (None, None) => return Err(Failure::Usage("name a folder or --source".to_owned())),
+            };
             let mut request = BackupRequest::new(folder, ref_name.clone());
             request.message = message;
             request.author = author;

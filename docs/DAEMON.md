@@ -79,6 +79,7 @@ every = "week"
 | `at` | For `day` and `week`: the earliest local time of day, `HH:MM` |
 | `sample_mb` | For `restore-test`: how much to restore, default 100 |
 | `on_change` | For `backup` and `sync`: also run after a change to the folder, once it has been quiet this long: a number with `s`, `m` or `h`, from `5s` to `24h` (section 4) |
+| `source`, `pause` | For `backup`: an application-consistent source instead of `folder`, such as `postgres:shop`, and `true` to pause a docker source's containers; not in a tenant's jobs ([CONSISTENT.md](CONSISTENT.md)) |
 | `alarm_percent`, `hold_on_alarm` | For `backup`: the ransomware alarm's percentage (50 by default, 0 turns it off), and `true` to place a legal hold on the ref when it goes off; a run with the alarm fails and pushes nothing ([CLI.md](CLI.md) §4.3) |
 | `rate_kb` | For `backup`, `push`, `pull`, `repair` and `sync`: the most kibibytes per second moved to or from remotes, on average ([SYNC.md](SYNC.md) §2); no limit by default |
 

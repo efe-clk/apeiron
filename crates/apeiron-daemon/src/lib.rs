@@ -9,6 +9,7 @@ mod jobs;
 mod metrics;
 mod notify;
 mod schedule;
+pub mod sources;
 mod state;
 mod watch;
 mod webhook;
@@ -40,6 +41,9 @@ pub enum Error {
     NoFolder(&'static str),
     #[error("cannot lower the priority: {0}")]
     Priority(#[source] io::Error),
+    /// Preparing an application-consistent source failed (CONSISTENT.md).
+    #[error("{0}")]
+    Source(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

@@ -1254,3 +1254,23 @@ ADR 001â€“008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009â€
 | MCP tools that back up and restore | An agent would undo its own work without the user deciding |
 
 **Consequences.** Checkpoints go into a repository of their own unless one is given, so they never fill a backup repository. A file `.gitignore` names, such as `.env`, is neither checkpointed nor touched by undo.
+
+## ADR-059: Consistent sources are prepared by the system's own programs and removed after the backup
+
+**Status:** Accepted (2026-11-25)
+
+**Context.** Files of a running database or of a disk being written change while a backup reads them, so the backup may hold a state that never existed ([CONSISTENT.md](CONSISTENT.md)).
+
+**Decision.** `apeiron backup --source <kind>:<target>` and the job key `source` prepare one moment of the source with the program made for it (`pg_dump`, `mysqldump`, btrfs, ZFS and LVM snapshots, a container reading a Docker or Kubernetes volume, Windows' shadow copy), back up the folder or import the tar archive it gives, and remove what was made, in the module `sources` of `apeiron-daemon`. Tenants' jobs cannot use sources.
+
+**Rationale.** Each system already knows how to give a consistent view; calling it needs no driver of our own and stays correct across versions. Plain dumps and folders go through the same backup, so chunking and deduplication work as for any file. Running programs is for whoever owns the server, not for a tenant.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| Hooks of the user that dump before a backup | Every user would write the same scripts, and cleaning up after a failure is easy to get wrong |
+| Database drivers inside Apeiron | Each database's protocol and versions to follow |
+| Compressed or custom-format dumps | They change completely from one day to the next and do not deduplicate |
+
+**Consequences.** The source's program must be installed where the backup runs. Sources not tried on a real system are marked so in CONSISTENT.md until they are.

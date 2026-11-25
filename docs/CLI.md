@@ -55,7 +55,7 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | Command | What it does | Status |
 | --- | --- | --- |
 | `apeiron init <path> [--encrypt]` | Creates an empty repository; `--encrypt` encrypts it with a password (section 2.1) | Done |
-| `apeiron backup <folder> [--ref <name>] [--message <text>] [--author <text>] [--host <text>] [--exclude <pattern>]... [--gitignore] [--reread] [--alarm-percent <n>] [--hold-on-alarm]` | Stores the folder as a new snapshot and moves the ref to it (default ref: `main`); warns of ransomware (§4.3) | Done |
+| `apeiron backup <folder>\|--source <kind>:<target> [--pause] [--ref <name>] [--message <text>] [--author <text>] [--host <text>] [--exclude <pattern>]... [--gitignore] [--reread] [--alarm-percent <n>] [--hold-on-alarm]` | Stores the folder as a new snapshot and moves the ref to it (default ref: `main`); warns of ransomware (§4.3); `--source` backs up a database dump, a file system snapshot or a volume instead ([CONSISTENT.md](CONSISTENT.md)) | Done |
 | `apeiron log [<ref>] [--grep <text>]` | Lists the snapshots of a ref, newest first; `--grep` keeps those whose message, author, host or metadata hold the text, ignoring case | Done |
 | `apeiron ls <snapshot> [<path>]` | Lists the files and folders inside a snapshot | Done |
 | `apeiron diff <snapshot> <snapshot> [--text]` | Lists files added, removed and changed between two snapshots; `--text` also shows the changed lines of files a plugin handles ([TEXT.md](TEXT.md)) | Done |

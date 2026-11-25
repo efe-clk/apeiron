@@ -125,6 +125,7 @@ Rules for code, commits and format changes: [CONTRIBUTING.md](CONTRIBUTING.md).
 | [Text plugin](docs/TEXT.md) | Merging text files line by line and showing their differences |
 | [Desktop interface](docs/DESKTOP.md) | Backing up and restoring in a window, without the command line |
 | [Terminal interface](docs/TUI.md) | The same screens inside a terminal, for servers and SSH |
+| [Consistent backups](docs/CONSISTENT.md) | Database dumps, file system snapshots and container volumes, each from one moment |
 | [AI agents](docs/AGENTS.md) | Checkpoints after each step of an agent, undoing its work, and the history through MCP |
 | [Mount](docs/MOUNT.md) | Every snapshot as a read-only folder, to open and search without restoring |
 | [Web interface](docs/WEB.md) | Using a backup server from a browser on another computer |

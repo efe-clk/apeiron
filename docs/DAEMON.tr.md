@@ -79,6 +79,7 @@ every = "week"
 | `at` | `day` ve `week` için: günün en erken yerel saati, `HH:MM` |
 | `sample_mb` | `restore-test` için: ne kadarının geri yükleneceği, varsayılan 100 |
 | `on_change` | `backup` ve `sync` için: klasördeki bir değişiklikten sonra, klasör bu kadar süre sessiz kalınca da çalış: `s`, `m` ya da `h` ile bir sayı, `5s` ile `24h` arası (bölüm 4) |
+| `source`, `pause` | `backup` için: `folder` yerine `postgres:shop` gibi uygulama tutarlı bir kaynak ve bir docker kaynağının konteynerlerini duraklatmak için `true`; bir kiracının işlerinde olmaz ([CONSISTENT.tr.md](CONSISTENT.tr.md)) |
 | `alarm_percent`, `hold_on_alarm` | `backup` için: fidye yazılımı alarmının yüzdesi (varsayılan 50, 0 kapatır) ve alarm çalınca ref'e yasal saklama kilidi koymak için `true`; alarmlı bir çalışma başarısız olur ve hiçbir şey push etmez ([CLI.tr.md](CLI.tr.md) §4.3) |
 | `rate_kb` | `backup`, `push`, `pull`, `repair` ve `sync` için: uzak depolara giden ya da onlardan gelen, saniyede ortalama en çok kibibayt ([SYNC.tr.md](SYNC.tr.md) §2); varsayılan olarak sınır yoktur |
 
