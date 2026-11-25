@@ -571,11 +571,15 @@ url = "peer://laptop.local:7865#3f9a…e1"            # başka bir cihaz, bölü
 
 [remote.photos]
 url = "plugin://example-cloud/bucket=photos"          # bir depolama arka ucu eklentisi (PLUGIN.tr.md §2.3)
+
+[remote.drive]
+url = "rclone:gdrive:backups/apeiron"                  # rclone'un ulaştığı bir yer
 ```
 
 - Dosya tek bir kopyaya özeldir; asla push edilmez. Adlar bölüm 9.3'teki ref adı kurallarına uyar, `/` içermez.
 - Gizli bilgi tutmaz. SFTP kullanıcının SSH anahtarlarını ve ajanını kullanır ve sunucuyu `~/.ssh/known_hosts` ile denetler; tanınmayan sunucu reddedilir. S3, `AWS_ACCESS_KEY_ID` ve `AWS_SECRET_ACCESS_KEY` değişkenlerini okur.
-- SFTP, S3, eş (peer) ya da eklenti uzak deposuna yalnızca şifreli bir depo (bölüm 14) push edilebilir. Harici disk gibi bir klasör uzak deposu şifresiz bir depo da tutabilir.
+- `rclone:<remote>:<path>`, rclone'un ulaştığı, `rclone config`'teki adıyla anılan herhangi bir yerdir. Apeiron her bağlantı için yalnızca bu bilgisayarda, onun için yapılmış bir sunucu ve bir istemci anahtarıyla `rclone serve sftp` başlatır ve onu bir SFTP uzak deposu olarak kullanır; böylece ref'ler bölüm 15.2'deki gibi değiştirilir; altındaki hizmetin, neredeyse hepsinin yapabildiği gibi bir dosyayı yeniden adlandırabilmesi gerekir.
+- SFTP, S3, eş (peer), eklenti ya da rclone uzak deposuna yalnızca şifreli bir depo (bölüm 14) push edilebilir. Harici disk gibi bir klasör uzak deposu şifresiz bir depo da tutabilir.
 
 ### 15.2 Depolama işlemleri
 

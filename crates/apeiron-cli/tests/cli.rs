@@ -2000,3 +2000,49 @@ fn a_recovery_key_is_split_into_shares() {
     let one = s.run(&["key", "join", &shares[0]]);
     assert_ne!(code(&one), Some(0));
 }
+
+/// A remote through rclone, when rclone is installed: a local folder named
+/// by an rclone remote of type `local`, set through the environment.
+#[test]
+fn an_rclone_remote_is_pushed_to_and_cloned() {
+    if !Command::new("rclone")
+        .arg("version")
+        .output()
+        .is_ok_and(|o| o.status.success())
+    {
+        eprintln!("skipped: rclone is not installed");
+        return;
+    }
+    let s = Setup::new();
+    let password = s.root.join("pw");
+    fs::write(&password, "secret").unwrap();
+    let repo = s.root.join("enc");
+    let target = s.root.join("target");
+    fs::create_dir_all(&target).unwrap();
+    let run = |args: &[&str]| {
+        let out = Command::new(env!("CARGO_BIN_EXE_apeiron"))
+            .args(args)
+            .env("APEIRON_PASSWORD_FILE", &password)
+            .env("RCLONE_CONFIG_APEIRONTEST_TYPE", "local")
+            .output()
+            .unwrap();
+        assert_eq!(
+            code(&out),
+            Some(0),
+            "{args:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8(out.stdout).unwrap()
+    };
+    let r = repo.to_str().unwrap();
+    run(&["init", "--encrypt", r]);
+    run(&["--repo", r, "backup", &s.path("src")]);
+    let url = format!("rclone:apeirontest:{}", target.display());
+    run(&["--repo", r, "remote", "add", "cloud", &url]);
+    run(&["--repo", r, "push", "cloud", "main"]);
+    let copy = s.root.join("copy");
+    run(&["clone", &url, copy.to_str().unwrap()]);
+    let listed = run(&["--repo", copy.to_str().unwrap(), "ls", "main"]);
+    assert!(listed.contains("a.txt"), "{listed}");
+    assert_eq!(fs::read_dir(repo.join("tmp")).unwrap().count(), 0);
+}

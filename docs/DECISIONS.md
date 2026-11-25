@@ -1294,3 +1294,23 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Rotating `data_key` | Every pack would be rewritten; the key-encryption key is what a policy asks to rotate |
 
 **Consequences.** Opening without a password needs the service reachable; a password or recovery key still opens the repository when it is not. Google Cloud KMS is marked as not tried until it is.
+
+## ADR-061: rclone is reached as an SFTP server on this computer, not through a plugin
+
+**Status:** Accepted (2026-11-25)
+
+**Context.** People keep backups on Google Drive, OneDrive, Backblaze B2 and dozens of other services that speak neither SFTP nor S3; rclone reaches more than seventy of them ([CLI.md](CLI.md) §2.2).
+
+**Decision.** A remote `rclone:<remote>:<path>` starts `rclone serve sftp` on `127.0.0.1` for each connection, with a host key and a client key made for it in the repository's `tmp/`, and uses the existing SFTP store against it; rclone is stopped and the keys removed when the store is dropped.
+
+**Rationale.** rclone already solves each service's interface and authentication, with the user's own `rclone config`. The SFTP store already replaces refs with a lock file and `posix-rename`, which rclone's SFTP server offers, so no new ref protocol is needed. Keys made per connection and a listener on this computer only keep other programs and users out.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| A storage backend plugin for rclone | WebAssembly plugins cannot start programs, and rclone is not a library |
+| `rclone serve s3` | Its S3 server does not offer the conditional writes refs need (FORMAT.md §15.2) |
+| Calling `rclone copyto` and `rclone cat` for each file | No atomic replacement of a ref, and a new process for every file |
+
+**Consequences.** rclone must be installed where Apeiron runs. A service under rclone that cannot rename files cannot hold refs.

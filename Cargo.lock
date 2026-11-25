@@ -321,6 +321,7 @@ name = "apeiron-remote-rs"
 version = "0.12.0"
 dependencies = [
  "apeiron-core-rs",
+ "getrandom 0.4.3",
  "object_store",
  "reqwest",
  "russh",

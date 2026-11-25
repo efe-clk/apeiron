@@ -1433,7 +1433,7 @@ const ORIGIN: &str = "origin";
 /// A folder given relative to the current folder, as an absolute path;
 /// other URLs as they are.
 fn absolute_url(url: &str) -> Result<String> {
-    if url.contains("://") {
+    if url.contains("://") || url.starts_with("rclone:") {
         return Ok(url.to_owned());
     }
     let path = std::path::absolute(url)
@@ -1488,6 +1488,16 @@ pub(crate) fn open_store(
                 None => None,
             };
             Box::new(apeiron_remote::PeerStore::connect(&url, token)?)
+        }
+        core::RemoteUrl::Rclone(target) => {
+            network_needs_encryption()?;
+            // The keys of the connection live in this copy's tmp/, or, for a
+            // clone, beside the folder it makes.
+            let work = match repo {
+                Some(r) => r.path().join("tmp"),
+                None => std::env::temp_dir(),
+            };
+            Box::new(apeiron_remote::RcloneStore::connect(&target, &work)?)
         }
         core::RemoteUrl::Plugin { name, config } => {
             network_needs_encryption()?;

@@ -1294,3 +1294,23 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | `data_key`'i yenilemek | Her pack yeniden yazılırdı; bir politikanın yenilenmesini istediği anahtar-şifreleme anahtarıdır |
 
 **Sonuçlar.** Parolasız açmak hizmetin erişilebilir olmasını ister; erişilemediğinde bir parola ya da kurtarma anahtarı depoyu yine açar. Google Cloud KMS denenene kadar denenmemiş olarak işaretlenir.
+
+## ADR-061: rclone'a bir eklentiyle değil, bu bilgisayarda bir SFTP sunucusu olarak ulaşılır
+
+**Durum:** Kabul edildi (2026-11-25)
+
+**Bağlam.** İnsanlar yedeklerini ne SFTP ne de S3 konuşan Google Drive, OneDrive, Backblaze B2 ve onlarca başka hizmette tutar; rclone bunların yetmişten fazlasına ulaşır ([CLI.tr.md](CLI.tr.md) §2.2).
+
+**Karar.** Bir `rclone:<remote>:<path>` uzak deposu, her bağlantı için `127.0.0.1` üzerinde, onun için deponun `tmp/` klasöründe yapılmış bir sunucu ve bir istemci anahtarıyla `rclone serve sftp` başlatır ve var olan SFTP deposunu ona karşı kullanır; depo bırakılınca rclone durdurulur ve anahtarlar silinir.
+
+**Gerekçe.** rclone, her hizmetin arayüzünü ve kimlik doğrulamasını kullanıcının kendi `rclone config`'iyle zaten çözer. SFTP deposu ref'leri bir kilit dosyası ve rclone'un SFTP sunucusunun sunduğu `posix-rename` ile zaten değiştirir; bu yüzden yeni bir ref protokolü gerekmez. Bağlantı başına yapılan anahtarlar ve yalnızca bu bilgisayardaki bir dinleyici, diğer programları ve kullanıcıları dışarıda tutar.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| rclone için bir depolama arka ucu eklentisi | WebAssembly eklentileri program başlatamaz ve rclone bir kütüphane değildir |
+| `rclone serve s3` | S3 sunucusu, ref'lerin gerektirdiği koşullu yazmaları sunmaz (FORMAT.tr.md §15.2) |
+| Her dosya için `rclone copyto` ve `rclone cat` çağırmak | Bir ref'in atomik değiştirilmesi olmaz ve her dosya için yeni bir süreç |
+
+**Sonuçlar.** rclone, Apeiron'un çalıştığı yerde kurulu olmalıdır. rclone altında dosya yeniden adlandıramayan bir hizmet ref tutamaz.

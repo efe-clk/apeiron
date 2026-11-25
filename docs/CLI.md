@@ -50,6 +50,8 @@ A home server is reached with SFTP: `apeiron remote add nas sftp://user@nas.loca
 
 Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron?endpoint=https://s3.example.com&region=eu-1'`. The `endpoint` is needed for S3-compatible services other than Amazon's. The keys come from `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`; they are never stored. The service must support conditional writes, and only an encrypted repository can use an S3 remote.
 
+Google Drive, OneDrive, Backblaze B2, Dropbox and the other services rclone reaches are used through rclone: `apeiron remote add drive rclone:gdrive:backups/apeiron`, where `gdrive` is a remote of `rclone config`. rclone must be installed; Apeiron starts it for each push, pull or clone on this computer only and stops it after ([FORMAT.md](FORMAT.md) §15.1). Only an encrypted repository can use an rclone remote.
+
 ## 3. Commands
 
 | Command | What it does | Status |

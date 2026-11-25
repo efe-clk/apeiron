@@ -59,6 +59,9 @@ pub enum RemoteUrl {
         name: String,
         config: String,
     },
+    /// `rclone:<remote>:<path>`: a place rclone reaches, served by
+    /// `rclone serve sftp` on this computer (FORMAT.md §15.1).
+    Rclone(String),
 }
 
 /// `peer://host[:port]#<SHA-256 of the device's certificate, hex>`
@@ -132,6 +135,12 @@ impl RemoteUrl {
                 port,
                 path: path.to_owned(),
             }));
+        }
+        if let Some(rest) = url.strip_prefix("rclone:") {
+            if !rest.contains(':') || rest.starts_with(':') {
+                return Err(invalid("write rclone:<remote>:<path>, as rclone names it"));
+            }
+            return Ok(RemoteUrl::Rclone(rest.to_owned()));
         }
         if let Some(rest) = url.strip_prefix("plugin://") {
             let (name, config) = rest.split_once('/').unwrap_or((rest, ""));

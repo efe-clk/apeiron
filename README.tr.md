@@ -47,7 +47,7 @@ Her katman yalnızca hemen altındaki katmanı kullanır. Ayrıntılar: [docs/AR
 | Katman | Crate | Rol | Durum |
 | --- | --- | --- | --- |
 | Çekirdek | `apeiron-core` | Nesne modeli, chunk bölme, paket/indeks dosyaları, ref ve reflog | Devam ediyor |
-| Depolama hedefleri | `apeiron-core`, `apeiron-remote`, `apeiron-plugin` | Klasör (yerel ya da harici disk), SFTP, S3 ve başka bir cihaz (`peer://`) uzak depo olarak; eklentiler daha fazlasını ekler (`plugin://`) | Tamamlandı |
+| Depolama hedefleri | `apeiron-core`, `apeiron-remote`, `apeiron-plugin` | Klasör (yerel ya da harici disk), SFTP, S3, başka bir cihaz (`peer://`) ve rclone'un ulaştığı her hizmet (`rclone:`) uzak depo olarak; eklentiler daha fazlasını ekler (`plugin://`) | Tamamlandı |
 | Hizmetler | `apeiron-services` | Bugün yedek, geri yükleme, listeleme, fark, senkron, birleştirme, arama ve eski yedekleri budama | Devam ediyor |
 | Herkese açık API | `apeiron` | Tüm işlemler için Rust API ([docs/API.tr.md](docs/API.tr.md) §8) | Devam ediyor |
 | Sistem çağrıları | `apeiron-sys` | `unsafe` gerektiren işletim sistemi çağrıları (Windows write-through) | Tamamlandı |

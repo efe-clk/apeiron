@@ -47,7 +47,7 @@ Each layer uses only the layer directly below it. Details: [docs/ARCHITECTURE.md
 | Layer | Crate | Role | Status |
 | --- | --- | --- | --- |
 | Core | `apeiron-core` | Object model, chunking, pack/index files, refs and reflogs | In progress |
-| Storage targets | `apeiron-core`, `apeiron-remote`, `apeiron-plugin` | Folder (local or external disk), SFTP, S3 and another device (`peer://`) as remotes; plugins add more (`plugin://`) | Done |
+| Storage targets | `apeiron-core`, `apeiron-remote`, `apeiron-plugin` | Folder (local or external disk), SFTP, S3, another device (`peer://`) and every service rclone reaches (`rclone:`) as remotes; plugins add more (`plugin://`) | Done |
 | Services | `apeiron-services` | Backup, restore, listing, diff, sync, merge, search and pruning old backups today | In progress |
 | Public API | `apeiron` | Rust API for all operations ([docs/API.md](docs/API.md) §8) | In progress |
 | System calls | `apeiron-sys` | Operating system calls that need `unsafe` (Windows write-through) | Done |

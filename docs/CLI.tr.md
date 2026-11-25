@@ -50,6 +50,8 @@ Bir ev sunucusuna SFTP ile ulaşılır: `apeiron remote add nas sftp://user@nas.
 
 Bulut depolamaya S3 ile ulaşılır: `apeiron remote add cloud 's3://bucket/apeiron?endpoint=https://s3.example.com&region=eu-1'`. `endpoint`, Amazon dışındaki S3 uyumlu hizmetler için gerekir. Anahtarlar `AWS_ACCESS_KEY_ID` ve `AWS_SECRET_ACCESS_KEY` değişkenlerinden okunur; asla kaydedilmez. Hizmet koşullu yazmayı desteklemelidir ve S3 uzak deposunu yalnızca şifreli bir depo kullanabilir.
 
+Google Drive, OneDrive, Backblaze B2, Dropbox ve rclone'un ulaştığı diğer hizmetler rclone üzerinden kullanılır: `apeiron remote add drive rclone:gdrive:backups/apeiron`; burada `gdrive`, `rclone config`'in bir uzak deposudur. rclone kurulu olmalıdır; Apeiron onu her push, pull ya da clone için yalnızca bu bilgisayarda başlatır ve ardından durdurur ([FORMAT.tr.md](FORMAT.tr.md) §15.1). rclone uzak deposunu yalnızca şifreli bir depo kullanabilir.
+
 ## 3. Komutlar
 
 | Komut | Ne yapar | Durum |

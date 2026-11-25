@@ -571,11 +571,15 @@ url = "peer://laptop.local:7865#3f9a…e1"            # another device, section 
 
 [remote.photos]
 url = "plugin://example-cloud/bucket=photos"          # a storage backend plugin (PLUGIN.md §2.3)
+
+[remote.drive]
+url = "rclone:gdrive:backups/apeiron"                  # a place rclone reaches
 ```
 
 - The file is local to one copy; it is never pushed. Names follow the ref name rules of section 9.3, without `/`.
 - It holds no secrets. SFTP uses the user's SSH keys and agent and checks the server against `~/.ssh/known_hosts`; an unknown server is refused. S3 reads `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
-- Only an encrypted repository (section 14) can be pushed to an SFTP, S3, peer or plugin remote. A folder remote, such as an external disk, may hold a repository that is not encrypted.
+- `rclone:<remote>:<path>` is any place rclone reaches, named as in its `rclone config`. For each connection Apeiron starts `rclone serve sftp` on this computer only, with a host key and a client key made for it, and uses it as an SFTP remote, so refs are replaced as in section 15.2; the service under it must be able to rename a file, as almost all can.
+- Only an encrypted repository (section 14) can be pushed to an SFTP, S3, peer, plugin or rclone remote. A folder remote, such as an external disk, may hold a repository that is not encrypted.
 
 ### 15.2 Store operations
 

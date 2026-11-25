@@ -6,9 +6,11 @@
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 
 mod peer;
+mod rclone;
 mod s3;
 mod sftp;
 
 pub use peer::{PeerStore, Swap, WireError, fingerprint};
+pub use rclone::RcloneStore;
 pub use s3::S3Store;
 pub use sftp::{SftpStore, SshOptions};
