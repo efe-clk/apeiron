@@ -14,7 +14,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-core-rs"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "apeiron-sys-rs",
  "argon2",
@@ -42,7 +42,7 @@ dependencies = [
 
 [[package]]
 name = "apeiron-sys-rs"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "libc",
  "windows-sys",
