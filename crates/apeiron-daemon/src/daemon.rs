@@ -222,6 +222,21 @@ impl Daemon {
             notify::show(&format!("Apeiron: {} failed", job.name), &run.message);
         }
         self.tell_webhooks(job, previous.as_ref(), &run);
+        crate::otel::record(crate::otel::Span {
+            name: format!("{} {}", job.action.name(), job.name),
+            start: start.into(),
+            end: end.into(),
+            error: (!succeeded).then(|| run.message.clone()),
+            attributes: vec![
+                ("apeiron.job".to_owned(), job.name.clone().into()),
+                ("apeiron.action".to_owned(), job.action.name().into()),
+                ("apeiron.result".to_owned(), run.result.name().into()),
+                (
+                    "apeiron.repository".to_owned(),
+                    job.repo.display().to_string().into(),
+                ),
+            ],
+        });
         Ok(RunRecord {
             job: job.name.clone(),
             run,

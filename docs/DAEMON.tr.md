@@ -181,13 +181,28 @@ jobs = ["documents"]
 
 `json` biçimi `{"event", "job", "do", "result", "message", "start", "end", "host"}` gönderir; diğerleri `Apeiron on nas: job documents failed: <message>` gibi bir satır. Ulaşılamayan ya da hatayla yanıt veren bir webhook en çok 10 saniye sonra kayda yazılır ve işi asla başarısız kılmaz. Geçersiz bir dosya da aynı şekilde kayda yazılır; `apeiron daemon test-webhooks` neyin yanlış olduğunu gösterir.
 
-## 9. Bu işin parçası olmayanlar
+## 9. İzler
+
+`OTEL_EXPORTER_OTLP_ENDPOINT`, örneğin `http://localhost:4318` olarak ayarlıysa, arka plan hizmeti bir işin her çalışması için, bir web sunucusu ([WEB.tr.md](WEB.tr.md)) da kendisinden istenen her işlem için o toplayıcıya JSON ile HTTP üzerinden OTLP olarak bir OpenTelemetry span'i gönderir; Jaeger, Grafana Tempo, Honeycomb, Datadog ve OpenTelemetry Collector bunu alır. Ayarlı değilse hiçbir şey gönderilmez.
+
+| Değişken | Anlamı |
+| --- | --- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Toplayıcı; span'ler `<o>/v1/traces` adresine gider |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | Bunun yerine span'lerin tam adresi, olduğu gibi kullanılır |
+| `OTEL_EXPORTER_OTLP_HEADERS` | Virgülle ayrılmış `key=value` çiftleri, örneğin bir hizmetin API anahtarı |
+| `OTEL_SERVICE_NAME` | Span'lerin `service.name`'i; varsayılan `apeiron` |
+
+Bir işin span'i `<do> <iş>` adını taşır, örneğin `backup documents`; öznitelikleri `apeiron.job`, `apeiron.action`, `apeiron.result` ve `apeiron.repository`'dir; başarısız bir çalışmanın durumu hata ve iletisidir. Bir işlemin span'i işlemin adını taşır, örneğin `refs`; öznitelikleri `apeiron.operation` ve oturum açmış bir kullanıcı için `enduser.id`'dir. Span'ler kendi iş parçacığından, iki sessiz saniyeden ya da 100 span'den sonra toplu gönderilir; böylece yavaş bir toplayıcı bir işi ya da isteği asla bekletmez; ulaşılamayan bir toplayıcı standart hataya yazılır. Her span kendi izidir; bir işin içindeki span'ler, örneğin dosya okuma ve pack yazma, henüz gönderilmez.
+
+## 10. Bu işin parçası olmayanlar
 
 | Konu | Nerede |
 | --- | --- |
 | Birden çok kiracılı bir web sunucusunun işlerini sunucunun içinde çalıştırmak | Her kiracının işleri kendi `apeiron daemon run --tenant`'ında çalışır (bölüm 3.1) |
+| Bir işin içindeki span'ler ve çağırandan gelen iz bağlamı | Daha sonra |
+| gRPC ya da protobuf üzerinden OTLP | Planlanmadı; toplayıcılar HTTP üzerinden JSON alır |
 
-## 10. Crate'ler ve kütüphaneler
+## 11. Crate'ler ve kütüphaneler
 
 | Crate | Görev | Durum |
 | --- | --- | --- |
@@ -199,7 +214,7 @@ jobs = ["documents"]
 | Günün yerel saati ve saat dilimleri | `jiff` | Linux, macOS ve Windows'ta yaz saati geçişlerinde doğru; saf Rust |
 | Yapılandırma ve durum klasörleri | `dirs` | Küçük; her sistemde doğru klasörü bilir |
 | İş dosyası ve durum | `toml`, `serde_json` | Zaten kullanılıyor |
-| Webhook'lar | `reqwest` (engelleyen), `gethostname` | Uzak depolar ve CLI zaten kullanıyor; engelleyen istemci hizmetin iş parçacığına uyar |
+| Webhook'lar ve izler | `reqwest` (engelleyen), `gethostname` | Uzak depolar ve CLI zaten kullanıyor; engelleyen istemci hizmetin iş parçacığına uyar |
 | `on_change` için klasör izleme | `notify` | Rust'ın yaygın izleyicisi: Linux'ta inotify, macOS'ta FSEvents, Windows'ta ReadDirectoryChangesW; kendi iş parçacığında çalışır, Tokio gerektirmez |
 
 Daemon'un Tokio'ya ihtiyacı yoktur: tek bir iş parçacığı sıradaki işin zamanına kadar uyur ve değişen bir iş dosyasını ya da ileri geri atlayan bir saati fark etmek için en az dakikada bir uyanır.

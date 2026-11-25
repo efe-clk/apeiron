@@ -553,6 +553,7 @@ async fn call(
 ) -> Answer {
     let request = body(&bytes)?;
     let who = who(&app, who_)?;
+    let begun = std::time::SystemTime::now();
     let result = checked(
         &app,
         who.clone(),
@@ -561,7 +562,21 @@ async fn call(
         request,
         json::call,
     )
-    .await?;
+    .await;
+    if apeiron_daemon::otel::enabled() {
+        let mut attributes = vec![("apeiron.operation".to_owned(), operation.clone().into())];
+        if let Some(who) = &who {
+            attributes.push(("enduser.id".to_owned(), who.user.name.clone().into()));
+        }
+        apeiron_daemon::otel::record(apeiron_daemon::otel::Span {
+            name: operation.clone(),
+            start: begun,
+            end: std::time::SystemTime::now(),
+            error: result.as_ref().err().map(|e| e.message.clone()),
+            attributes,
+        });
+    }
+    let result = result?;
     Ok(axum::Json(match (&app.mode, &who) {
         (Mode::Web(web), Some(who)) => web.filter(&who.user, &operation, result),
         _ => result,

@@ -1314,3 +1314,22 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Her dosya için `rclone copyto` ve `rclone cat` çağırmak | Bir ref'in atomik değiştirilmesi olmaz ve her dosya için yeni bir süreç |
 
 **Sonuçlar.** rclone, Apeiron'un çalıştığı yerde kurulu olmalıdır. rclone altında dosya yeniden adlandıramayan bir hizmet ref tutamaz.
+
+## ADR-062: Elle yazılmış OTLP JSON olarak OpenTelemetry izleri
+
+**Durum:** Kabul edildi (2026-11-25)
+
+**Bağlam.** Şirketler hizmetlerini Jaeger, Tempo, Honeycomb ya da Datadog'da izler ve yedekleri de aynı yerde, her işin ve her isteğin ne kadar sürdüğü ve birinin neden başarısız olduğuyla görmek ister ([DAEMON.tr.md](DAEMON.tr.md) §9).
+
+**Karar.** `apeiron-daemon`'un küçük bir modülü OTLP isteklerini JSON olarak kurar ve hizmetin zaten kullandığı engelleyen `reqwest` ile, kendi iş parçacığından gönderir; yalnızca standart `OTEL_EXPORTER_OTLP_*` değişkenleriyle ayarlanır. Her iş çalışması ve bir web sunucusunun her işlemi için bir span kaydedilir.
+
+**Gerekçe.** OpenTelemetry crate'leri kendi çalışma ortamlarını, gRPC'yi ve büyük bir bağımlılık kümesini getirir; iş başına bir span ise birkaç düzine satır ister. HTTP üzerinden JSON ile OTLP spesifikasyonun parçasıdır ve her toplayıcı onu alır. Standart değişkenler, diğer programlarla aynı ayarların değişmeden çalışmasını sağlar.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| `opentelemetry` ve `opentelemetry-otlp` crate'leri | Çok sayıda bağımlılık ve eşzamanlı olan daemon için asenkron bir çalışma ortamı |
+| Yalnızca kayıtlar | Bir izleme sisteminin gösterip karşılaştırabileceği süre bilgisi yok |
+
+**Sonuçlar.** Bir işin içindeki span'ler ve çağıranlardan gelen iz bağlamı istenene kadar bekler; onları eklemek o zaman crate'leri haklı çıkarabilir.

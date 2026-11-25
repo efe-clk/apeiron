@@ -8,6 +8,7 @@ mod daemon;
 mod jobs;
 mod metrics;
 mod notify;
+pub mod otel;
 mod schedule;
 pub mod sources;
 mod state;

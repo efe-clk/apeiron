@@ -144,6 +144,6 @@ Proje sahibi 2026-11-20'de hem kişisel geliştiriciler hem kurumlar için bu ö
 | `0.11.0` | Uygulama tutarlı yedek: PostgreSQL ve MySQL dökümleri, Windows VSS, btrfs, ZFS ve LVM snapshot'ları, Docker birimleri, Kubernetes birimleri ([CONSISTENT.tr.md](CONSISTENT.tr.md)) | Tamamlandı; PostgreSQL, btrfs ve Docker denendi, diğerleri henüz değil |
 | `0.12.0` | Anahtar yönetimi: AWS ve GCP KMS, HashiCorp Vault, PKCS#11 HSM'ler, anahtar rotasyonu, Shamir ile N'den K'ya bölünmüş kurtarma anahtarı ([KEYS.tr.md](KEYS.tr.md)) | Tamamlandı; Vault, AWS KMS ve PKCS#11 denendi, Google Cloud KMS henüz değil |
 | `0.13.0` | rclone'un ulaştığı depolama hizmetleri için bir rclone arka ucu ([CLI.tr.md](CLI.tr.md) §2.2) | Tamamlandı |
-| `0.14.0` | OpenTelemetry izleri | Başlanmadı |
+| `0.14.0` | OpenTelemetry izleri ([DAEMON.tr.md](DAEMON.tr.md) §9) | Tamamlandı; Jaeger 2.11 ile denendi |
 
 Bu listede olmayanlar: proje sahibinin seçeceği bir üçüncü taraf gerektiren dış güvenlik denetimi ve format 2. sürüme geçene kadar bekleyen format yükseltme aracı (§8). Sürümler yalnızca Sigstore ile imzalanır, bu yüzden macOS ve Windows yine uyarır; crates.io'ya yayımlama ertelenmiş kalır.

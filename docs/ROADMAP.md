@@ -144,6 +144,6 @@ The owner asked on 2026-11-20 for these features, for personal developers and or
 | `0.11.0` | Application-consistent backups: PostgreSQL and MySQL dumps, Windows VSS, btrfs, ZFS and LVM snapshots, Docker volumes, Kubernetes volumes ([CONSISTENT.md](CONSISTENT.md)) | Done; PostgreSQL, btrfs and Docker were tried, the others not yet |
 | `0.12.0` | Key management: AWS and GCP KMS, HashiCorp Vault, PKCS#11 HSMs, key rotation, a recovery key split K of N with Shamir's scheme ([KEYS.md](KEYS.md)) | Done; Vault, AWS KMS and PKCS#11 were tried, Google Cloud KMS not yet |
 | `0.13.0` | An rclone backend, for the storage services rclone reaches ([CLI.md](CLI.md) §2.2) | Done |
-| `0.14.0` | OpenTelemetry traces | Not started |
+| `0.14.0` | OpenTelemetry traces ([DAEMON.md](DAEMON.md) §9) | Done; tried with Jaeger 2.11 |
 
 Not in this list: an external security audit, which needs a third party the owner chooses, and the format upgrade tool, which waits for format version 2 (§8). Releases are signed with Sigstore only, so macOS and Windows still warn about them; publishing to crates.io stays postponed.

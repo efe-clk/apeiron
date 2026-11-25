@@ -4804,7 +4804,9 @@ fn run_daemon(
             let stop = Arc::new(AtomicBool::new(false));
             let flag = stop.clone();
             let _ = ctrlc::set_handler(move || flag.store(true, Ordering::Relaxed));
-            daemon.run(&stop).map_err(daemon_error)?;
+            let ran = daemon.run(&stop);
+            apeiron_daemon::otel::flush();
+            ran.map_err(daemon_error)?;
             Ok(0)
         }
         DaemonCommand::Once => {
@@ -4813,7 +4815,9 @@ fn run_daemon(
             let daemon = Daemon::start(paths).map_err(daemon_error)?;
             let runs = daemon
                 .run_due(&jobs, &AtomicBool::new(false))
-                .map_err(daemon_error)?;
+                .map_err(daemon_error);
+            apeiron_daemon::otel::flush();
+            let runs = runs?;
             out.result(&runs, |runs| {
                 for r in runs {
                     say!(

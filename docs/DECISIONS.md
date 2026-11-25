@@ -1314,3 +1314,22 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Calling `rclone copyto` and `rclone cat` for each file | No atomic replacement of a ref, and a new process for every file |
 
 **Consequences.** rclone must be installed where Apeiron runs. A service under rclone that cannot rename files cannot hold refs.
+
+## ADR-062: OpenTelemetry traces as OTLP JSON written by hand
+
+**Status:** Accepted (2026-11-25)
+
+**Context.** Companies watch their services in Jaeger, Tempo, Honeycomb or Datadog and want backups in the same place, with how long each job and each request took and why one failed ([DAEMON.md](DAEMON.md) §9).
+
+**Decision.** A small module of `apeiron-daemon` builds OTLP requests as JSON and posts them with the blocking `reqwest` the service already uses, from a thread of its own, configured only by the standard `OTEL_EXPORTER_OTLP_*` variables. A span is recorded for each job run and each operation of a web server.
+
+**Rationale.** The OpenTelemetry crates bring their own runtime, gRPC and a large set of dependencies, while one span per job needs a few dozen lines. OTLP over HTTP with JSON is part of the specification and every collector takes it. The standard variables let the same settings as other programs work unchanged.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| The `opentelemetry` and `opentelemetry-otlp` crates | Many dependencies and an async runtime for the daemon, which is synchronous |
+| Logs only | No timing that a tracing system can show and compare |
+
+**Consequences.** Spans inside a job and trace context from callers wait until they are asked for; adding them may then justify the crates.

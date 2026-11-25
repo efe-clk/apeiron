@@ -181,13 +181,28 @@ jobs = ["documents"]
 
 The `json` format posts `{"event", "job", "do", "result", "message", "start", "end", "host"}`; the others a line such as `Apeiron on nas: job documents failed: <message>`. A webhook that cannot be reached, or answers with an error, is noted in the log after at most 10 seconds and never fails the job. An invalid file is noted in the log the same way; `apeiron daemon test-webhooks` shows what is wrong with it.
 
-## 9. Not part of this work item
+## 9. Traces
+
+With `OTEL_EXPORTER_OTLP_ENDPOINT` set, such as `http://localhost:4318`, the background service sends an OpenTelemetry span for each run of a job, and a web server ([WEB.md](WEB.md)) one for each operation it is asked, to that collector as OTLP over HTTP with JSON; Jaeger, Grafana Tempo, Honeycomb, Datadog and the OpenTelemetry Collector take it. Without it, nothing is sent.
+
+| Variable | Meaning |
+| --- | --- |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | The collector; spans go to `<it>/v1/traces` |
+| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | The full address for spans instead, used as it is |
+| `OTEL_EXPORTER_OTLP_HEADERS` | `key=value` pairs separated by commas, such as a service's API key |
+| `OTEL_SERVICE_NAME` | `service.name` of the spans; `apeiron` by default |
+
+A job's span is named `<do> <job>`, such as `backup documents`, with the attributes `apeiron.job`, `apeiron.action`, `apeiron.result` and `apeiron.repository`; a failed run has the status error and its message. An operation's span is named after the operation, such as `refs`, with `apeiron.operation` and, for a signed-in user, `enduser.id`. Spans are sent in batches from a thread of their own, after two quiet seconds or 100 spans, so a slow collector never holds up a job or a request; one that cannot be reached is noted on standard error. Each span is a trace of its own; spans inside a job, such as reading files and writing packs, are not sent yet.
+
+## 10. Not part of this work item
 
 | Item | Where |
 | --- | --- |
 | Jobs of a web server for several tenants inside the server | Each tenant's jobs run in an `apeiron daemon run --tenant` of their own (section 3.1) |
+| Spans inside a job, and trace context passed in from a caller | Later |
+| OTLP over gRPC or protobuf | Not planned; collectors take JSON over HTTP |
 
-## 10. Crates and libraries
+## 11. Crates and libraries
 
 | Crate | Role | Status |
 | --- | --- | --- |
@@ -199,7 +214,7 @@ The `json` format posts `{"event", "job", "do", "result", "message", "start", "e
 | Local time of day and time zones | `jiff` | Correct across daylight saving changes on Linux, macOS and Windows; pure Rust |
 | Configuration and state folders | `dirs` | Small; knows the right folder on each system |
 | Jobs file and state | `toml`, `serde_json` | Already used |
-| Webhooks | `reqwest` (blocking), `gethostname` | Already used by the remotes and the CLI; the blocking client fits the daemon's thread |
+| Webhooks and traces | `reqwest` (blocking), `gethostname` | Already used by the remotes and the CLI; the blocking client fits the daemon's thread |
 | Watching folders for `on_change` | `notify` | The common Rust watcher: inotify on Linux, FSEvents on macOS, ReadDirectoryChangesW on Windows; it runs its own thread and needs no Tokio |
 
 The daemon needs no Tokio: one thread sleeps until the next job is due and wakes at least every minute to notice a changed jobs file or a clock that jumped.
