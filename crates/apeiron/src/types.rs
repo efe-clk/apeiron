@@ -53,6 +53,9 @@ pub struct SwitchRequest {
     /// Shows what would change without changing the folder or a ref.
     #[serde(default)]
     pub dry_run: bool,
+    /// Patterns of what the switch leaves alone (CLI.md §4.1).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exclude: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]

@@ -210,6 +210,10 @@
           "description": "Reads every file, also those whose size and time say they did not\nchange (CLI.md §4).",
           "type": "boolean"
         },
+        "skip_same": {
+          "description": "When the folder holds the same as the ref's snapshot, stores no new\nsnapshot and leaves the ref, as checkpoints want (AGENTS.md §2).",
+          "type": "boolean"
+        },
         "source": {
           "type": "string"
         }
@@ -272,6 +276,10 @@
             }
           ],
           "description": "The snapshot the ref pointed to before, now the first parent."
+        },
+        "same": {
+          "description": "With `skip_same`: the folder held the same as the ref's snapshot,\nwhich `snapshot` names; nothing was stored.",
+          "type": "boolean"
         },
         "snapshot": {
           "$ref": "#/$defs/ObjectId"
@@ -3939,6 +3947,13 @@
           "default": false,
           "description": "Shows what would change without changing the folder or a ref.",
           "type": "boolean"
+        },
+        "exclude": {
+          "description": "Patterns of what the switch leaves alone (CLI.md §4.1).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         },
         "folder": {
           "type": "string"

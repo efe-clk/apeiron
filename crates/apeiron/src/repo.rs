@@ -362,6 +362,7 @@ impl Repository {
             folder: request.folder,
             dry_run: request.dry_run,
             host: gethostname::gethostname().into_string().ok(),
+            exclude: request.exclude,
         };
         let repo = self.clone();
         Job::spawn("switch", move |ctl| {

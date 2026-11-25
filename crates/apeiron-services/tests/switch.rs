@@ -60,6 +60,7 @@ fn options(repo: &Repository, folder: &Path, to: &str, dry_run: bool) -> SwitchO
         name: "switch/work".to_owned(),
         dry_run,
         host: None,
+        exclude: Vec::new(),
     }
 }
 

@@ -125,6 +125,7 @@ Kod, commit ve format değişikliği kuralları: [CONTRIBUTING.tr.md](CONTRIBUTI
 | [Metin eklentisi](docs/TEXT.tr.md) | Metin dosyalarını satır satır birleştirmek ve farklarını göstermek |
 | [Masaüstü arayüzü](docs/DESKTOP.tr.md) | Komut satırı olmadan, bir pencerede yedekleme ve geri yükleme |
 | [Terminal arayüzü](docs/TUI.tr.md) | Aynı ekranlar bir terminalin içinde; sunucular ve SSH için |
+| [Yapay zekâ ajanları](docs/AGENTS.tr.md) | Bir ajanın her adımından sonra kontrol noktaları, işini geri alma ve MCP üzerinden geçmiş |
 | [Bağlama](docs/MOUNT.tr.md) | Her snapshot, geri yüklemeden açmak ve aramak için salt okunur bir klasör olarak |
 | [Web arayüzü](docs/WEB.tr.md) | Bir yedek sunucusunu başka bir bilgisayardaki tarayıcıdan kullanmak |
 | [Kullanıcılar ve izinler](docs/USERS.tr.md) | Tek bir yedek sunucusunda, her biri kendi yedekleriyle birkaç kişi |

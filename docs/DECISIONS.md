@@ -1234,3 +1234,23 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Keeping LFS pointers and the LFS store side by side | The large files would not be chunked or deduplicated |
 
 **Consequences.** The import needs the program installed and room for one snapshot's tar archive in the repository's `tmp/`. An LFS object missing locally stays a pointer.
+
+## ADR-058: Agents get checkpoints through hooks and history through a read-only MCP server
+
+**Status:** Accepted (2026-11-25)
+
+**Context.** AI agents edit many files in a few seconds and sometimes go wrong; Git commits are too coarse and a backup schedule too slow to undo one turn ([AGENTS.md](AGENTS.md)).
+
+**Decision.** `apeiron checkpoint save` is a backup that stores nothing when the folder has not changed (`skip_same`), leaves out `.git`, build output and what `.gitignore` names, and keeps the agent's session and event in `meta`; agents run it from their hooks. `checkpoint undo` is a switch (BRANCH.md §6) that leaves the same paths alone. `apeiron mcp` serves read-only tools over the JSON operations.
+
+**Rationale.** Hooks are what agents offer for running a command after each step, so nothing has to watch the folder. Reusing backup and switch keeps one object model and their crash safety. An MCP server that only reads cannot make an agent's mistake worse.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| Watching the folder with the background service | It cannot tell one turn of an agent from the next |
+| Git stashes or commits | They change the user's Git history and miss files Git ignores |
+| MCP tools that back up and restore | An agent would undo its own work without the user deciding |
+
+**Consequences.** Checkpoints go into a repository of their own unless one is given, so they never fill a backup repository. A file `.gitignore` names, such as `.env`, is neither checkpointed nor touched by undo.

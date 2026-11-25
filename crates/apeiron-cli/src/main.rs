@@ -10,8 +10,10 @@ macro_rules! say {
     };
 }
 
+mod agents;
 mod foreign;
 mod format;
+mod mcp;
 mod sign;
 mod standard;
 
@@ -124,6 +126,15 @@ enum Command {
         #[arg(long)]
         grep: Option<String>,
     },
+    /// Record a folder an AI agent works in after each step, and undo the
+    /// agent's work (docs/AGENTS.md)
+    Checkpoint {
+        #[command(subcommand)]
+        command: CheckpointCommand,
+    },
+    /// Give an AI agent the history of the repository through the Model
+    /// Context Protocol, on standard input and output; read-only
+    Mcp,
     /// Show every snapshot as a read-only folder at an empty folder, until
     /// Ctrl+C or until it is unmounted (Linux)
     Mount {
@@ -2422,6 +2433,40 @@ fn print_added(out: &Output, added: &apeiron::PluginAdded) {
 }
 
 #[derive(Subcommand)]
+enum CheckpointCommand {
+    /// Record the folder (default: the current one) if it changed since its
+    /// last checkpoint
+    Save {
+        folder: Option<PathBuf>,
+        /// The agent's session, to undo it as a whole later
+        #[arg(long)]
+        session: Option<String>,
+        #[arg(short, long)]
+        message: Option<String>,
+        /// Read the folder, session and event from an agent's hook on
+        /// standard input, and never fail the agent
+        #[arg(long)]
+        hook: bool,
+    },
+    /// List the checkpoints of the folder, newest first
+    List { folder: Option<PathBuf> },
+    /// Make the folder hold what it held before the agent's last turn;
+    /// what it holds now is recorded first, so the undo can be undone
+    Undo {
+        folder: Option<PathBuf>,
+        /// Undo the whole last session, not only its last turn
+        #[arg(long)]
+        session: bool,
+        /// Go back to this checkpoint instead
+        #[arg(long, conflicts_with = "session")]
+        to: Option<String>,
+        /// Only show what would change
+        #[arg(long)]
+        dry_run: bool,
+    },
+}
+
+#[derive(Subcommand)]
 enum ForeignCommand {
     /// Import every snapshot not imported yet, oldest first; the program
     /// itself must be installed, and its password given as it reads it
@@ -2604,6 +2649,15 @@ fn command_main() -> ExitCode {
 enum Failure {
     Usage(String),
     Api(Error),
+}
+
+impl Failure {
+    fn message(&self) -> String {
+        match self {
+            Failure::Usage(m) => m.clone(),
+            Failure::Api(e) => e.to_string(),
+        }
+    }
 }
 
 impl From<Error> for Failure {
@@ -4330,6 +4384,7 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                 snapshot: snapshot.clone(),
                 folder,
                 dry_run,
+                exclude: Vec::new(),
             };
             let report = watch(out, repo.switch(request)?)?;
             out.result(&report, |r| print_switch(r, &snapshot, dry_run));
@@ -4369,6 +4424,13 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
         }
         Command::Dotfiles { command } => run_dotfiles(out, cli.repo, password_file, command),
         Command::Mount { mountpoint } => run_mount(cli.repo, password_file, &mountpoint),
+        Command::Checkpoint { command } => run_checkpoint(out, cli.repo, password_file, command),
+        Command::Mcp => {
+            let repo = agents::repository(cli.repo, password_file)?;
+            mcp::serve(&repo)
+                .map_err(|e| Failure::Usage(format!("standard input or output: {e}")))?;
+            Ok(0)
+        }
         Command::Restic {
             command: ForeignCommand::Import { source, prefix },
         } => {
@@ -4849,6 +4911,112 @@ fn print_switch(r: &apeiron::SwitchReport, snapshot: &str, dry_run: bool) {
         format::short_id(&r.snapshot),
         format::count(r.changes.len() as u64, "change")
     );
+}
+
+/// `apeiron checkpoint` (docs/AGENTS.md).
+fn run_checkpoint(
+    out: &Output,
+    repo: Option<PathBuf>,
+    password_file: Option<&Path>,
+    command: CheckpointCommand,
+) -> Result<u8, Failure> {
+    match command {
+        CheckpointCommand::Save {
+            folder,
+            session,
+            message,
+            hook,
+        } => {
+            let from_hook = hook.then(agents::read_hook);
+            let result = (|| {
+                let repo = agents::repository(repo, password_file)?;
+                let given = folder.or_else(|| from_hook.as_ref().and_then(|h| h.folder.clone()));
+                let folder = agents::folder(given)?;
+                let session =
+                    session.or_else(|| from_hook.as_ref().and_then(|h| h.session.clone()));
+                let event = from_hook.as_ref().and_then(|h| h.event.clone());
+                agents::save(
+                    out,
+                    &repo,
+                    &folder,
+                    session.as_deref(),
+                    event.as_deref(),
+                    message,
+                )
+                .map(|(id, new)| (id, new, folder))
+            })();
+            match result {
+                Ok((id, new, folder)) => {
+                    if !hook {
+                        agents::print_saved(&id, new, &folder);
+                    }
+                    Ok(0)
+                }
+                // An agent's step is never stopped by a checkpoint.
+                Err(e) if hook => {
+                    eprintln!("apeiron checkpoint: {}", e.message());
+                    Ok(0)
+                }
+                Err(e) => Err(e),
+            }
+        }
+        CheckpointCommand::List { folder } => {
+            let repo = agents::repository(repo, password_file)?;
+            let folder = agents::folder(folder)?;
+            let checkpoints = agents::history(&repo, &folder)?;
+            out.result(&checkpoints, |list| {
+                for c in list {
+                    say!("{}", agents::describe(c));
+                }
+                if list.is_empty() {
+                    say!("No checkpoints of {}", folder.display());
+                }
+            });
+            Ok(0)
+        }
+        CheckpointCommand::Undo {
+            folder,
+            session,
+            to,
+            dry_run,
+        } => {
+            let repo = agents::repository(repo, password_file)?;
+            let folder = agents::folder(folder)?;
+            let checkpoints = agents::history(&repo, &folder)?;
+            let target = match &to {
+                Some(spec) => {
+                    let id = repo.resolve(spec)?;
+                    checkpoints
+                        .iter()
+                        .find(|c| c.id == id)
+                        .cloned()
+                        .ok_or_else(|| {
+                            Failure::Usage(format!(
+                                "{spec} is not a checkpoint of {}",
+                                folder.display()
+                            ))
+                        })?
+                }
+                None => agents::undo_target(&checkpoints, None, session).ok_or_else(|| {
+                    Failure::Usage(format!(
+                        "no checkpoint of an agent's session for {}",
+                        folder.display()
+                    ))
+                })?,
+            };
+            if !dry_run {
+                agents::save(out, &repo, &folder, Some("undo"), Some("undo"), None)?;
+            }
+            let report = agents::restore(out, &repo, &folder, &target, dry_run)?;
+            // The checkpoints go on from what the folder holds now.
+            if !dry_run {
+                agents::save(out, &repo, &folder, Some("undo"), Some("undone"), None)?;
+            }
+            let to_name = format::short_id(&target.id);
+            out.result(&report, |r| print_switch(r, &to_name, dry_run));
+            Ok(0)
+        }
+    }
 }
 
 /// `apeiron mount` (docs/MOUNT.md): serves the snapshots until Ctrl+C or

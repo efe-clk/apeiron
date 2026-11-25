@@ -1234,3 +1234,23 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | LFS işaretçilerini ve LFS deposunu yan yana tutmak | Büyük dosyalar chunk'lara bölünmez ve tekilleştirilmezdi |
 
 **Sonuçlar.** İçe aktarma programın kurulu olmasını ve deponun `tmp/` klasöründe bir snapshot'ın tar arşivi kadar yer ister. Yerelde olmayan bir LFS nesnesi işaretçi olarak kalır.
+
+## ADR-058: Ajanlar kontrol noktalarını kancalarla, geçmişi salt okunur bir MCP sunucusuyla alır
+
+**Durum:** Kabul edildi (2026-11-25)
+
+**Bağlam.** Yapay zekâ ajanları birkaç saniyede birçok dosyayı düzenler ve bazen yanılır; bir turu geri almak için Git commit'leri fazla kaba, yedek zamanlaması da fazla yavaştır ([AGENTS.tr.md](AGENTS.tr.md)).
+
+**Karar.** `apeiron checkpoint save`, klasör değişmediyse hiçbir şey saklamayan (`skip_same`), `.git`'i, derleme çıktısını ve `.gitignore`'un adlandırdıklarını dışarıda bırakan ve ajanın oturumunu ve olayını `meta`'da tutan bir yedektir; ajanlar onu kancalarından çalıştırır. `checkpoint undo`, aynı yolları olduğu gibi bırakan bir switch'tir (BRANCH.tr.md §6). `apeiron mcp`, JSON işlemleri üzerinden salt okunur araçlar sunar.
+
+**Gerekçe.** Kancalar, ajanların her adımdan sonra bir komut çalıştırmak için sunduğu şeydir; böylece hiçbir şeyin klasörü izlemesi gerekmez. Yedeği ve switch'i yeniden kullanmak tek nesne modelini ve onların çökme güvenliğini korur. Yalnızca okuyan bir MCP sunucusu bir ajanın hatasını büyütemez.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Klasörü arka plan hizmetiyle izlemek | Bir ajanın bir turunu bir sonrakinden ayıramaz |
+| Git stash'leri ya da commit'leri | Kullanıcının Git geçmişini değiştirir ve Git'in yok saydığı dosyaları kaçırır |
+| Yedekleyen ve geri yükleyen MCP araçları | Bir ajan, kullanıcı karar vermeden kendi işini geri alırdı |
+
+**Sonuçlar.** Kontrol noktaları, bir depo verilmezse kendi depolarına gider; böylece bir yedek deposunu asla doldurmaz. `.env` gibi `.gitignore`'un adlandırdığı bir dosya ne kontrol noktasına girer ne de geri alma ona dokunur.

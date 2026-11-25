@@ -24,7 +24,7 @@ pub(crate) struct Foreign {
 }
 
 /// Lowercase letters, digits, `.`, `_` and `-`, as ref names allow.
-fn ref_part(text: &str) -> String {
+pub(crate) fn ref_part(text: &str) -> String {
     let part: String = text
         .to_lowercase()
         .chars()

@@ -31,6 +31,10 @@ pub struct SwitchOptions {
     pub dry_run: bool,
     #[serde(default)]
     pub host: Option<String>,
+    /// Patterns of what the switch leaves alone, beside the folder's
+    /// `.apeironignore` (CLI.md §4.1), such as `.git` for checkpoints.
+    #[serde(default)]
+    pub exclude: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
@@ -72,7 +76,7 @@ pub fn switch(
             &mut writer,
             &options.folder,
             true,
-            &[],
+            &options.exclude,
             backup::Previous::default(),
             ctl,
         )?;
@@ -149,7 +153,7 @@ pub fn switch(
         mode: SyncMode::Receive,
         dry_run: options.dry_run,
         host: options.host.clone(),
-        exclude: Vec::new(),
+        exclude: options.exclude.clone(),
     };
     let suffix = format!(" (conflict {})", options.target_name.replace('/', "-"));
     apply_tree(

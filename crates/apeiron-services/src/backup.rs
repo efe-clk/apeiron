@@ -45,6 +45,10 @@ pub struct BackupOptions {
     /// turns the alarm off.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alarm_percent: Option<u32>,
+    /// When the folder holds the same as the ref's snapshot, stores no new
+    /// snapshot and leaves the ref, as checkpoints want (AGENTS.md §2).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub skip_same: bool,
 }
 
 impl BackupOptions {
@@ -59,6 +63,7 @@ impl BackupOptions {
             exclude: Vec::new(),
             reread: false,
             alarm_percent: None,
+            skip_same: false,
         }
     }
 }
@@ -86,6 +91,10 @@ pub struct BackupOutcome {
     /// the snapshot is stored all the same.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alarm: Option<crate::alarm::Alarm>,
+    /// With `skip_same`: the folder held the same as the ref's snapshot,
+    /// which `snapshot` names; nothing was stored.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub same: bool,
 }
 
 /// Stores `options.source` as a new snapshot and moves the ref to it.
@@ -111,6 +120,10 @@ pub fn backup_with(
 ) -> Result<BackupOutcome> {
     apeiron_core::validate_ref_name(&options.ref_name)?;
     let parent = repo.read_ref(&options.ref_name)?;
+    let parent_tree = match (options.skip_same, parent) {
+        (true, Some(p)) => Some(repo.read_snapshot(&p)?.tree),
+        _ => None,
+    };
     let before = match parent {
         Some(id) if !options.reread => {
             let snapshot = repo.read_snapshot(&id)?;
@@ -133,6 +146,29 @@ pub fn backup_with(
         ctl,
     )?;
     let tree = stored.tree;
+    if options.skip_same
+        && let (Some(parent), Some(before)) = (parent, parent_tree)
+    {
+        writer.finish()?;
+        if crate::merge::same_content(repo, before, tree)? {
+            ctl.set_phase(Phase::Done);
+            return Ok(BackupOutcome {
+                snapshot: parent,
+                parent: Some(parent),
+                files: stored.files,
+                dirs: stored.dirs,
+                symlinks: stored.symlinks,
+                bytes: stored.bytes,
+                new_bytes: 0,
+                excluded: stored.excluded,
+                unchanged: stored.unchanged,
+                warnings: stored.warnings,
+                alarm: None,
+                same: true,
+            });
+        }
+        writer = repo.writer();
+    }
     let mut meta = options.meta.clone();
     meta.sort();
     let snapshot = Snapshot {
@@ -212,6 +248,7 @@ pub fn backup_with(
             .chain(told)
             .collect(),
         alarm,
+        same: false,
     })
 }
 

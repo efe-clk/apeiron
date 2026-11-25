@@ -1774,3 +1774,126 @@ fn restic_and_borg_backups_are_imported_with_their_times() {
         eprintln!("skipped borg: not installed");
     }
 }
+
+/// An agent's hooks record a folder after each step; `checkpoint undo`
+/// brings back what it held before the last turn, and leaves Git's folder
+/// and build output alone (AGENTS.md).
+#[test]
+fn checkpoints_undo_an_agents_turn() {
+    let s = Setup::new();
+    let proj = s.root.join("proj");
+    fs::create_dir_all(proj.join(".git")).unwrap();
+    fs::create_dir_all(proj.join("node_modules")).unwrap();
+    fs::write(proj.join("main.rs"), "fn main() {}\n").unwrap();
+    fs::write(proj.join(".git/HEAD"), "ref: refs/heads/main\n").unwrap();
+    fs::write(proj.join("node_modules/x.js"), "1").unwrap();
+    let hook = |event: &str, tool: &str| {
+        let input = serde_json::json!({
+            "session_id": "s1", "cwd": proj, "hook_event_name": event, "tool_name": tool,
+        });
+        let mut child = Command::new(env!("CARGO_BIN_EXE_apeiron"))
+            .args(["checkpoint", "save", "--hook"])
+            .env("APEIRON_REPO", s.repo())
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        use std::io::Write;
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(input.to_string().as_bytes())
+            .unwrap();
+        let out = child.wait_with_output().unwrap();
+        assert_eq!(
+            code(&out),
+            Some(0),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert!(out.stdout.is_empty());
+    };
+    hook("UserPromptSubmit", "");
+    fs::write(proj.join("main.rs"), "fn main() { broken }\n").unwrap();
+    fs::write(proj.join("added.rs"), "new").unwrap();
+    hook("PostToolUse", "Edit");
+    // Nothing changed: no new checkpoint.
+    hook("PostToolUse", "Edit");
+    let list = s.json(&["checkpoint", "list", proj.to_str().unwrap()]);
+    assert_eq!(list.as_array().unwrap().len(), 2, "{list}");
+    fs::write(proj.join(".git/HEAD"), "ref: refs/heads/other\n").unwrap();
+
+    s.ok(&["checkpoint", "undo", proj.to_str().unwrap()]);
+    assert_eq!(
+        fs::read_to_string(proj.join("main.rs")).unwrap(),
+        "fn main() {}\n"
+    );
+    assert!(!proj.join("added.rs").exists());
+    assert_eq!(
+        fs::read_to_string(proj.join(".git/HEAD")).unwrap(),
+        "ref: refs/heads/other\n"
+    );
+    assert!(proj.join("node_modules/x.js").exists());
+    // The undo is a checkpoint too, so it can be undone.
+    let list = s.json(&["checkpoint", "list", proj.to_str().unwrap()]);
+    assert_eq!(list[0]["message"], "checkpoint: undone", "{list}");
+
+    // A hook that cannot save never stops the agent.
+    let out = Command::new(env!("CARGO_BIN_EXE_apeiron"))
+        .args([
+            "--repo",
+            s.root.join("missing").to_str().unwrap(),
+            "checkpoint",
+            "save",
+            "--hook",
+        ])
+        .stdin(std::process::Stdio::null())
+        .output()
+        .unwrap();
+    assert_eq!(code(&out), Some(0));
+}
+
+/// `apeiron mcp` answers the Model Context Protocol on standard input.
+#[test]
+fn an_agent_reads_history_through_mcp() {
+    let s = Setup::new();
+    s.ok(&["backup", &s.path("src")]);
+    let messages = [
+        serde_json::json!({"jsonrpc": "2.0", "id": 1, "method": "initialize",
+            "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "t", "version": "1"}}}),
+        serde_json::json!({"jsonrpc": "2.0", "method": "notifications/initialized"}),
+        serde_json::json!({"jsonrpc": "2.0", "id": 2, "method": "tools/list"}),
+        serde_json::json!({"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+            "params": {"name": "read_file", "arguments": {"snapshot": "main", "path": "a.txt"}}}),
+        serde_json::json!({"jsonrpc": "2.0", "id": 4, "method": "tools/call",
+            "params": {"name": "list", "arguments": {"snapshot": "missing"}}}),
+    ];
+    let input: String = messages.iter().map(|m| format!("{m}\n")).collect();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_apeiron"))
+        .arg("mcp")
+        .env("APEIRON_REPO", s.repo())
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    use std::io::Write;
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(input.as_bytes())
+        .unwrap();
+    let out = child.wait_with_output().unwrap();
+    let replies: Vec<serde_json::Value> = String::from_utf8(out.stdout)
+        .unwrap()
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    assert_eq!(replies.len(), 4, "{replies:?}");
+    assert_eq!(replies[0]["result"]["protocolVersion"], "2025-06-18");
+    assert!(replies[1]["result"]["tools"].as_array().unwrap().len() >= 6);
+    assert_eq!(replies[2]["result"]["content"][0]["text"], "first");
+    assert_eq!(replies[3]["result"]["isError"], true);
+}
