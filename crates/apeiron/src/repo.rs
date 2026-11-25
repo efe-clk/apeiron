@@ -105,6 +105,23 @@ impl Repository {
         ))
     }
 
+    /// Opens an encrypted repository with the key-encryption key a key
+    /// management service unwrapped for the external key file `key_id`
+    /// (KEYS.md §2).
+    pub fn unlock_external(path: impl AsRef<Path>, key_id: &str, kek: [u8; 32]) -> Result<Self> {
+        let path = path.as_ref();
+        Ok(Repository::wrap(
+            path,
+            core::Repository::unlock_external(path, key_id, kek)?,
+        ))
+    }
+
+    /// The external key files of the repository at `path`, readable before
+    /// it is opened.
+    pub fn external_keys(path: impl AsRef<Path>) -> Result<Vec<crate::ExternalKey>> {
+        Ok(core::Repository::external_keys(path.as_ref())?)
+    }
+
     /// Makes a new repository in a new or empty folder from a remote copy
     /// and pulls every ref of it; the remote is then known as `origin`
     /// ([FORMAT.md](FORMAT.md) §15.6). Open the result with `unlock`.
@@ -1076,6 +1093,27 @@ impl Repository {
             })
         })();
         self.recorded("add-recovery-key", None, detail, result)
+    }
+
+    /// Adds a key held by a key management service (KEYS.md §2): `kek`, 32
+    /// random bytes the caller made, opens the repository keys, and
+    /// `wrapped` is `kek` as the service `provider` wrapped it with `key`.
+    pub fn add_external_key(
+        &self,
+        provider: &str,
+        key: &str,
+        wrapped: &str,
+        kek: [u8; 32],
+    ) -> Result<AddedKey> {
+        let detail = Some(format!("{provider} {key}"));
+        let result = (|| {
+            let id = self.read().add_external_key(provider, key, wrapped, kek)?;
+            Ok(AddedKey {
+                id,
+                recovery_key: None,
+            })
+        })();
+        self.recorded("add-external-key", None, detail, result)
     }
 
     /// Removes a password or recovery key by its id or the start of it and

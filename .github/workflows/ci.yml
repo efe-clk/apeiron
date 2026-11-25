@@ -151,3 +151,41 @@ jobs:
         with:
           name: fuzz-artifacts
           path: fuzz/artifacts/
+
+  # Keys held by Vault and AWS KMS (docs/KEYS.md), against Vault in dev mode
+  # and LocalStack.
+  kms:
+    runs-on: ubuntu-latest
+    services:
+      vault:
+        image: hashicorp/vault:1.20
+        env:
+          VAULT_DEV_ROOT_TOKEN_ID: root
+        options: --cap-add=IPC_LOCK
+        ports:
+          - 8200:8200
+      localstack:
+        image: localstack/localstack:4.9
+        env:
+          SERVICES: kms
+        ports:
+          - 4566:4566
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - run: |
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:8200/v1/sys/health > /dev/null && break; sleep 2; done
+          curl -sf -H "X-Vault-Token: root" -X POST -d '{"type":"transit"}' http://127.0.0.1:8200/v1/sys/mounts/transit
+          curl -sf -H "X-Vault-Token: root" -X POST http://127.0.0.1:8200/v1/transit/keys/apeiron > /dev/null
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:4566/_localstack/health | grep -Eq '"kms": "(available|running)"' && break; sleep 2; done
+          key=$(curl -sf -X POST -H "Content-Type: application/x-amz-json-1.1" -H "X-Amz-Target: TrentService.CreateKey" -d '{}' http://127.0.0.1:4566/ | python3 -c 'import sys,json; print(json.load(sys.stdin)["KeyMetadata"]["KeyId"])')
+          echo "APEIRON_TEST_AWS_KEY=$key" >> "$GITHUB_ENV"
+      - run: cargo test --locked -p apeiron-kms-rs --test services -- --nocapture
+        env:
+          VAULT_ADDR: http://127.0.0.1:8200
+          VAULT_TOKEN: root
+          APEIRON_TEST_VAULT_KEY: apeiron
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_REGION: us-east-1
+          AWS_ENDPOINT_URL: http://127.0.0.1:4566

@@ -13,6 +13,7 @@ name = "apeiron_daemon"
 
 [dependencies]
 apeiron = { package = "apeiron-rs", path = "../apeiron" }
+apeiron-kms = { package = "apeiron-kms-rs", path = "../apeiron-kms" }
 apeiron-sys = { package = "apeiron-sys-rs", path = "../apeiron-sys" }
 dirs = "6.0.0"
 fs4 = "1.1.0"

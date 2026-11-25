@@ -1529,6 +1529,13 @@
           "description": "Whether the repository was opened with this key.",
           "type": "boolean"
         },
+        "external": {
+          "description": "For an external key: the service and its key, as `<provider> <key>`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "id": {
           "description": "The name of the key file without `.key`.",
           "type": "string"
@@ -1547,11 +1554,20 @@
     },
     "KeyKind": {
       "description": "What a password or recovery key is.",
-      "enum": [
-        "password",
-        "recovery"
-      ],
-      "type": "string"
+      "oneOf": [
+        {
+          "enum": [
+            "password",
+            "recovery"
+          ],
+          "type": "string"
+        },
+        {
+          "const": "external",
+          "description": "Held by a key management service (FORMAT.md §14.2).",
+          "type": "string"
+        }
+      ]
     },
     "Kind": {
       "enum": [

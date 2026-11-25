@@ -2550,6 +2550,32 @@ enum KeyCommand {
         /// File holding the new password on its first line
         #[arg(long, value_name = "PATH", conflicts_with = "recovery")]
         new_password_file: Option<PathBuf>,
+        /// Add a key held by a key management service instead: vault:<key>,
+        /// aws-kms:<key>, gcp-kms:<key> or pkcs11:<key> (docs/KEYS.md)
+        #[arg(long, value_name = "PROVIDER:KEY", conflicts_with_all = ["recovery", "new_password_file"])]
+        external: Option<String>,
+    },
+    /// Replace an external key with a new one held by the same service, or
+    /// by another with --to; the old one is removed after
+    Rotate {
+        /// Key id from `apeiron key list`; its first characters are enough
+        id: String,
+        /// Move it to this service and key instead
+        #[arg(long, value_name = "PROVIDER:KEY")]
+        to: Option<String>,
+    },
+    /// Add a new recovery key and show it as shares, of which the threshold
+    /// give it back; the key itself is never shown
+    Split {
+        #[arg(long, default_value_t = 5)]
+        shares: u8,
+        #[arg(long, default_value_t = 3)]
+        threshold: u8,
+    },
+    /// Put a recovery key together from its shares and show it
+    Join {
+        #[arg(required = true)]
+        shares: Vec<String>,
     },
     /// Remove a password or recovery key; the last one cannot be removed
     Remove {
@@ -2777,11 +2803,23 @@ impl CliAudit {
 fn unlock(path: &Path, password_file: Option<&Path>, asking: &str) -> Result<Repository, Failure> {
     let repo = match Repository::open(path) {
         Err(e) if e.kind == ErrorKind::Key => {
-            let secret = match password_file {
-                Some(file) => read_password_file(file)?,
-                None => prompt(asking)?,
+            let external = match password_file {
+                None => apeiron_daemon::open_external(path),
+                Some(_) => (None, String::new()),
             };
-            Repository::unlock(path, &secret)?
+            match external {
+                (Some(repo), _) => repo,
+                (None, tried) => {
+                    if !tried.is_empty() {
+                        eprintln!("note: no key management service opened it{tried}");
+                    }
+                    let secret = match password_file {
+                        Some(file) => read_password_file(file)?,
+                        None => prompt(asking)?,
+                    };
+                    Repository::unlock(path, &secret)?
+                }
+            }
         }
         result => result?,
     };
@@ -2795,6 +2833,19 @@ fn unlock(path: &Path, password_file: Option<&Path>, asking: &str) -> Result<Rep
         );
     }
     Ok(repo)
+}
+
+/// Adds a key held by the service of `spec`, `<provider>:<key>` (KEYS.md §2).
+fn add_external(repo: &Repository, spec: &str) -> Result<apeiron::AddedKey, Failure> {
+    let usage = |e: apeiron_kms::Error| Failure::Usage(e.to_string());
+    let (provider, key) = apeiron_kms::parse(spec).map_err(usage)?;
+    let kek = apeiron_kms::new_kek().map_err(usage)?;
+    let wrapped = apeiron_kms::wrap(&provider, &key, &kek).map_err(usage)?;
+    // The service must give it back before the key file counts on it.
+    if apeiron_kms::unwrap(&provider, &key, &wrapped).map_err(usage)? != kek {
+        return Err(Failure::Usage(format!("{provider} gave back another key")));
+    }
+    Ok(repo.add_external_key(&provider, &key, &wrapped, kek)?)
 }
 
 /// Reads a password or recovery key from the first line of a file.
@@ -3327,6 +3378,20 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
             });
             Ok(0)
         }
+        Command::Key {
+            command: KeyCommand::Join { shares },
+        } => {
+            let secret =
+                apeiron_kms::shamir::join(&shares).map_err(|e| Failure::Usage(e.to_string()))?;
+            let bytes: [u8; 32] = secret
+                .try_into()
+                .map_err(|_| Failure::Usage("the shares do not hold a recovery key".to_owned()))?;
+            let key = apeiron_kms::recovery_text(&bytes);
+            out.result(&serde_json::json!({ "recovery_key": key }), |_| {
+                say!("Recovery key: {key}");
+            });
+            Ok(0)
+        }
         Command::Key { command } => {
             let repo = open(cli.repo, password_file)?;
             match command {
@@ -3337,10 +3402,16 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                             let kind = match k.kind {
                                 KeyKind::Password => "password",
                                 KeyKind::Recovery => "recovery",
+                                KeyKind::External => "external",
                             };
                             let current = if k.current { "  (in use)" } else { "" };
+                            let held = k
+                                .external
+                                .as_deref()
+                                .map(|e| format!("  held by {e}"))
+                                .unwrap_or_default();
                             say!(
-                                "{}  {kind:8}  added {}{current}",
+                                "{}  {kind:8}  added {}{current}{held}",
                                 format::short_key(&k.id),
                                 k.created.replace('T', " ").replace('Z', " UTC")
                             );
@@ -3350,8 +3421,11 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                 KeyCommand::Add {
                     recovery,
                     new_password_file,
+                    external,
                 } => {
-                    let added = if recovery {
+                    let added = if let Some(spec) = external {
+                        add_external(&repo, &spec)?
+                    } else if recovery {
                         repo.add_recovery_key()?
                     } else {
                         repo.add_password(&new_password(new_password_file.as_deref())?)?
@@ -3364,6 +3438,61 @@ fn run(cli: Cli, out: &Output) -> Result<u8, Failure> {
                         }
                     });
                 }
+                KeyCommand::Rotate { id, to } => {
+                    let keys = repo.keys()?;
+                    let old = match keys
+                        .iter()
+                        .filter(|k| k.id.starts_with(&id))
+                        .collect::<Vec<_>>()[..]
+                    {
+                        [k] => k.clone(),
+                        [] => return Err(Failure::Usage(format!("no key with id {id:?}"))),
+                        _ => return Err(Failure::Usage(format!("{id:?} names more than one key"))),
+                    };
+                    let spec = match (to, &old.external) {
+                        (Some(to), _) => to,
+                        (None, Some(held)) => held.replacen(' ', ":", 1),
+                        (None, None) => {
+                            return Err(Failure::Usage(
+                                "only an external key is rotated; for a password, add a new one and remove the old".to_owned(),
+                            ));
+                        }
+                    };
+                    let added = add_external(&repo, &spec)?;
+                    repo.remove_key(&old.id)?;
+                    out.result(
+                        &serde_json::json!({ "added": added.id, "removed": old.id }),
+                        |_| {
+                            say!(
+                                "Key {} replaced by {}",
+                                format::short_key(&old.id),
+                                format::short_key(&added.id)
+                            );
+                        },
+                    );
+                }
+                KeyCommand::Split { shares, threshold } => {
+                    let added = repo.add_recovery_key()?;
+                    let key = added.recovery_key.clone().unwrap_or_default();
+                    let bytes = apeiron_kms::recovery_bytes(&key)
+                        .map_err(|e| Failure::Usage(e.to_string()))?;
+                    let parts =
+                        apeiron_kms::shamir::split(&bytes, shares, threshold).map_err(|e| {
+                            let _ = repo.remove_key(&added.id);
+                            Failure::Usage(e.to_string())
+                        })?;
+                    out.result(&serde_json::json!({ "id": added.id, "shares": parts }), |_| {
+                        say!(
+                            "Added recovery key {}, as {shares} shares of which any {threshold} give it back:",
+                            format::short_key(&added.id)
+                        );
+                        for p in &parts {
+                            say!("  {p}");
+                        }
+                        say!("Give each share to a different person; `apeiron key join` puts {threshold} of them together.");
+                    });
+                }
+                KeyCommand::Join { .. } => {}
                 KeyCommand::Remove { id } => {
                     let removed = repo.remove_key(&id)?;
                     out.result(&serde_json::json!({ "removed": removed }), |_| {

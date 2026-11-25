@@ -74,7 +74,8 @@ Cloud storage is reached with S3: `apeiron remote add cloud 's3://bucket/apeiron
 | `apeiron gc [--keep-days <days>] [--dry-run]` | Deletes data no ref and no reflog line of the last 90 days (or `--keep-days`) can reach; `--dry-run` only reports | Done |
 | `apeiron gc --remote <remote> [--dry-run]` | Deletes from a remote the data its refs cannot reach, such as on a replica; only for a remote this repository alone writes to ([FORMAT.md](FORMAT.md) §15.8) | Done |
 | `apeiron key list` | Lists the passwords and recovery keys of an encrypted repository | Done |
-| `apeiron key add [--recovery] [--new-password-file <file>]` | Adds a password (asked twice, or read from the file), or with `--recovery` a new recovery key, printed once | Done |
+| `apeiron key add [--recovery] [--new-password-file <file>] [--external <provider>:<key>]` | Adds a password (asked twice, or read from the file), or with `--recovery` a new recovery key, printed once, or with `--external` a key held by a key management service ([KEYS.md](KEYS.md)) | Done |
+| `apeiron key rotate <id> [--to <provider>:<key>]`, `key split [--shares <n>] [--threshold <k>]`, `key join <share>...` | Replaces an external key with a new one; shows a new recovery key as shares of which the threshold give it back, and puts them together ([KEYS.md](KEYS.md)) | Done |
 | `apeiron remote add <name> <url>` | Adds a remote: a folder, such as one on an external disk, `sftp://[user@]host[:port]/path` or `s3://bucket/path?endpoint=…&region=…` (section 2.2) | Done |
 | `apeiron remote list` | Lists the remotes | Done |
 | `apeiron remote remove <name>` | Forgets a remote; the copy itself is not touched | Done |

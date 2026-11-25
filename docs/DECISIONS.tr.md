@@ -1274,3 +1274,23 @@ ADR 001–008, Aşama 0 başlamadan önce alındı ([VISION.tr.md](VISION.tr.md)
 | Sıkıştırılmış ya da özel biçimli dökümler | Bir günden ötekine tamamen değişir ve tekilleştirilmez |
 
 **Sonuçlar.** Kaynağın programı, yedeğin çalıştığı yerde kurulu olmalıdır. Gerçek bir sistemde denenmemiş kaynaklar, denenene kadar CONSISTENT.tr.md'de öyle işaretlenir.
+
+## ADR-060: Hizmetler deponun anahtarlarını değil bir anahtar-şifreleme anahtarını tutar; kurtarma anahtarları Shamir düzeniyle bölünür
+
+**Durum:** Kabul edildi (2026-11-25)
+
+**Bağlam.** Bankalar ve hastaneler anahtarları bir anahtar yönetim hizmetinde ya da bir donanım modülünde tutar, onları orada iptal eder ve yedeklerini tek bir kişinin açabilmesini istemez ([KEYS.tr.md](KEYS.tr.md)).
+
+**Karar.** Yeni bir anahtar dosyası türü, `external`, deponun anahtarlarını bir hizmetin sardığı 32 rastgele baytla mühürler (FORMAT.tr.md §14.2); `apeiron-kms` crate'i Vault'un transit motoru, AWS KMS, Google Cloud KMS ve PKCS#11 ile konuşur, çekirdek yalnızca açılmış anahtarı alır. `key rotate`, bir dış anahtar dosyasını yeni bir anahtar-şifreleme anahtarıyla değiştirir. `key split`, yeni bir kurtarma anahtarını yalnızca GF(256) üzerinde Shamir parçaları olarak gösterir.
+
+**Gerekçe.** Sarılmış bir anahtar-şifreleme anahtarı bir parolanınki gibi çalışır: format, kopyalar ve eski okuyucular değişmez ve hizmet veri anahtarlarını asla görmez. Hizmetlerin düz HTTP arayüzlerini çağırmak her sağlayıcının SDK'sından kaçınır; SigV4 birkaç satırdır ve AWS'nin kendi örneğine karşı denetlenir. Veri anahtarı yerine kurtarma anahtarını bölmek, depoyu açmanın diğer bütün yollarını korur.
+
+**Değerlendirilen alternatifler.**
+
+| Alternatif | Neden seçilmedi |
+| --- | --- |
+| Veriyi hizmetin kendisine şifreletmek | Her okuma hizmeti çağırırdı ve çevrimdışı kullanım biterdi |
+| Sağlayıcıların SDK'ları | Her biri kendi çalışma ortamı ve kimlik bilgisi zinciri olan büyük bağımlılıklar |
+| `data_key`'i yenilemek | Her pack yeniden yazılırdı; bir politikanın yenilenmesini istediği anahtar-şifreleme anahtarıdır |
+
+**Sonuçlar.** Parolasız açmak hizmetin erişilebilir olmasını ister; erişilemediğinde bir parola ya da kurtarma anahtarı depoyu yine açar. Google Cloud KMS denenene kadar denenmemiş olarak işaretlenir.

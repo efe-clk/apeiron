@@ -51,6 +51,7 @@ Her katman yalnızca hemen altındaki katmanı kullanır. Ayrıntılar: [docs/AR
 | Hizmetler | `apeiron-services` | Bugün yedek, geri yükleme, listeleme, fark, senkron, birleştirme, arama ve eski yedekleri budama | Devam ediyor |
 | Herkese açık API | `apeiron` | Tüm işlemler için Rust API ([docs/API.tr.md](docs/API.tr.md) §8) | Devam ediyor |
 | Sistem çağrıları | `apeiron-sys` | `unsafe` gerektiren işletim sistemi çağrıları (Windows write-through) | Tamamlandı |
+| Anahtar yönetimi | `apeiron-kms` | Vault, AWS KMS, Google Cloud KMS ya da bir PKCS#11 modülünün tuttuğu anahtarlar ve parçalara bölünmüş kurtarma anahtarları ([docs/KEYS.tr.md](docs/KEYS.tr.md)) | Tamamlandı |
 | C ABI | `apeiron-ffi` | `apeiron.h` başlık dosyasıyla kararlı C arayüzü `libapeiron` ve onun üzerindeki Python SDK'sı ([docs/SDK.tr.md](docs/SDK.tr.md)); `unsafe` kullanabilir | Tamamlandı |
 | CLI | `apeiron-cli` | `apeiron` komutu ([docs/CLI.tr.md](docs/CLI.tr.md)) | Devam ediyor |
 | Arka plan hizmeti | `apeiron-daemon` | Zamanlanmış işler ve geri yükleme testi ([docs/DAEMON.tr.md](docs/DAEMON.tr.md)) | Tamamlandı |
@@ -125,6 +126,7 @@ Kod, commit ve format değişikliği kuralları: [CONTRIBUTING.tr.md](CONTRIBUTI
 | [Metin eklentisi](docs/TEXT.tr.md) | Metin dosyalarını satır satır birleştirmek ve farklarını göstermek |
 | [Masaüstü arayüzü](docs/DESKTOP.tr.md) | Komut satırı olmadan, bir pencerede yedekleme ve geri yükleme |
 | [Terminal arayüzü](docs/TUI.tr.md) | Aynı ekranlar bir terminalin içinde; sunucular ve SSH için |
+| [Anahtar yönetimi](docs/KEYS.tr.md) | Anahtar yönetim hizmetlerinin ve donanım modüllerinin tuttuğu anahtarlar ve bölünmüş kurtarma anahtarları |
 | [Tutarlı yedekler](docs/CONSISTENT.tr.md) | Veritabanı dökümleri, dosya sistemi anlık görüntüleri ve konteyner birimleri, her biri tek bir andan |
 | [Yapay zekâ ajanları](docs/AGENTS.tr.md) | Bir ajanın her adımından sonra kontrol noktaları, işini geri alma ve MCP üzerinden geçmiş |
 | [Bağlama](docs/MOUNT.tr.md) | Her snapshot, geri yüklemeden açmak ve aramak için salt okunur bir klasör olarak |

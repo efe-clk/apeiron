@@ -1274,3 +1274,23 @@ ADR 001–008 were made before Stage 0 began ([VISION.md](VISION.md)). ADR 009�
 | Compressed or custom-format dumps | They change completely from one day to the next and do not deduplicate |
 
 **Consequences.** The source's program must be installed where the backup runs. Sources not tried on a real system are marked so in CONSISTENT.md until they are.
+
+## ADR-060: Services hold a key-encryption key, never the repository's keys, and recovery keys split by Shamir's scheme
+
+**Status:** Accepted (2026-11-25)
+
+**Context.** Banks and hospitals keep keys in a key management service or a hardware module, revoke them there and want no single person able to open their backups ([KEYS.md](KEYS.md)).
+
+**Decision.** A new kind of key file, `external`, seals the repository keys with 32 random bytes that a service wraps (FORMAT.md §14.2); the crate `apeiron-kms` speaks to Vault's transit engine, AWS KMS, Google Cloud KMS and PKCS#11, and the core only takes the unwrapped key. `key rotate` replaces an external key file with a new key-encryption key. `key split` shows a new recovery key only as Shamir shares over GF(256).
+
+**Rationale.** A wrapped key-encryption key works like a password's: the format, copies and older readers do not change, and the service never sees data keys. Calling the services' plain HTTP interfaces avoids each vendor's SDK; SigV4 is a few lines and checked against AWS's own example. Splitting the recovery key rather than the data key keeps every other way to open the repository.
+
+**Alternatives considered.**
+
+| Alternative | Why not chosen |
+| --- | --- |
+| Having the service encrypt the data itself | Every read would call the service, and offline use would end |
+| The vendors' SDKs | Large dependencies, each with its own runtime and credential chain |
+| Rotating `data_key` | Every pack would be rewritten; the key-encryption key is what a policy asks to rotate |
+
+**Consequences.** Opening without a password needs the service reachable; a password or recovery key still opens the repository when it is not. Google Cloud KMS is marked as not tried until it is.

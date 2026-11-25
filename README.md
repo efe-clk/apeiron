@@ -51,6 +51,7 @@ Each layer uses only the layer directly below it. Details: [docs/ARCHITECTURE.md
 | Services | `apeiron-services` | Backup, restore, listing, diff, sync, merge, search and pruning old backups today | In progress |
 | Public API | `apeiron` | Rust API for all operations ([docs/API.md](docs/API.md) §8) | In progress |
 | System calls | `apeiron-sys` | Operating system calls that need `unsafe` (Windows write-through) | Done |
+| Key management | `apeiron-kms` | Keys held by Vault, AWS KMS, Google Cloud KMS or a PKCS#11 module, and recovery keys split into shares ([docs/KEYS.md](docs/KEYS.md)) | Done |
 | C ABI | `apeiron-ffi` | Stable C interface `libapeiron` with the header `apeiron.h`, and the Python SDK over it ([docs/SDK.md](docs/SDK.md)); may use `unsafe` | Done |
 | CLI | `apeiron-cli` | The `apeiron` command ([docs/CLI.md](docs/CLI.md)) | In progress |
 | Background service | `apeiron-daemon` | Scheduled jobs and the restore test ([docs/DAEMON.md](docs/DAEMON.md)) | Done |
@@ -125,6 +126,7 @@ Rules for code, commits and format changes: [CONTRIBUTING.md](CONTRIBUTING.md).
 | [Text plugin](docs/TEXT.md) | Merging text files line by line and showing their differences |
 | [Desktop interface](docs/DESKTOP.md) | Backing up and restoring in a window, without the command line |
 | [Terminal interface](docs/TUI.md) | The same screens inside a terminal, for servers and SSH |
+| [Key management](docs/KEYS.md) | Keys held by key management services and hardware modules, and split recovery keys |
 | [Consistent backups](docs/CONSISTENT.md) | Database dumps, file system snapshots and container volumes, each from one moment |
 | [AI agents](docs/AGENTS.md) | Checkpoints after each step of an agent, undoing its work, and the history through MCP |
 | [Mount](docs/MOUNT.md) | Every snapshot as a read-only folder, to open and search without restoring |

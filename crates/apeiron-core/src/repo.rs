@@ -113,6 +113,22 @@ impl Repository {
         Repository::open_with(path, Unlock::Secret(secret))
     }
 
+    /// Opens an encrypted repository with the key-encryption key that a key
+    /// management service unwrapped for the external key file `key_id`.
+    pub fn unlock_external(path: &Path, key_id: &str, kek: [u8; 32]) -> Result<Self> {
+        Repository::open_with(path, Unlock::External(key_id, kek))
+    }
+
+    /// The external key files of the repository at `path`, which can be read
+    /// before it is opened (FORMAT.md §14.2).
+    pub fn external_keys(path: &Path) -> Result<Vec<crate::ExternalKey>> {
+        let dir = path.join(KEYS);
+        if !dir.exists() {
+            return Ok(Vec::new());
+        }
+        keyfile::externals(&dir)
+    }
+
     /// Opens the same repository again, with the keys this one was opened
     /// with, and loads its index from disk.
     pub fn reopen(&self) -> Result<Self> {
@@ -149,6 +165,11 @@ impl Repository {
                 (keys, Some(key_id))
             }
             (None, Unlock::Keys(keys, key_id)) => (keys, key_id),
+            (None, Unlock::External(key_id, kek)) => {
+                let (keys, key_id) =
+                    keyfile::unlock_external(&path.join(KEYS), &config.id, key_id, kek)?;
+                (keys, Some(key_id))
+            }
         };
         let mut repo = Repository {
             root: path.to_path_buf(),
@@ -226,6 +247,28 @@ impl Repository {
             &self.config.id,
             &self.keys.id,
             self.data_key()?,
+        )
+    }
+
+    /// Adds a key held by a key management service: `kek` sealed with the
+    /// repository keys, and `wrapped`, the service's wrapping of `kek`.
+    pub fn add_external_key(
+        &self,
+        provider: &str,
+        key: &str,
+        wrapped: &str,
+        kek: [u8; 32],
+    ) -> Result<String> {
+        keyfile::write_external(
+            &self.dir(KEYS),
+            &self.dir(TMP),
+            &self.config.id,
+            &self.keys.id,
+            self.data_key()?,
+            provider,
+            key,
+            wrapped,
+            kek,
         )
     }
 
@@ -970,6 +1013,8 @@ enum Unlock<'a> {
     None,
     Secret(&'a str),
     Keys(Keys, Option<String>),
+    /// The key-encryption key of an external key file (FORMAT.md §14.2).
+    External(&'a str, [u8; 32]),
 }
 
 /// Creates the folders of a new repository in a new or empty folder.
@@ -1090,6 +1135,37 @@ mod tests {
         let mut out = Vec::new();
         repo.reopen().unwrap().read_file(&blob, &mut out).unwrap();
         assert_eq!(out, secret);
+    }
+
+    #[test]
+    fn an_external_key_opens_with_its_unwrapped_key() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("repo");
+        let params = ChunkerParams::new(64 * 1024).unwrap();
+        let (repo, _) = Repository::init_encrypted(&path, params, "pw").unwrap();
+        let kek = [7u8; 32];
+        let id = repo
+            .add_external_key("vault", "apeiron", "vault:v1:abc", kek)
+            .unwrap();
+        let external = Repository::external_keys(&path).unwrap();
+        assert_eq!(external.len(), 1);
+        assert_eq!(
+            (external[0].id.as_str(), external[0].wrapped.as_str()),
+            (id.as_str(), "vault:v1:abc")
+        );
+        let opened = Repository::unlock_external(&path, &id, kek).unwrap();
+        assert_eq!(opened.keys.id, repo.keys.id);
+        assert!(matches!(
+            Repository::unlock_external(&path, &id, [8u8; 32]),
+            Err(Error::WrongKey)
+        ));
+        let listed = opened.list_keys().unwrap();
+        let ext = listed.iter().find(|k| k.id == id).unwrap();
+        assert_eq!(ext.kind, crate::KeyKind::External);
+        assert_eq!(ext.external.as_deref(), Some("vault apeiron"));
+        assert!(ext.current);
+        // A password does not open an external key file, and the other way round.
+        assert!(Repository::unlock(&path, "pw").is_ok());
     }
 
     #[test]

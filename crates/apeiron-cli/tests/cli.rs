@@ -1951,3 +1951,52 @@ fn a_docker_volume_is_backed_up() {
         0
     );
 }
+
+/// `key split` shows a new recovery key as shares and `key join` puts any
+/// threshold of them together again (KEYS.md §3).
+#[test]
+fn a_recovery_key_is_split_into_shares() {
+    let s = Setup::new();
+    let encrypted = s.root.join("enc");
+    let password = s.root.join("pw");
+    fs::write(&password, "secret").unwrap();
+    s.ok(&[
+        "init",
+        "--encrypt",
+        "--password-file",
+        password.to_str().unwrap(),
+        encrypted.to_str().unwrap(),
+    ]);
+    let split = s.json(&[
+        "--repo",
+        encrypted.to_str().unwrap(),
+        "--password-file",
+        password.to_str().unwrap(),
+        "key",
+        "split",
+        "--shares",
+        "4",
+        "--threshold",
+        "2",
+    ]);
+    let shares: Vec<String> = split["shares"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(shares.len(), 4);
+    let joined = s.json(&["key", "join", &shares[3], &shares[1]]);
+    let key = joined["recovery_key"].as_str().unwrap();
+    let file = s.root.join("rk");
+    fs::write(&file, key).unwrap();
+    s.ok(&[
+        "--repo",
+        encrypted.to_str().unwrap(),
+        "--password-file",
+        file.to_str().unwrap(),
+        "refs",
+    ]);
+    let one = s.run(&["key", "join", &shares[0]]);
+    assert_ne!(code(&one), Some(0));
+}

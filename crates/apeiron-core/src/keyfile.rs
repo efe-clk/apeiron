@@ -19,6 +19,8 @@ const FORMAT: &str = "apeiron-key";
 const VERSION: u32 = 1;
 const KIND_PASSWORD: &str = "password";
 const KIND_RECOVERY: &str = "recovery";
+const KIND_EXTERNAL: &str = "external";
+const EXTERNAL: &str = "external";
 const ARGON2ID: &str = "argon2id";
 const BLAKE3_DERIVE: &str = "blake3-derive";
 const AAD_PREFIX: &[u8] = b"apeiron-key 1";
@@ -43,7 +45,31 @@ struct RawKeyFile {
     kind: String,
     created: Datetime,
     kdf: RawKdf,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    external: Option<RawExternal>,
     sealed: RawSealed,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawExternal {
+    provider: String,
+    key: String,
+    wrapped: String,
+}
+
+/// A key file whose key-encryption key a key management service holds
+/// (FORMAT.md §14.2).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+pub struct ExternalKey {
+    /// The name of the key file without `.key`.
+    pub id: String,
+    /// `vault`, `aws-kms`, `gcp-kms` or `pkcs11`.
+    pub provider: String,
+    /// The service's name for its key.
+    pub key: String,
+    /// The key-encryption key as the service wrapped it.
+    pub wrapped: String,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -72,6 +98,8 @@ struct RawSealed {
 pub enum KeyKind {
     Password,
     Recovery,
+    /// Held by a key management service (FORMAT.md §14.2).
+    External,
 }
 
 /// A key file of an encrypted repository.
@@ -84,6 +112,9 @@ pub struct KeyInfo {
     pub created: String,
     /// Whether the repository was opened with this key.
     pub current: bool,
+    /// For an external key: the service and its key, as `<provider> <key>`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external: Option<String>,
 }
 
 /// Writes a new key file that opens with `password` and returns its id.
@@ -114,7 +145,96 @@ pub(crate) fn write_password(
         KIND_PASSWORD,
         kdf,
         &kek,
+        None,
     )
+}
+
+/// Writes a new key file whose key-encryption key `kek` is held by a key
+/// management service as `wrapped`, and returns its id.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn write_external(
+    keys_dir: &Path,
+    tmp_dir: &Path,
+    repo_id: &[u8; 16],
+    id_key: &IdKey,
+    data_key: &SecretKey,
+    provider: &str,
+    key: &str,
+    wrapped: &str,
+    kek: [u8; 32],
+) -> Result<String> {
+    let kdf = RawKdf {
+        algorithm: EXTERNAL.to_owned(),
+        memory_kib: None,
+        iterations: None,
+        parallelism: None,
+        salt: None,
+    };
+    let external = RawExternal {
+        provider: provider.to_owned(),
+        key: key.to_owned(),
+        wrapped: wrapped.to_owned(),
+    };
+    write(
+        keys_dir,
+        tmp_dir,
+        repo_id,
+        id_key,
+        data_key,
+        KIND_EXTERNAL,
+        kdf,
+        &SecretKey::from_bytes(kek),
+        Some(external),
+    )
+}
+
+/// The external key files in `keys_dir`, for a program that asks their
+/// services to unwrap them.
+pub(crate) fn externals(keys_dir: &Path) -> Result<Vec<ExternalKey>> {
+    let mut out = Vec::new();
+    for (id, path) in key_files(keys_dir)? {
+        let Some(raw) = parse(&fs::read_to_string(&path).at(&path)?) else {
+            continue;
+        };
+        if let (KIND_EXTERNAL, Some(e)) = (raw.kind.as_str(), raw.external) {
+            out.push(ExternalKey {
+                id,
+                provider: e.provider,
+                key: e.key,
+                wrapped: e.wrapped,
+            });
+        }
+    }
+    Ok(out)
+}
+
+/// Opens the repository keys with the key-encryption key of the external
+/// key file `key_id`.
+pub(crate) fn unlock_external(
+    keys_dir: &Path,
+    repo_id: &[u8; 16],
+    key_id: &str,
+    kek: [u8; 32],
+) -> Result<(Keys, String)> {
+    let path = keys_dir.join(format!("{key_id}.key"));
+    let raw = parse(&fs::read_to_string(&path).at(&path)?)
+        .filter(|r| r.kind == KIND_EXTERNAL)
+        .ok_or_else(|| Error::KeyNotFound(key_id.to_owned()))?;
+    let kek = SecretKey::from_bytes(kek);
+    open_sealed(&raw, &kek, repo_id)
+        .map(|keys| (keys, key_id.to_owned()))
+        .ok_or(Error::WrongKey)
+}
+
+fn open_sealed(raw: &RawKeyFile, kek: &SecretKey, repo_id: &[u8; 16]) -> Option<Keys> {
+    let plain = parse_hex_vec(&raw.sealed.keys)
+        .and_then(|s| kek.open(&aad(repo_id), &s))
+        .filter(|p| p.len() == 64)?;
+    let (id, data) = plain.split_at(32);
+    Some(Keys {
+        id: IdKey::from_bytes(id.try_into().ok()?),
+        data: Some(SecretKey::from_bytes(data.try_into().ok()?)),
+    })
 }
 
 /// Writes a new key file that opens with a new random recovery key and
@@ -144,6 +264,7 @@ pub(crate) fn write_recovery(
         KIND_RECOVERY,
         kdf,
         &kek,
+        None,
     )?;
     Ok((id, format_recovery(&recovery)))
 }
@@ -158,6 +279,7 @@ fn write(
     kind: &str,
     kdf: RawKdf,
     kek: &SecretKey,
+    external: Option<RawExternal>,
 ) -> Result<String> {
     let mut plain = Vec::with_capacity(64);
     plain.extend_from_slice(id_key.as_bytes());
@@ -168,6 +290,7 @@ fn write(
         kind: kind.to_owned(),
         created: utc_datetime(SystemTime::now()),
         kdf,
+        external,
         sealed: RawSealed {
             keys: to_hex(&kek.seal(&aad(repo_id), &plain)?),
         },
@@ -208,6 +331,7 @@ pub(crate) fn list(keys_dir: &Path, current: Option<&str>) -> Result<Vec<KeyInfo
         let kind = match raw.kind.as_str() {
             KIND_PASSWORD => KeyKind::Password,
             KIND_RECOVERY => KeyKind::Recovery,
+            KIND_EXTERNAL => KeyKind::External,
             _ => continue,
         };
         keys.push(KeyInfo {
@@ -215,6 +339,7 @@ pub(crate) fn list(keys_dir: &Path, current: Option<&str>) -> Result<Vec<KeyInfo
             id,
             kind,
             created: raw.created.to_string(),
+            external: raw.external.map(|e| format!("{} {}", e.provider, e.key)),
         });
     }
     keys.sort_by(|a, b| (&a.created, &a.id).cmp(&(&b.created, &b.id)));

@@ -356,10 +356,17 @@ fn open(job: &Job) -> apeiron::Result<Repository> {
     match Repository::open(&job.repo) {
         Err(e) if e.kind == ErrorKind::Key => {
             let Some(file) = &job.password_file else {
-                return Err(apeiron::Error::new(
-                    ErrorKind::Key,
-                    "the repository is encrypted; set `password_file` for this job",
-                ));
+                // A key held by a key management service needs no file
+                // (KEYS.md §2).
+                let (repo, tried) = open_external(&job.repo);
+                return repo.ok_or_else(|| {
+                    apeiron::Error::new(
+                        ErrorKind::Key,
+                        format!(
+                            "the repository is encrypted; set `password_file` for this job{tried}"
+                        ),
+                    )
+                });
             };
             let text = fs::read_to_string(file).map_err(|e| {
                 apeiron::Error::new(ErrorKind::Io, format!("{}: {e}", file.display()))
@@ -368,6 +375,22 @@ fn open(job: &Job) -> apeiron::Result<Repository> {
         }
         result => result,
     }
+}
+
+/// Opens an encrypted repository with the first of its external keys whose
+/// service unwraps it; else `None` and why each one failed.
+pub fn open_external(path: &std::path::Path) -> (Option<Repository>, String) {
+    let mut tried = String::new();
+    for key in Repository::external_keys(path).unwrap_or_default() {
+        match apeiron_kms::unwrap(&key.provider, &key.key, &key.wrapped) {
+            Ok(kek) => match Repository::unlock_external(path, &key.id, kek) {
+                Ok(repo) => return (Some(repo), tried),
+                Err(e) => tried.push_str(&format!("; {}: {}", key.provider, e.message)),
+            },
+            Err(e) => tried.push_str(&format!("; {e}")),
+        }
+    }
+    (None, tried)
 }
 
 /// Waits for a job, cancelling it once `stop` is set.

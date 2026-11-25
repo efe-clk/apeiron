@@ -142,7 +142,7 @@ Proje sahibi 2026-11-20'de hem kişisel geliştiriciler hem kurumlar için bu ö
 | `0.9.0` | restic ve Borg depolarını ve Git LFS'in büyük dosyalarını içe aktarma ([CLI.tr.md](CLI.tr.md) §4.4, [GIT.tr.md](GIT.tr.md) §2.3) | Tamamlandı |
 | `0.10.0` | Yapay zekâ ajanları için kontrol noktaları, bir ajanın işini geri alma, geçmiş, fark ve arama için bir MCP sunucusu ([AGENTS.tr.md](AGENTS.tr.md)) | Tamamlandı |
 | `0.11.0` | Uygulama tutarlı yedek: PostgreSQL ve MySQL dökümleri, Windows VSS, btrfs, ZFS ve LVM snapshot'ları, Docker birimleri, Kubernetes birimleri ([CONSISTENT.tr.md](CONSISTENT.tr.md)) | Tamamlandı; PostgreSQL, btrfs ve Docker denendi, diğerleri henüz değil |
-| `0.12.0` | Anahtar yönetimi: AWS ve GCP KMS, HashiCorp Vault, PKCS#11 HSM'ler, anahtar rotasyonu, Shamir ile N'den K'ya bölünmüş kurtarma anahtarı | Başlanmadı |
+| `0.12.0` | Anahtar yönetimi: AWS ve GCP KMS, HashiCorp Vault, PKCS#11 HSM'ler, anahtar rotasyonu, Shamir ile N'den K'ya bölünmüş kurtarma anahtarı ([KEYS.tr.md](KEYS.tr.md)) | Tamamlandı; Vault, AWS KMS ve PKCS#11 denendi, Google Cloud KMS henüz değil |
 | `0.13.0` | rclone'un ulaştığı depolama hizmetleri için bir rclone arka ucu | Başlanmadı |
 | `0.14.0` | OpenTelemetry izleri | Başlanmadı |
 
